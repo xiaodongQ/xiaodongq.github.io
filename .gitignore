@@ -1,2 +1,5 @@
+_site
+.sass-cache
+.jekyll-metadata
+.vscode
 .DS_Store
-push_new_blog.sh
