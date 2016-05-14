@@ -8,7 +8,7 @@ icon: bookmark
 * content
 {:toc}
 
-## 前端工具
+<!-- ## 前端工具
 
 * [box-shadow generator](http://www.cssmatic.com/box-shadow)
 
@@ -24,21 +24,15 @@ icon: bookmark
 
 * [CSS Generators -CSSREFLEX](http://www.cssreflex.com/css-generators/)
 
-    CSS3 生成器
+    CSS3 生成器 -->
 
 
 ## Other blogs
 
-* [凳子_Joinery 邓智容  http://www.dengzhr.com/](http://www.dengzhr.com/)
+* [后端技术杂谈](http://www.rowkey.me/)
 
-* [赵达的个人网站 腾讯高级前端开发工程师](http://zhaoda.net/)
+* [酷 壳](http://coolshell.cn/)
 
-* [Randy](http://djyde.github.io/)
-
-    95年出生的全栈。卢涛南，英文名 Randy，用 djyde 这个ID混迹于网络。
-
-* [JS前端开发群月报 -豪情等人维护](http://www.kancloud.cn/jsfront/month/82796)
-
-## Comments
+* [晚晴幽草轩](http://www.jeffjade.com/)
 
 {% include comments.html %}
