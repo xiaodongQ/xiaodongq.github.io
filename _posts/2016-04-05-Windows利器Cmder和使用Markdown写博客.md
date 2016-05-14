@@ -2,7 +2,7 @@
 layout: post
 title: Windows利器Cmder&使用Markdown写博客
 categories: 工具
-tags: Windows Markdown Cmder
+tags: [Windows,Markdown,Cmder]
 ---
 
 * content
@@ -12,36 +12,37 @@ tags: Windows Markdown Cmder
 
 
 
+
 ## 工具
-* Cmder
 
-     右键在当前位置打开终端，操作习惯跟linux终端差不了多少，可以使用大量linux命令，集成了grep、tar、curl等等工具。终于不用再忍受Windows的cmd了。*有一点不足的就是在我电脑上启动后加载比较慢，要等个7、8秒才能操作*
+### Cmder
 
-     参考：**[Win下必备神器之Cmder](http://www.jeffjade.com/2016/01/13/2016-01-13-windows-software-cmder/)**
+  右键在当前位置打开终端，操作习惯跟linux终端差不了多少，可以使用大量linux命令，集成了grep、tar、curl等等工具。终于不用再忍受Windows的cmd了。*有一点不足的就是在我电脑上启动后加载比较慢，要等个7、8秒才能操作*
 
-* Markdown
+  参考：**[Win下必备神器之Cmder](http://www.jeffjade.com/2016/01/13/2016-01-13-windows-software-cmder/)**
 
-    之前在CSDN写博客的时候看到Markdown，排版格式挺好看的就用来写博客，也没有去看看它的语法，而一直以来都是在网页上选择各个组件拼出来一片博客，现在看之前的自己跟看猴子似的。其语法很直观，十分钟内就能操作熟悉了。
+### Markdown
 
-    这篇博客就是用Atom编辑器和Markdown语法来写的。前几天一直在折腾编辑Sublime和Atom编辑神器，在这几天的使用中发现确实很令人愉快。Sublime和Atom都有相关的使用插件，不过Sublime中对Markdown的语法高亮支持得不好，而Atom支持得很好，毕竟github上.md文件普遍；Atom中还支持实时预览，St中要到浏览器中才能够预览，所以还是推荐Atom来使用Markdown写东西。
+  之前在CSDN写博客的时候看到Markdown，排版格式挺好看的就用来写博客，也没有去看看它的语法，而一直以来都是在网页上选择各个组件拼出来一片博客，现在看之前的自己跟看猴子似的。其语法很直观，十分钟内就能操作熟悉了。
 
-    简书上这篇指南的图文排版都很好，跟着操作一遍差不多就能用了：  **[Markdown——入门指南](http://www.jianshu.com/p/1e402922ee32/)**
+  这篇博客就是用Atom编辑器和Markdown语法来写的。前几天一直在折腾编辑Sublime和Atom编辑神器，在这几天的使用中发现确实很令人愉快。Sublime和Atom都有相关的使用插件，不过Sublime中对Markdown的语法高亮支持得不好，而Atom支持得很好，毕竟github上.md文件普遍；Atom中还支持实时预览，St中要到浏览器中才能够预览，所以还是推荐Atom来使用Markdown写东西。
 
-    更全的语法：
-    **[Markdown 语法说明 (简体中文版)](http://www.appinn.com/markdown/#p)**
+  简书上这篇指南的图文排版都很好，跟着操作一遍差不多就能用了：  **[Markdown——入门指南](http://www.jianshu.com/p/1e402922ee32/)**
 
-    这一篇比上一个看得舒服一些，直接看后面的Markdown：
+  更全的语法：
+  **[Markdown 语法说明 (简体中文版)](http://www.appinn.com/markdown/#p)**
 
-    **[atom编辑器的使用和markdown基本语法](http://www.jianshu.com/p/f3fd881548ad)**
+  这一篇比上一个看得舒服一些，直接看后面的Markdown：
+  **[atom编辑器的使用和markdown基本语法](http://www.jianshu.com/p/f3fd881548ad)**
 
-    *下面是几篇比较好的sublime和atom的Markdown相关文章*
+  *下面是几篇比较好的sublime和atom的Markdown相关文章*
 
-    * St下Markdown使用：
-    **[sublime text 2 下的Markdown写作](http://www.jianshu.com/p/378338f10263)**
+  * St下Markdown使用：
+  **[sublime text 2 下的Markdown写作](http://www.jianshu.com/p/378338f10263)**
 
-    * 若用Atom这几个插件都装上(同步滚动、图片链接管理、格式化表格)：
+  * 若用Atom这几个插件都装上(同步滚动、图片链接管理、格式化表格)：
 
-        **[Atom Markdown 相关插件](https://segmentfault.com/a/1190000004271747)**
+    **[Atom Markdown 相关插件](https://segmentfault.com/a/1190000004271747)**
 
 ***
 
