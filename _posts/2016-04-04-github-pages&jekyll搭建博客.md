@@ -11,7 +11,11 @@ tags: [github,jekyll,工具]
 
 
 
+
+*Windows环境*
+
 一个淡雅简明的博客风格: [Gaohaoyang](https://github.com/Gaohaoyang/gaohaoyang.github.io.git)
+
 [jekyll初级入门-jekyll安装运行](http://www.thxopen.com/jekyll/2014/04/25/i-and-jekyll.html)
 
 1. 下载自己对应系统的版本(ruby和devkit都装)
