@@ -30,6 +30,4 @@ icon: heart
 
 [后端技术杂谈](http://www.rowkey.me/) \| [酷 壳](http://coolshell.cn/) \| [晚晴幽草轩](http://www.jeffjade.com/)
 
-## Comments
-
 {% include comments.html %}
