@@ -1,14 +1,16 @@
 ---
 layout: post
 title: github pages & jekyll搭建博客
-categories: [工具]
-tags: [github,jekyll]
+categories: 工具
+tags: [github,jekyll,工具]
 ---
 
-#content
+* content
 {:toc}
 
-# github pages & jekyll搭建博客
+
+
+
 
 [jekyll初级入门-jekyll安装运行](http://www.thxopen.com/jekyll/2014/04/25/i-and-jekyll.html)
 
@@ -36,7 +38,7 @@ tags: [github,jekyll]
 
  > 在命令行下随便进入一个目录，这里假设是d:/,输入jekyll new myblog，这时会在该目录下生成一个myblog的文件夹，先不管，命令行进入该目录cd myblog，再输入jekyll serve ,这个时候打开浏览器访问http://localhost:4000
 
-# 自己搭建jekyll结构
+### 自己搭建jekyll结构
 
 这里有各个目录和文件的用途，还有些具体的操作，适合手动操作一遍
 

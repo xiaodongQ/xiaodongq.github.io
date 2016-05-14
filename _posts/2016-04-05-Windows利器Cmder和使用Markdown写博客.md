@@ -1,15 +1,15 @@
 ---
 layout: post
 title: Windows利器Cmder和使用Markdown写博客
-categories: [工具]
-tags: [Windows,Markdown,Cmder]
+categories: 工具
+tags: Windows Markdown Cmder
 ---
 
-#content
+* content
 {:toc}
 
 
-# 工具
+## 工具
 * Cmder
 
      右键在当前位置打开终端，操作习惯跟linux终端差不了多少，可以使用大量linux命令，集成了grep、tar、curl等等工具。终于不用再忍受Windows的cmd了。*有一点不足的就是在我电脑上启动后加载比较慢，要等个7、8秒才能操作*
@@ -42,7 +42,7 @@ tags: [Windows,Markdown,Cmder]
 
 ***
 
-## 踩过的坑
+### 踩过的坑
 
 1. Atom里安装Package时，报编译有问题，有些包的依赖关系没有找到，还是用apm(atom package manager)(非War3概念..)来装插件方便。Atom安装时是自带有apm的，记得添加其路径到path环境变量。**因为环境变量未添加的问题导致一直以为还需要安装其他应用，apm的路径比较深：**
 
