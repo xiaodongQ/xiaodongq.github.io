@@ -21,7 +21,7 @@ tags: [github,jekyll,工具]
 
     问题描述：[issues 26](https://github.com/Gaohaoyang/gaohaoyang.github.io/issues/26)
 
-2. 博客配置中\n\n\n\n表示将上面的内容展示在home文章简介中，回车符代表的符号可能导致展示失败。
+2. 博客配置中\n\n\n\n表示将上面的内容展示在Home文章简介中，回车符代表的符号可能导致展示失败。
 
 > 在atom中右下角可以查看回车符
 
