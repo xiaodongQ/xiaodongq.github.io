@@ -15,7 +15,7 @@ tags: [github,jekyll,工具]
 
 
 
-**创建及使用过程中遇到的问题**
+**创建及使用过程中注意事项及遇到的问题**
 
 1. 标签小于2时，构建失败Page build failed，本地jekyll错误信息：divided by 0 in index.html
 
@@ -23,16 +23,21 @@ tags: [github,jekyll,工具]
 
 2. 博客配置中\n\n\n\n表示将上面的内容展示在Home文章简介中，回车符代表的符号可能导致展示失败。
 
-> 在atom中右下角可以查看回车符
+    > 在atom中右下角可以查看回车符
 
-有必要弄清 LF 和 CRLF的区别: [CRLF和LF
-](http://blog.csdn.net/samdy1990/article/details/24314957)
+    有必要弄清 LF 和 CRLF的区别: [CRLF和LF](http://blog.csdn.net/samdy1990/article/details/24314957)
 
-> CRLF->Windows style：
+    > CRLF->Windows style：
     CRLF表示句尾使用回车换行两个字符(即我们常在Windows编程时使用"\r\n"换行)
 
-> LF->Unix Style：
+    > LF->Unix Style：
     LF表示表示句尾，只使用换行.
+
+3. 添加第三方评论时，需先在相关网站注册站点才能使用(添加站点名)
+
+    Disqus 或 多说 获取short_name，然后添加到_config.yml文件中
+
+    访问 [Disqus](https://disqus.com/) 或 [多说](http://duoshuo.com/) 根据提示操作即可。
 
 ---
 
