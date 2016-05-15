@@ -8,12 +8,19 @@ tags: [github,jekyll,工具]
 * content
 {:toc}
 
+```
 
-
-
-*Windows环境*
+*本人博客clone自以下模板:*
 
 一个淡雅简明的博客风格: [Gaohaoyang](https://github.com/Gaohaoyang/gaohaoyang.github.io.git)
+
+```
+---
+
+
+
+
+### jekyll安装 (*Windows环境*)
 
 [jekyll初级入门-jekyll安装运行](http://www.thxopen.com/jekyll/2014/04/25/i-and-jekyll.html)
 
