@@ -23,6 +23,8 @@ tags: [github,jekyll,工具]
 
 2. 博客配置中\n\n\n\n表示将上面的内容展示在home文章简介中，回车符代表的符号可能导致展示失败。
 
+> 在atom中右下角可以查看回车符
+
 有必要弄清 LF 和 CRLF的区别: [CRLF和LF
 ](http://blog.csdn.net/samdy1990/article/details/24314957)
 
