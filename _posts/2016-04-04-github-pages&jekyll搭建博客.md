@@ -8,17 +8,31 @@ tags: [github,jekyll,工具]
 * content
 {:toc}
 
-```
-
 *本人博客clone自以下模板:*
 
 一个淡雅简明的博客风格: [Gaohaoyang](https://github.com/Gaohaoyang/gaohaoyang.github.io.git)
 
-```
+
+
+
+**创建及使用过程中遇到的问题**
+
+1. 标签小于2时，构建失败Page build failed，本地jekyll错误信息：divided by 0 in index.html
+
+    问题描述：[issues 26](https://github.com/Gaohaoyang/gaohaoyang.github.io/issues/26)
+
+2. 博客配置中\n\n\n\n表示将上面的内容展示在home文章简介中，回车符代表的符号可能导致展示失败。
+
+有必要弄清 LF 和 CRLF的区别: [CRLF和LF
+](http://blog.csdn.net/samdy1990/article/details/24314957)
+
+> CRLF->Windows style：
+    CRLF表示句尾使用回车换行两个字符(即我们常在Windows编程时使用"\r\n"换行)
+
+> LF->Unix Style：
+    LF表示表示句尾，只使用换行.
+
 ---
-
-
-
 
 ### jekyll安装 (*Windows环境*)
 
