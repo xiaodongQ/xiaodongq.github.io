@@ -1,7 +1,7 @@
 ---
 layout: page
 title: Reading
-permalink: /books/
+permalink: /book/
 icon: book
 ---
 
