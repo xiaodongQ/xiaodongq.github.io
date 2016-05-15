@@ -14,14 +14,15 @@ url: "https://xiaodongq.github.io" # the base hostname & protocol for your site
 permalink: /:year/:month/:day/:title/
 
 # other links
-twitter_username:
-facebook_username:
+twitter_username: xiaodongQ
+facebook_username: xiaodongQ
 github_username: xiaodongQ
 email: xiaodong0795@163.com
-weibo_username:
+weibo_username: 1830793531
 zhihu_username: jxxd
 
 description_footer: 记录•工作学习 成长岁月
+
 # comments
 # two ways to comment, only choose one, and use your own short name
 # 两种评论插件，选一个就好了，使用自己的 short_name

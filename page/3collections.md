@@ -35,4 +35,6 @@ icon: bookmark
 
 * [晚晴幽草轩](http://www.jeffjade.com/)
 
+## Comments
+
 {% include comments.html %}
