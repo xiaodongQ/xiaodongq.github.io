@@ -21,8 +21,12 @@ icon: heart
 ## 联系我
 
 * GitHub：[xiaodongQ](https://github.com/xiaodongQ)
-* Email：xiaodong0795@163.com
-         xiaodong0795@gmail.com
+* Email：
+
+    <xiaodong0795@163.com>
+
+    <xiaodong0795@gmail.com>
+    
 * [Weibo](http://weibo.com/1830793531)
 * [知乎](https://www.zhihu.com/people/jxxd)
 
