@@ -13,13 +13,13 @@ tags: MySQL SQL 数据库
 
 ## 基本命令
 
-默认端口: 3306 默认用户: root
+  默认端口: 3306 默认用户: root
 
-登录: mysql -uroot -p密码 -P端口 -hIP地址
+  登录: mysql -uroot -p密码 -P端口 -hIP地址
 
-退出: exit; quit; \q
+  退出: exit; quit; \q
 
-prompt mysql> 改描述符
+  prompt mysql> 改描述符
 
 ## 语句规范：
 
@@ -29,15 +29,15 @@ prompt mysql> 改描述符
 
 ## 操作数据库
 
-create database [if not exists] 名字 character set 编码;
+  create database [if not exists] 名字 character set 编码;
 
-alter database 名字 character set 编码;
+  alter database 名字 character set 编码;
 
-drop database [if exists] 名字;
+  drop database [if exists] 名字;
 
-show warnings;
+  show warnings;
 
-show errors;
+  show errors;
 
 ## 数据类型及表操作
 
@@ -92,33 +92,34 @@ show errors;
 
 ### 数据表
 
-USE 数据库名称
+  USE 数据库名称
 
-select database() 查看打开的数据库
+  select database() 查看打开的数据库
 
 * 建表
 
-```
-  create table [if not exists] table_name (
+  ```sql
+    create table [if not exists] table_name (
     column_name data_type,
     ...
-    )
-```
+    );
+  ```
 
-```
+  ```sql
     create table tb1(
       username VARCHAR(20),
       age tinyint unsigned,
-      salary float(8,2) unsigned );
-```
+      salary float(8,2) unsigned
+      );
+  ```
 
-    **查看表是否存在: show tables [from db_name];**
+  **查看表是否存在: show tables [from db_name];**
 
-    **查看表结构: show columns from tbl_name;**
+  **查看表结构: show columns from tbl_name;**
 
 * 插入记录
 
-  insert [into] tbl_name [(col_name,...)] values(val,...);
+  `insert [into] tbl_name [(col_name,...)] values(val,...);`
 
 * 查找记录
 
@@ -132,7 +133,7 @@ select database() 查看打开的数据库
 
   primary key,
 
-**自动编号**
+  **自动编号**
 
   auto_increment
 
@@ -194,64 +195,64 @@ select database() 查看打开的数据库
 
   * 添加单列 (可指定列的位置)
 
-  ALTER TABLE tbl_name ADD [COLUMN] col_name column_definition [FIRST|AFTER col_name]
+    `ALTER TABLE tbl_name ADD [COLUMN] col_name column_definition [FIRST|AFTER col_name]`
 
   * 添加多列 (不可指定位置，添加在最后)
 
-    ALTER TALBE tbl_name ADD [COLUMN] (col_name column_definition, ...)
+    `ALTER TALBE tbl_name ADD [COLUMN] (col_name column_definition, ...)`
 
   * 删除列
 
-    ALTER TABLE tbl_name DROP col_name
+    `ALTER TABLE tbl_name DROP col_name`
 
     *也可删除多列，或同时添加列，使用 , 分隔 (e.g. drop col1,drop col2,add col3 int)*
 
   * 添加主键约束
 
-    ALTER TABLE tbl_name ADD [CONSTRAINT [symbol]] PRIMARY KEY [index_type] (index_col_name,...)
+    `ALTER TABLE tbl_name ADD [CONSTRAINT [symbol]] PRIMARY KEY [index_type] (index_col_name,...)`
 
   * 添加唯一约束
 
-  ALTER TABLE tbl_name ADD [CONSTRAINT [symbol]] UNIQUE [INDEX|KEY] [index_name] [index_type] (index_col_name, ...)
+    `ALTER TABLE tbl_name ADD [CONSTRAINT [symbol]] UNIQUE [INDEX|KEY] [index_name] [index_type] (index_col_name, ...)`
 
   * 添加外键约束
 
-  ALTER TABLE tbl_name ADD [CONSTRAINT [symbol]] FOREIGN KEY [index_name] (index_col_name, ...) reference_definition
+    `ALTER TABLE tbl_name ADD [CONSTRAINT [symbol]] FOREIGN KEY [index_name] (index_col_name, ...) reference_definition`
 
-      e.g. ALTER TABLE users1 ADD FOREIGN KEY (pid) REFERENCES provinces(id)
+    e.g. `ALTER TABLE users1 ADD FOREIGN KEY (pid) REFERENCES provinces(id)`
 
   * 添加/删除默认约束
 
-  ALTER TABLE tbl_name ALTER [COLUMN] col_name {SET DEFAULT iteral | DROP DEFAULT}
+    `ALTER TABLE tbl_name ALTER [COLUMN] col_name {SET DEFAULT iteral | DROP DEFAULT}`
 
-    e.g. ALTER TABLE users1 ALTER age SET DEFAULT 10;
+    e.g. `ALTER TABLE users1 ALTER age SET DEFAULT 10;`
 
-         ALTER TABLE users1 ALTER age DROP DEFAULT;
+    e.g. `ALTER TABLE users1 ALTER age DROP DEFAULT;`
 
   * 删除主键约束
 
-  ALTER TABLE tbl_name DROP PRIMARY KEY;
+    `ALTER TABLE tbl_name DROP PRIMARY KEY;``
 
   * 删除唯一约束
 
-  ALTER TABLE tbl_name DROP {KEY|INDEX} index_name
+    `ALTER TABLE tbl_name DROP {KEY|INDEX} index_name`
 
   * 删除外键约束
 
-  ALTER TABLE tbl_name DROP FOREIGN KEY fk_symbol (fk_symbol需知道名字, show create table 表名)
+    `ALTER TABLE tbl_name DROP FOREIGN KEY fk_symbol (fk_symbol需知道名字, show create table 表名)`
 
   * 修改列定义 (只能改类型)
 
-  ALTER TABLE tbl_name MODIFY [COLUMN] col_name column_definition [FIRST|AFTER col_name]
+    `ALTER TABLE tbl_name MODIFY [COLUMN] col_name column_definition [FIRST|AFTER col_name]`
 
   * 修改列名称
 
-  ALTER TABLE tbl_name CHANGE [COLUMN] old_col_name new col_name column_definition [FIRST|AFTER col_name]
+    `ALTER TABLE tbl_name CHANGE [COLUMN] old_col_name new col_name column_definition [FIRST|AFTER col_name]`
 
   * 数据表更名
 
-  1. ALTER TABLE tbl_name RENAME [TO|AS] new_tbl_name
+  1. `ALTER TABLE tbl_name RENAME [TO|AS] new_tbl_name`
 
-  2. RENAME TABLE tbl_name TO new_tbl_name [,tbl_name2 TO new_tbl_name2]...
+  2. `RENAME TABLE tbl_name TO new_tbl_name [,tbl_name2 TO new_tbl_name2]...`
 
-    **数据列和数据表名尽量不去修改**
+  **数据列和数据表名尽量不去修改**
