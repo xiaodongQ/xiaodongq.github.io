@@ -117,6 +117,8 @@ tags: MySQL SQL 数据库
 
   **查看表结构: show columns from tbl_name;**
 
+  **DESC 表名**
+
 * 插入记录
 
   `insert [into] tbl_name [(col_name,...)] values(val,...);`
@@ -174,7 +176,7 @@ tags: MySQL SQL 数据库
 
   主键创建时会自动创建索引。
 
-    show indexes from 表名\G; (\G排版清晰)
+    show indexes from 表名\G; (\G表示以网格的形式显示)
 
     **外键约束的参照操作**
 
@@ -231,7 +233,7 @@ tags: MySQL SQL 数据库
 
   * 删除主键约束
 
-    `ALTER TABLE tbl_name DROP PRIMARY KEY;``
+    `ALTER TABLE tbl_name DROP PRIMARY KEY;`
 
   * 删除唯一约束
 
@@ -256,3 +258,121 @@ tags: MySQL SQL 数据库
   2. `RENAME TABLE tbl_name TO new_tbl_name [,tbl_name2 TO new_tbl_name2]...`
 
   **数据列和数据表名尽量不去修改**
+
+## 操作数据表中的记录
+
+### 插入记录
+
+  **三种形式:**
+
+  1. 可一次插入多条记录
+
+  `INSERT [INTO] tbl_name [(col_name,...)] {VALUES | VALUE} ({expr | DEFAULT},...),(...),...`
+
+  e.g. `INSERT users VALUES (DEFAULT, 'Tom', 3*3+1), (NULL, 'Cat', 3);`
+
+  > 对AUTO_INCREMENT可赋值为NULL,DEFAULT；  含有默认值的列也可以赋DEFAULT
+
+  2. 可使用子查询,一次性仅能插入一条记录
+
+  `INSERT [INTO] tbl_name SET col_name={expr|DEFAULT},...`
+
+  3. 将查询结果插入到指定表
+
+  `INSERT [INTO] tbl_name [(col_name,...)] SELECT...`
+
+### 更新记录(单表更新)
+
+```sql
+  UPDATE [LOW_PRIORITY] [IGNORE] table_reference SET col_name1={expr1|DEFAULT}[,col_name2={expr2|DEFAULT}]... [WHERE where_condition]
+```
+
+  e.g. `UPDATE student SET age=age-id where id%2=0;`
+
+### 删除记录(单表删除)
+
+  `DELETE FROM tbl_name [WHERE where_condition]`
+
+### 查询表达式
+
+```sql
+  SELECT select_expr [,select_expr ...]
+  [
+    FROM table_reference
+    [WHERE where_condition]
+    [GROUP BY {col_name|position} [ASC|DESC], ...]
+    [HAVING where_condition]
+    [ORDER BY {col_name|expr|position} [ASC|DESC], ...]
+    [LIMIT {[offset,]row_count|row_count OFFSET offset}]
+  ]
+```
+
+  可使用别名 [AS]可使用，也可不使用，建议使用。
+
+  e.g. `SELECT id AS no,studentname AS name FROM student WHERE id=3;`
+
+* 分组条件
+
+  GROUP BY 子句 HAVING 条件
+
+  **HAVING中的列需保证在SELECT中 或 该列位于聚合函数**
+
+  e.g. `SELECT id,age FROM student GROUP BY id HAVING age > 4;`
+
+* 排序
+
+  `[ORDER BY {col_name|expr|position} [DESC|ASC]]`
+
+* 限制查询结果返回的数量 LIMIT子句
+
+  `[LIMIT {[offset,] row_count|row_count OFFSET offset}]`
+
+  e.g. 前两条记录 `SELECT * FROM student LIMIT 2`
+
+  e.g. 从第2条(0,1,2)开始的两条记录 `SELECT * FROM student LIMIT 2,2`
+
+## 子查询与连接
+
+### 子查询
+
+  Subquery指出现在其他SQL语句内的SELECT子句。嵌套在查询内部，必须始终出现在圆括号内。
+
+  比较运算符 >, >=, <, <=, =, <>, != 注意不等
+
+  (操作数 比较运算符 子查询)
+
+  `operand comparison_operator ANY (subquery)`
+
+  `operand comparison_operator SOME (subquery)`
+
+  `operand comparison_operator ALL (subquery)`
+
+  `operand comparison_operator [NOT] IN (subquery)` (相当于 = ANY)
+
+  `operand comparison_operator [NOT] EXISTS (subquery)` (返回TRUE或FALSE)
+
+### 多表更新
+
+  多表更新: 参照其他表更新本表记录
+
+```sql
+  UPDATE table_references
+  SET col_name1={exp1|DEFAULT}[,col_name2={expr2|DEFAULT}] ...
+  [WHERE where_condition]
+```
+
+* 连接
+
+  1. INNER JOIN, 内连接
+
+    *MySQL中,JOIN,CROSS JOIN和INNER JOIN是等价的。*
+
+  2. LEFT [OUTER] JOIN, 左外连接
+
+  3. RIGHT [OUTER] JOIN, 右外连接
+
+  ```sql
+  table_reference {[INNER|CROSS] JOIN|{LEFT|RIGHT} [OUTER] JOIN}
+  table_reference
+  ON conditionl_expr
+  ```
