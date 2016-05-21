@@ -44,6 +44,7 @@ show errors;
 ### 数据类型
 
 * 整型: 有符无符 unsigned
+
   TINYINT    1
 
   SMALLINT   2
@@ -54,11 +55,13 @@ show errors;
 
   BIGINT     8
 * 浮点型
+
   FLOAT[(M,D)]  
 
   DOUBLE
 
 * 日期时间型
+
   YEAR 1
 
   TIME 3
@@ -90,31 +93,35 @@ show errors;
 ### 数据表
 
 USE 数据库名称
+
 select database() 查看打开的数据库
 
 * 建表
 
-  ```
+```
   create table [if not exists] table_name (
     column_name data_type,
     ...
     )
-  ```
+```
 
-    ``` SQL
+```
     create table tb1(
       username VARCHAR(20),
       age tinyint unsigned,
       salary float(8,2) unsigned );
-    ```
+```
 
     **查看表是否存在: show tables [from db_name];**
 
     **查看表结构: show columns from tbl_name;**
 
 * 插入记录
+
   insert [into] tbl_name [(col_name,...)] values(val,...);
+
 * 查找记录
+
   select * from tbl_name;
 
   *空值与非空*
@@ -122,21 +129,29 @@ select database() 查看打开的数据库
   建表 column_name data_type not null,
 
 * 主键
+
   primary key,
 
 **自动编号**
 
   auto_increment
+
   必须与主键组合使用;
+
   默认情况下，起始值为1，每次增量为1
 
 * 唯一约束
+
   UNIQUE KEY
+
   保证记录的唯一性;
+
   唯一约束的字段可为空值(NULL);
+
   每张表可存在多个唯一约束。
 
 * 默认值
+
   enum('1','2','3') default '3'
 
 ## 约束及修改数据表
@@ -151,9 +166,13 @@ select database() 查看打开的数据库
 * 外键约束
 
   父表，子表: 有外键的表称作子表；
+
   默认存储引擎: InnoDB;
+
   外键列，参照列: (是否有符要一致，外键列和参照列必须创建索引)；
+
   主键创建时会自动创建索引。
+
     show indexes from 表名\G; (\G排版清晰)
 
     **外键约束的参照操作**
@@ -175,7 +194,7 @@ select database() 查看打开的数据库
 
   * 添加单列 (可指定列的位置)
 
-    ALTER TABLE tbl_name ADD [COLUMN] col_name column_definition [FIRST|AFTER col_name]
+  ALTER TABLE tbl_name ADD [COLUMN] col_name column_definition [FIRST|AFTER col_name]
 
   * 添加多列 (不可指定位置，添加在最后)
 
@@ -184,6 +203,7 @@ select database() 查看打开的数据库
   * 删除列
 
     ALTER TABLE tbl_name DROP col_name
+
     *也可删除多列，或同时添加列，使用 , 分隔 (e.g. drop col1,drop col2,add col3 int)*
 
   * 添加主键约束
@@ -192,45 +212,46 @@ select database() 查看打开的数据库
 
   * 添加唯一约束
 
-    ALTER TABLE tbl_name ADD [CONSTRAINT [symbol]] UNIQUE [INDEX|KEY] [index_name] [index_type] (index_col_name, ...)
+  ALTER TABLE tbl_name ADD [CONSTRAINT [symbol]] UNIQUE [INDEX|KEY] [index_name] [index_type] (index_col_name, ...)
 
   * 添加外键约束
 
-    ALTER TABLE tbl_name ADD [CONSTRAINT [symbol]] FOREIGN KEY [index_name] (index_col_name, ...) reference_definition
+  ALTER TABLE tbl_name ADD [CONSTRAINT [symbol]] FOREIGN KEY [index_name] (index_col_name, ...) reference_definition
 
       e.g. ALTER TABLE users1 ADD FOREIGN KEY (pid) REFERENCES provinces(id)
 
   * 添加/删除默认约束
 
-    ALTER TABLE tbl_name ALTER [COLUMN] col_name {SET DEFAULT iteral | DROP DEFAULT}
+  ALTER TABLE tbl_name ALTER [COLUMN] col_name {SET DEFAULT iteral | DROP DEFAULT}
 
-      e.g. ALTER TABLE users1 ALTER age SET DEFAULT 10;
-           ALTER TABLE users1 ALTER age DROP DEFAULT;
+    e.g. ALTER TABLE users1 ALTER age SET DEFAULT 10;
+
+         ALTER TABLE users1 ALTER age DROP DEFAULT;
 
   * 删除主键约束
 
-    ALTER TABLE tbl_name DROP PRIMARY KEY;
+  ALTER TABLE tbl_name DROP PRIMARY KEY;
 
   * 删除唯一约束
 
-    ALTER TABLE tbl_name DROP {KEY|INDEX} index_name
+  ALTER TABLE tbl_name DROP {KEY|INDEX} index_name
 
   * 删除外键约束
 
-    ALTER TABLE tbl_name DROP FOREIGN KEY fk_symbol (fk_symbol需知道名字, show create table 表名)
+  ALTER TABLE tbl_name DROP FOREIGN KEY fk_symbol (fk_symbol需知道名字, show create table 表名)
 
   * 修改列定义 (只能改类型)
 
-    ALTER TABLE tbl_name MODIFY [COLUMN] col_name column_definition [FIRST|AFTER col_name]
+  ALTER TABLE tbl_name MODIFY [COLUMN] col_name column_definition [FIRST|AFTER col_name]
 
   * 修改列名称
 
-    ALTER TABLE tbl_name CHANGE [COLUMN] old_col_name new col_name column_definition [FIRST|AFTER col_name]
+  ALTER TABLE tbl_name CHANGE [COLUMN] old_col_name new col_name column_definition [FIRST|AFTER col_name]
 
   * 数据表更名
 
-    1. ALTER TABLE tbl_name RENAME [TO|AS] new_tbl_name
+  1. ALTER TABLE tbl_name RENAME [TO|AS] new_tbl_name
 
-    2. RENAME TABLE tbl_name TO new_tbl_name [,tbl_name2 TO new_tbl_name2]...
+  2. RENAME TABLE tbl_name TO new_tbl_name [,tbl_name2 TO new_tbl_name2]...
 
     **数据列和数据表名尽量不去修改**
