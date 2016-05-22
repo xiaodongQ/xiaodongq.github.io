@@ -92,9 +92,9 @@ tags: MySQL SQL 数据库
 
 ### 数据表
 
-  USE 数据库名称
+USE 数据库名称
 
-  select database() 查看打开的数据库
+select database() 查看打开的数据库
 
 * 建表
 
@@ -253,9 +253,9 @@ tags: MySQL SQL 数据库
 
   * 数据表更名
 
-  1. `ALTER TABLE tbl_name RENAME [TO|AS] new_tbl_name`
+      1. `ALTER TABLE tbl_name RENAME [TO|AS] new_tbl_name`
 
-  2. `RENAME TABLE tbl_name TO new_tbl_name [,tbl_name2 TO new_tbl_name2]...`
+      2. `RENAME TABLE tbl_name TO new_tbl_name [,tbl_name2 TO new_tbl_name2]...`
 
   **数据列和数据表名尽量不去修改**
 
@@ -267,19 +267,19 @@ tags: MySQL SQL 数据库
 
   1. 可一次插入多条记录
 
-  `INSERT [INTO] tbl_name [(col_name,...)] {VALUES | VALUE} ({expr | DEFAULT},...),(...),...`
+      `INSERT [INTO] tbl_name [(col_name,...)] {VALUES | VALUE} ({expr | DEFAULT},...),(...),...`
 
-  e.g. `INSERT users VALUES (DEFAULT, 'Tom', 3*3+1), (NULL, 'Cat', 3);`
+        e.g. `INSERT users VALUES (DEFAULT, 'Tom', 3*3+1), (NULL, 'Cat', 3);`
 
-  > 对AUTO_INCREMENT可赋值为NULL,DEFAULT；  含有默认值的列也可以赋DEFAULT
+        > 对AUTO_INCREMENT可赋值为NULL,DEFAULT；  含有默认值的列也可以赋DEFAULT
 
   2. 可使用子查询,一次性仅能插入一条记录
 
-  `INSERT [INTO] tbl_name SET col_name={expr|DEFAULT},...`
+      `INSERT [INTO] tbl_name SET col_name={expr|DEFAULT},...`
 
   3. 将查询结果插入到指定表
 
-  `INSERT [INTO] tbl_name [(col_name,...)] SELECT...`
+      `INSERT [INTO] tbl_name [(col_name,...)] SELECT...`
 
 ### 更新记录(单表更新)
 
@@ -365,10 +365,9 @@ tags: MySQL SQL 数据库
 
   1. INNER JOIN, 内连接
 
-    *MySQL中,JOIN,CROSS JOIN和INNER JOIN是等价的。*
+      *MySQL中,JOIN,CROSS JOIN和INNER JOIN是等价的。*
 
   2. LEFT [OUTER] JOIN, 左外连接
-
   3. RIGHT [OUTER] JOIN, 右外连接
 
   ```sql
@@ -376,3 +375,5 @@ tags: MySQL SQL 数据库
   table_reference
   ON conditionl_expr
   ```
+
+  e.g. `UPDATE tdb_goods INNER JOIN tdb_goods_cates on goods_cate=cate_name SET goods_cate=cate_id;`
