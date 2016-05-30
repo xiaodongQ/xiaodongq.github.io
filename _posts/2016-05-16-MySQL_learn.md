@@ -284,7 +284,9 @@ select database() 查看打开的数据库
 ### 更新记录(单表更新)
 
 ```sql
-  UPDATE [LOW_PRIORITY] [IGNORE] table_reference SET col_name1={expr1|DEFAULT}[,col_name2={expr2|DEFAULT}]... [WHERE where_condition]
+  UPDATE [LOW_PRIORITY] [IGNORE] table_reference
+  SET col_name1={expr1|DEFAULT}[,col_name2={expr2|DEFAULT}]... 
+  [WHERE where_condition]
 ```
 
   e.g. `UPDATE student SET age=age-id where id%2=0;`
@@ -376,4 +378,14 @@ select database() 查看打开的数据库
   ON conditionl_expr
   ```
 
-  e.g. `UPDATE tdb_goods INNER JOIN tdb_goods_cates on goods_cate=cate_name SET goods_cate=cate_id;`
+  e.g. `UPDATE tdb_goods AS a INNER JOIN tdb_goods_cates as b on a.goods_cate=b.cate_name SET a.goods_cate=cate_id;`
+
+### 多表删除
+
+e.g. 删除重复的记录(自身连接)
+  ```sql
+    DELETE t1 FROM tdb_goods AS t1 LEFT JOIN (SELECT
+    goods_name,goods_id FROM tdb_goods GROUP BY goods_name HAVING
+    count(goods_name) >= 2) AS t2 ON t1.goods_name = t2.goods_name
+    WHERE t1.goods_id > t2.goods_id;
+  ```
