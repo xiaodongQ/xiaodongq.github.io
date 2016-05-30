@@ -16,7 +16,7 @@ icon: heart
 
 爱好民谣、健身、乒乓，远途骑行憧憬者，Dota手残党、观众;
 
-虽然我"努力"，但是我菜啊。
+虽菜犹有成为一颗成为技术大神的心。
 
 ## 联系我
 
@@ -26,7 +26,7 @@ icon: heart
     <xiaodong0795@163.com>
 
     <xiaodong0795@gmail.com>
-    
+
 * [Weibo](http://weibo.com/1830793531)
 * [知乎](https://www.zhihu.com/people/jxxd)
 
