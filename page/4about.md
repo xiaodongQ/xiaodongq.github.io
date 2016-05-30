@@ -27,8 +27,8 @@ icon: heart
 
     <xiaodong0795@gmail.com>
 
-* [Weibo](http://weibo.com/1830793531)
-* [知乎](https://www.zhihu.com/people/jxxd)
+* [Weibo](http://weibo.com/xiaodongQ)
+* [知乎](https://www.zhihu.com/people/xiaodongQ)
 
 ## 链接
 
