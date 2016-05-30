@@ -1,7 +1,7 @@
 ---
 layout: post
 title: MySQL学习实践笔记
-categories: MySQL
+categories: 数据库
 tags: MySQL SQL 数据库
 ---
 
@@ -285,7 +285,7 @@ select database() 查看打开的数据库
 
 ```sql
   UPDATE [LOW_PRIORITY] [IGNORE] table_reference
-  SET col_name1={expr1|DEFAULT}[,col_name2={expr2|DEFAULT}]... 
+  SET col_name1={expr1|DEFAULT}[,col_name2={expr2|DEFAULT}]...
   [WHERE where_condition]
 ```
 
