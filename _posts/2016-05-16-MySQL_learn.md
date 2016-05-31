@@ -249,7 +249,7 @@ select database() 查看打开的数据库
 
   * 修改列名称
 
-    `ALTER TABLE tbl_name CHANGE [COLUMN] old_col_name new col_name column_definition [FIRST|AFTER col_name]`
+    `ALTER TABLE tbl_name CHANGE [COLUMN] old_col_name new_col_name column_definition [FIRST|AFTER col_name]`
 
   * 数据表更名
 
@@ -369,7 +369,7 @@ select database() 查看打开的数据库
 
       *MySQL中,JOIN,CROSS JOIN和INNER JOIN是等价的。*
 
-  2. LEFT [OUTER] JOIN, 左外连接
+  2. LEFT [OUTER] JOIN, 左外连接 所有左表记录
   3. RIGHT [OUTER] JOIN, 右外连接
 
   ```sql
@@ -388,4 +388,79 @@ e.g. 删除重复的记录(自身连接)
     goods_name,goods_id FROM tdb_goods GROUP BY goods_name HAVING
     count(goods_name) >= 2) AS t2 ON t1.goods_name = t2.goods_name
     WHERE t1.goods_id > t2.goods_id;
+  ```
+
+## 运算符和函数
+
+* 字符函数
+* 数值运算符和函数
+* 比较运算符和函数
+* 日期时间函数
+* 信息函数
+* 聚合函数
+* 加密函数
+
+## 自定义函数
+
+* 仅有一个返回值
+
+  ```sql
+  CREATE FUNCTION function_name
+  RETURNS
+  {STRING|INTEGER|REAL|DECIMAL}
+  routine_body
+  ```
+
+  e.g.
+
+  ```sql
+  CREATE FUNCTION getAvg(num1 INT UNSIGNED, num2 INT UNSIGNED)
+  RETURNS FLOAT(10,2) UNSIGNED
+  RETURN (num1+num2)/2;
+  ```
+
+  调用自定义函数: `SELECT getAvg(10,34);`
+
+* 函数体中若有复合结构则使用 `BEGIN END`，由于复合结构中含有';'字符导致语句提前结束，可先将MySQL结束符设为其他字符(如//):
+`DELIMITER //`，待创建完函数或存储过程后再`DELIMITER ;`
+
+## MySQL存储过程
+
+* 可有多个返回值
+
+* 语法与函数类似
+
+  ```sql
+  CREATE [DEFINER = {user|CURRENT_USER}]
+  PROCEDURE sp_name ([proc_parameter[,...]])
+  [characteristic ...] routine_body
+
+  proc_parameter:
+  [IN|OUT|INOUT] para_name type
+  ```
+
+  e.g.
+
+  ```sql
+  CREATE PROCEDURE removeAndReturnNums(IN p_id INT UNSIGNED, OUT nums INT UNSIGNED)
+  BEGIN
+  DELETE FROM users WHERE id = p_id;
+  SELECT count(id) FROM users INTO nums;
+  END
+  ```
+
+  使用 `call removeAndReturnNums(3, @para);` 调用存储过程
+
+* 复合语句中定义局部变量 DECLARE
+
+  ```sql
+  CREATE PROCEDURE sp()   
+  BEGIN   
+  DECLARE a INT;   
+  DECLARE b INT;   
+  SET a = 5;   
+  SET b = 5;   
+  INSERT INTO test(id) VALUES (a);   
+  SELECT id * a FROM test WHERE id >= b;   
+  END;
   ```
