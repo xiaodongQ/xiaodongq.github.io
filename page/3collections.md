@@ -10,9 +10,11 @@ icon: bookmark
 
 * [oh my zsh](http://macshuo.com/?p=676)  
 
-    ---Mac zsh介绍及使用 (MacTalk-池建强的随想录)
+    ---Mac zsh介绍及使用 (MacTalk)
 
 ## Other blogs
+
+* [MacTalk-池建强的随想录](http://macshuo.com/)
 
 * [后端技术杂谈](http://www.rowkey.me/)
 
