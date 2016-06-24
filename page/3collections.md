@@ -10,7 +10,11 @@ icon: bookmark
 
 * [oh my zsh](http://macshuo.com/?p=676)  
 
-    ---Mac zsh介绍及使用 (MacTalk)
+    --- Mac下 zsh介绍及使用 (MacTalk)
+
+* [Cmder](http://www.jeffjade.com/2016/01/13/2016-01-13-windows-software-cmder/)
+
+    --- 一款强大的Windows下类Unix命令终端
 
 ## Other blogs
 
