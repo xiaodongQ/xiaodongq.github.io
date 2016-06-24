@@ -30,9 +30,6 @@ icon: heart
 * [Weibo](http://weibo.com/xiaodongQ)
 * [知乎](https://www.zhihu.com/people/xiaodongQ)
 
-## 链接
-
-[后端技术杂谈](http://www.rowkey.me/) \| [酷 壳](http://coolshell.cn/) \| [晚晴幽草轩](http://www.jeffjade.com/)
 
 ## Comments
 
