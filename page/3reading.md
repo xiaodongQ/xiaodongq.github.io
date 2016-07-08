@@ -30,9 +30,8 @@ icon: book
   * HTTP权威指南
   * 测试驱动开发
 
-  搁置：
-
-    * Head First设计模式
+  * 搁置：
+      * Head First设计模式
 
 -------------------
 
