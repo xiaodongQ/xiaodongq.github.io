@@ -26,9 +26,7 @@ gSOAP包括两个工具：wsdl2h和soapcpp2。
 
 ```
 ./configure --prefix=XXX(无root权限可用prefix指定安装路径)
-
 make
-
 make install
 ```
 
