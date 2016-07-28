@@ -32,7 +32,8 @@ make
 make install
 ```
 
-了解WSDL和SOAP，对gSOAP理解得更清楚一点：
+了解WSDL和SOAP，有助于对gSOAP理解得更清楚一点，见下文：
+
 **[使用 WSDL 部署 Web 服务: 第 1 部分](https://www.ibm.com/developerworks/cn/webservices/ws-intwsdl/part1/)**
 
 WSDL中的类型可能在XSD文件中定义。
