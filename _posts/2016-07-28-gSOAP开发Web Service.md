@@ -31,7 +31,8 @@ make
 make install
 ```
 
-了解WSDL和SOAP，对gSOAP理解得更清楚一点[使用 WSDL 部署 Web 服务: 第 1 部分](https://www.ibm.com/developerworks/cn/webservices/ws-intwsdl/part1/)
+了解WSDL和SOAP，对gSOAP理解得更清楚一点：
+**[使用 WSDL 部署 Web 服务: 第 1 部分](https://www.ibm.com/developerworks/cn/webservices/ws-intwsdl/part1/)**
 
 WSDL中的类型可能在XSD文件中定义。
 
@@ -92,8 +93,8 @@ stlvector.h，位于：gsoap/import/目录下)
     * 编写服务端程序，使用soapService服务端类，并在文件中实现add等运算功能，测试时可启动一个服务，需指定端口(e.g. 7000)进行绑定
     * 编写客户端程序，使用soapProxy代理类，定义一个实例指定一下地址(endpoint中指定,e.g. http://localhost:7000)直接使用即可
 
-  **分别编译服务器端和客户端时，有多个一起编译的文件**
+    **分别编译服务器端和客户端时，有多个一起编译的文件**
 
-  **具体查看安装包中的例子和README，比较清晰**
+    **具体查看安装包中的例子和README，比较清晰**
 
   * 把gsoap目录下的stdsoap2.h和stdsoap2.cpp拷到项目目录，编译需要(无则会报错提示)
