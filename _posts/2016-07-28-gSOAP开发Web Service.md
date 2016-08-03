@@ -97,4 +97,4 @@ stlvector.h，位于：gsoap/import/目录下)
 
     **具体查看安装包中的例子和README，比较清晰**
 
-  * 把gsoap目录下的stdsoap2.h和stdsoap2.cpp拷到项目目录，编译需要(无则会报错提示)
+  * 把gsoap目录下的stdsoap2.h和stdsoap2.cpp拷到项目目录，编译需要(无则会报错提示,对头文件也可-I指定.h路径)
