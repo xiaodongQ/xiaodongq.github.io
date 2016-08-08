@@ -55,10 +55,11 @@ WSDL中的类型可能在XSD文件中定义。
   wsdl2h常用选项
 
   * -o 文件名，指定输出头文件
-  * -n 名空间前缀 代替默认的ns
+  * -n 名字空间前缀 代替默认的ns
+  * -qname 指定命名空间 use name for the C++ namespace of all declarations
   * -c 产生纯C代码，否则是C++代码
   * -s 不要使用STL代码
-  * -e 禁止为enum成员加上名空间前缀
+  * -e 禁止为enum成员加上名字空间前缀
 
 例如：`wsdl2h -s -o calc.h XXX.wsdl`
 
@@ -98,3 +99,9 @@ stlvector.h，位于：gsoap/import/目录下)
     **具体查看安装包中的例子和README，比较清晰**
 
   * 把gsoap目录下的stdsoap2.h和stdsoap2.cpp拷到项目目录，编译需要(无则会报错提示,对头文件也可-I指定.h路径)
+
+## 踩坑
+
+  * 当存在多个gSOAP编写的服务端时，注意使用命名空间
+  * 本地存在多个需调用的gSOAP客户端时，使用命名空间各自分隔
+  * 本地gSOAP服务端接收请求调用远程服务(即本地又作为需调用远程服务的客户端)时，需调用中间结构，进行字段适配后调用相关API，否则会报多重定义(目前只能定义中间结构先解决问题，之后再看看有没有解决方法)
