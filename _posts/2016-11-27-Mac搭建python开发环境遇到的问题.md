@@ -19,8 +19,11 @@ OS X系统自带了python运行环境，但作为开发不是很方便，tab键�
 使用阿里云，如下
 
 >[global]
-index-url = http://mirrors.aliyun.com/pypi/simple/
-[install]
-trusted-host=mirrors.aliyun.com
+
+>index-url = http://mirrors.aliyun.com/pypi/simple/
+
+>[install]
+
+>trusted-host=mirrors.aliyun.com
 
 ipython就可以通过pip安装了 `pip install ipython`
