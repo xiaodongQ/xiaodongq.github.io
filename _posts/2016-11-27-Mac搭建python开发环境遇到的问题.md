@@ -1,8 +1,8 @@
 ---
 layout: post
 title: Mac搭建python开发环境遇到的问题
-categories: MAC
-tags: MAC Python pip
+categories: Linux
+tags: Linux Mac Python pip
 ---
 
 * content
