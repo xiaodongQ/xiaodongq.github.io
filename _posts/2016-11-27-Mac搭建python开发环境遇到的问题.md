@@ -15,7 +15,7 @@ OS X系统自带了python运行环境，但作为开发不是很方便，tab键�
 
 
 
-## 安装
+## 工具安装
 
 使用`easy_install pip`安装pip，但由于网络原因一直下载安装不成功，于是又安装了一个python 2.7.11，
 `brew install python`，安装python会自带pip。
@@ -35,7 +35,7 @@ ipython就可以通过pip加包名安装了 `pip install ipython`
 
 ipython 能够完成补齐操作(包括对象的属性等)，调试时比较方便
 
-## 使用简介
+## django使用简介
 
 ### django简单测试
 
@@ -116,9 +116,9 @@ ipython 能够完成补齐操作(包括对象的属性等)，调试时比较方�
 
 	GET查看资源 POST增加资源 PATCH更新资源 PUT替换资源 DELETE删除资源 HEAD查看响应头 OPTIONS查看可用请求方法
 
-## 发送请求
+### 发送请求
 
-### HTTP状态码
+#### HTTP状态码
 
 1xx 消息
 2xx 成功
@@ -128,9 +128,9 @@ ipython 能够完成补齐操作(包括对象的属性等)，调试时比较方�
 4xx 客户端错误
 5xx 服务端错误
 
-## 处理响应
+### 处理响应
 
-### 响应基本api
+#### 响应基本api
 
 encoding
 raw 
@@ -138,17 +138,17 @@ content
 text
 json  获得更多信息
 
-### 下载图片/文件
+#### 下载图片/文件
 
-### 处理响应的事件钩子
+#### 处理响应的事件钩子
 
-## 进阶话题
+### 进阶话题
 
-### HTTP认证
+#### HTTP认证
 基本认证 用户名/密码
 token验证
 
-### 代理 Proxy
+#### 代理 Proxy
 请求转发
 
 1. 启动代理服务Heroku
@@ -156,7 +156,7 @@ token验证
 3. 将请求转发到1080
 4. 获取相应资源
 
-### Session和Cookie
+#### Session和Cookie
 cookie:
 浏览器http请求(无cookie)->服务器http响应->浏览器设置cookie，保存本地->http请求(带cookie)->解析cookie识别信息->http响应
 
@@ -169,5 +169,6 @@ session存在服务器端，从网络转到服务器
 
 压力从浏览器到服务器，不安全介质到安全介质💍
 
-flask django
+## web.py框架
+
 
