@@ -50,10 +50,10 @@ sar -n DEV 1 1, 所有网卡
 ### pidstat -u (默认,CPU使用)
 
 Report CPU utilization.
-(%usr:Percentage of CPU used by the task while executing at  the  user  level (application), with or without nice riority.
-%system: Percentage of CPU used by the task while executing at the system  level (kernel).
-%guest: Percentage  of CPU spent by the task in virtual machine (running a virtual processor).
-%CPU: Total percentage of CPU time used by the task. 
+(- %usr:Percentage of CPU used by the task while executing at  the  user  level (application), with or without nice riority.
+- %system: Percentage of CPU used by the task while executing at the system  level (kernel).
+- %guest: Percentage  of CPU spent by the task in virtual machine (running a virtual processor).
+- %CPU: Total percentage of CPU time used by the task. 
 )
 
 ```py
@@ -81,9 +81,9 @@ Linux 4.4.0-28-generic (ubuntu) 	03/24/2019 	_x86_64_	(1 CPU)
 ### pidstat -d (磁盘io)
 
 pidstat -d -p 1619 1, Report I/O statistics 
-(kB_rd:Number  of  kilobytes the task has caused to be read from disk per second.
-kB_ccwr: Number  of  kilobytes  whose  writing to disk has been cancelled by the task;
-iodelay:Block I/O delay of the task being monitored)
+(- kB_rd:Number  of  kilobytes the task has caused to be read from disk per second.
+- kB_ccwr: Number  of  kilobytes  whose  writing to disk has been cancelled by the task;
+- iodelay:Block I/O delay of the task being monitored)
 
 ```py
 root@ubuntu:~# pidstat -d -p 1619 1
@@ -97,9 +97,9 @@ Linux 4.4.0-28-generic (ubuntu) 	03/24/2019 	_x86_64_	(1 CPU)
 ### pidstat -r (内存使用)
 
 Report page faults and memory utilization.
-(minflt:Total  number of minor faults the task has made per second,
-VSZ:Virtual Size: The virtual memory usage of entire task in kilobytes
-RSS:Resident  Set Size: The non-swapped physical memory used by the task in kilobytes.)
+(- minflt:Total  number of minor faults the task has made per second,
+- VSZ:Virtual Size: The virtual memory usage of entire task in kilobytes
+- RSS:Resident  Set Size: The non-swapped physical memory used by the task in kilobytes.)
 
 ```py
 root@ubuntu:~# pidstat -r -p 1619 1 
@@ -113,8 +113,8 @@ Linux 4.4.0-28-generic (ubuntu) 	03/24/2019 	_x86_64_	(1 CPU)
 ### pidstat -s (栈使用)
 
 Report stack utilization. 
-(StkSize:The  amount  of memory in kilobytes reserved for the task as stack, but not necessarily used.
-StkRef:The amount of memory in kilobytes used  as  stack,  referenced  by  the task.)
+(- StkSize:The  amount  of memory in kilobytes reserved for the task as stack, but not necessarily used.
+- StkRef:The amount of memory in kilobytes used  as  stack,  referenced  by  the task.)
 
 ```py
 root@ubuntu:~# pidstat -s -p 1619 1 
@@ -147,8 +147,8 @@ Linux 4.4.0-28-generic (ubuntu) 	03/24/2019 	_x86_64_	(1 CPU)
 ### -v (其他有用信息, 线程数/文件句柄数等)
 
 Report values of some kernel tables.
-(threads: Number of threads associated with current task.
-fd-nr: Number of file descriptors associated with current task.)
+(- threads: Number of threads associated with current task.
+- fd-nr: Number of file descriptors associated with current task.)
 
 ```py
 root@ubuntu:~# pidstat -u -p 1619 1 -v
@@ -175,8 +175,8 @@ Linux 4.4.0-28-generic (ubuntu) 	03/24/2019 	_x86_64_	(1 CPU)
 (vmstat和dstat都可查看系统的cs切换和in中断)
 
 Report task switching activity (kernels 2.6.23 and later only). 
-(cswch/s: Total number of voluntary context switches the task made per second. 每秒自愿上下文切换次数，如等待io等
-nvcswch/s: Total number of non voluntary context switches the task made per second. 每秒非自愿上下文切换次数，如时间片用完切换。)
+(- cswch/s: Total number of voluntary context switches the task made per second. 每秒自愿上下文切换次数，如等待io等
+- nvcswch/s: Total number of non voluntary context switches the task made per second. 每秒非自愿上下文切换次数，如时间片用完切换。)
 
 ```py
 root@ubuntu:~# pidstat -w -p 1619 1
