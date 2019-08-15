@@ -21,6 +21,11 @@ tags: MySQL SQL 数据库
 
   prompt mysql> 改描述符
 
+启动:
+  mysql.server start
+  mysql.server stop
+  mysql.server restart
+
 ## 语句规范：
 
 * 关键字与函数名称全部大写；
