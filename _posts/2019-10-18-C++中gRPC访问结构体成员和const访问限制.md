@@ -19,6 +19,7 @@ tags: C++ const gRPC
 ## gRPC C++访问结构体成员
 
 参考：
+
 [对set_allocated_和mutable_的使用](https://blog.csdn.net/wujunokay/article/details/51287312)
 
 [gRPC Basics - C++](https://grpc.io/docs/tutorials/basic/cpp/)
@@ -69,7 +70,9 @@ void func(const &B)
 
 ## const成员函数功能及使用
 
-参考zh.cppreference.com：
+参考
+
+zh.cppreference.com：
 [const、volatile 及引用限定的成员函数](https://zh.cppreference.com/w/cpp/language/member_functions#const.E3.80.81volatile_.E5.8F.8A.E5.BC.95.E7.94.A8.E9.99.90.E5.AE.9A.E7.9A.84.E6.88.90.E5.91.98.E5.87.BD.E6.95.B0)
 
 对const修饰成员函数的功能作用，做一个说明和实例演示。
@@ -107,7 +110,9 @@ int main()
 }
 ```
 
-### 单独定义简单类进行编译演示const变量及const成员函数
+### 自定义类编译演示
+
+单独定义简单类进行编译演示const变量及const成员函数
 
 #### 印证：
 
@@ -181,10 +186,3 @@ func3
 test_const_func.cpp: 在成员函数‘void Apple::print() const’中:
 test_const_func.cpp:19:8: 错误：将‘const Apple’作为‘void Apple::func2()’的‘this’实参时丢弃了类型限定 [-fpermissive]
 ```
-
-
-
-
-
-
-
