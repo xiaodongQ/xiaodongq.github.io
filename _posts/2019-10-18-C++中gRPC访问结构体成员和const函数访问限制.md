@@ -1,6 +1,6 @@
 ---
 layout: post
-title: C++中grpc访问结构体成员和const成员函数访问时的限制
+title: C++中gRPC访问结构体成员和const访问限制
 categories: C/C++
 tags: C++ const gRPC
 ---
@@ -10,13 +10,13 @@ tags: C++ const gRPC
 
 介绍C++中gRPC访问结构体成员的方式和const成员函数访问时的限制。
 
+
+
 当gRPC proto协议中定义的message消息不仅仅包含基本的int、string等类型，还包含结构体类型时，访问结构体类型成员不适用`.变量名()/.set_变量名()`形式。
 
-传入参数被const修饰时，访问内部非const函数，编译会遇到的问题。
+传入参数被const修饰时，访问内部非const函数，编译会遇到的问题和正常使用方式。
 
-
-
-#### gRPC C++访问结构体成员
+## gRPC C++访问结构体成员
 
 参考：
 [对set_allocated_和mutable_的使用](https://blog.csdn.net/wujunokay/article/details/51287312)
@@ -28,9 +28,11 @@ tags: C++ const gRPC
 
 查看分析grpc生成的.cpp和.h文件代码，生成的成员函数为`mutable_`、`set_allocated_`，通过这种方式访问和设置成员。
 
-下面代码演示(另外分析函数入参被限定为const时的访问情况)：
+### 代码演示
 
-* 程序伪代码：
+另外分析函数入参被限定为const时的访问情况：
+
+#### 程序伪代码：
 
 ```cpp
 
@@ -48,14 +50,14 @@ void func(const &B)
 若request为const修饰的变量，要调用如下func函数的话，需要解引用，会出现const的this调用非const函数，编译报类似下面错误。
 ```
 
-* 编译报错：
+#### 编译报错：
 
 ```sh
 # const访问问题
 错误：将‘const A’作为‘B* A::mutable_Bstructfield()’的‘this’实参时丢弃了类型限定 [-fpermissive]
 ```
 
-* 使用方式：
+#### 正确使用方式：
 
 可通过新增变量方式解引用：
 
@@ -65,7 +67,7 @@ void func(const &B)
     func(*a->mutable_b)
 ```
 
-### const成员函数功能及使用
+## const成员函数功能及使用
 
 参考zh.cppreference.com：
 [const、volatile 及引用限定的成员函数](https://zh.cppreference.com/w/cpp/language/member_functions#const.E3.80.81volatile_.E5.8F.8A.E5.BC.95.E7.94.A8.E9.99.90.E5.AE.9A.E7.9A.84.E6.88.90.E5.91.98.E5.87.BD.E6.95.B0)
@@ -78,7 +80,7 @@ const、volatile 及引用限定的成员函数
 * cv 限定性不同的函数具有不同类型，从而可以相互重载。
 * 在 cv 限定的函数体内，this 指针被 cv 限定，**const 成员函数中，只能正常地调用其他 const 成员函数。**
 
-* 参考中的示例：
+### 参考中的示例：
 
 ```cpp
 #include <vector>
@@ -105,14 +107,16 @@ int main()
 }
 ```
 
-* 单独定义简单类进行编译演示const变量及const成员函数
+### 单独定义简单类进行编译演示const变量及const成员函数
 
-印证：
+#### 印证：
 
 1. const 成员函数中，只能正常地调用其他 const 成员函数
 2. 定义的const 变量，只能访问非const成员函数
 
-自定义一个类中，成员函数以const在形参列表后修饰：
+#### 自定义一个类演示
+
+成员函数以const在形参列表后修饰：
 
 ```cpp
 #include <iostream>
@@ -160,6 +164,8 @@ int main(int argc, const char *argv[])
     return 0;
 }
 ```
+
+#### 编译情况
 
 ```
 [➜ /home/xd/workspace/src ]$ ./a.out
