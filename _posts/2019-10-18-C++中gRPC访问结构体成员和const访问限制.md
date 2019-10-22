@@ -1,4 +1,4 @@
----
+    ---
 layout: post
 title: C++中gRPC访问结构体成员和const访问限制
 categories: C/C++
@@ -48,7 +48,7 @@ void func(const &B)
 }
 
 // grpc访问结构体成员
-若request为const修饰的变量，要调用如下func函数的话，需要解引用，会出现const的this调用非const函数，编译报类似下面错误。
+// 若request为const修饰的变量，要调用如下func函数的话，需要解引用，会出现const的this调用非const函数，编译报类似下面错误。
 ```
 
 #### 编译报错：
