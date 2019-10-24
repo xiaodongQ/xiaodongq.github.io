@@ -1,4 +1,4 @@
-    ---
+---
 layout: post
 title: C++中gRPC访问结构体成员和const访问限制
 categories: C/C++
