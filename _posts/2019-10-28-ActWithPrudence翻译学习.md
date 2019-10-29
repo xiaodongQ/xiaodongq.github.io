@@ -29,9 +29,11 @@ Act with Prudence(Prudence 英 /ˈpruːdns/ 审慎，谨慎)
 "Whatever you undertake, act with prudence and consider the consequences" Anon
 
 无论一个计划在开始迭代的前期看起来多么美好，你无法避免在后续的时间里承受着压力。如果你发现必须在“正确的做”和“快速的做”之间做一个选择，经常性的结果是你会基于后续很快会回过头来修复这些问题，然后被“快速的做”吸引。当你对你自己、你的团队、你的顾客承诺时，你是这个意思。  
-但是情况往往是在下一次迭代时，又带来了新的问题，然后你开始关注于这些问题。这类拖延的工作被称作技术债务，而这不应该成为你的朋友。具体的说，马丁·福勒[^Martin Fowler]在他的技术债务分类中指出，这种故意的技术债务不应该和无意的技术债务混淆在一起。
+但是情况往往是在下一次迭代时，又带来了新的问题，然后你开始关注于这些问题。这类拖延的工作被称作技术债务，而这不应该成为你的朋友。具体的说，马丁·福勒[^Martin Fowler] 在他的技术债务分类中指出，这种故意的技术债务不应该和无意的技术债务混淆在一起。
 
-[^Martin Fowler]: 马丁·福勒，是一个软件开发方面的著作者和国际知名演说家，专注于面向对象分析与设计，统一建模语言，领域建模，以及敏捷软件开发方法，包括极限编程，2000年3月，他成为ThoughtWorks的首席科学家。([马丁·福勒百度百科](https://baike.baidu.com/item/%E9%A9%AC%E4%B8%81%C2%B7%E7%A6%8F%E5%8B%92/3107032?fromtitle=martin%20fowler&fromid=9005728))
+[^Martin Fowler]: 马丁·福勒，是一个软件开发方面的著作者和国际知名演说家，专注于面向对象分析与设计，统一建模语言，领域建模，以及敏捷软件开发方法，包括极限编程，2000年3月，他成为ThoughtWorks的首席科学家。
+
+> 参考：[马丁·福勒百度百科](https://baike.baidu.com/item/%E9%A9%AC%E4%B8%81%C2%B7%E7%A6%8F%E5%8B%92/3107032?fromtitle=martin%20fowler&fromid=9005728)
 
 No matter how comfortable a schedule looks at the beginning of an iteration(迭代，循环), you can't avoid being under pressure some of the time. If you find yourself having to choose between "doing it right" and "doing it quick" it is often appealing to "do it quick" on the understanding that you'll come back and fix it later. When you make this promise to yourself, your team, and your customer, you mean it. But all too often the next iteration brings new problems and you become focused on them. This sort of deferred work is known as technical debt and it is not your friend. Specifically(特别地，具体的说), Martin Fowler(马丁·福勒 ThoughtWorks的首席科学家) calls this deliberate(英 /dɪˈlɪbərət/ 故意的，蓄意的) technical debt in his taxonomy(英 /tækˈsɒnəmi/ 分类) of technical debt, which should not be confused(英 /kənˈfjuːzd/ 混乱的，糊涂的。跟refuse：拒绝 区分开) with inadvertent(英 /ˌɪnədˈvɜːtnt/ 疏忽的，无意中做的) technical debt.
 
