@@ -12,7 +12,7 @@ tags: [Markdown,Cmder]
 
 ### Cmder
 
-  右键在当前位置打开终端，操作习惯跟linux终端差不了多少，可以使用大量linux命令，集成了grep、tar、curl等等工具。终于不用再忍受Windows的cmd了。*有一点不足的就是在我电脑上启动后加载比较慢，要等个7、8秒才能操作*
+右键在当前位置打开终端，操作习惯跟linux终端差不了多少，可以使用大量linux命令，集成了grep、tar、curl等等工具。终于不用再忍受Windows的cmd了。*有一点不足的就是在我电脑上启动后加载比较慢，要等个7、8秒才能操作(之前的笔记了，慢的原因还不确定 20191103注)*(cmder_mini中执行find，与linux下有点差别，e.g. `find . -name "window*"` 执行报`拒绝访问 - .`和 `找不到文件 - -NAME`，要`find "-name" "*.go"`形式才执行正常)
 
   参考：**[Win下必备神器之Cmder](http://www.jeffjade.com/2016/01/13/2016-01-13-windows-software-cmder/)**
 
