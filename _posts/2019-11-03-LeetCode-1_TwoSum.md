@@ -10,6 +10,8 @@ tags: LeetCode
 
 LeetCode之1_TwoSum
 
+GitHub路径：[xiaodongQ/LeetCode](https://github.com/xiaodongQ/LeetCode)
+
 
 
 ## 题目
@@ -139,8 +141,10 @@ func twoSum(nums []int, target int) []int {
 看提交记录，Go的执行用时只有4ms，比C++快了不少，内存也小很多，有些疑问，知道比较两个东西需要看适用场景，但是这个场景下的差别以现在的知识储备还是留下了一个大大的问号。
 
 * 怀疑原因(不是很有根据的怀疑)：
-    - 逻辑里主要是数组遍历和map的查找两块比较耗时，C++的unordered_map和Go的map底层也是一个hash表，两者的hash实现是否有hash冲突，是否经常有rehash，下面示例里问的perl/C++/Golang的hash，为什么C++比较慢，具体hash内部先不作深入，数据结构还要再加强
+    - 逻辑里主要是数组遍历和map的查找两块比较耗时，C++的unordered_map和Go的map底层也是一个hash表，两者的hash实现差别，具体hash内部先不作深入，数据结构还要再加强
+    - 用例是否经常有hash冲突和rehash，下面示例里也是问的perl/C++/Golang的hash，为什么C++比较慢，但是没有这个问题的定论
     - 里面使用valgrind --tool=cachegrind工具分析CPU的缓存，以后也可以了解一下 [Performance of hash table, why is C++ the slowest? Jens' answer](https://stackoverflow.com/questions/33950565/performance-of-hash-table-why-is-c-the-slowest)
+    - 问题留存，后续回头梳理(技术债...)
 
 查找关于Go的性能问题，看到这篇文章里关于一个编程比赛用Go实现的回答，里面的Go实现觉得可以学习一下(进去看不少东西不懂)：
 
