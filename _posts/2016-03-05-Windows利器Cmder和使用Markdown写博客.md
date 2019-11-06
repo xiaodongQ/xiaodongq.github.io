@@ -21,6 +21,7 @@ tags: [Markdown,Cmder]
 参考：**[Win下必备神器之Cmder](http://www.jeffjade.com/2016/01/13/2016-01-13-windows-software-cmder/)**
 
 部分设置：颜色-取消不活动时褪色(个人习惯)
+外观-滚动条-选择显示
 
 ### Markdown
 
