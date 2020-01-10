@@ -20,8 +20,12 @@ tags: [Markdown,Cmder]
 
 参考：**[Win下必备神器之Cmder](http://www.jeffjade.com/2016/01/13/2016-01-13-windows-software-cmder/)**
 
-部分设置：颜色-取消不活动时褪色(个人习惯)
-外观-滚动条-选择显示
+* 部分设置
+  - 颜色-取消不活动时褪色(个人习惯)
+    + 设置方式：外观-滚动条-选择显示
+* 终端中文乱码
+  - 右下角->Settings(或者快捷键Win+Alt+P)->搜索框搜 chcp，添加`chcp 65001` `set LANG=zh_CN.UTF-8`->保存重启cmder即可
+  - [cmder 中文乱码的解决方法](https://blog.csdn.net/lamp_yang_3533/article/details/79841328)
 
 ### Markdown
 
