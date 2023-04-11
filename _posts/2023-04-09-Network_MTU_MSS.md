@@ -59,7 +59,7 @@ MSS(Maximum Segment Size，最大报文长度) 指的是 TCP 层的最大传输�
 	- 2、 浏览器进入网站 `www.baidu.com`，而后停止抓包  
 	- 3、 过滤包 `tcp contains "baidu"`进行实验分析  
 * 协商过程查看
-	- 抓包如下：![MSS.png](/_resource/MSS/MSS_pkg.png)
+	- 抓包如下：![MSS.png](https://github.com/xiaodongQ/xiaodongq.github.io/blob/master/_resources/MSS/MSS_pkg.png)
 	- 可看到三次握手时，src端(客户端)MSS=1460, dst端(网站服务端)MSS=1452，协商后数据传输时Len=1452，展开看TCP头时也可看到`[TCP Segment Len: 1452]`
 
 ### 2. 修改一端的MSS
