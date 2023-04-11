@@ -59,7 +59,7 @@ MSS(Maximum Segment Size，最大报文长度) 指的是 TCP 层的最大传输�
 	- 2、 浏览器进入网站 `www.baidu.com`，而后停止抓包  
 	- 3、 过滤包 `tcp contains "baidu"`进行实验分析  
 * 协商过程查看
-	- 抓包如下：![MSS.png](https://postimg.cc/K3QY66Dv)
+	- 抓包如下：![MSS.png](/_resource/MSS/MSS_pkg.png)
 	- 可看到三次握手时，src端(客户端)MSS=1460, dst端(网站服务端)MSS=1452，协商后数据传输时Len=1452，展开看TCP头时也可看到`[TCP Segment Len: 1452]`
 
 ### 2. 修改一端的MSS
@@ -73,6 +73,9 @@ MSS(Maximum Segment Size，最大报文长度) 指的是 TCP 层的最大传输�
 		+ python：`tcp = TCP(dport=80, flags="S",options=[('MSS',48),('SAckOK', '')])`
 	- 4、 也可以直接调整网卡上的 MTU：`ifconfig eth0 mtu 800 up`.
 		+ 这样 Kernel 的 TCP 栈在建立连接的时候会自动计算 MSS。
+
+#### ping 测试
+
 * 步骤
 	- 环境说明：主机1：mac笔记本(192.168.1.2) + 主机2：linux主机(192.168.1.150)
 	- 1、到linux端通过iptables设置MSS
@@ -82,9 +85,8 @@ MSS(Maximum Segment Size，最大报文长度) 指的是 TCP 层的最大传输�
 * 抓包分析
 	- 观察到IP分片
 
-**TODO**
+#### scp 测试
 
-<!-- 
 * 步骤
 	- 1、到linux端通过iptables设置MSS
 		- `iptables -I OUTPUT -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 50`
@@ -92,7 +94,6 @@ MSS(Maximum Segment Size，最大报文长度) 指的是 TCP 层的最大传输�
 	- 3、到linux端开启抓包 `tcpdump -i enp4s0 -s 0 -w set_mss50_scp.pcap -v`
 	- 4、scp拷贝文件，结束后停止抓包。获取抓包文件后wireshark分析
 	- 5、清理iptables规则，重新设置mss为1000，抓包为`set_mss1000_scp.pcap`
- -->
 
 
 ## 收获
