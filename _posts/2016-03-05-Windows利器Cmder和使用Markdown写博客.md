@@ -2,7 +2,7 @@
 layout: post
 title: Windows利器Cmder&使用Markdown写博客
 categories: 工具
-tags: Markdown,Cmder
+tags: Markdown
 ---
 
 * content

@@ -2,7 +2,7 @@
 layout: post
 title: GitHub Pages及jekyll搭建博客
 categories: 工具
-tags: [github,jekyll,工具]
+tags: jekyll
 ---
 
 * content
