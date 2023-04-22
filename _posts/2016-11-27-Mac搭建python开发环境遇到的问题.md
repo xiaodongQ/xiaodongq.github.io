@@ -167,7 +167,7 @@ session:
 http请求->服务器存储session->http响应(set cookie-session-id),浏览器解析cookie保存本地(很小)->http请求(带cookie)->解析sessionid->http响应
 session存在服务器端，从网络转到服务器
 
-压力从浏览器到服务器，不安全介质到安全介质💍
+压力从浏览器到服务器，不安全介质到安全介质
 
 ## web.py框架
 

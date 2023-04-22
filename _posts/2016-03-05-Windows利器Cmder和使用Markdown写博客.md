@@ -2,7 +2,7 @@
 layout: post
 title: Windows利器Cmder&使用Markdown写博客
 categories: 工具
-tags: [Markdown,Cmder]
+tags: Markdown,Cmder
 ---
 
 * content
@@ -29,9 +29,9 @@ tags: [Markdown,Cmder]
 
 ### Markdown
 
-  之前在CSDN写博客的时候看到Markdown，排版格式挺好看的就用来写博客，也没有去看看它的语法，而一直以来都是在网页上选择各个组件拼出来一片博客，现在看之前的自己跟看猴子似的。其语法很直观，十分钟内就能操作熟悉了。
+  之前在CSDN写博客的时候看到Markdown，觉得排版格式挺好看的，不过也没有去看看它的语法。其语法很直观，十分钟内就能操作熟悉了。
 
-  这篇博客就是用Atom编辑器和Markdown语法来写的。前几天一直在折腾编辑Sublime和Atom编辑神器，在这几天的使用中发现确实很令人愉快。Sublime和Atom都有相关的使用插件，不过Sublime中对Markdown的语法高亮支持得不好，而Atom支持得很好，毕竟github上.md文件普遍；Atom中还支持实时预览，St中要到浏览器中才能够预览，所以还是推荐Atom来使用Markdown写东西。
+  这篇博客就是用Atom编辑器和Markdown语法来写的。前几天一直在折腾编辑Sublime和Atom编辑器，在这几天的使用中发现确实很便捷。Sublime和Atom都有相关的使用插件。
 
   简书上这篇指南的图文排版都很好，跟着操作一遍差不多就能用了：  **[Markdown——入门指南](http://www.jianshu.com/p/1e402922ee32/)**
 
@@ -75,7 +75,7 @@ tags: [Markdown,Cmder]
 
 ### 踩过的坑
 
-1. Atom里安装Package时，报编译有问题，有些包的依赖关系没有找到，还是用apm(atom package manager)(非War3概念..)来装插件方便。Atom安装时是自带有apm的，记得添加其路径到path环境变量。**因为环境变量未添加的问题导致一直以为还需要安装其他应用，apm的路径比较深：**
+1. Atom里安装Package时，报编译有问题，有些包的依赖关系没有找到，还是用apm(atom package manager)来装插件方便。Atom安装时是自带有apm的，记得添加其路径到path环境变量。**因为环境变量未添加的问题导致一直以为还需要安装其他应用，apm的路径比较深：**
 
     `xxxxxx\atom\app-1.6.1\resources\app\apm\bin`
 
