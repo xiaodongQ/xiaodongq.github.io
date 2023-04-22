@@ -2,7 +2,7 @@
 layout: post
 title: sar和pidstat使用
 categories: Linux
-tags: Linux sar pidstat 性能监测
+tags: sar pidstat
 ---
 
 * content
