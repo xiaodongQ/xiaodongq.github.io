@@ -2,7 +2,7 @@
 layout: post
 title: Mac搭建python开发环境搭建及学习笔记
 categories: Linux
-tags: Linux Mac Python pip
+tags: Linux Mac Python
 ---
 
 * content
