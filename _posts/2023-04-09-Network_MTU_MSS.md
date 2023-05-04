@@ -18,7 +18,9 @@ tags: 网络
 
 ### MTU
 
-MTU(Maximum Transmission Unit，最大传输单元) 指的是二层协议（即数据链路层）里面的最大传输单元，一般MTU都是1500。
+* MTU(Maximum Transmission Unit，最大传输单元) 指的是二层协议（即数据链路层）里面的最大传输单元，一般MTU都是1500。
+	- 1500是一个平衡折衷的结果，太大的MTU出错概率更大、重传代价更大、对设备性能要求更高（以太网是分组交换网络，路由设备或交换机转发下一跳前需要存储未发完的数据）
+	- 而太小则传输效率更低
 
 * MUT长度图示（未包含以太网头信息 14字节 和 尾部校验和FCS 4字节）：
 
@@ -26,7 +28,7 @@ MTU(Maximum Transmission Unit，最大传输单元) 指的是二层协议（即�
 [图片来源](https://www.kawabangga.com/posts/4983)
 
 * 一个标准的以太网数据帧的长度为：**`1500 + 14 + 4 = 1518` 字节**
-* 超过MTU的数据帧一般会被丢弃，出现该现象的典型场景是 VPN 和 overlay 网络
+* 超过MTU的数据帧一般会被丢弃，出现该现象的典型场景是 **VPN** 和 **overlay** 网络
 
 * 另外记录一下关于二层、三层交换机的特点(之前概念比较模糊)：  
 	- 三层交换机：基于`网络层`的`IP地址`进行`路由选择和分组过滤`  
@@ -58,9 +60,12 @@ MSS(Maximum Segment Size，最大报文长度) 指的是 TCP 层的最大传输�
 	- 1、 开启wireshark抓包  
 	- 2、 浏览器进入网站 `www.baidu.com`，而后停止抓包  
 	- 3、 过滤包 `tcp contains "baidu"`进行实验分析  
+
 * 协商过程查看
-	- 抓包如下：![MSS.png](https://github.com/xiaodongQ/xiaodongq.github.io/blob/master/_resources/MSS/MSS_pkg.png)
-	- 可看到三次握手时，src端(客户端)MSS=1460, dst端(网站服务端)MSS=1452，协商后数据传输时Len=1452，展开看TCP头时也可看到`[TCP Segment Len: 1452]`
+
+抓包如下：<div align=center><img src="/_resources/MSS/MSS_pkg.png"/></div>
+
+可看到三次握手时，src端(客户端)MSS=1460, dst端(网站服务端)MSS=1452，协商后数据传输时Len=1452，展开看TCP头时也可看到`[TCP Segment Len: 1452]`
 
 ### 2. 修改一端的MSS
 
