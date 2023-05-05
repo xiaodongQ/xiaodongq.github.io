@@ -12,28 +12,43 @@ layout: default
             </div>
 
             <div class="label-card">
-                {% if page.author %}<i class="fa fa-user"></i>{{ page.author }}
-                {% endif %}
+                {% if page.meta %}<i class="fa fa-key"></i>{{ page.meta }} {% endif %}
             </div>
 
             <div class="label-card">
-                {% if page.meta %}<i class="fa fa-key"></i>{{ page.meta }}  {% endif %}
-            </div>
-
-            <div class="label-card">
-            {% include category.html %}
-            </div>
-
-            <div class="label-card">
-            {% include tag.html %}
+                {% include category.html %}
             </div>
 
         </div>
         <hr>
         <article itemscope itemtype="http://schema.org/BlogPosting">
-        {{content}}
+            {{content}}
         </article>
-        <hr>
+        <hr />
+        <div>
+            <ul class="post-copyright">
+                <li class="post-copyright-author">
+                    <strong>本文作者： </strong> wenfh2020
+                </li>
+                <li class="post-copyright-link">
+                    <strong>本文链接：</strong>
+                    <a href="{{ page.url | prepend: site.baseurl }}" title="{{page.title}}">{{ site.post_site }}{{
+                        page.url }}</a>
+                </li>
+                <li class="post-copyright-license">
+                    <strong>版权声明： </strong>本文可以自由拷贝，转载，请注明出处，谢谢！ 🤝
+                </li>
+            </ul>
+        </div>
+        <!-- <div class="post-widgets">
+            <div id="needsharebutton-postbottom">
+                <span class="btn">
+                    <i class="fa fa-share-alt" aria-hidden="true"></i>
+                    <img src="/images/network-share-icon.png" alt="分享">
+                </span>
+            </div>
+        </div> -->
+        <hr />
 
         {% assign hasSimilar = '' %}
         {% for post in site.related_posts %}
@@ -64,10 +79,9 @@ layout: default
 
         {% include previousAndNext.html %}
 
-        <h2 id="comments">Comments</h2>
-        {% include comments.html %}
-
-
+        <!-- <h2 id="comments">Comments</h2>
+        {% include comments.html %} -->
+        <div id="gitalk-container"></div>
     </div>
     <button class="anchor"><i class="fa fa-anchor"></i></button>
     <div class="right">
@@ -76,17 +90,68 @@ layout: default
             <!-- Content -->
             <div class="side content">
                 <div>
-                    Content
+                    <i class="fa fa-bars"></i>
+                    目录
                 </div>
                 <ul id="content-side" class="content-ul">
-                    {% if hasSimilar.size > 0 %}
-                    <li><a href="#similar_posts">Similar Posts</a></li>
-                    {% endif %}
-                    <li><a href="#comments">Comments</a></li>
+                    <!-- {% if hasSimilar.size > 0 %}
+                    <li><a href="#similar_posts">文章推荐</a></li>
+                    {% endif %} -->
+                    <!-- <li><a href="#comments">Comments</a></li> -->
                 </ul>
             </div>
             <!-- 其他div框放到这里 -->
-            <!-- <div class="side">bbbb</div> -->
+            <!-- <div class="side">
+                <div>
+                    <i class="fa fa-pencil-square-o" aria-hidden="true"></i>
+                    近期文章
+                </div>
+                <ul class="content-ul" recent>
+                    {% for post in site.posts offset: 0 limit: 8 %}
+                    <li><a href="{{ site.baseurl }}{{ post.url }}">{{ post.title }}</a></li>
+                    {% endfor %}
+                </ul>
+            </div> 
+            <br />-->
+            <div class="side">
+                <div>
+                    <i class="fa fa-th-list"></i>
+                    文集
+                </div>
+                <ul id="categories-list" class="content-ul" cate>
+                    {% for category in site.categories%}
+                    <li class="categories-list-item">
+                        <a href="{{ root_url }}/{{ site.category_dir }}#{{ category | first }}"
+                            cate="{{ category | first }}">
+                            <span class="name">
+                                {{ category | first }}
+                            </span>
+                            <span class="badge">({{ category | last | size }})</span>
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <br />
+            <div class="side content">
+                <div>
+                    归档
+                </div>
+                <ul id="content-side" class="content-ul">
+                    {% assign counter = 0 %}
+                    {% for post in site.posts %}
+                    {% assign thisyear = post.date | date: "%Y" %}
+                    {% assign prevyear = post.previous.date | date: "%Y" %}
+                    {% assign counter = counter | plus: 1 %}
+                    {% if thisyear != prevyear %}
+                    <li><a data-scroll href="{{ root_url }}/archive/#y{{ post.date | date: '%Y' }}">{{ thisyear }}
+                            ({{ counter }})</a>
+                    </li>
+                    {% assign counter = 0 %}
+                    {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
         </div>
     </div>
 </div>
@@ -102,3 +167,50 @@ layout: default
 }());
 </script>
 <script src="{{ "/js/pageContent.js " | prepend: site.baseurl }}" charset="utf-8"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+<script src="https://cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+<script type="text/javascript">
+    var title = location.pathname.substr(0, 50);//截取路径的前50个字符作为标识符
+    var gitalk = new Gitalk({
+        // gitalk的主要参数
+        clientID: "{{ site.gitalk_clientid }}",
+        clientSecret: "{{ site.gitalk_secret }}",
+        repo: 'xiaodongq.github.io/',
+        owner: 'xiaodongQ',
+        admin: ['xiaodongQ'],
+        id: title,//因为这里不能超过50字符，所以做了处理，当超过50时自动截取前50
+        language: 'zh-CN',
+    });
+    gitalk.render('gitalk-container');
+</script>
+<script src="https://cdn.bootcss.com/jquery/1.12.4/jquery.min.js"></script>
+
+<script>
+    (function () {
+        var cat_map = {
+            '案例实验': 9880,
+            'c/c++': 9800,
+            Linux: 9700,
+            '随笔': -2
+        };
+
+
+        var get_score = function (key) {
+            var score = cat_map[$.trim(key)];
+            // console.log(score);
+            return (typeof (score) != "undefined") ? score : 0;
+        }
+
+        var sortDom = function ($domlist) {
+            var $item = $domlist.find('.categories-list-item');
+            var $newList = Array.prototype.sort.call($item, function (a, b) {
+                return get_score($(b).find('.name').html()) - get_score($(a).find('.name').html());
+            });
+            return $newList;
+        }
+
+        var $domlist = $("#categories-list");
+        var $result = sortDom($domlist);
+        $("#categories-list").html($result);
+    })();
+</script>

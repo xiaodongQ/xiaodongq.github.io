@@ -15,6 +15,5 @@ type: page
 
 * [酷 壳](http://coolshell.cn/)
 
-## Comments
 
-{% include comments.html %}
+<!-- {% include comments.html %} -->
