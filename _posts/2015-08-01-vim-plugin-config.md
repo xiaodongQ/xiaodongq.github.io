@@ -61,7 +61,7 @@ tags: Vim
   vim-snipmate这个插件只用了一个键，就是TAB键，比如对一个C/C++文件，输入inc，再按TAB键，就会填充为#include <stdio.h>，同时stdio被选中，以备修改。还有其他的，如main+TAB, wh+TAB,do+TAB,for+TAB,forr+TAB,if+TAB……具体可以看snippets文件夹下的那些文件，比如c.snippets
 
 * delimitMate 符号自动补全
-    [VIM插件: DELIMITMATE[符号自动补全](http://www.wklken.me/posts/2015/06/07/vim-plugin-delimitmate.html)
+    [VIM插件: DELIMITMATE 符号自动补全](http://www.wklken.me/posts/2015/06/07/vim-plugin-delimitmate.html)
 * emmet-vim HTML代码简写
     [vim插件--emmet-vim](http://www.jianshu.com/p/ad8a6a786054)
 

@@ -79,6 +79,6 @@ tags: jekyll
 
 ### 更新博客框架
 
-添加搜索功能
+简化博客风格，借用[wenfh2020](https://wenfh2020.com/)的风格。
 
 参考：[github + jekyll 搭建博客](https://wenfh2020.com/2020/02/17/make-blog/)
