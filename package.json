@@ -1,0 +1,23 @@
+{
+  "name": "xiaodongq.github.io/",
+  "version": "1.0.0",
+  "description": "参考 [GitHub Pages及jekyll搭建博客](https://xiaodongq.github.io/2016/04/04/github-pages&jekyll%E6%90%AD%E5%BB%BA%E5%8D%9A%E5%AE%A2/)",
+  "main": "index.js",
+  "dependencies": {
+    "simple-jekyll-search": "^1.7.3"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xiaodongQ/xiaodongq.github.io.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/xiaodongQ/xiaodongq.github.io/issues"
+  },
+  "homepage": "https://github.com/xiaodongQ/xiaodongq.github.io#readme"
+}
