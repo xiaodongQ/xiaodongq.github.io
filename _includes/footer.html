@@ -25,30 +25,34 @@
                 Site powered by <a href="https://jekyllrb.com/">Jekyll</a> & <a href="https://pages.github.com/">Github Pages</a>.
             </span>
             <span>
-                Theme designed by <a href="https://github.com/Gaohaoyang">HyG</a>.
+                Theme designed by <a href="https://github.com/Gaohaoyang">HyG</a>,<a href="https://wenfh2020.com/">wenfh2020</a>.
             </span>
         </p>
     </div>
 </footer>
 
 <!-- 添加search功能 start -->
-<div class="cb-search-tool" style="position: fixed; top: 0px ; bottom: 0px; left: 0px; right:  0px;
+<script src="https://cdn.bootcss.com/jquery/1.12.4/jquery.min.js"></script>
+<script src="https://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<link href="{{ '/zoom-vanilla/css/zoom.css' | prepend: site.baseurl }}" rel="stylesheet">
+<script src="{{ '/zoom-vanilla/dist/zoom-vanilla.min.js' | prepend: site.baseurl }}"></script>
+<div class="cb-search-tool" style="position: fixed; top:0 ; bottom:0; left:0; right: 0;
       opacity: 0.95; background-color: #111111; z-index: 9999; display: none;">
-    <input type="text" class="form-control cb-search-content" id="cb-search-content" style="position: fixed; top: 60px" placeholder="文章标题 日期 标签" autocomplete="off">
+    <input type="text" autocomplete="off" class="form-control cb-search-content" id="cb-search-content"
+        style="position: fixed; top: 60px" placeholder="搜索文章题目...">
 
     <div style="position: fixed; top: 16px; right: 16px;">
         <img src="/search/img/cb-close.png"  id="cb-close-btn"/>
     </div>
 </div>
 
-<link rel="stylesheet" href="{{ "/search/css/cb-search.css" | prepend: site.baseurl }}">
 <!-- jQuery -->
-<script src="//cdn.bootcss.com/jquery/2.2.2/jquery.min.js"></script>
 <!-- Bootstrap Core JavaScript -->
-<script src="//cdn.bootcss.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+<script src="{{ '/js/codeboy.min.js' | prepend: site.baseurl }}"></script>
 
-<script src="{{ "/search/js/bootstrap3-typeahead.min.js" | prepend: site.baseurl }}"></script>
-<script src="{{ "/search/js/cb-search.js" | prepend: site.baseurl }}"></script>
+<link rel="stylesheet" href="{{ '/search/css/cb-search.css' | prepend: site.baseurl }}">
+<script src="{{ '/search/js/bootstrap3-typeahead.min.js' | prepend: site.baseurl }}"></script>
+<script src="{{ '/search/js/cb-search.min.js' | prepend: site.baseurl }}"></script>
 
 <!-- 添加search功能 end -->
 

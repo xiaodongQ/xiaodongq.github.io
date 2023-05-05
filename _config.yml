@@ -6,18 +6,20 @@
 # 'jekyll serve'. If you change this file, please restart the server process.
 
 # Site settings
-title: xdargs
-brief-intro: Weak Coder
+title: ' '
+brief-intro: ' '
 baseurl: "" # the subpath of your site, e.g. /blog
 url: "https://xiaodongq.github.io" # the base hostname & protocol for your site
 
 permalink: /:year/:month/:day/:title/
+gitalk_clientid: 05cc3f2bd6f6a938b0b0
+gitalk_secret: a71068a0f954e9a558d36a022327d9d179ea2c8b
 
 # other links
 github_username: xiaodongQ
 email: xiaodong0795@163.com
 
-description_footer: 记录技术学习
+description_footer: 
 
 # comments
 # two ways to comment, only choose one, and use your own short name
@@ -33,11 +35,21 @@ baidu_tongji_id: cf8506e0ef223e57ff6239944e5d46a4
 google_analytics_id: UA-5111238766-4 # google 分析追踪id
 
 # Build settings
+highlighter: rouge
 markdown: kramdown
-
 kramdown:
+  math_engine: mathjax
+  auto_ids:       true
+  toc_levels:     1..4
   input: GFM
   syntax_highlighter: rouge
+  syntax_highlighter_opts:
+    css_class: 'highlight'
+    span:
+      line_numbers: false
+    block:
+      line_numbers: true
+      start_line: 1
 
 # port
 # port: 1234
@@ -46,12 +58,13 @@ kramdown:
 category_dir: category/
 tag_dir: tag/
 
-# excerpt
+# excerpt 摘要分割
 excerpt_separator: "\n\n\n\n"
 
 # paginate
-gems: [jekyll-paginate]
-paginate: 10
+#gems: [jekyll-paginate]
+#paginate: 6
 
-plugins:
+gems:
   - jekyll-paginate
+paginate: 15

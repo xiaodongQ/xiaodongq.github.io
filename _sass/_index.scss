@@ -13,16 +13,17 @@
                 list-style: none;
             }
             li {
-                color: #333;
+                color: #212529;
                 h2 {
                     border: none;
-                    font-size: 27px;
+                    font-size: 18px;
                     margin: 0;
                 }
                 .label {
                     margin-bottom: 15px;
                     overflow: hidden;
                     .label-card {
+                        color: #888;
                         float: left;
                         margin-right: 15px;
                         i {
@@ -78,6 +79,7 @@
         }
     }
     .right {
+        visibility: hidden;
         .wrap {
             .side {
                 margin-bottom: 20px;
@@ -153,7 +155,7 @@
     .page[index] {
         .left>ul li {
             h2 {
-                font-size: 22px;
+                font-size: 18px;
             }
             .excerpt {
                 h2 {

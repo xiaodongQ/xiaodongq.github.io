@@ -1,11 +1,12 @@
 #markdown-toc {
-    display: none;
+    display: block;
 }
 .page[post] {
     .label {
         margin-top: 16px;
         overflow: hidden;
         .label-card {
+            color: #888;
             float: left;
             margin-right: 15px;
             .point {
@@ -29,10 +30,10 @@
     .left {
         ul {
             >h2 {
-                color: #333;
+                color: #000;
             }
             li {
-                color: #333;
+                color: #212529;
                 margin: 0;
             }
         }
@@ -62,21 +63,24 @@
 @media screen and (max-width: 770px) {
     .page[post] {
         .left {
-            font-size: 15px;
+            font-size: 14px;
+            h1 {
+                font-size: 21.5px;
+            }
             h2 {
-                font-size: 24px;
+                font-size: 18.5px;
             }
             h3 {
-                font-size: 20px;
+                font-size: 19px;
             }
             h4 {
                 font-size: 18px;
             }
             h5 {
-                font-size: 16px;
+                font-size: 17px;
             }
             h6 {
-                font-size: 15px;
+                font-size: 16px;
             }
         }
     }

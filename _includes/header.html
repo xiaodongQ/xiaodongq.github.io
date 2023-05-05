@@ -9,14 +9,15 @@
                     {% if page.url == '/' %}
                     <a class="active" href="{{site.baseurl}}/">
                         {% else %}
-                    <a href="{{site.baseurl}}/">
-                    {% endif %}
-                        <i class="fa fa-home"></i>Home
-                    </a>
+                        <a href="{{site.baseurl}}/">
+                            {% endif %}
+                            <i class="fa fa-home"></i>主页
+                        </a>
                 </li>
 
                 {% for my_page in site.pages %}
-                    {% if my_page.type == 'page' %}
+                {% if my_page.type == 'page' and my_page.url != '/tag/' and my_page.url != '/about/' and my_page.url !=
+                '/collection/' %}
                     <li>
                         {% if my_page.url == page.url %}
                         <a class="active" href="{{ my_page.url | prepend: site.baseurl }}">
@@ -28,6 +29,11 @@
                     </li>
                     {% endif %}
                 {% endfor %}
+                <li>
+                    <a id="cb-search-btn">
+                        <i class=" fa fa-search"></i> 搜索
+                    </a>
+                </li>
             </ul>
         </nav>
     </div>
