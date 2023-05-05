@@ -167,8 +167,7 @@
         display: none;
     }
     .right {
-        // visibility: hidden;
-        visibility: visible;
+        visibility: hidden;
         float: left;
         width: 25%;
         padding-left: 20px;
@@ -263,8 +262,7 @@
         }
         .anchor {
             display: block;
-            // visibility: hidden;
-            visibility: visible;
+            visibility: hidden;
             position: fixed;
             top: 76px;
             right: 2.5%;
