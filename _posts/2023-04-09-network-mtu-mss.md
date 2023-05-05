@@ -21,7 +21,6 @@ tags: 网络
 * MTU(Maximum Transmission Unit，最大传输单元) 指的是二层协议（即数据链路层）里面的最大传输单元，一般MTU都是1500。
 	- 1500是一个平衡折衷的结果，太大的MTU出错概率更大、重传代价更大、对设备性能要求更高（以太网是分组交换网络，路由设备或交换机转发下一跳前需要存储未发完的数据）
 	- 而太小则传输效率更低
-![MSS_pkg](https://raw.githubusercontent.com/xiaodongQ/xiaodongq.github.io/master/images/MSS_pkg.png)
 * MUT长度图示（未包含以太网头信息 14字节 和 尾部校验和FCS 4字节）：
 
 ![报文MTU长度](https://www.kawabangga.com/wp-content/uploads/2023/03/ethernet-mtu.jpeg)
@@ -63,7 +62,7 @@ MSS(Maximum Segment Size，最大报文长度) 指的是 TCP 层的最大传输�
 
 * 协商过程查看
 
-抓包如下：![MSS_pkg](https://raw.githubusercontent.com/xiaodongQ/xiaodongq.github.io/master/images/MSS_pkg.png)
+抓包如下：![MSS_pkg](/images/2023-04-09-mss-pkg.png)
 
 可看到三次握手时，src端(客户端)MSS=1460, dst端(网站服务端)MSS=1452，协商后数据传输时Len=1452，展开看TCP头时也可看到`[TCP Segment Len: 1452]`
 
@@ -99,9 +98,6 @@ MSS(Maximum Segment Size，最大报文长度) 指的是 TCP 层的最大传输�
 	- 3、到linux端开启抓包 `tcpdump -i enp4s0 -s 0 -w set_mss50_scp.pcap -v`
 	- 4、scp拷贝文件，结束后停止抓包。获取抓包文件后wireshark分析
 	- 5、清理iptables规则，重新设置mss为1000，抓包为`set_mss1000_scp.pcap`
-
-
-* ![ceshi](/images/2023-05-05-17-06-58.png)
 
 
 ## 收获
