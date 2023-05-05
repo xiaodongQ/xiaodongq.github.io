@@ -82,5 +82,6 @@ tags: jekyll
 ### 更新博客框架
 
 简化博客风格，借用[wenfh2020](https://wenfh2020.com/)的风格。
+![示例](images/2023-05-05-21-51-21.png)
 
 参考：[github + jekyll 搭建博客](https://wenfh2020.com/2020/02/17/make-blog/)
