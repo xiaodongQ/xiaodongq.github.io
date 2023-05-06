@@ -26,7 +26,7 @@ MTU(Maximum Transmission Unit，最大传输单元) 指的是二层协议（也�
 
 * MTU长度图示（未包含以太网头信息 14字节 和 尾部校验和FCS 4字节）
 
-![以太帧MTU长度示意](images/2023-05-06-17-00-50.png)
+![以太帧MTU长度示意](/images/2023-05-06-17-00-50.png)
 [原图片来源](https://www.kawabangga.com/posts/4983)
 
 * 一个标准的以太网数据帧的长度为：**`1500 + 14 + 4 = 1518` 字节**
