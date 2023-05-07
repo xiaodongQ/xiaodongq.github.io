@@ -38,15 +38,16 @@ MTU长度图示（传输层以TCP为例，未包含以太网头信息 14字节 �
 
 若要保证以太帧不超过MTU，就需要各上层协议保证其最大的数据长度。比如对于MTU 1500来说：
 
-1、IP层需要保证其`Packet`数据不超过 `1500 - 20 = 1480 字节`(减去20字节IP报文头)
-2、TCP层需要保证其`Segment`数据(即下述的MSS)不超过 `1480 - 20 = 1460 字节`(IP Package内容长度减去TCP头)
+1. IP层需要保证其`Packet`数据不超过 `1500 - 20 = 1480 字节`(减去20字节IP报文头)
+2. TCP层需要保证其`Segment`数据(即下述的MSS)不超过 `1480 - 20 = 1460 字节`(IP Package内容长度减去TCP头)
 
 示例：传输2000byte的数据，MTU为1500，就需要进行分片传输。若为tcp协议，1500中包含20byte的IP头+20byte的TCP头，每个分片最大payload数据长度为1460，需要分两个分片：1460、540；若为icmp，则分片1480+520
 
 上层协议（如TCP层）如何知道二层(数据链路层)的MTU？
-    - 网卡驱动知道 2 层的 MTU 是多少；
-    - 3 层协议栈 IP 会问网卡驱动 MTU 是多少；
-    - 4 层协议 TCP 会问 IP Max Datagram Data Size (MDDS) 是多少；
+
+* 网卡驱动知道 2 层的 MTU 是多少；
+* 3 层协议栈 IP 会问网卡驱动 MTU 是多少；
+* 4 层协议 TCP 会问 IP Max Datagram Data Size (MDDS) 是多少；
 
 ### 1.3. MSS
 
@@ -84,8 +85,7 @@ kernel的协议栈会将数据(TCP/UDP)拆分为IP层正好能处理的长度发
 
 开启wireshark抓包，浏览器进入网站 `www.baidu.com`，而后停止抓包，过滤包`tcp contains "baidu"`
 
-协商过程查看：  
-抓包如图：![MSS_pkg](/images/2023-04-09-mss-pkg.png)
+协商过程查看：抓包如图：![MSS_pkg](/images/2023-04-09-mss-pkg.png)
 
 可看到三次握手时，src端(客户端)MSS=1460, dst端(网站服务端)MSS=1452，协商后数据传输时Len=1452，展开看TCP头时也可看到`[TCP Segment Len: 1452]`
 
@@ -102,9 +102,10 @@ kernel的协议栈会将数据(TCP/UDP)拆分为IP层正好能处理的长度发
 
 ### 2.3. ping 测试
 
-环境说明：主机1：mac笔记本(192.168.1.2) + 主机2：linux pc主机(192.168.1.150)
+环境说明：  
+主机1：mac笔记本(192.168.1.2) + 主机2：linux pc主机(192.168.1.150)
 
-1、 测试1：两端MTU均1500，ping packagesize 2000
+1. 测试1：两端MTU均1500，ping packagesize 2000
 
     主机1启动wireshark，ping主机2，`ping 192.168.1.2 -s 2000`(指定要发送的数据长度，默认56，不包含8字节ICMP头)，保存抓包文件：[ping-s2000.pcapng](/images/srcfiles/ping-s2000.pcapng)
 
@@ -112,7 +113,7 @@ kernel的协议栈会将数据(TCP/UDP)拆分为IP层正好能处理的长度发
     1）可看到请求和响应的ip报文都有两个分片(fragment)，第1个分片的ip报文1500，第2个548。  
     2）请求报文：其中第1个分片中20byte是IP头，1480是ICMP数据，IP头Flags中的`More fragments`为1，表示本package还有更多分片，`Fragment Offset`是0；第2个分片，548-20=528，其中包含了ICMP头(8字节)，ICMP数据为520。所以发送的数据长度为`1480+520+8=2008`(说明-s数据长度不包含ip头)
 
-2、 测试2：对端MTU 500，本端1500，ping packagesize 2000
+2. 测试2：对端MTU 500，本端1500，ping packagesize 2000
 
     到主机2设置MSS `ifconfig enp4s0 mtu 500 up`，而后ping主机2
 
@@ -120,7 +121,7 @@ kernel的协议栈会将数据(TCP/UDP)拆分为IP层正好能处理的长度发
     1）请求2个分片，依旧是1500+548  
     2）应答5个分片，4个500byte和1个108byte的ip分片，数据长度：`480*4+88=2008`（不包含每个分片中的ip头，包含完整package的icmp头）
 
-3、 测试3：对端MTU 1500，本端500，ping packagesize 2000
+3. 测试3：对端MTU 1500，本端500，ping packagesize 2000
 
     到主机1设置MSS `sudo ifconfig en0 mtu 500 up`，而后ping主机2
 
@@ -129,9 +130,10 @@ kernel的协议栈会将数据(TCP/UDP)拆分为IP层正好能处理的长度发
 
 ### 2.4. scp 测试
 
-环境说明：主机1：mac笔记本(192.168.1.2) + 主机2：linux pc主机(192.168.1.150)
+环境说明：  
+主机1：mac笔记本(192.168.1.2) + 主机2：linux pc主机(192.168.1.150)
 
-1、 测试1：到主机2设置MSS，主机1上开启抓包，并进行文件下载
+1. 测试1：到主机2设置MSS，主机1上开启抓包，并进行文件下载
 
 ```sh
 # 1、主机2上生成测试2000字节大小文件，用于scp测试
@@ -171,6 +173,6 @@ scp root@192.168.1.150:/home/xd/workspace/experiment/temp.dat .
 
 ## 3. 参考
 
-1. [知识星球实验案例](https://t.zsxq.com/0cOVm843F)
-2. [有关 MTU 和 MSS 的一切](https://www.kawabangga.com/posts/4983)
-3. [什么是MTU（Maximum Transmission Unit）？](https://info.support.huawei.com/info-finder/encyclopedia/zh/MTU.html)
+1、[知识星球实验案例](https://t.zsxq.com/0cOVm843F)
+2、[有关 MTU 和 MSS 的一切](https://www.kawabangga.com/posts/4983)
+3、[什么是MTU（Maximum Transmission Unit）？](https://info.support.huawei.com/info-finder/encyclopedia/zh/MTU.html)
