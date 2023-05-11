@@ -173,6 +173,6 @@ scp root@192.168.1.150:/home/xd/workspace/experiment/temp.dat .
 
 ## 3. 参考
 
-1、[知识星球实验案例](https://t.zsxq.com/0cOVm843F)
-2、[有关 MTU 和 MSS 的一切](https://www.kawabangga.com/posts/4983)
-3、[什么是MTU（Maximum Transmission Unit）？](https://info.support.huawei.com/info-finder/encyclopedia/zh/MTU.html)
+1. [知识星球实验案例](https://t.zsxq.com/0cOVm843F)
+2. [有关 MTU 和 MSS 的一切](https://www.kawabangga.com/posts/4983)
+3. [什么是MTU（Maximum Transmission Unit）？](https://info.support.huawei.com/info-finder/encyclopedia/zh/MTU.html)
