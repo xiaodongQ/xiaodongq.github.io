@@ -153,19 +153,19 @@ scp root@192.168.1.150:/home/xd/workspace/experiment/temp.dat .
 
 * **疑问(TODO)**
 
-使用该方式看报文交互没限制成功？三次握手时两端MSS是100和1460，传输时有132、256、1048等大小的tcp segment。以下尝试后仍有该问题
-    1）尝试OUTPUT、FORWARD都添加规则
+使用该方式看报文交互没限制成功？三次握手时两端MSS是100和1460，传输时有132、256、1048等大小的tcp segment。以下尝试后仍有该问题  
+    1）尝试OUTPUT、FORWARD都添加规则  
     2）尝试参考文章中关闭TSO(TCP Segment Offload)结果也一样(offload相关的选项都关闭了)，还是有超出100byte的包  
     offload：![2023-05-07-offload](/images/2023-05-07-offload.png)
 
 ```sh
-    # 查看网卡offload
-    ethtool -k enp4s0 |grep offload
-    # 关闭offload相关配置
-    ethtool -K enp4s0 tx off
-    ethtool -K enp4s0 generic-receive-offload off
-    ethtool -K enp4s0 rx-vlan-offload off
-    ethtool -K enp4s0 tx-vlan-offload off
+# 查看网卡offload
+ethtool -k enp4s0 |grep offload
+# 关闭offload相关配置
+ethtool -K enp4s0 tx off
+ethtool -K enp4s0 generic-receive-offload off
+ethtool -K enp4s0 rx-vlan-offload off
+ethtool -K enp4s0 tx-vlan-offload off
 ```
 
 * 两端均限制MSS大小后是正常的，但是实际场景中一般是只有某一端才有问题。上述问题还待明确原因。
