@@ -154,7 +154,7 @@ scp root@192.168.1.150:/home/xd/workspace/experiment/temp.dat .
 * **疑问(TODO)**
 
 使用该方式看报文交互没限制成功？三次握手时两端MSS是100和1460，传输时有132、256、1048等大小的tcp segment。以下尝试后仍有该问题  
-    1）尝试OUTPUT、FORWARD都添加规则  
+    1）尝试OUTPUT、FORWARD都添加规则(FORWARD规则链对应转发，两台主机在同一个子网中，所以此处其实用不着)  
     2）尝试参考文章中关闭TSO(TCP Segment Offload)结果也一样(offload相关的选项都关闭了)，还是有超出100byte的包  
     offload：![2023-05-07-offload](/images/2023-05-07-offload.png)
 
@@ -170,6 +170,75 @@ ethtool -K enp4s0 tx-vlan-offload off
 
 * 两端均限制MSS大小后是正常的，但是实际场景中一般是只有某一端才有问题。上述问题还待明确原因。
 * 星球里面提问，答主给的一个思路是iptables trace跟踪下iptables的规则是否生效。上述抓包中其实能看到握手时主机2通告的MSS是100，规则是生效的。此处了解下iptables trace使用(待实验)。
+
+scp的抓包里ssh协议本身和数据传输混在一起，不容易区分包内容，调整成以下通过http服务来验证。
+
+## http服务验证
+
+验证方式：
+
+1. 在主机1 生成20KB的测试文件temp.dat，在当前目录起http服务：`python -m SimpleHTTPServer`，默认为8000端口
+2. 在主机2 开启抓包，再wget文件
+
+以下记录几次不同尝试(主要通过Claude确定排查思路，类似chatgpt，优势在于免梯子且可在slack客户端交互)：
+
+1. 尝试1：客户端服务端均设置mss为100，均关闭网卡offload
+
+```sh
+iptables -I OUTPUT -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 100
+# -K将下面网卡各项offload相关功能都关闭
+ethtool -k enp4s0 |grep offload
+```
+
+结果：  
+    抓包查看，握手时客户端及服务端的MSS均为100，但是后面还是出现了超过100字节的包。
+
+思考：  
+    利用wireshark里的Statistics->TCP Stream Graphs->Window Scaling查看发送包大小变化：慢慢上升、阶梯上升后再下降、再上升而后下降，像是TCP慢启动过程和拥塞避免过程。  
+    在连接建立后，TCP协议本身的一些机制可以通过协商使用更大的包来改写这个限制，所以数据包传输可能还是超过100字节。比如window scale、SACK、nagle
+
+2. 尝试2：关闭Window scale
+
+三次握手后，TCP进入滑动窗口阶段，通过窗口扩展可以使实际拥塞窗口大于100字节，所以数据包可以大于100字节。
+
+所以进行以下实验，在尝试1设置mss为100且关闭offload基础上，两端均操作：
+
+1）尝试`echo 0 >/proc/sys/net/ipv4/tcp_window_scaling`，在两端都禁用window scale，结果：失败，依旧超出100字节  
+2）尝试`iptables -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu`，协商MTU不超过路径MTU的大小，结果：失败
+
+3. 尝试3：关闭SACK
+
+一些TCP选项或扩展如SACK可以使包头变大，也会导致实际发送的数据包大于100字节。SACK主要作用于连接的慢启动阶段，一旦连接进入拥塞避免阶段，删除SACK选项就无法立即生效。  
+抓包看三次握手中，Options里的 SACK 为permitted。
+
+在尝试1、2的设置基础上，再在两端设置内核参数关闭SACK，`sysctl -w net.ipv4.tcp_sack=0`
+
+结果：  
+    失败。三次握手时SACK不支持了，但是还是有超出100字节的包。
+
+4. 尝试4：排除Nagle算法影响
+
+Nagle算法的原理是将多个较小的数据包合并成一个较大的数据包进行发送。  
+不过一般是将小于MSS的小包缓冲起来，超过MSS后进行发送，跟上述现象里发送超出MSS很多(MSS100，有时有1600多字节的包)的情形不符。总之，(在之前尝试设置基础上)先关闭客户端和服务端的Nagle算法使能。
+
+服务端：  
+    /usr/lib64/python2.7/SocketServer.py备份后修改  
+    1）StreamRequestHandler类中`disable_nagle_algorithm=False`置`True`，添加打印  
+    2）TCPServer类中`__init__`(影响所有连接)，setsockopt新增`TCP_NODELAY`选项设置，置1，添加打印
+
+另外，服务端添加打印观察send buff，为26400，添加设置前后打印还是这个值（？TODO），只打印了一次，可能时机晚了？
+
+结果：  
+    失败。python启动时、接收连接时显示设置生效，但包超过100字节。
+
+客户端：
+    wget和curl没找到禁用nagle选项。写客户端demo实现，claude生成一份go代码，设置nodelay
+
+结果：  
+    失败。
+
+小结：  
+    暂未找到根因，先留坑了。
 
 ## 3. 参考
 
