@@ -10,8 +10,6 @@ tags: 网络
 
 网络案例实践：设置机器的MTU和MSS。通过案例理解MTU和TCP MSS协商。
 
-
-
 ## 1. 概念
 
 主要参考laixintao 老师的文章：[有关 MTU 和 MSS 的一切](https://www.kawabangga.com/posts/4983)
@@ -107,26 +105,26 @@ kernel的协议栈会将数据(TCP/UDP)拆分为IP层正好能处理的长度发
 
 1、 测试1：两端MTU均1500，ping packagesize 2000
 
-    主机1启动wireshark，ping主机2，`ping 192.168.1.2 -s 2000`(指定要发送的数据长度，默认56，不包含8字节ICMP头)，保存抓包文件：[ping-s2000.pcapng](/images/srcfiles/ping-s2000.pcapng)
+主机1启动wireshark，ping主机2，`ping 192.168.1.2 -s 2000`(指定要发送的数据长度，默认56，不包含8字节ICMP头)，保存抓包文件：[ping-s2000.pcapng](/images/srcfiles/ping-s2000.pcapng)
 
-    抓包如图：![2023-05-07-ping_s2000_mtu1500](/images/2023-05-07-ping_s2000_mtu1500.png)  
-    1）可看到请求和响应的ip报文都有两个分片(fragment)，第1个分片的ip报文1500，第2个548。  
-    2）请求报文：其中第1个分片中20byte是IP头，1480是ICMP数据，IP头Flags中的`More fragments`为1，表示本package还有更多分片，`Fragment Offset`是0；第2个分片，548-20=528，其中包含了ICMP头(8字节)，ICMP数据为520。所以发送的数据长度为`1480+520+8=2008`(说明-s数据长度不包含ip头)
+抓包如图：![2023-05-07-ping_s2000_mtu1500](/images/2023-05-07-ping_s2000_mtu1500.png)  
+1）可看到请求和响应的ip报文都有两个分片(fragment)，第1个分片的ip报文1500，第2个548。  
+2）请求报文：其中第1个分片中20byte是IP头，1480是ICMP数据，IP头Flags中的`More fragments`为1，表示本package还有更多分片，`Fragment Offset`是0；第2个分片，548-20=528，其中包含了ICMP头(8字节)，ICMP数据为520。所以发送的数据长度为`1480+520+8=2008`(说明-s数据长度不包含ip头)
 
 2、 测试2：对端MTU 500，本端1500，ping packagesize 2000
 
-    到主机2设置MSS `ifconfig enp4s0 mtu 500 up`，而后ping主机2
+到主机2设置MSS `ifconfig enp4s0 mtu 500 up`，而后ping主机2
 
-    抓包如图：![2023-05-07-ping-s2000-smtu1500-d500](/images/2023-05-07-ping-s2000-smtu1500-d500.png)  
-    1）请求2个分片，依旧是1500+548  
-    2）应答5个分片，4个500byte和1个108byte的ip分片，数据长度：`480*4+88=2008`（不包含每个分片中的ip头，包含完整package的icmp头）
+抓包如图：![2023-05-07-ping-s2000-smtu1500-d500](/images/2023-05-07-ping-s2000-smtu1500-d500.png)  
+1）请求2个分片，依旧是1500+548  
+2）应答5个分片，4个500byte和1个108byte的ip分片，数据长度：`480*4+88=2008`（不包含每个分片中的ip头，包含完整package的icmp头）
 
 3、 测试3：对端MTU 1500，本端500，ping packagesize 2000
 
-    到主机1设置MSS `sudo ifconfig en0 mtu 500 up`，而后ping主机2
+到主机1设置MSS `sudo ifconfig en0 mtu 500 up`，而后ping主机2
 
-    抓包如图：![2023-05-07-ping-s2000-smtu500-d1500](/images/2023-05-07-ping-s2000-smtu500-d1500.png)  
-    和上一个场景相反，请求报文拆成5个ip分片。
+抓包如图：![2023-05-07-ping-s2000-smtu500-d1500](/images/2023-05-07-ping-s2000-smtu500-d1500.png)  
+和上一个场景相反，请求报文拆成5个ip分片。
 
 ### 2.4. scp 测试
 
@@ -173,16 +171,16 @@ ethtool -K enp4s0 tx-vlan-offload off
 
 scp的抓包里ssh协议本身和数据传输混在一起，不容易区分包内容，调整成以下通过http服务来验证。
 
-## http服务验证
+## 3. http服务验证
 
 验证方式：
 
 1. 在主机1 生成20KB的测试文件temp.dat，在当前目录起http服务：`python -m SimpleHTTPServer`，默认为8000端口
 2. 在主机2 开启抓包，再wget文件
 
-以下记录几次不同尝试(主要通过Claude确定排查思路，类似chatgpt，优势在于免梯子且可在slack客户端交互)：
+以下记录几次不同尝试(主要通过Claude确定排查思路，类似chatgpt，优势在于免梯子且可在slack客户端交互)
 
-1、 尝试1：客户端服务端均设置mss为100，均关闭网卡offload
+### 3.1. 尝试1：客户端服务端均设置mss为100，均关闭网卡offload
 
 ```sh
 iptables -I OUTPUT -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 100
@@ -196,57 +194,62 @@ iptables -vL OUTPUT
 ```
 
 结果：  
-    抓包查看，握手时客户端及服务端的MSS均为100，但是后面还是出现了超过100字节的包。  
-    `iptables -vL OUTPUT` 看添加的规则是生效的。
+抓包查看，握手时客户端及服务端的MSS均为100，但是后面还是出现了超过100字节的包。
+`iptables -vL OUTPUT` 看添加的规则是生效的。
 
 思考：  
-    利用wireshark里的Statistics->TCP Stream Graphs->Window Scaling查看发送包大小变化：慢慢上升、阶梯上升后再下降、再上升而后下降，像是TCP慢启动过程和拥塞避免过程。  
-    在连接建立后，TCP协议本身的一些机制可以通过协商使用更大的包来改写这个限制，所以数据包传输可能还是超过100字节。比如window scale、SACK、nagle
+利用wireshark里的Statistics->TCP Stream Graphs->Window Scaling查看发送包大小变化：慢慢上升、阶梯上升后再下降、再上升而后下降，像是TCP慢启动过程和拥塞避免过程。
 
-2、 尝试2：关闭Window scale
+在连接建立后，TCP协议本身的一些机制可以通过协商使用更大的包来改写这个限制，所以数据包传输可能还是超过100字节。比如window scale、SACK、nagle
 
-三次握手后，TCP进入滑动窗口阶段，通过窗口扩展可以使实际拥塞窗口大于100字节，所以数据包可以大于100字节。
+### 3.2. 尝试2：关闭Window scale
 
-所以进行以下实验，在尝试1设置mss为100且关闭offload基础上，两端均操作：
+三次握手后，TCP进入滑动窗口阶段，通过窗口扩展可以使实际拥塞窗口大于100字节，所以数据包可以大于100字节。所以进行以下实验。
 
-1）尝试`echo 0 >/proc/sys/net/ipv4/tcp_window_scaling`，在两端都禁用window scale，结果：失败，依旧超出100字节  
-2）尝试`iptables -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu`，协商MTU不超过路径MTU的大小，结果：失败
+在上述设置mss为100且关闭offload基础上，两端均操作：
 
-3、 尝试3：关闭SACK
+1）尝试`echo 0 >/proc/sys/net/ipv4/tcp_window_scaling`，在两端都禁用window scale  
+    结果：失败，依旧超出100字节  
+2）尝试`iptables -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu`，协商MTU不超过路径MTU的大小  
+    结果：失败
 
-一些TCP选项或扩展如SACK可以使包头变大，也会导致实际发送的数据包大于100字节。SACK主要作用于连接的慢启动阶段，一旦连接进入拥塞避免阶段，删除SACK选项就无法立即生效。  
+### 3.3. 尝试3：关闭SACK
+
+一些TCP选项或扩展如SACK可以使包头变大，也会导致实际发送的数据包大于100字节。SACK主要作用于连接的慢启动阶段，一旦连接进入拥塞避免阶段，删除SACK选项就无法立即生效。
+
 抓包看三次握手中，Options里的 SACK 为permitted。
 
-在尝试1、2的设置基础上，再在两端设置内核参数关闭SACK，`sysctl -w net.ipv4.tcp_sack=0`
+在尝试1、2的设置基础上，再在两端设置内核参数关闭SACK：`sysctl -w net.ipv4.tcp_sack=0`
 
-结果：  
-    失败。三次握手时SACK不支持了，但是还是有超出100字节的包。
+结果：失败，三次握手时看没有SACK支持了，但是还是有超出100字节的包。
 
-4、 尝试4：排除Nagle算法影响
+### 3.4. 尝试4：排除Nagle算法影响
 
-Nagle算法的原理是将多个较小的数据包合并成一个较大的数据包进行发送。  
-不过一般是将小于MSS的小包缓冲起来，超过MSS后进行发送，跟上述现象里发送超出MSS很多(MSS100，有时有1600多字节的包)的情形不符。总之，(在之前尝试设置基础上)先关闭客户端和服务端的Nagle算法使能。
+Nagle算法的原理是将多个较小的数据包合并成一个较大的数据包进行发送。
+
+不过一般是将小于MSS的小包缓冲起来，超过MSS后进行发送，跟上述现象里发送超出MSS很多(MSS100，有时有1600多字节的包)的情形不符。
+
+总之，(在之前尝试设置基础上)先关闭客户端和服务端的Nagle算法使能。
 
 服务端：  
-    /usr/lib64/python2.7/SocketServer.py备份后修改  
+    将/usr/lib64/python2.7/SocketServer.py备份后修改  
     1）StreamRequestHandler类中`disable_nagle_algorithm=False`置`True`，添加打印  
     2）TCPServer类中`__init__`(影响所有连接)，setsockopt新增`TCP_NODELAY`选项设置，置1，添加打印
 
-结果：  
-    失败。python启动时、接收连接时显示设置生效，但包超过100字节。
+结果：失败，python启动时、接收连接时显示设置生效，但包还是超过100字节。
 
-    另外，服务端添加打印观察send buff，为26400，python模块添加设置send buff，设置前后打印还是这个值（？TODO），只打印了一次，可能时机晚了？
+* 另外，在服务端添加打印观察send buff，为26400，python模块添加设置send buff，设置前后打印还是这个值（？TODO），只打印了一次，可能时机晚了？
 
-客户端：
-    wget和curl没找到禁用nagle选项。写客户端demo实现，claude生成一份go代码，设置nodelay
+客户端：  
+    wget和curl没找到禁用nagle选项。写客户端demo实现文件下载：用claude生成一份go代码，设置nodelay
 
-结果：  
-    失败。
+结果：失败。
 
-小结：  
-    暂未找到根因，标记一下，先留坑了orz。。
+### 3.5. 小结
 
-## 3. 参考
+暂未找到根因，TCP数据交互过程中还有其他因素影响。标记一下，先留坑了orz。。
+
+## 4. 参考
 
 1. [知识星球实验案例](https://t.zsxq.com/0cOVm843F)
 2. [有关 MTU 和 MSS 的一切](https://www.kawabangga.com/posts/4983)
