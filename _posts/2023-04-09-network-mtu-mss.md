@@ -10,6 +10,8 @@ tags: 网络
 
 网络案例实践：设置机器的MTU和MSS。通过案例理解MTU和TCP MSS协商。
 
+
+
 ## 1. 概念
 
 主要参考laixintao 老师的文章：[有关 MTU 和 MSS 的一切](https://www.kawabangga.com/posts/4983)
@@ -41,11 +43,11 @@ MTU长度图示（传输层以TCP为例，未包含以太网头信息 14字节 �
 
 示例：传输2000byte的数据，MTU为1500，就需要进行分片传输。若为tcp协议，1500中包含20byte的IP头+20byte的TCP头，每个分片最大payload数据长度为1460，需要分两个分片：1460、540；若为icmp，则分片1480+520
 
-上层协议（如TCP层）如何知道二层(数据链路层)的MTU？
+* 上层协议（如TCP层）如何知道二层(数据链路层)的MTU？
 
-* 网卡驱动知道 2 层的 MTU 是多少；
-* 3 层协议栈 IP 会问网卡驱动 MTU 是多少；
-* 4 层协议 TCP 会问 IP Max Datagram Data Size (MDDS) 是多少；
+    * 网卡驱动知道 2 层的 MTU 是多少；
+    * 3 层协议栈 IP 会问网卡驱动 MTU 是多少；
+    * 4 层协议 TCP 会问 IP Max Datagram Data Size (MDDS) 是多少；
 
 ### 1.3. MSS
 
@@ -59,23 +61,23 @@ SYN 包里面的 TCP option 字段中，会带有 `MSS`，如果不带的话，d
 
 每层协议向下一层协议传输数据时，会确保在其最大长度限制内，但也有各种各样的原因，导致下层收到的数据超出限制，此时各层协议有不同的处理机制。
 
-1、数据链路层
+* 1、数据链路层
 
-超出MTU一般丢弃，依赖上层保证发送的数据不超过MTU。（也有协议支持拆分，如MLPPP）
+    超出MTU一般丢弃，依赖上层保证发送的数据不超过MTU。（也有协议支持拆分，如MLPPP）
 
-2、网络层
+* 2、网络层
 
-若package超出MTU，IP层将其进行IP分片（IP Fragmentation），只有该package的所有fragment都收到后才能进行处理。IP分片会降低传输层传送数据的效率，且会增加数据传送失败率，需要避免IP分片。
+    若package超出MTU，IP层将其进行IP分片（IP Fragmentation），只有该package的所有fragment都收到后才能进行处理。IP分片会降低传输层传送数据的效率，且会增加数据传送失败率，需要避免IP分片。
 
-IP协议头中的 DF(`Don't fragment`)标志位若设置为1，则表示路由设备收到package大小超过MTU时不进行分片，而是丢弃该包。
+    IP协议头中的 DF(`Don't fragment`)标志位若设置为1，则表示路由设备收到package大小超过MTU时不进行分片，而是丢弃该包。
 
-IP分片示意图：
-![ip-fragmentation](https://www.kawabangga.com/wp-content/uploads/2023/04/ip-fragmentation.png)  
-[图片来源](https://www.plixer.com/blog/netflow-security-detecting-ip-fragmentation-exploits-scrutinizer/)
+    IP分片示意图：
+    ![ip-fragmentation](https://www.kawabangga.com/wp-content/uploads/2023/04/ip-fragmentation.png)  
+    [图片来源](https://www.plixer.com/blog/netflow-security-detecting-ip-fragmentation-exploits-scrutinizer/)
 
-3、传输层
+* 3、传输层
 
-kernel的协议栈会将数据(TCP/UDP)拆分为IP层正好能处理的长度发出去，注意此处的拆分是TCP拆成多个segment，在IP层并没有拆分，每个IP package里都包含TCP header。
+    kernel的协议栈会将数据(TCP/UDP)拆分为IP层正好能处理的长度发出去，注意此处的拆分是TCP拆成多个segment，在IP层并没有拆分，每个IP package里都包含TCP header。
 
 ## 2. 实验
 
@@ -100,38 +102,44 @@ kernel的协议栈会将数据(TCP/UDP)拆分为IP层正好能处理的长度发
 
 ### 2.3. ping 测试
 
-环境说明：  
+环境说明：
+
 主机1：mac笔记本(192.168.1.2) + 主机2：linux pc主机(192.168.1.150)
 
-1、 测试1：两端MTU均1500，ping packagesize 2000
+* 1、 测试1：两端MTU均1500，ping packagesize 2000
 
-主机1启动wireshark，ping主机2，`ping 192.168.1.2 -s 2000`(指定要发送的数据长度，默认56，不包含8字节ICMP头)，保存抓包文件：[ping-s2000.pcapng](/images/srcfiles/ping-s2000.pcapng)
+    主机1启动wireshark，ping主机2，`ping 192.168.1.2 -s 2000`(指定要发送的数据长度，默认56，不包含8字节ICMP头)，保存抓包文件：[ping-s2000.pcapng](/images/srcfiles/ping-s2000.pcapng)
 
-抓包如图：![2023-05-07-ping_s2000_mtu1500](/images/2023-05-07-ping_s2000_mtu1500.png)  
-1）可看到请求和响应的ip报文都有两个分片(fragment)，第1个分片的ip报文1500，第2个548。  
-2）请求报文：其中第1个分片中20byte是IP头，1480是ICMP数据，IP头Flags中的`More fragments`为1，表示本package还有更多分片，`Fragment Offset`是0；第2个分片，548-20=528，其中包含了ICMP头(8字节)，ICMP数据为520。所以发送的数据长度为`1480+520+8=2008`(说明-s数据长度不包含ip头)
+    抓包如图：![2023-05-07-ping_s2000_mtu1500](/images/2023-05-07-ping_s2000_mtu1500.png)
 
-2、 测试2：对端MTU 500，本端1500，ping packagesize 2000
+    1）可看到请求和响应的ip报文都有两个分片(fragment)，第1个分片的ip报文1500，第2个548。
 
-到主机2设置MSS `ifconfig enp4s0 mtu 500 up`，而后ping主机2
+    2）请求报文：其中第1个分片中20byte是IP头，1480是ICMP数据，IP头Flags中的`More fragments`为1，表示本package还有更多分片，`Fragment Offset`是0；第2个分片，548-20=528，其中包含了ICMP头(8字节)，ICMP数据为520。所以发送的数据长度为`1480+520+8=2008`(说明-s数据长度不包含ip头)
 
-抓包如图：![2023-05-07-ping-s2000-smtu1500-d500](/images/2023-05-07-ping-s2000-smtu1500-d500.png)  
-1）请求2个分片，依旧是1500+548  
-2）应答5个分片，4个500byte和1个108byte的ip分片，数据长度：`480*4+88=2008`（不包含每个分片中的ip头，包含完整package的icmp头）
+* 2、 测试2：对端MTU 500，本端1500，ping packagesize 2000
 
-3、 测试3：对端MTU 1500，本端500，ping packagesize 2000
+    到主机2设置MSS `ifconfig enp4s0 mtu 500 up`，而后ping主机2
 
-到主机1设置MSS `sudo ifconfig en0 mtu 500 up`，而后ping主机2
+    抓包如图：![2023-05-07-ping-s2000-smtu1500-d500](/images/2023-05-07-ping-s2000-smtu1500-d500.png)
 
-抓包如图：![2023-05-07-ping-s2000-smtu500-d1500](/images/2023-05-07-ping-s2000-smtu500-d1500.png)  
-和上一个场景相反，请求报文拆成5个ip分片。
+    1）请求2个分片，依旧是1500+548
+
+    2）应答5个分片，4个500byte和1个108byte的ip分片，数据长度：`480*4+88=2008`（不包含每个分片中的ip头，包含完整package的icmp头）
+
+* 3、 测试3：对端MTU 1500，本端500，ping packagesize 2000
+
+    到主机1设置MSS `sudo ifconfig en0 mtu 500 up`，而后ping主机2
+
+    抓包如图：![2023-05-07-ping-s2000-smtu500-d1500](/images/2023-05-07-ping-s2000-smtu500-d1500.png)
+
+    和上一个场景相反，请求报文拆成5个ip分片。
 
 ### 2.4. scp 测试
 
 环境说明：  
 主机1：mac笔记本(192.168.1.2) + 主机2：linux pc主机(192.168.1.150)
 
-1、 测试1：到主机2设置MSS，主机1上开启抓包，并进行文件下载
+* 1、 测试1：到主机2设置MSS，主机1上开启抓包，并进行文件下载
 
 ```sh
 # 1、主机2上生成测试2000字节大小文件，用于scp测试
@@ -180,7 +188,7 @@ scp的抓包里ssh协议本身和数据传输混在一起，不容易区分包�
 
 以下记录几次不同尝试(主要通过Claude确定排查思路，类似chatgpt，优势在于免梯子且可在slack客户端交互)
 
-### 3.1. 尝试1：客户端服务端均设置mss为100，均关闭网卡offload
+### 3.1. 尝试1：两端均设置mss为100、关闭网卡offload
 
 ```sh
 iptables -I OUTPUT -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 100
@@ -193,14 +201,16 @@ iptables -Z OUTPUT [n]
 iptables -vL OUTPUT
 ```
 
-结果：  
-抓包查看，握手时客户端及服务端的MSS均为100，但是后面还是出现了超过100字节的包。
-`iptables -vL OUTPUT` 看添加的规则是生效的。
+* 结果：
 
-思考：  
-利用wireshark里的Statistics->TCP Stream Graphs->Window Scaling查看发送包大小变化：慢慢上升、阶梯上升后再下降、再上升而后下降，像是TCP慢启动过程和拥塞避免过程。
+    抓包查看，握手时客户端及服务端的MSS均为100，但是后面还是出现了超过100字节的包。
+    `iptables -vL OUTPUT` 看添加的规则是生效的。
 
-在连接建立后，TCP协议本身的一些机制可以通过协商使用更大的包来改写这个限制，所以数据包传输可能还是超过100字节。比如window scale、SACK、nagle
+* 思考：
+
+    利用wireshark里的Statistics->TCP Stream Graphs->Window Scaling查看发送包大小变化：慢慢上升、阶梯上升后再下降、再上升而后下降，像是TCP慢启动过程和拥塞避免过程。
+
+    在连接建立后，TCP协议本身的一些机制可以通过协商使用更大的包来改写这个限制，所以数据包传输可能还是超过100字节，比如window scale、SACK、nagle。
 
 ### 3.2. 尝试2：关闭Window scale
 
@@ -209,7 +219,8 @@ iptables -vL OUTPUT
 在上述设置mss为100且关闭offload基础上，两端均操作：
 
 1）尝试`echo 0 >/proc/sys/net/ipv4/tcp_window_scaling`，在两端都禁用window scale  
-    结果：失败，依旧超出100字节  
+    结果：失败，依旧超出100字节
+
 2）尝试`iptables -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu`，协商MTU不超过路径MTU的大小  
     结果：失败
 
@@ -221,29 +232,33 @@ iptables -vL OUTPUT
 
 在尝试1、2的设置基础上，再在两端设置内核参数关闭SACK：`sysctl -w net.ipv4.tcp_sack=0`
 
-结果：失败，三次握手时看没有SACK支持了，但是还是有超出100字节的包。
+* 结果
+
+    失败，三次握手时看没有SACK支持了，但是还是有超出100字节的包。
 
 ### 3.4. 尝试4：排除Nagle算法影响
 
 Nagle算法的原理是将多个较小的数据包合并成一个较大的数据包进行发送。
 
-不过一般是将小于MSS的小包缓冲起来，超过MSS后进行发送，跟上述现象里发送超出MSS很多(MSS100，有时有1600多字节的包)的情形不符。
+不过该算法一般是将小于MSS的小包缓冲起来，超过MSS后进行发送，跟上述现象里发送超出MSS很多的情形（MSS100，有时有1600多字节的包）不符。
 
 总之，(在之前尝试设置基础上)先关闭客户端和服务端的Nagle算法使能。
 
-服务端：  
+* 服务端：
+
     将/usr/lib64/python2.7/SocketServer.py备份后修改  
     1）StreamRequestHandler类中`disable_nagle_algorithm=False`置`True`，添加打印  
     2）TCPServer类中`__init__`(影响所有连接)，setsockopt新增`TCP_NODELAY`选项设置，置1，添加打印
 
-结果：失败，python启动时、接收连接时显示设置生效，但包还是超过100字节。
+    * 结果：失败，python启动时、接收连接时显示设置生效，但包还是超过100字节。
 
 * 另外，在服务端添加打印观察send buff，为26400，python模块添加设置send buff，设置前后打印还是这个值（？TODO），只打印了一次，可能时机晚了？
 
-客户端：  
+* 客户端：
+
     wget和curl没找到禁用nagle选项。写客户端demo实现文件下载：用claude生成一份go代码，设置nodelay
 
-结果：失败。
+* 结果：失败。
 
 ### 3.5. 小结
 
