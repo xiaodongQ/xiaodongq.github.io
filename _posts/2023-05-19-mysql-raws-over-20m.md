@@ -8,7 +8,7 @@ tags: MySQL
 * content
 {:toc}
 
-进行实验学习：MySQL单表超过2000万条记录，分析现象。
+实验学习：MySQL单表超过2000万条记录，分析现象。
 
 
 
@@ -20,7 +20,7 @@ tags: MySQL
 
 ## 1. 理论
 
-> 回翻MySQL索引实现的文章：[48 | B+树：MySQL数据库索引是如何实现的？](https://time.geekbang.org/column/article/77830)，结合本文场景加深一下理解。
+回翻MySQL索引实现的文章：[48、B+树：MySQL数据库索引是如何实现的？](https://time.geekbang.org/column/article/77830)，结合本文场景加深一下理解。
 
 * InnoDB索引说明
 
