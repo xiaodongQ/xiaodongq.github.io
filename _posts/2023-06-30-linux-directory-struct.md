@@ -53,9 +53,11 @@ drwxr-xr-x. 2 root root 159744 Sep 12 11:29 dir_0_file
 
 * 链接相关操作查看
 
-    1. 当一个文件拥有多个硬链接时，对文件内容修改，会影响到所有文件名
-    2. 删除一个文件名，不影响另一个文件名的访问，只会使得inode中的链接数减1
-    3. 不能对目录做硬链接
+    1、当一个文件拥有多个硬链接时，对文件内容修改，会影响到所有文件名
+
+    2、删除一个文件名，不影响另一个文件名的访问，只会使得inode中的链接数减1
+
+    3、不能对目录做硬链接
 
 ```sh
 # ln对test.dat创建2个硬链接
@@ -138,10 +140,15 @@ struct ext2_dir_entry_2 {
 * 当前目录：/log (mount查看为ext4文件系统：/dev/mapper/VolGroup-lv_log on /log type ext4)
 
     1) 空目录 ll查看大小： 4096 Sep 22 14:36 tmp (和xfs不同，在xfs上看空目录只占用了6字节)
+
     2) touch tmp/1，大小不变，还是4096
+
     3) touch tmp/222，大小不变，还是4096
+
     4) echo "xxx">tmp/3，还是4096
+
     5) touch 空文件，文件名128字节，还是4096
+
     6) 批量实验：touch 40个空文件，每文件名为100字节，从4096跳到12288(3个blocksize)(此时父目录ll看是不占空间的)
 
 可用`dumpe2fs`查看ext2/3/4文件系统上的超级块和block组的信息(XFS族用 `xfs_info` 查看信息)
@@ -186,10 +193,15 @@ realtime =none                   extsz=4096   blocks=0, rtextents=0
 * inode实验：当前目录为xfs文件系统(mount可查看，/dev/mapper/centos-home on /home type xfs)
 
     1) 空目录 ll查看大小： 6 Sep 21 10:34 tmp
+
     2) touch tmp/1，15 Sep 21 10:34 tmp (新增9字节：上述结构体中，8字节+1字节文件名)
+
     3) touch tmp/222，26 Sep 21 10:36 tmp (新增11字节：8字节+3字节文件名)
+
     4) echo "xxx">tmp/3，35 Sep 21 10:37 tmp (新增9字节，说明和文件内容无关，查看的目录大小只跟文件名长度有关系)
+
     5) touch 空文件，文件名128字节 (目录新增136字节：8字节+128文件名)
+
     6) 批量实验：touch 9个空文件，每文件名为10字节，理论新增长度 (8+10)*9 = 162字节 (查看目录大小，由35 -> 197，和理论一致)
 
 #### 2.3.2. xfs on-disk结构
@@ -206,10 +218,13 @@ realtime =none                   extsz=4096   blocks=0, rtextents=0
 
 * `xxd -l $((8*4096)) -g 1 -a /dev/vdisk/vdisk0008 > xdtmp_xfs`
 
-    - 只获取了AG部分长度数据
-    - -l len 输出<len>个字符后停止
-    - -g bytes 每<bytes>个字符(每两个十六进制字符或者八个二进制数字)之间用一个空格隔开
-    - -a 打开/关闭 autoskip: 用一个单独的 '*' 来代替空行。默认关闭
+    只获取了AG部分长度数据
+
+    -l len 输出<len>个字符后停止
+
+    -g bytes 每<bytes>个字符(每两个十六进制字符或者八个二进制数字)之间用一个空格隔开
+
+    -a 打开/关闭 autoskip: 用一个单独的 '*' 来代替空行。默认关闭
 
 ```sh
 # xdtmp_xfs开始部分内容
@@ -256,9 +271,11 @@ typedef struct xfs_sb {
 
 * 对照代码和上述数据查看
 
-    - sb_magicnum `58 46 53 42`  XFSB (magic number，ASCII值为88 70 83 66)
-    - sb_blocksize `00 00 10 00` block大小4096字节
-    - sb_dblocks `00 00 00 00 74 6c 25 56` 当前的XFS的总大小，单位是block(十进制是：1953244502)
+    sb_magicnum `58 46 53 42`  XFSB (magic number，ASCII值为88 70 83 66)
+
+    sb_blocksize `00 00 10 00` block大小4096字节
+
+    sb_dblocks `00 00 00 00 74 6c 25 56` 当前的XFS的总大小，单位是block(十进制是：1953244502)
 
 xfs相关初始化，相关概念后续深入：
 
