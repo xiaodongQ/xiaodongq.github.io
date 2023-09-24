@@ -22,11 +22,11 @@ tags: 存储
 
 Linux 文件系统会为每个文件分配两个数据结构：索引节点（index node） 和 目录项（directory entry），它们主要用来记录文件的元信息和目录层次结构。
 
-索引节点，也就是inode
+* 索引节点，也就是inode
 
     用来记录文件的元信息，比如 inode 编号、文件大小、访问权限、创建时间、修改时间、数据在磁盘的位置等等。索引节点是文件的唯一标识，它们之间一一对应，也同样都会被存储在硬盘中，所以索引节点同样占用磁盘空间。
 
-目录项，也就是dentry
+* 目录项，也就是dentry
 
     用来记录文件的名字、索引节点指针以及与其他目录项的层级关联关系。多个目录项关联起来，就会形成目录结构，但它与索引节点不同的是，目录项是由内核维护的一个数据结构，不存放于磁盘，而是缓存在内存。
 
@@ -55,13 +55,15 @@ Filesystem                       Inodes IUsed     IFree IUse% Mounted on
 drwxr-xr-x. 2 root root 159744 Sep 12 11:29 dir_0_file
 ```
 
-链接相关操作查看
+* 链接相关操作查看
 
     1、当一个文件拥有多个硬链接时，对文件内容修改，会影响到所有文件名
 
     2、删除一个文件名，不影响另一个文件名的访问，只会使得inode中的链接数减1
 
     3、不能对目录做硬链接
+
+硬链接示例：
 
 ```sh
 # ln对test.dat创建2个硬链接
@@ -110,7 +112,7 @@ struct ext4_inode {
 };
 ```
 
-inode中不定义文件名，是在目录项结构(entry)中定义的
+* inode中不定义文件名，是在目录项结构(entry)中定义的
 
 ```c
 // fs/ext4/ext4.h
@@ -124,7 +126,7 @@ struct ext4_dir_entry {
 };
 ```
 
-ext4里面文件长度宏定义最大长度为255，touch文件名最长只能255，超出会报错 "File name too long"
+* ext4里面文件长度宏定义最大长度为255，touch文件名最长只能255，超出会报错 "File name too long"
 
 查看ext2里文件长度也是255
 
@@ -142,7 +144,7 @@ struct ext2_dir_entry_2 {
 
 #### 2.2.2. ext4下inode实验
 
-当前目录：/log (mount查看为ext4文件系统：/dev/mapper/VolGroup-lv_log on /log type ext4)
+* 当前目录：/log (mount查看为ext4文件系统：/dev/mapper/VolGroup-lv_log on /log type ext4)
 
     1) 空目录 ll查看大小： 4096 Sep 22 14:36 tmp (和xfs不同，在xfs上看空目录只占用了6字节)
 
@@ -197,7 +199,7 @@ log      =internal               bsize=4096   blocks=108559, version=2
 realtime =none                   extsz=4096   blocks=0, rtextents=0
 ```
 
-inode实验：当前目录为xfs文件系统(mount可查看，/dev/mapper/centos-home on /home type xfs)
+* inode实验：当前目录为xfs文件系统(mount可查看，/dev/mapper/centos-home on /home type xfs)
 
     1) 空目录 ll查看大小： 6 Sep 21 10:34 tmp
 
@@ -223,9 +225,9 @@ inode实验：当前目录为xfs文件系统(mount可查看，/dev/mapper/centos
 0000000: 6162 3132 330a                           ab123.
 ```
 
-* 获取磁盘上前32KB信息，`xxd -l $((8*4096)) -g 1 -a /dev/vdisk/vdisk0008 > xdtmp_xfs`
+* 获取磁盘上前面部分信息，`xxd -l $((8*4096)) -g 1 -a /dev/vdisk/vdisk0008 > xdtmp_xfs`
 
-    只获取了AG部分长度数据
+    此处只获取了AG部分长度数据
 
     `-l len` 输出<len>个字符后停止
 
@@ -285,6 +287,29 @@ typedef struct xfs_sb {
     sb_blocksize `00 00 10 00` block大小4096字节
 
     sb_dblocks `00 00 00 00 74 6c 25 56` 当前的XFS的总大小，单位是block(十进制是：1953244502)
+
+> 实际查看XFS的Superblock结构并不需要像上面那样，自己对着RAW格式的硬盘内容挨个对照，这里只是为了给读者一个硬盘如何存储文件系统数据的直观印象。实际上我们在调试时直接使用专业工具即可，如xfs_db。获取主superblock的内容只需要下述命令即可：
+
+* `xfs_db -c "sb 0" -c "p" $your_xfs_dev` (注意要在没mount的时候才能查看)
+
+    `-c`用于指定执行命令，可指定多个，依次执行后结束
+
+    `-c "sb [agno]"` 查看指定AG(allocation group)里的超级块信息
+
+    `-c "p/print"` 打印指定字段的值，未指定则打印当前结构中所有字段
+
+* 也可以`xfs_db /dev/sdb`后进入交互式界面
+
+```sh
+[root@localhost ~]# xfs_db /dev/sdb
+xfs_db> sb 0
+xfs_db> p
+magicnum = 0x58465342
+blocksize = 4096
+dblocks = 244190646
+rblocks = 0
+...
+```
 
 xfs相关初始化，相关概念后续深入：
 
