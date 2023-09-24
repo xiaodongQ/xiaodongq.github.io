@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 从100万空文件占用空间大小看Linux文件系统结构
+title: 从1万空文件占用空间大小看Linux文件系统结构
 categories: 案例实验
 tags: 存储
 ---
@@ -8,7 +8,7 @@ tags: 存储
 * content
 {:toc}
 
-当一个目录中包含100万个空文件时，目录会占用多大的空间？
+当一个目录中包含1万个空文件时，目录会占用多大的空间？
 
 
 
@@ -22,9 +22,13 @@ tags: 存储
 
 Linux 文件系统会为每个文件分配两个数据结构：索引节点（index node） 和 目录项（directory entry），它们主要用来记录文件的元信息和目录层次结构。
 
-索引节点，也就是 inode，用来记录文件的元信息，比如 inode 编号、文件大小、访问权限、创建时间、修改时间、数据在磁盘的位置等等。索引节点是文件的唯一标识，它们之间一一对应，也同样都会被存储在硬盘中，所以索引节点同样占用磁盘空间。
+索引节点，也就是inode
 
-目录项，也就是 dentry，用来记录文件的名字、索引节点指针以及与其他目录项的层级关联关系。多个目录项关联起来，就会形成目录结构，但它与索引节点不同的是，目录项是由内核维护的一个数据结构，不存放于磁盘，而是缓存在内存。
+    用来记录文件的元信息，比如 inode 编号、文件大小、访问权限、创建时间、修改时间、数据在磁盘的位置等等。索引节点是文件的唯一标识，它们之间一一对应，也同样都会被存储在硬盘中，所以索引节点同样占用磁盘空间。
+
+目录项，也就是dentry
+
+    用来记录文件的名字、索引节点指针以及与其他目录项的层级关联关系。多个目录项关联起来，就会形成目录结构，但它与索引节点不同的是，目录项是由内核维护的一个数据结构，不存放于磁盘，而是缓存在内存。
 
 ### 2.1. 查看inode使用
 
@@ -36,7 +40,7 @@ Filesystem                       Inodes IUsed     IFree IUse% Mounted on
 /dev/mapper/VolGroup-lv_root   55304192 80470  55223722    1% /
 ```
 
-创建一个目录dir_0_file，在目录下创建10000个空文件后查看，占用了10001个inode(创建一个文件会消耗一个inode，创建一个目录也是占用1个inode)：
+创建一个目录dir_0_file(ext4文件系统)，在目录下创建10000个空文件后查看，占用了10001个inode(创建一个文件会消耗一个inode，创建一个目录也是占用1个inode)：
 
 ```sh
 [root@localhost xd]# df -i
@@ -44,14 +48,14 @@ Filesystem                       Inodes IUsed     IFree IUse% Mounted on
 /dev/mapper/VolGroup-lv_root   55304192 90471  55213721    1% /
 ```
 
-查看该目录占用大小：
+查看该目录占用大小，占用159744：
 
 ```sh
 [root@localhost xd]# ll
 drwxr-xr-x. 2 root root 159744 Sep 12 11:29 dir_0_file
 ```
 
-* 链接相关操作查看
+链接相关操作查看
 
     1、当一个文件拥有多个硬链接时，对文件内容修改，会影响到所有文件名
 
@@ -106,7 +110,7 @@ struct ext4_inode {
 };
 ```
 
-* inode中不定义文件名，是在目录结构(entry)中定义的
+inode中不定义文件名，是在目录项结构(entry)中定义的
 
 ```c
 // fs/ext4/ext4.h
@@ -120,8 +124,9 @@ struct ext4_dir_entry {
 };
 ```
 
-* ext4里面文件长度宏定义最大长度为255，touch文件名最长只能255，超出会报错 "File name too long"
-* 查看ext2里文件长度也是255
+ext4里面文件长度宏定义最大长度为255，touch文件名最长只能255，超出会报错 "File name too long"
+
+查看ext2里文件长度也是255
 
 ```c
 // fs/ext2/ext2.h
@@ -137,7 +142,7 @@ struct ext2_dir_entry_2 {
 
 #### 2.2.2. ext4下inode实验
 
-* 当前目录：/log (mount查看为ext4文件系统：/dev/mapper/VolGroup-lv_log on /log type ext4)
+当前目录：/log (mount查看为ext4文件系统：/dev/mapper/VolGroup-lv_log on /log type ext4)
 
     1) 空目录 ll查看大小： 4096 Sep 22 14:36 tmp (和xfs不同，在xfs上看空目录只占用了6字节)
 
@@ -153,7 +158,7 @@ struct ext2_dir_entry_2 {
 
 可用`dumpe2fs`查看ext2/3/4文件系统上的超级块和block组的信息(XFS族用 `xfs_info` 查看信息)
 
-```c
+```sh
 // blocksize:4096
 [root@localhost xd]# dumpe2fs -h /dev/mapper/VolGroup-lv_log
 dumpe2fs 1.42.9 (28-Dec-2013)
@@ -177,7 +182,9 @@ Block size:               4096
 
 #### 2.3.1. xfs下inode实验
 
-```c
+查看xfs超级块信息
+
+```sh
 [root@localhost xd]# xfs_info /home
 meta-data=/dev/mapper/centos-home isize=512    agcount=4, agsize=55582208 blks
          =                       sectsz=512   attr=2, projid32bit=1
@@ -190,7 +197,7 @@ log      =internal               bsize=4096   blocks=108559, version=2
 realtime =none                   extsz=4096   blocks=0, rtextents=0
 ```
 
-* inode实验：当前目录为xfs文件系统(mount可查看，/dev/mapper/centos-home on /home type xfs)
+inode实验：当前目录为xfs文件系统(mount可查看，/dev/mapper/centos-home on /home type xfs)
 
     1) 空目录 ll查看大小： 6 Sep 21 10:34 tmp
 
@@ -216,15 +223,15 @@ realtime =none                   extsz=4096   blocks=0, rtextents=0
 0000000: 6162 3132 330a                           ab123.
 ```
 
-* `xxd -l $((8*4096)) -g 1 -a /dev/vdisk/vdisk0008 > xdtmp_xfs`
+* 获取磁盘上前32KB信息，`xxd -l $((8*4096)) -g 1 -a /dev/vdisk/vdisk0008 > xdtmp_xfs`
 
     只获取了AG部分长度数据
 
-    -l len 输出<len>个字符后停止
+    `-l len` 输出<len>个字符后停止
 
-    -g bytes 每<bytes>个字符(每两个十六进制字符或者八个二进制数字)之间用一个空格隔开
+    `-g bytes` 每<bytes>个字符(每两个十六进制字符或者八个二进制数字)之间用一个空格隔开
 
-    -a 打开/关闭 autoskip: 用一个单独的 '*' 来代替空行。默认关闭
+    `-a` 打开/关闭 autoskip: 用一个单独的 '*' 来代替空行。默认关闭
 
 ```sh
 # xdtmp_xfs开始部分内容
@@ -252,6 +259,8 @@ realtime =none                   extsz=4096   blocks=0, rtextents=0
 0001030: 00 00 00 04    0f fd bd 70    0e ff fe f8 00 00 00 00  .......p........
 0001040: 96 f6 5e 64    f1 6b 4b 17    a4 80 93 3f e4 f0 09 c0  ..^d.kK....?....
 ```
+
+xfs超级块结构定义：
 
 ```c
 // fs/xfs/libxfs/xfs_format.h
@@ -299,10 +308,11 @@ int xfs_ag_init_headers(
 
 ## 3. 小结
 
-1. ext4和xfs文件系统的inode结构和空间占用
-2. xfs在磁盘上的结构学习，有点硬。。以后再深入
+1. 实验对照了ext4和xfs文件系统的inode、dentry结构和空间占用
+2. 学习了xfs在磁盘上的结构，有点硬。。以后再深入
 
 ## 4. 参考
 
-1. [说说文件系统](https://www.zhihu.com/column/zorrolang)
-2. [XFS的on-disk组织结构(2)——SuperBlock](https://zhuanlan.zhihu.com/p/352722394)
+1. [新建一个空文件占用多少磁盘空间？](https://mp.weixin.qq.com/s/9YeUEnRnegplftpKlW4ZCA)
+2. [说说文件系统](https://www.zhihu.com/column/zorrolang)
+3. [XFS的on-disk组织结构(2)——SuperBlock](https://zhuanlan.zhihu.com/p/352722394)
