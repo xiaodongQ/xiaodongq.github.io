@@ -72,7 +72,7 @@ layout: default
       <div class="side ">
         <div>
           <i class="fa fa-th-list"></i>
-          文集
+          分类
         </div>
         <ul id="categories-list" class="content-ul" cate>
           {% for category in site.categories %}
@@ -174,12 +174,12 @@ layout: default
 <!-- <script src="https://libs.baidu.com/jquery/2.0.0/jquery.min.js"></script> -->
 <script src="https://cdn.bootcss.com/jquery/1.12.4/jquery.min.js"></script>
 
-<!-- 添加文集排序，有待优化，cat_map 写到 _config.yml -->
+<!-- 添加分类排序，有待优化，cat_map 写到 _config.yml -->
 <script>
   (function () {
     /* 数值越大，越靠前。 */
     var cat_map = {
-      '案例实验': 10000,
+      '案例实验': 9001,
       'C/C++': 9000,
       Linux: 8000,
       '其他': -2
