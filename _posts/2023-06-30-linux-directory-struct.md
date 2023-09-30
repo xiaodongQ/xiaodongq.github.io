@@ -2,7 +2,7 @@
 layout: post
 title: 从1万空文件占用空间大小看Linux文件系统结构
 categories: 案例实验
-tags: 存储
+tags: 存储 文件系统
 ---
 
 * content
@@ -55,7 +55,7 @@ Filesystem                       Inodes IUsed     IFree IUse% Mounted on
 drwxr-xr-x. 2 root root 159744 Sep 12 11:29 dir_0_file
 ```
 
-* 链接相关操作查看
+* 链接相关说明
 
     1、当一个文件拥有多个硬链接时，对文件内容修改，会影响到所有文件名
 
@@ -89,7 +89,7 @@ Change: 2023-09-12 11:37:35.538457863 +0800
 
 #### 2.2.1. ext4中inode和entry结构
 
-基于linux-5.10内核代码查看相关定义。
+查看内核代码中相关定义(基于linux-5.10)。
 
 ```c
 // fs/ext4/ext4.h
@@ -215,7 +215,7 @@ realtime =none                   extsz=4096   blocks=0, rtextents=0
 
 #### 2.3.2. xfs on-disk结构
 
-参考这个系列下的文章，跟着操作查看：[XFS的on-disk组织结构(2)——SuperBlock](https://zhuanlan.zhihu.com/p/352722394)
+参考这个系列下的文章，跟着操作并对照内核代码查看：[XFS的on-disk组织结构(2)——SuperBlock](https://zhuanlan.zhihu.com/p/352722394)
 
 `xxd`是一个十六进制dump工具，可以将二进制文件转换为十六进制表示，并以可读的形式显示。xxd命令可用于显示文件内容、编辑文件等用途
 
