@@ -2,7 +2,7 @@
 layout: post
 title: 服务究竟被谁kill了？ -- 利用audit审计监测
 categories: Linux
-tags: auditd
+tags: audit
 ---
 
 * content
@@ -24,46 +24,29 @@ Linux环境上一个应用服务会被定期异常kill掉，但是未直接找�
 
 网上(同质)资料很多，不贴基本介绍了。
 
-操作：起一个后台脚本，手动kill/调脚本kill监测不到，没效果
-原因：没开启对kill系统调用的审计，通过auditctrl添加规则
-使用命令： `auditctl -a exit,always -F arch=b64 -S kill -F a1=9`
+监测事件需要先通过auditctrl添加规则，开启对kill系统调用的审计
+
+* 使用命令： `auditctl -a exit,always -F arch=b64 -S kill -F a1=9`
+
     `-a <l,a>` 添加规则到l后面，此处指定一直添加到exit后面
+
     `-F f=v` 构建规则，此处`arch=b64`指定64位系统，也可用其他操作符`!=`/`>`/`<`/`>=`等
+
     `-S syscall` 指定系统调用名称或者编号(32位和64位的编号不同)
+
     `-F a1=9` a0, a1, a2, a3这四个参数为传给系统调用的参数，此处规则即`kill -9`
-其他实用功能
-    `-k xxx` 指定自定义串，可用于查询过滤
-    `-F dir` 监控目录路径
-    auditctl -a always,exit -F dir=/home/ -F uid=0 -C auid!=obj_uid
-    `-F pid` 监测进程做的动作(日志比较多，不是监测对该进程的操作)
-    auditctl -a always,exit -S all -F pid=1005
-    auditctl -w /etc/ -p wa
-其他用法：
-    auditctl -l 查看规则列表
-    auditctl -D 删除所有规则
-    auditctl -d 删除指定规则，注意要匹配完整的规则
-        比如上述规则删除要用`auditctl -d exit,always -F arch=b64 -S kill -F a1=9`
-查询方式：
-`ausearch -sc kill`，查询(ausearch)audit日志中的系统调用(-sc)：kill
-    -k,–key 查询添加规则时指定的关键字
 
-系统调用编号示例(kill示例)：
+* 查询审计记录的方式：
 
-```c
-// 64位下
-#define __NR_kill 62
+    `ausearch -sc kill`，查询(ausearch)audit日志中的系统调用(-sc)：kill
 
-// 32位下
-#define __NR_kill 37
-```
+    `-k,–key` 查询添加规则时指定的关键字
 
-操作：
-1) 后台起循环脚本 sh test.sh &
-2) 脚本调用kill -9：sh xdkill.sh
+* 操作：
+    1) 后台起循环脚本 sh test.sh &
+    2) 脚本调用kill -9：sh xdkill.sh
 
-`type=SYSCALL`是发起者的记录，根据ppid=5533 pid=12256找到调用者的线索。此处12256是xdkill.sh的临时进程号，5533是其父进程-bash
-`type=OBJ_PID`是被操作对象的记录，`opid=7677`即test.sh的pid号
-`type=PROCTITLE`指定此记录提供触发此审计事件的完整命令行，终端直接执行是proctitle=-bash，此处一串可能要转换下
+分别查看audit.log里和auserach的结果，如下：
 
 ```sh
 # /var/log/audit/audit.log日志文件
@@ -74,7 +57,7 @@ type=PROCTITLE msg=audit(1695710251.567:366042): proctitle=73680078646B696C6C2E7
 ```
 
 ```sh
-# ausearch的结果，打印了一下转换后的时间戳，相对直观一点（内容是一样的）
+# ausearch的结果，打印了一下转换后的时间戳，相对直观一点（对比看内容是一样的）
 [root@localhost qiuxiaodong]# ausearch -sc kill
 ----
 time->Tue Sep 26 14:37:31 2023
@@ -84,12 +67,54 @@ type=SYSCALL msg=audit(1695710251.567:366042): arch=c000003e syscall=62 success=
 ----
 ```
 
+* 结果说明：
+
+    `type=SYSCALL`是发起者的记录，根据ppid=5533 pid=12256找到调用者的线索。此处12256是xdkill.sh的临时进程号，5533是其父进程-bash
+
+    `type=OBJ_PID`是被操作对象的记录，`opid=7677`即test.sh的pid号
+
+    `type=PROCTITLE`指定此记录提供触发此审计事件的完整命令行，终端直接执行是proctitle=-bash，此处一串可能要转换下
+
+    这个效果来看，可以通过该方式来监测这类事件。
+
+上述调用记录中，syscall=62，系统编号在32位和64位系统下是不一样的：
+
+```c
+// 64位下
+#define __NR_kill 62
+
+// 32位下
+#define __NR_kill 37
+```
+
+### 其他实用功能/选项
+
+* auditctl选项和示例
+
+    `-k xxx` 指定自定义串，可用于查询过滤，`auditctl -a exit,always -F arch=b64 -S kill -F a1=9 -k xdtest`，查询时基于该串来过滤提高定位效率
+
+    `-F dir` 监控目录路径，`auditctl -a always,exit -F dir=/home/ -F uid=0 -C auid!=obj_uid`
+
+    `-F pid` 监测进程做的动作(日志比较多，不是监测对该进程的操作)，`auditctl -a always,exit -S all -F pid=1005`
+
+    监测目录下的修改 `auditctl -w /etc/ -p wa`，-w指定目录或文件，-p指定操作类型(w:写，a:属性修改)
+
+* 其他用法：
+
+    `auditctl -l` 查看规则列表
+
+    `auditctl -D` 删除所有规则
+
+    `auditctl -d` 删除指定规则，注意要匹配完整的规则，比如上述实验里的规则删除要用`auditctl -d exit,always -F arch=b64 -S kill -F a1=9`
+
 ## 3. 小结
 
-1. 实验audit审计监测进程kill操作，能监测到记录。
-2. audit在下述场景也很有效果
+1. 实验audit审计监测进程kill操作，比较适用于该场景。
+2. audit在其他类似场景下也很有效果。注意使用中配置的规则范围，防止日志刷得太多了。
 
-    - 文件被异常修改
+    配置文件被异常修改(如系统时区文件修改、服务配置文件被其他模块异常修改)
+
+    文件大小不定期累加，不明确写入方(lsof不好准确监测)
 
 ## 4. 参考
 
