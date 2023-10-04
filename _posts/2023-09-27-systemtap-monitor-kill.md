@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 服务究竟被谁kill了？ -- 利用Systemtap监测
+title: 服务究竟被谁kill了？ -- 利用SystemTap监测
 categories: Linux
 tags: SystemTap
 ---
@@ -61,15 +61,15 @@ systemtap支持很多内建事件(tapset)，常见内建函数和变量：
     + 可以输出当前probe所处的可执行程序名称、线程id、函数执行的相对时间和执行的次数（通过空格的数量）信息，它的返回值就是一个字符串。参数delta是在每次调用时增加或移除的空白数量 (未梳理如何得到相对时间的，参考：https://www.cnblogs.com/10087622blog/articles/9592036.html)
     + 查看其实现为：`return _generic_indent (tid(), sprintf("%s(%d)", execname(), tid()), delta)`
 
-具体可以参考官网链接，笔记记录：[动态追踪技术笔记](https://github.com/xiaodongQ/devNoteBackup/blob/master/%E5%90%84%E5%88%86%E7%B1%BB%E8%AE%B0%E5%BD%95/%E5%8A%A8%E6%80%81%E8%BF%BD%E8%B8%AA%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0.md)。
+具体可以参考官网链接。
 
-## 2. 实验
+## 3. 实验
 
-### 安装SystemTap
+### 3.1. 安装SystemTap
 
 SystemTap安装中踩了几个坑，具体可见：[动态追踪技术笔记](https://github.com/xiaodongQ/devNoteBackup/blob/master/%E5%90%84%E5%88%86%E7%B1%BB%E8%AE%B0%E5%BD%95/%E5%8A%A8%E6%80%81%E8%BF%BD%E8%B8%AA%E6%8A%80%E6%9C%AF%E7%AC%94%E8%AE%B0.md)
 
-### 实验步骤
+### 3.2. 实验步骤
 
 * 1、运行systemtap探测脚本
 
@@ -143,11 +143,11 @@ Mon Oct  2 01:33:53 2023 : sh (154315) is exec'ing "/usr/bin/ps"
 154313 sh           9     154293    646
 ```
 
-## 3. 小结
+## 4. 小结
 
 实验了使用systemtap追踪kill操作。
 
-## 4. 参考
+## 5. 参考
 
 1. [systemtap tutorial](https://sourceware.org/systemtap/tutorial/tutorialse2.html#x4-30002)
 2. [使用 Systemtap 排查隐形 Killer](https://www.jianshu.com/p/671014356c41)
