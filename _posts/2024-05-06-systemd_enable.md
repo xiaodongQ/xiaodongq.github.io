@@ -134,9 +134,9 @@ disabled
 
 > 对于传统的 SysV init 脚本（与 chkconfig 配合使用），这些脚本通常遵循以下格式和约定：
 
-1. 开头行：指定使用哪种shell来解释脚本。通常是 #!/bin/bash 或其他shell的路径。
+1、开头行：指定使用哪种shell来解释脚本。通常是 #!/bin/bash 或其他shell的路径。
 
-2. chkconfig注释：在脚本的顶部，你可以添加一些特殊的注释来告诉 chkconfig 如何在不同的运行级别启动或停止服务。例如：
+2、chkconfig注释：在脚本的顶部，你可以添加一些特殊的注释来告诉 chkconfig 如何在不同的运行级别启动或停止服务。例如：
 
 ```bash
 #!/bin/bash  
@@ -146,11 +146,11 @@ disabled
 
 > 这里，345 表示该服务应在运行级别 3、4 和 5 下启动，99 是启动优先级（数字越大，启动越晚），20 是停止优先级（数字越小，停止越早）。
 
-3. 脚本逻辑：接下来是实际的脚本逻辑，用于启动、停止、重新启动或检查服务的状态。通常，你会看到 case 语句来处理不同的操作，如 start、stop、restart 和 status。
+3、脚本逻辑：接下来是实际的脚本逻辑，用于启动、停止、重新启动或检查服务的状态。通常，你会看到 case 语句来处理不同的操作，如 start、stop、restart 和 status。
 
-4. 启动和停止链接：当你使用 chkconfig 将服务添加到系统中时，它会为你创建符号链接在 /etc/rc[0-6].d/ 目录中。这些链接指向你的初始化脚本，并带有特定的前缀（如 S 或 K）和优先级数字。
+4、启动和停止链接：当你使用 chkconfig 将服务添加到系统中时，它会为你创建符号链接在 /etc/rc[0-6].d/ 目录中。这些链接指向你的初始化脚本，并带有特定的前缀（如 S 或 K）和优先级数字。
 
-5. 权限和所有权：初始化脚本通常需要具有执行权限，并且通常由 root 用户拥有。
+5、权限和所有权：初始化脚本通常需要具有执行权限，并且通常由 root 用户拥有。
 
 然而，值得注意的是，许多现代Linux发行版已经转向使用 systemd 作为其服务管理工具，而不是传统的 SysV init 和 chkconfig。在 systemd 中，服务配置文件（称为单元文件）位于 /usr/lib/systemd/system/ 或 /etc/systemd/system/ 目录中，并使用不同的语法和约定。
 
@@ -209,12 +209,14 @@ strace -tt systemctl enable auditd.service
 22:59:07.968501 socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK, 0) = 3
 ```
 
-### 3.3. 源码对比
+### 3.4. 源码对比
 
 1、查看当前出问题环境的systemctl版本，下载对应tag的源码
 
 [root@iZ2zebfcx8h2zfz7ieqaquZ init.d]# systemctl --version
 systemd 239 (239-51.el8_5.2)
+
+2、上述strace不明显，安装ltrace并结合源码跟踪
 
 ```sh
 [root@iZ2zebfcx8h2zfz7ieqaquZ init.d]# ltrace -f systemctl enable XD-Service.service 
@@ -341,12 +343,11 @@ systemd 239 (239-51.el8_5.2)
 [pid 16504] +++ exited (status 0) +++
 ```
 
-2、通过对比，可以看到最核心区别还是 /etc/init.d/下是否存在服务脚本的判断。其实上一小节的strace也能看到线索，但是不直观。ltrace跟踪库函数并结合源码，基本可以定位到源码位置，而后查问题就有头绪了。
+3、通过对比，可以看到最核心区别还是 /etc/init.d/下是否存在服务脚本的判断。其实上一小节的strace也能看到线索，但是不直观。ltrace跟踪库函数并结合源码，基本可以定位到源码位置，而后查问题就有头绪了。
 
 根据报错快速找到位置：`with SysV service script`，调用栈：`enable_unit` -> 先调`enable_sysv_units(verb, names)`，再后续处理。里面判断没有sysv脚本或者sysv处理成功则返回0，继续执行；若找到sysv且执行失败，则整体报错退出。
 
 ```cpp
-
 static int enable_unit(int argc, char *argv[], void *userdata) {
     ...
     // 先直接尝试sysv方式，里面判断没有sysv脚本或者sysv处理成功则返回0，继续执行；若找到sysv且执行失败，则整体报错退出
@@ -421,7 +422,7 @@ static int enable_sysv_units(const char *verb, char **args) {
 }
 ```
 
-3、为佐证上述定位结论，将/etc/init.d/下有问题的脚本移除，`mv /etc/init.d/XD-Service /etc/init.d/XD-Service_bak`
+4、为佐证上述定位结论，将/etc/init.d/下有问题的脚本移除，`mv /etc/init.d/XD-Service /etc/init.d/XD-Service_bak`
 
 `systemctl enable XD-Service.service`设置自启动成功，且是通过systemd分支处理的。
 
