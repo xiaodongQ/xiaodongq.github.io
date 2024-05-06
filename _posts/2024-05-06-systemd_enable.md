@@ -209,7 +209,7 @@ strace -tt systemctl enable auditd.service
 22:59:07.968501 socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK, 0) = 3
 ```
 
-### 源码对比
+### 3.3. 源码对比
 
 1、查看当前出问题环境的systemctl版本，下载对应tag的源码
 
