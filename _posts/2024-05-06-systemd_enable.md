@@ -14,7 +14,7 @@ tags: systemd
 
 ## 1. 背景
 
-最近碰到一个服务入口脚本(/etc/init.d/下)中误删除了脚本chkconfig注释导致服务没有自启动的问题，并且在CentOS7.7上正常，但是在openEuler上没有正常自启动。服务自CentOS6.5迭代至CentOS7.7，也适配了一些其他系统。
+最近碰到一个服务入口脚本(/etc/init.d/下)中误删除了脚本chkconfig注释导致服务没有自启动的问题，并且在CentOS7.7上正常，但是在openEuler上没有正常自启动。
 
 跟踪执行过程和systemd源码定位到了原因，本文进行简单记录。
 
@@ -22,7 +22,7 @@ tags: systemd
 
 ### 2.1. 快速模拟步骤
 
-1、阿里云
+1、阿里云抢占式ECS
 
 2、借助ChatGPT/文心一言快速模拟环境。(你是一个linux资深开发者->快速创建一个chkconfig服务->通过systemd创建服务，上面的服务换成XD-Service，并且调用的启停脚本为/etc/init.d/XD-Service，调整脚本)
 
@@ -120,7 +120,7 @@ disabled
 
 ## 3. 问题分析和定位
 
-### 3.1. 问题
+### 3.1. 提出问题
 
 1、为什么删除了上面的注释，导致服务设置不了自启动？
 
@@ -158,7 +158,7 @@ disabled
 
 1、和CentOS7.7对比，同样`systemctl enable XD-Service`操作，正常走systemd的流程(没打印sysV)
 
-2、第一反应是strace跟踪对比，对比两者不是太明显。同一个系统上的其他服务正常走systemd，
+2、第一反应是strace跟踪对比，对比两者不是太明显。同一个系统上的其他服务正常走systemd处理，以auditd为例进行跟踪
 
 `strace -tt systemctl enable XD-Service.service`
 
@@ -188,7 +188,7 @@ NULL, 8) = 0
 ...
 ```
 
-strace -tt systemctl enable auditd.service
+`strace -tt systemctl enable auditd.service`
 
 ```sh
 22:59:07.967786 openat(3, "auditd.service.d", O_RDONLY|O_NOFOLLOW|O_CLOEXEC|O_PATH) = -1 ENOENT (No such file or directory)
@@ -213,10 +213,14 @@ strace -tt systemctl enable auditd.service
 
 1、查看当前出问题环境的systemctl版本，下载对应tag的源码
 
+```sh
 [root@iZ2zebfcx8h2zfz7ieqaquZ init.d]# systemctl --version
 systemd 239 (239-51.el8_5.2)
+```
 
 2、上述strace不明显，安装ltrace并结合源码跟踪
+
+跟踪XD-Service服务
 
 ```sh
 [root@iZ2zebfcx8h2zfz7ieqaquZ init.d]# ltrace -f systemctl enable XD-Service.service 
@@ -267,6 +271,8 @@ systemd 239 (239-51.el8_5.2)
 [pid 30828] textdomain("chkconfig")                                                      = "chkconfig"
 [pid 30828] poptGetContext(0x55a3105c80a8, 3, 0x7fff5f51e978, 0x7fff5f51e640)            = 0x55a3116a29c0
 ```
+
+跟踪auditd服务
 
 ```sh
 [root@iZ2zebfcx8h2zfz7ieqaquZ init.d]# ltrace -f systemctl enable auditd.service 
@@ -343,7 +349,7 @@ systemd 239 (239-51.el8_5.2)
 [pid 16504] +++ exited (status 0) +++
 ```
 
-3、通过对比，可以看到最核心区别还是 /etc/init.d/下是否存在服务脚本的判断。其实上一小节的strace也能看到线索，但是不直观。ltrace跟踪库函数并结合源码，基本可以定位到源码位置，而后查问题就有头绪了。
+3、通过对比，可以看到最核心区别还是 /etc/init.d/下是否存在服务脚本的判断。其实上一小节的strace也能看到线索，但是不直观。ltrace跟踪库函数并结合源码，基本可以大概定位到源码位置，而后查问题就有头绪了。
 
 根据报错快速找到位置：`with SysV service script`，调用栈：`enable_unit` -> 先调`enable_sysv_units(verb, names)`，再后续处理。里面判断没有sysv脚本或者sysv处理成功则返回0，继续执行；若找到sysv且执行失败，则整体报错退出。
 
@@ -371,7 +377,22 @@ static int enable_unit(int argc, char *argv[], void *userdata) {
 // 内部逻辑，判断
 static int enable_sysv_units(const char *verb, char **args) {
     ...
+    // 初始化paths里面sysv和systemd uint对应的各自路径
+    r = lookup_paths_init(&paths, arg_scope, LOOKUP_PATHS_EXCLUDE_GENERATED, arg_root);
+    ...
     while (args[f]) {
+        ...
+        // 找是否存在systemd uint文件
+        j = unit_file_exists(arg_scope, &paths, name);
+        if (j < 0 && !IN_SET(j, -ELOOP, -ERFKILL, -EADDRNOTAVAIL))
+                return log_error_errno(j, "Failed to lookup unit file state: %m");
+        found_native = j != 0;
+
+        // 这里是关键，下面对比CentOS7.7和CentOS8默认的systemd实现可以看到原因
+        /* If we have both a native unit and a SysV script, enable/disable them both (below); for is-enabled,
+         * prefer the native unit */
+        if (found_native && streq(verb, "is-enabled"))
+            continue;
         ...
         p = path_join(arg_root, SYSTEM_SYSVINIT_PATH, name);
         if (!p)
@@ -422,7 +443,33 @@ static int enable_sysv_units(const char *verb, char **args) {
 }
 ```
 
-4、为佐证上述定位结论，将/etc/init.d/下有问题的脚本移除，`mv /etc/init.d/XD-Service /etc/init.d/XD-Service_bak`
+4、进一步获取查看CentOS7.7默认的systemd对应源码，其版本为：v219
+
+* 流程类似：`enable_unit`(systemctl.c) ->  `enable_sysv_units`(systemctl.c)，里面先判断systemd unit，判断有则退出；没有则继续判断sysv，有则fork子进程执行
+
+    会判断这些目录中是否存在服务脚本：/etc/systemd/system、/run/systemd/system、/usr/local/lib/systemd/system、/usr/lib/systemd/system
+
+* 和高版本(V239)区别在于
+
+    CentOS7.7对应的219 systemd先判断systemd unit，再判断sysv；
+
+    而CentOS8对应的239 systemd先判断sysv再判断systemd unit
+
+**streq(verb, "is-enabled")这个条件是v221(2015.6.19)新增的，之前只判断found_native为true就退出，之后版本只有`is-enabled`才走该逻辑，`enable/disable`则继续往下判断处理sysV**
+
+```cpp
+// enable_sysv_units函数逻辑
+
+// v220及之前
+if (found_native)
+    continue;
+
+// v221(2015.6.19)及之后，所以systemctl enabled在此之后会继续判断是否走sysV处理
+if (found_native && streq(verb, "is-enabled"))
+    continue;
+```
+
+5、为佐证上述定位结论，将/etc/init.d/下有问题的脚本移除，`mv /etc/init.d/XD-Service /etc/init.d/XD-Service_bak`
 
 `systemctl enable XD-Service.service`设置自启动成功，且是通过systemd分支处理的。
 
