@@ -382,7 +382,8 @@ static int enable_sysv_units(const char *verb, char **args) {
     ...
     while (args[f]) {
         ...
-        // 找是否存在systemd uint文件
+        // 找是否存在服务的systemd uint文件
+        // 会遍历判断这些目录下：/etc/systemd/system、/run/systemd/system、/usr/local/lib/systemd/system、/usr/lib/systemd/system
         j = unit_file_exists(arg_scope, &paths, name);
         if (j < 0 && !IN_SET(j, -ELOOP, -ERFKILL, -EADDRNOTAVAIL))
                 return log_error_errno(j, "Failed to lookup unit file state: %m");
@@ -445,17 +446,13 @@ static int enable_sysv_units(const char *verb, char **args) {
 
 4、进一步获取查看CentOS7.7默认的systemd对应源码，其版本为：v219
 
-* 流程类似：`enable_unit`(systemctl.c) ->  `enable_sysv_units`(systemctl.c)，里面先判断systemd unit，判断有则退出；没有则继续判断sysv，有则fork子进程执行
+* 流程类似：`enable_unit`(systemctl.c) ->  `enable_sysv_units`(systemctl.c)，和高版本(V239)区别在于下面的`continue`条件
 
-    会判断这些目录中是否存在服务脚本：/etc/systemd/system、/run/systemd/system、/usr/local/lib/systemd/system、/usr/lib/systemd/system
+**streq(verb, "is-enabled")这个条件是v221(2015.6.19)新增的，之前只判断found_native为true就退出，之后版本只有`systemctl is-enabled`才走该`continue`逻辑，`enable/disable`则继续往下判断处理sysV**
 
-* 和高版本(V239)区别在于
+所以CentOS7.7上，不管/etc/init.d/下的服务脚本里是否去掉`#chkconfig`标记，`systemctl enable/disable xxx.service`都不会走sysV处理；
 
-    CentOS7.7对应的219 systemd先判断systemd unit，再判断sysv；
-
-    而CentOS8对应的239 systemd先判断sysv再判断systemd unit
-
-**streq(verb, "is-enabled")这个条件是v221(2015.6.19)新增的，之前只判断found_native为true就退出，之后版本只有`is-enabled`才走该逻辑，`enable/disable`则继续往下判断处理sysV**
+而CentOS8或者其他使用>=V221版本systemctl的系统上，当sysV chkconfig脚本(位于/etc/init.d/)和systemd unit共存时，enable/disable都会走sysV处理。
 
 ```cpp
 // enable_sysv_units函数逻辑
@@ -481,4 +478,4 @@ if (found_native && streq(verb, "is-enabled"))
 
 ## 5. 参考
 
-1、文心一言，省了梯子，体验效果还好
+1、文心一言，省了梯子，体验效果还不错
