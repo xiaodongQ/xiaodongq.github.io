@@ -32,8 +32,6 @@ tags: 网络
 
 环境：起两个阿里云抢占式实例，Alibaba Cloud Linux 3.2104 LTS 64位（内核版本：5.10.134-16.1.al8.x86_64）
 
-    ip分别为：172.23.133.138、172.23.133.139，下述把138作为服务端，139作为客户端
-
 基于5.10内核代码跟踪流程
 
 ## 3. TCP握手和断开总体流程
@@ -41,27 +39,18 @@ tags: 网络
 ![TCP握手断开过程和相关控制参数](/images/tcp-connect-close.png)  
 基于[出处1](https://mp.weixin.qq.com/s/YpSlU1yaowTs-pF6R43hMw?poc_token=HKCgSGaji2dgAtvVc7gzTQykh3Aw6neDWcojHyB8)、[出处2](https://time.geekbang.org/column/article/284912)
 
-<!-- 
-client                      server
-发SYN
-`SYN_SENT`              收到后状态：`SYN_RECV`
-                   内核把连接存储到半连接队列(SYN Queue)
-                     向client回复 SYN+ACK
-收到后回复ACK
-变成`ESTABLISHED`   收到ACK后，内核把连接从半连接队列取出，添加到全连接队列(Accept Queue)
-                        变`ESTABLISHED`
-                    `accept()`处理，将连接从全连接队列取出
- -->
+上图中TCP相关参数配置说明：![TCP参数配置](/images/tcp_param_suggest.png)  
+[出处](https://time.geekbang.org/column/article/284912)
 
 ## 4. netstat/ss简单监测实验
 
 ### 4.1. `Recv-Q`和`Send-Q`
 
-1. 服务端起一个简单http服务，`python2 -m SimpleHTTPServer`(python2，python3上用`python -m http.server`)，默认8000端口
+1、服务端起一个简单http服务，`python2 -m SimpleHTTPServer`(python2，python3上用`python -m http.server`)，默认8000端口
 
-2. 观察`netstat`和`ss`展示的各列信息
+2、观察`netstat`和`ss`展示的各列信息
 
-`netstat`：
+* `netstat`：
 
 ```sh
 [root@iZ2ze45jbqveelsasuub53Z ~]# netstat -atnp
@@ -69,43 +58,36 @@ Active Internet connections (servers and established)
 Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
 tcp        0      0 0.0.0.0:8000            0.0.0.0:*               LISTEN      1910/python         
 tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      1258/sshd           
-tcp        0     36 172.23.133.138:22       100.104.192.176:51624   ESTABLISHED 1998/sshd: root [pr 
-tcp        0      0 172.23.133.138:48378    100.100.30.27:80        ESTABLISHED 1691/AliYunDun      
-tcp6       0      0 :::111                  :::*                    LISTEN      1/systemd  
 ...
 ```
 
-`ss`：
+* `ss`：
 
 ```sh
 [root@iZ2ze45jbqveelsasuub53Z ~]# ss -atnp
 State          Recv-Q      Send-Q  Local Address:Port     Peer Address:Port   Process
 LISTEN         0           5       0.0.0.0:8000            0.0.0.0:*          users:(("python",pid=1910,fd=3))   
 LISTEN         0           128     0.0.0.0:22              0.0.0.0:*          users:(("sshd",pid=1258,fd=3))     
-TIME-WAIT      0           0       172.23.133.138:47218    100.100.18.120:80  
-LISTEN         0           4096    [::]:111                [::]:*          users:(("rpcbind",pid=554,fd=6),("systemd",pid=1,fd=65))
 ...
 ```
 
 `netstat`和`ss`里展示的`Recv-Q`和`Send-Q`含义是不一样的，可以看到上述两者的值不同。
 
-* 在`netstat`中
+在`netstat`中：
 
-`Recv-Q`表示收到的数据已经在本地接收缓冲，但是还有多少没有被进程取走（即还没有被应用程序读取）。如果接收队列Recv-Q一直处于阻塞状态，可能是遭受了拒绝服务（denial-of-service）攻击。
+* `Recv-Q`表示收到的数据已经在本地接收缓冲，但是还有多少没有被进程取走（即还没有被应用程序读取）。如果接收队列Recv-Q一直处于阻塞状态，可能是遭受了拒绝服务（denial-of-service）攻击。
+* `Send-Q`表示对方没有收到的数据或者说没有Ack的，还是本地缓冲区。如果发送队列Send-Q不能很快的清零，可能是有应用向外发送数据包过快，或者是对方接收数据包不够快。
+* 疑问：针对监听和非监听端口，netstat中的`Recv-Q`和`Send-Q`的含义是否有区别？待定，后续分析netstat的源码(TODO)
 
-`Send-Q`表示对方没有收到的数据或者说没有Ack的，还是本地缓冲区。如果发送队列Send-Q不能很快的清零，可能是有应用向外发送数据包过快，或者是对方接收数据包不够快。
+在`ss`中：
 
-疑问：针对监听和非监听端口，netstat中的`Recv-Q`和`Send-Q`的含义是否有区别？待定，后续分析netstat的源码(TODO)
+* 对于 LISTEN 状态的 socket
+    * `Recv-Q`：当前全连接队列的大小，即已完成三次握手等待应用程序 accept() 的 TCP 链接  
+    * `Send-Q`：全连接队列的最大长度，即全连接队列的大小  
 
-* 在`ss`中
-
-对于 LISTEN 状态的 socket：  
-    `Recv-Q`：当前全连接队列的大小，即已完成三次握手等待应用程序 accept() 的 TCP 链接  
-    `Send-Q`：全连接队列的最大长度，即全连接队列的大小  
-
-对于非 LISTEN 状态的 socket：  
-    `Recv-Q`：已收到但未被应用程序读取的字节数，表示在接收缓冲区中等待处理的数据量。  
-    `Send-Q`：已发送但未收到确认的字节数  
+* 对于非 LISTEN 状态的 socket
+    * `Recv-Q`：已收到但未被应用程序读取的字节数，表示在接收缓冲区中等待处理的数据量。  
+    * `Send-Q`：已发送但未收到确认的字节数  
 
 上面SimpleHTTPServer服务的全连接队列最大长度只有5，可以查看其源码：/usr/lib64/python2.7/SimpleHTTPServer.py。一步步跟踪代码可以看到其默认队列长度就是`5`，如下：
 
@@ -134,9 +116,9 @@ class TCPServer(BaseServer):
 
 另外：`netstat -s`里可以查看listen队列溢出的情况
 
-1. 客户端上安装`ab`压测工具：`yum install httpd-tools`
+1、客户端上安装`ab`压测工具：`yum install httpd-tools`
 
-2. 向上述http服务进行并发请求，请求前开启两端的抓包
+2、向上述http服务进行并发请求，请求前开启两端的抓包
 
 `ab -n 100 -c 10 http://172.23.133.138:8000/`  
     -n 100 表示总共发送100个请求。  
@@ -146,7 +128,7 @@ class TCPServer(BaseServer):
 
 服务端：`tcpdump -i eth0 port 8000 -w 8000_server138.cap -v`
 
-3. 服务端查看统计情况`netstat -s|grep -i listen`
+3、服务端查看统计情况`netstat -s|grep -i listen`
 
 ```sh
 [root@iZ2ze45jbqveelsasuub53Z ~]# netstat -s|grep -i listen
@@ -158,20 +140,36 @@ class TCPServer(BaseServer):
 
 `times the listen queue of a socket overflowed` 这是全连接队列溢出？
 
-4. 抓包情况
+4、查看抓包情况
 
 只能看到几个`PSH, ACK`的重传，请求应答最后还是正常的。ab工具应该有自己的重试机制。稍后参考原博客的方式构造场景。
 
-本次ECS上的对应参数：
+5、备份修改python中`SocketServer.py`里的默认为2048，可看到Send-Q变成了2048
+
+/usr/lib64/python2.7/SocketServer.py
 
 ```sh
-[root@iZ2ze45jbqveelsasuub53Z ~]# sysctl -a|grep -E "syn_backlog|somaxconn|syn_retries|synack_retries|syncookies|abort_on_overflow"
+[root@iZ2ze76owg090hoj8a5bpqZ ~]# ss -anlt
+State      Recv-Q Send-Q         Local Address:Port        Peer Address:Port              
+LISTEN     0      128            *:22                      *:*                  
+LISTEN     0      2048           *:8000
+```
+
+而后继续进行一次ab测试，`ab -n 100 -c 10 http://172.23.133.138:8000/`，查看统计信息后，这次没有再出现队列溢出的情况了。
+
+* 本次ECS上的对应参数：
+
+```sh
+[root@iZ2zejee6e4h8ysmmjwj1nZ ~]# sysctl -a|grep -E "syn_backlog|somaxconn|syn_retries|synack_retries|syncookies|abort_on_overflow|net.ipv4.tcp_fin_timeout|tw_buckets|tw_reuse|tw_recycle"
 net.core.somaxconn = 4096
 net.ipv4.tcp_abort_on_overflow = 0
+net.ipv4.tcp_fin_timeout = 60
 net.ipv4.tcp_max_syn_backlog = 128
+net.ipv4.tcp_max_tw_buckets = 5000
 net.ipv4.tcp_syn_retries = 6
 net.ipv4.tcp_synack_retries = 2
 net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_tw_reuse = 2
 ```
 
 之前CentOS7.7(3.10内核)上的默认参数也贴到这里：
@@ -186,24 +184,11 @@ net.ipv4.tcp_synack_retries = 2
 net.ipv4.tcp_syncookies = 1
 ```
 
-* 备份修改python中`SocketServer.py`里的默认为2048，可看到Send-Q变成了2048
-
-/usr/lib64/python2.7/SocketServer.py
-
-```sh
-[root@iZ2ze76owg090hoj8a5bpqZ ~]# ss -anlt
-State      Recv-Q Send-Q         Local Address:Port        Peer Address:Port              
-LISTEN     0      128            *:22                      *:*                  
-LISTEN     0      2048           *:8000
-```
-
-而后继续进行一次ab测试，`ab -n 100 -c 10 http://172.23.133.138:8000/`，查看统计信息后，这次没有再出现队列溢出的情况了。
-
 所以上述两个溢出打印，是由于服务端处理不过来导致全连接队列满，不去取出半连接队列进而导致半连接队列满？这个待定(TODO)
 
 ### 4.3. ss中关于监听和非监听端口的区别说明
 
-1. `ss`和`netstat`数据获取的方式不同，`ss`用的是`tcp_diag`模块通过网络获取，而`netstat`是直接解析`/proc/net/tcp`文件，`ltrace`可以大致看出其过程差别。
+1、`ss`和`netstat`数据获取的方式不同，`ss`用的是`tcp_diag`模块通过网络获取，而`netstat`是直接解析`/proc/net/tcp`文件，`ltrace`可以大致看出其过程差别。
 
 ```sh
 [root@iZ2ze76owg090hoj8a5bpqZ ~]# ltrace netstat -ntl
@@ -243,7 +228,7 @@ recvmsg(3, 0x7fff6f427d80, 0, 14)                                               
 memset(0x7fff6f427b40, '\0', 152)                                                                    = 0x7fff6f427b40
 ```
 
-2. `ss`命令位于`iproute`这个库，若要具体分析过程需要找这个库的源码。
+2、`ss`命令位于`iproute`这个库，若要具体分析过程需要找这个库的源码。
 
 ```sh
 [root@iZ2ze45jbqveelsasuub53Z ~]# rpm -qf /usr/sbin/ss
@@ -254,7 +239,7 @@ iproute-5.18.0-1.1.0.1.al8.x86_64
 net-tools-2.0-0.52.20160912git.1.al8.x86_64
 ```
 
-3. tcp_diag中，获取信息的代码位置：`tcp_diag_get_info`(linux-5.10.10/net/ipv4/tcp_diag.c)
+3、tcp_diag中，获取信息的代码位置：`tcp_diag_get_info`(linux-5.10.10/net/ipv4/tcp_diag.c)
 
 ```c
 // linux-5.10.10/net/ipv4/tcp_diag.c
@@ -288,11 +273,13 @@ static void tcp_diag_get_info(struct sock *sk, struct inet_diag_msg *r,
 
 TCP 全连接队列的最大长度由 `min(somaxconn, backlog)` 控制，对应内核代码见下面的`listen流程`小节。
 
-上面已经看过当前环境中：net.core.somaxconn = 4096
+两个ip分别为：172.23.133.140、172.23.133.141，下述把140作为服务端，141作为客户端
 
-### 构造方法及代码
+当前环境中：`net.core.somaxconn = 4096`
 
-通过让服务端应用只负责 Listen 对应端口而不执行 accept() TCP 连接，使 TCP 全连接队列溢出。
+### 5.1. 构造方法及代码
+
+通过让服务端应用只负责`listen`对应端口而不执行`accept()` TCP 连接，使 TCP 全连接队列溢出。
 
 * 服务端：
 
@@ -359,7 +346,7 @@ int main() {
 #include <unistd.h>  
 #include <string.h>  
   
-const char *SERVER_IP = "172.23.133.138";  
+char SERVER_IP[64] = "";  
 const int PORT = 8080;  
   
 void send_message(int num_requests) {  
@@ -403,12 +390,13 @@ void send_message(int num_requests) {
 }  
   
 int main(int argc, char *argv[]) {  
-    if (argc != 2) {  
-        std::cerr << "Usage: " << argv[0] << " <num_requests>" << std::endl;  
+    if (argc != 3) {  
+        std::cerr << "Usage: " << argv[0] << " <server_ip> <num_requests>" << std::endl;  
         return 1;  
     }  
-  
-    int num_requests = std::stoi(argv[1]);  
+    strncpy(SERVER_IP, argv[1], sizeof(SERVER_IP));
+
+    int num_requests = std::stoi(argv[2]);  
     if (num_requests <= 0) {  
         std::cerr << "Invalid number of requests" << std::endl;  
         return 1;  
@@ -432,9 +420,9 @@ int main(int argc, char *argv[]) {
 
 编译：`g++ client.cpp -o client -std=c++11 -lpthread`
 
-### 观察过程
+### 5.2. 观察过程
 
-1. 服务端代码编译后运行，`./server`
+1、服务端代码编译后运行，`./server`
 
 ```sh
 [root@iZ2ze45jbqveelsasuub53Z ~]# netstat -anpt|grep 8080
@@ -446,41 +434,72 @@ State     Recv-Q Send-Q  Local Address:Port     Peer Address:Port Process
 LISTEN    0      5   0.0.0.0:8080            0.0.0.0:*     users:(("server",pid=18330,fd=3))  
 ```
 
-2. 开启两端抓包
+2、开启两端抓包
 
-客户端：`tcpdump -i eth0 port 8080 -w 8080_client139.cap -v`
+服务端：`tcpdump -i eth0 port 8080 -w 8080_server140.cap -v`
 
-服务端：`tcpdump -i eth0 port 8080 -w 8080_server138.cap -v`
+客户端：`tcpdump -i eth0 port 8080 -w 8080_client141.cap -v`
 
-3. 客户端并发10个请求，`./client 10`
+3、客户端并发10个请求，`./client 172.23.133.140 10`，结束后查看客户端和服务端信息
+
+请求结束后，在客户端grep查看8080，没有任何连接了。
+
+服务端信息如下：
+
+* 可看到当前全连接队列中当前还有6个连接，且有6个`CLOSE_WAIT`状态的连接
+* `netstat -s`中有半连接drop(SYN drop)及全连接drop(listen queue)
 
 ```sh
+# 客户端发请求前，服务端的统计信息，没有溢出信息
 [root@iZ2ze45jbqveelsasuub53Z ~]# netstat -s|grep -i list
-    6 times the listen queue of a socket overflowed
-    6 SYNs to LISTEN sockets dropped
+[root@iZ2ze45jbqveelsasuub53Z ~]#
 
-[root@iZ2ze45jbqveelsasuub53Z ~]# netstat -anpt|grep 8080
-tcp        6      0 0.0.0.0:8080            0.0.0.0:*               LISTEN      19906/./server      
-tcp       11      0 172.23.133.138:8080     172.23.133.139:35074    CLOSE_WAIT  -                   
-tcp       11      0 172.23.133.138:8080     172.23.133.139:35060    CLOSE_WAIT  -                   
-tcp       11      0 172.23.133.138:8080     172.23.133.139:35044    CLOSE_WAIT  -                   
-tcp       11      0 172.23.133.138:8080     172.23.133.139:35026    CLOSE_WAIT  -                   
-tcp       11      0 172.23.133.138:8080     172.23.133.139:35032    CLOSE_WAIT  -                   
-tcp       11      0 172.23.133.138:8080     172.23.133.139:35072    CLOSE_WAIT  -                   
-[root@iZ2ze45jbqveelsasuub53Z ~]# ss -anpt|grep 8080
-LISTEN     6      5             0.0.0.0:8080          0.0.0.0:*     users:(("server",pid=19906,fd=3))                       
-CLOSE-WAIT 11     0      172.23.133.138:8080   172.23.133.139:35074                                                         
-CLOSE-WAIT 11     0      172.23.133.138:8080   172.23.133.139:35060                                                         
-CLOSE-WAIT 11     0      172.23.133.138:8080   172.23.133.139:35044                                                         
-CLOSE-WAIT 11     0      172.23.133.138:8080   172.23.133.139:35026                                                         
-CLOSE-WAIT 11     0      172.23.133.138:8080   172.23.133.139:35032                                                         
-CLOSE-WAIT 11     0      172.23.133.138:8080   172.23.133.139:35072                                                         
+# 客户端请求结束后，服务端netstat
+[root@iZ2zejee6e4h8ysmmjwj1nZ ~]# netstat -anp|grep 8080
+tcp        6      0 0.0.0.0:8080            0.0.0.0:*               LISTEN      2774/./server       
+tcp       11      0 172.23.133.140:8080     172.23.133.141:41718    CLOSE_WAIT  -                   
+tcp       11      0 172.23.133.140:8080     172.23.133.141:41680    CLOSE_WAIT  -                   
+tcp       11      0 172.23.133.140:8080     172.23.133.141:41706    CLOSE_WAIT  -                   
+tcp       11      0 172.23.133.140:8080     172.23.133.141:41702    CLOSE_WAIT  -                   
+tcp       11      0 172.23.133.140:8080     172.23.133.141:41780    CLOSE_WAIT  -                   
+tcp       11      0 172.23.133.140:8080     172.23.133.141:41674    CLOSE_WAIT  - 
+# 客户端请求结束后，服务端ss
+[root@iZ2zejee6e4h8ysmmjwj1nZ ~]# ss -anp|grep 8080
+tcp   LISTEN     6      5         0.0.0.0:8080                0.0.0.0:*     users:(("server",pid=2774,fd=3))
+tcp   CLOSE-WAIT 11     0         172.23.133.140:8080         172.23.133.141:41718
+tcp   CLOSE-WAIT 11     0         172.23.133.140:8080         172.23.133.141:41680
+tcp   CLOSE-WAIT 11     0         172.23.133.140:8080         172.23.133.141:41706
+tcp   CLOSE-WAIT 11     0         172.23.133.140:8080         172.23.133.141:41702
+tcp   CLOSE-WAIT 11     0         172.23.133.140:8080         172.23.133.141:41780
+tcp   CLOSE-WAIT 11     0         172.23.133.140:8080         172.23.133.141:41674
 
-# 多了8个drop
-[root@iZ2ze45jbqveelsasuub53Z ~]# netstat -s|grep -i list
-    14 times the listen queue of a socket overflowed
-    14 SYNs to LISTEN sockets dropped
+# 客户端请求结束后，服务端统计信息
+# 多了17个drop
+[root@iZ2zejee6e4h8ysmmjwj1nZ ~]# netstat -s|grep -i listen
+    17 times the listen queue of a socket overflowed
+    17 SYNs to LISTEN sockets dropped
 ```
+
+4、结果分析
+
+抓包文件：[服务端140抓包](/images/srcfiles/8080_server140.cap)、[客户端141抓包](/images/srcfiles/8080_server141.cap)
+
+先看客户端抓包结果，能观察到下面几种情况
+
+1、情况1：成功建立连接，发送数据成功
+
+![成功建立连接和发送数据](/images/client1_ok.png)
+
+如上所示，客户端正常发起三次握手，发送完数据后客户端进行close，主动发起FIN。但是由于服务端没有accept，所以全连接队列中并不会移除连接。会进行这些处理：
+
+1. 客户端发起SYN，服务端接收到SYN后将连接存到`半连接队列`，而后应答SYN+ACK
+2. 客户端收到后，应答ACK，服务端收到ACK后，把连接从`半连接队列`取出，放入`全连接队列`
+3. **服务端没有`accept()`，全连接队列中并不会移除连接**
+4. 客户端发送数据；发送完成后，`close()`发起关闭，发送FIN
+5. 服务端收到FIN后应答ACK
+6. **服务端没有`accept()`处理请求，所以也不会`close()`，一直保持CLOSE_WAIT状态**
+
+2、情况2：
 
 
 ## 6. 源码中各阶段简要流程
