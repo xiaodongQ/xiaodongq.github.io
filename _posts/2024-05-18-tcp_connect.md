@@ -16,9 +16,9 @@ tags: 网络
 
 最近碰到一个项目上服务端程序处理请求时没有响应的问题，协助尝试定位。初步抓包和`ss`/`netstat`定位是服务端一直没对第一次SYN做响应，也能观察到listen队列溢出了。服务端基于python框架，通过多进程进行监听处理。
 
-在另一个环境进行复现后，发现出问题的子进程有连接一直处于`CLOSE_WAIT`且不响应其他请求，没有出现`CLOSE_WAIT`的子进程还能处理请求，pstack/strace/ltrace一通下来只跟踪到基本都在等条件变量，也没有死锁之类的。
+在另一个环境进行复现后，发现出问题的子进程有连接一直处于`CLOSE_WAIT`且不响应其他请求，全连接队列也是满的。pstack/strace/ltrace一通下来只跟踪到基本都在等条件变量，也没有死锁之类的。
 
-平时都写C++，涉及到python的只是一些胶水脚本，学艺不精所以暂时阻塞在怀疑业务逻辑导致python网络框架卡死。
+平时都写C++，涉及到python的只是一些胶水脚本，所以暂时阻塞在怀疑业务逻辑某处卡死导致没最后发FIN关闭进而丢弃新的SYN，具体哪里出问题受限于python方面学艺不精就没辙定位了。
 
 另一个背景是知识星球里正好有个案例，涉及定位过程中一些知识点和工具，一些概念发现自己还是掌握得不够清晰和深入。
 
@@ -26,18 +26,20 @@ tags: 网络
 
 本篇先说明TCP三次握手相关过程。
 
-前置说明：
+## 2. 前置说明
 
 主要基于这篇文章："[从一次线上问题说起，详解 TCP 半连接队列、全连接队列](https://mp.weixin.qq.com/s/YpSlU1yaowTs-pF6R43hMw?poc_token=HKCgSGaji2dgAtvVc7gzTQykh3Aw6neDWcojHyB8)"，进行学习和扩展。
 
-环境：起两个阿里云抢占式实例，CentOS7.7系统
+环境：起两个阿里云抢占式实例，Alibaba Cloud Linux 3.2104 LTS 64位（内核版本：5.10.134-16.1.al8.x86_64）
 
-基于5.10内核代码跟踪流程（虽然上面实例是3.10.0-1062.18.1.el7.x86_64）
+    ip分别为：172.23.133.138、172.23.133.139，下述把138作为服务端，139作为客户端
 
-## 2. 三次握手总体流程
+基于5.10内核代码跟踪流程
 
-![TCP三次握手及相关控制参数](/images/tcp-connect.png)  
-基于[原图出处](https://mp.weixin.qq.com/s/YpSlU1yaowTs-pF6R43hMw?poc_token=HKCgSGaji2dgAtvVc7gzTQykh3Aw6neDWcojHyB8)加工
+## 3. TCP握手和断开总体流程
+
+![TCP握手断开过程和相关控制参数](/images/tcp-connect-close.png)  
+基于[出处1](https://mp.weixin.qq.com/s/YpSlU1yaowTs-pF6R43hMw?poc_token=HKCgSGaji2dgAtvVc7gzTQykh3Aw6neDWcojHyB8)、[出处2](https://time.geekbang.org/column/article/284912)
 
 <!-- 
 client                      server
@@ -51,45 +53,43 @@ client                      server
                     `accept()`处理，将连接从全连接队列取出
  -->
 
-## 3. netstat/ss监测实验
+## 4. netstat/ss简单监测实验
 
-### 3.1. `Recv-Q`和`Send-Q`
+### 4.1. `Recv-Q`和`Send-Q`
 
-1. 起一个简单http服务，`python -m SimpleHTTPServer`(python2，python3上用`python -m http.server`)，默认8000端口
+1. 服务端起一个简单http服务，`python2 -m SimpleHTTPServer`(python2，python3上用`python -m http.server`)，默认8000端口
 
 2. 观察`netstat`和`ss`展示的各列信息
 
-`netstat -ltnp`：
+`netstat`：
 
 ```sh
-[root@iZ2ze76owg090hoj8a5bpqZ ~]# netstat -anpt
+[root@iZ2ze45jbqveelsasuub53Z ~]# netstat -atnp
 Active Internet connections (servers and established)
 Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
-tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      1154/sshd           
-tcp        0      0 0.0.0.0:8000            0.0.0.0:*               LISTEN      1764/python         
-tcp        0      0 172.23.133.137:22       100.104.192.180:54409   ESTABLISHED 1790/sshd: root@not 
-tcp        0      0 172.23.133.137:35694    100.100.30.28:80        ESTABLISHED 1382/AliYunDun      
-tcp        0     36 172.23.133.137:22       100.104.192.180:54413   ESTABLISHED 1810/sshd: root@pts 
-tcp        0      0 172.23.133.137:22       100.104.192.136:48604   ESTABLISHED 1512/sshd: root@pts 
-tcp        0      0 172.23.133.137:49200    100.100.18.120:443      TIME_WAIT   - 
+tcp        0      0 0.0.0.0:8000            0.0.0.0:*               LISTEN      1910/python         
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      1258/sshd           
+tcp        0     36 172.23.133.138:22       100.104.192.176:51624   ESTABLISHED 1998/sshd: root [pr 
+tcp        0      0 172.23.133.138:48378    100.100.30.27:80        ESTABLISHED 1691/AliYunDun      
+tcp6       0      0 :::111                  :::*                    LISTEN      1/systemd  
+...
 ```
 
-`ss -ltnp`：
+`ss`：
 
 ```sh
-[root@iZ2ze76owg090hoj8a5bpqZ ~]# ss -atnp
-State      Recv-Q Send-Q        Local Address:Port        Peer Address:Port              
-LISTEN     0      128           *:22                      *:*                     users:(("sshd",pid=1154,fd=3))
-LISTEN     0      5             *:8000                    *:*                     users:(("python",pid=1764,fd=3))
-ESTAB      0      0             172.23.133.137:35694      100.100.30.28:80        users:(("AliYunDun",pid=1382,fd=12))
-ESTAB      0      36            172.23.133.137:22         100.104.192.180:54413   users:(("sshd",pid=1810,fd=3))
-ESTAB      0      0             172.23.133.137:22         100.104.192.136:48604   users:(("sshd",pid=1512,fd=3))
-TIME-WAIT  0      0             172.23.133.137:49200      100.100.18.120:443 
+[root@iZ2ze45jbqveelsasuub53Z ~]# ss -atnp
+State          Recv-Q      Send-Q  Local Address:Port     Peer Address:Port   Process
+LISTEN         0           5       0.0.0.0:8000            0.0.0.0:*          users:(("python",pid=1910,fd=3))   
+LISTEN         0           128     0.0.0.0:22              0.0.0.0:*          users:(("sshd",pid=1258,fd=3))     
+TIME-WAIT      0           0       172.23.133.138:47218    100.100.18.120:80  
+LISTEN         0           4096    [::]:111                [::]:*          users:(("rpcbind",pid=554,fd=6),("systemd",pid=1,fd=65))
+...
 ```
 
 `netstat`和`ss`里展示的`Recv-Q`和`Send-Q`含义是不一样的，可以看到上述两者的值不同。
 
-1、 在`netstat`中
+* 在`netstat`中
 
 `Recv-Q`表示收到的数据已经在本地接收缓冲，但是还有多少没有被进程取走（即还没有被应用程序读取）。如果接收队列Recv-Q一直处于阻塞状态，可能是遭受了拒绝服务（denial-of-service）攻击。
 
@@ -97,7 +97,7 @@ TIME-WAIT  0      0             172.23.133.137:49200      100.100.18.120:443
 
 疑问：针对监听和非监听端口，netstat中的`Recv-Q`和`Send-Q`的含义是否有区别？待定，后续分析netstat的源码(TODO)
 
-2、在`ss`中
+* 在`ss`中
 
 对于 LISTEN 状态的 socket：  
     `Recv-Q`：当前全连接队列的大小，即已完成三次握手等待应用程序 accept() 的 TCP 链接  
@@ -130,31 +130,51 @@ class TCPServer(BaseServer):
     ...
 ```
 
-### 3.2. listen队列溢出
+### 4.2. listen队列溢出
 
 另外：`netstat -s`里可以查看listen队列溢出的情况
 
-1、安装`ab`压测工具：`yum install httpd-tools`
+1. 客户端上安装`ab`压测工具：`yum install httpd-tools`
 
-2、向上述http服务进行并发请求
+2. 向上述http服务进行并发请求，请求前开启两端的抓包
 
-`ab -n 1000 -c 10 http://172.23.133.137:8000/`  
-    -n 1000 表示总共发送1000个请求。  
+`ab -n 100 -c 10 http://172.23.133.138:8000/`  
+    -n 100 表示总共发送100个请求。  
     -c 10 表示并发数为10，也就是同时尝试建立1000个连接
 
-3、查看统计情况`netstat -s|grep -i listen`：
+客户端：`tcpdump -i eth0 port 8000 -w 8000_client139.cap -v`
+
+服务端：`tcpdump -i eth0 port 8000 -w 8000_server138.cap -v`
+
+3. 服务端查看统计情况`netstat -s|grep -i listen`
 
 ```sh
-[root@iZ2ze76owg090hoj8a5bpqZ ~]# netstat -s|grep -i listen
-    9 times the listen queue of a socket overflowed
-    9 SYNs to LISTEN sockets dropped
+[root@iZ2ze45jbqveelsasuub53Z ~]# netstat -s|grep -i listen
+    6 times the listen queue of a socket overflowed
+    6 SYNs to LISTEN sockets dropped
 ```
 
-`9 SYNs to LISTEN sockets dropped` 这是半连接队列溢出
+`SYNs to LISTEN sockets dropped` 这是半连接队列溢出
 
-`9 times the listen queue of a socket overflowed` 这是全连接队列溢出？
+`times the listen queue of a socket overflowed` 这是全连接队列溢出？
 
-ECS上的对应参数：
+4. 抓包情况
+
+只能看到几个`PSH, ACK`的重传，请求应答最后还是正常的。ab工具应该有自己的重试机制。稍后参考原博客的方式构造场景。
+
+本次ECS上的对应参数：
+
+```sh
+[root@iZ2ze45jbqveelsasuub53Z ~]# sysctl -a|grep -E "syn_backlog|somaxconn|syn_retries|synack_retries|syncookies|abort_on_overflow"
+net.core.somaxconn = 4096
+net.ipv4.tcp_abort_on_overflow = 0
+net.ipv4.tcp_max_syn_backlog = 128
+net.ipv4.tcp_syn_retries = 6
+net.ipv4.tcp_synack_retries = 2
+net.ipv4.tcp_syncookies = 1
+```
+
+之前CentOS7.7(3.10内核)上的默认参数也贴到这里：
 
 ```sh
 [root@iZ2ze76owg090hoj8a5bpqZ ~]# sysctl -a|grep -E "syn_backlog|somaxconn|syn_retries|synack_retries|syncookies|abort_on_overflow"
@@ -166,8 +186,9 @@ net.ipv4.tcp_synack_retries = 2
 net.ipv4.tcp_syncookies = 1
 ```
 
-* 修改`sysctl -w net.core.somaxconn=4096`，重新起http服务，全连接队列长度还是5，执行ab后上述溢出变成18(即还是多了9个)
 * 备份修改python中`SocketServer.py`里的默认为2048，可看到Send-Q变成了2048
+
+/usr/lib64/python2.7/SocketServer.py
 
 ```sh
 [root@iZ2ze76owg090hoj8a5bpqZ ~]# ss -anlt
@@ -176,19 +197,13 @@ LISTEN     0      128            *:22                      *:*
 LISTEN     0      2048           *:8000
 ```
 
-而后继续进行一次ab测试，`ab -n 1000 -c 10 http://172.23.133.137:8000/`，查看统计信息后，这次没有再出现队列溢出的情况了。
+而后继续进行一次ab测试，`ab -n 100 -c 10 http://172.23.133.138:8000/`，查看统计信息后，这次没有再出现队列溢出的情况了。
 
-```sh
-[root@iZ2ze76owg090hoj8a5bpqZ ~]# netstat -s|grep -i listen
-    18 times the listen queue of a socket overflowed
-    18 SYNs to LISTEN sockets dropped
-```
+所以上述两个溢出打印，是由于服务端处理不过来导致全连接队列满，不去取出半连接队列进而导致半连接队列满？这个待定(TODO)
 
-所以上述两个溢出打印，是由于服务端处理不过来导致全连接队列满，不去取出半连接队列进而导致半连接队列满？这个待定后续再深究(TODO)
+### 4.3. ss中关于监听和非监听端口的区别说明
 
-### 3.3. ss中关于监听和非监听端口的区别说明
-
-1、`ss`和`netstat`数据获取的方式不同，`ss`用的是`tcp_diag`模块通过网络获取，而`netstat`是直接解析`/proc/net/tcp`文件，`ltrace`可以大致看出其过程差别。
+1. `ss`和`netstat`数据获取的方式不同，`ss`用的是`tcp_diag`模块通过网络获取，而`netstat`是直接解析`/proc/net/tcp`文件，`ltrace`可以大致看出其过程差别。
 
 ```sh
 [root@iZ2ze76owg090hoj8a5bpqZ ~]# ltrace netstat -ntl
@@ -228,50 +243,249 @@ recvmsg(3, 0x7fff6f427d80, 0, 14)                                               
 memset(0x7fff6f427b40, '\0', 152)                                                                    = 0x7fff6f427b40
 ```
 
-2、`ss`命令位于`iproute`这个库，若要具体分析过程需要找这个库的源码。
+2. `ss`命令位于`iproute`这个库，若要具体分析过程需要找这个库的源码。
 
 ```sh
-[root@iZ2ze76owg090hoj8a5bpqZ ~]# rpm -qf /usr/sbin/ss
-iproute-4.11.0-25.el7_7.2.x86_64
+[root@iZ2ze45jbqveelsasuub53Z ~]# rpm -qf /usr/sbin/ss
+iproute-5.18.0-1.1.0.1.al8.x86_64
 
 # netstat位于net-tools中
-[root@iZ2ze76owg090hoj8a5bpqZ ~]# rpm -qf /usr/bin/netstat 
-net-tools-2.0-0.25.20131004git.el7.x86_64
+[root@iZ2ze45jbqveelsasuub53Z ~]# rpm -qf /usr/bin/netstat
+net-tools-2.0-0.52.20160912git.1.al8.x86_64
 ```
 
-3、tcp_diag中，获取信息的代码位置：`tcp_diag_get_info`(linux-5.10.10/net/ipv4/tcp_diag.c)
+3. tcp_diag中，获取信息的代码位置：`tcp_diag_get_info`(linux-5.10.10/net/ipv4/tcp_diag.c)
 
 ```c
 // linux-5.10.10/net/ipv4/tcp_diag.c
 static void tcp_diag_get_info(struct sock *sk, struct inet_diag_msg *r,
-			      void *_info)
+                  void *_info)
 {
-	struct tcp_info *info = _info;
+    struct tcp_info *info = _info;
 
-	if (inet_sk_state_load(sk) == TCP_LISTEN) {
-		// socket 状态是 LISTEN 时
-		// 当前全连接队列个数 (RECV-Q会用这个)
-		r->idiag_rqueue = READ_ONCE(sk->sk_ack_backlog);
-		// 当前全连接队列最大个数 (SEND-Q会用这个)
-		r->idiag_wqueue = READ_ONCE(sk->sk_max_ack_backlog);
-	} else if (sk->sk_type == SOCK_STREAM) {
-		// SOCK_STREAM(典型如TCP) socket 状态是其他状态时，
-		const struct tcp_sock *tp = tcp_sk(sk);
+    if (inet_sk_state_load(sk) == TCP_LISTEN) {
+        // socket 状态是 LISTEN 时
+        // 当前全连接队列个数 (RECV-Q会用这个)
+        r->idiag_rqueue = READ_ONCE(sk->sk_ack_backlog);
+        // 当前全连接队列最大个数 (SEND-Q会用这个)
+        r->idiag_wqueue = READ_ONCE(sk->sk_max_ack_backlog);
+    } else if (sk->sk_type == SOCK_STREAM) {
+        // SOCK_STREAM(典型如TCP) socket 状态是其他状态时，
+        const struct tcp_sock *tp = tcp_sk(sk);
 
-		// 已收到但未被应用程序读取处理的字节数
-		r->idiag_rqueue = max_t(int, READ_ONCE(tp->rcv_nxt) -
-					     READ_ONCE(tp->copied_seq), 0);
-		// 已发送但未收到确认的字节数
-		r->idiag_wqueue = READ_ONCE(tp->write_seq) - tp->snd_una;
-	}
-	if (info)
-		tcp_get_info(sk, info);
+        // 已收到但未被应用程序读取处理的字节数
+        r->idiag_rqueue = max_t(int, READ_ONCE(tp->rcv_nxt) -
+                         READ_ONCE(tp->copied_seq), 0);
+        // 已发送但未收到确认的字节数
+        r->idiag_wqueue = READ_ONCE(tp->write_seq) - tp->snd_una;
+    }
+    if (info)
+        tcp_get_info(sk, info);
 }
 ```
 
-## 4. 源码各阶段流程
+## 5. 全连接队列溢出实验
 
-### 4.1. listen流程
+TCP 全连接队列的最大长度由 `min(somaxconn, backlog)` 控制，对应内核代码见下面的`listen流程`小节。
+
+上面已经看过当前环境中：net.core.somaxconn = 4096
+
+### 构造方法及代码
+
+通过让服务端应用只负责 Listen 对应端口而不执行 accept() TCP 连接，使 TCP 全连接队列溢出。
+
+* 服务端：
+
+```cpp
+#include <iostream>  
+#include <sys/socket.h>  
+#include <netinet/in.h>  
+#include <unistd.h>  
+#include <string.h>  
+  
+const int PORT = 8080;  
+const int BACKLOG = 5;
+  
+int main() {  
+    int server_fd, new_socket;  
+    struct sockaddr_in address;  
+    int addrlen = sizeof(address);  
+  
+    // 创建socket  
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {  
+        perror("socket failed");  
+        exit(EXIT_FAILURE);  
+    }  
+  
+    address.sin_family = AF_INET;  
+    address.sin_addr.s_addr = INADDR_ANY;  
+    address.sin_port = htons(PORT);  
+  
+    // 绑定  
+    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {  
+        perror("bind failed");  
+        exit(EXIT_FAILURE);  
+    }  
+  
+    // 监听  
+    if (listen(server_fd, BACKLOG) < 0) {  
+        perror("listen");  
+        exit(EXIT_FAILURE);  
+    }  
+  
+    std::cout << "Server listening on port " << PORT << std::endl;  
+  
+    // 注意：服务器不会接受连接，而是保持监听状态  
+  
+    // 您可以添加代码来让服务器持续运行，例如：  
+    while (true) {  
+        sleep(1); // 模拟服务器持续运行  
+    }  
+  
+    return 0;  
+}
+```
+
+编译：`g++ server.cpp -o server`
+
+* 客户端
+
+```cpp
+#include <iostream>  
+#include <thread>  
+#include <vector>  
+#include <sys/socket.h>  
+#include <arpa/inet.h>  
+#include <unistd.h>  
+#include <string.h>  
+  
+const char *SERVER_IP = "172.23.133.138";  
+const int PORT = 8080;  
+  
+void send_message(int num_requests) {  
+    for (int i = 0; i < num_requests; ++i) {  
+        int sock = 0;  
+        struct sockaddr_in serv_addr;  
+  
+        // 创建socket  
+        if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {  
+            std::cerr << "Socket creation error" << std::endl;  
+            return;  
+        }  
+  
+        serv_addr.sin_family = AF_INET;  
+        serv_addr.sin_port = htons(PORT);  
+  
+        // 将服务器的IP地址转换为网络字节序  
+        if (inet_pton(AF_INET, SERVER_IP, &serv_addr.sin_addr) <= 0) {  
+            std::cerr << "Invalid address/ Address not supported" << std::endl;  
+            close(sock);  
+            return;  
+        }  
+  
+        // 连接到服务器  
+        if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {  
+            std::cerr << "Connection Failed" << std::endl;  
+            close(sock);  
+            return;  
+        }  
+  
+        std::string message = "helloworld";  
+        // 发送消息  
+        if (send(sock, message.c_str(), message.length(), 0) < 0) {  
+            std::cerr << "Send failed" << std::endl;  
+        } else {  
+            std::cout << "Message sent: " << message << std::endl;  
+        }  
+  
+        close(sock);  
+    }  
+}  
+  
+int main(int argc, char *argv[]) {  
+    if (argc != 2) {  
+        std::cerr << "Usage: " << argv[0] << " <num_requests>" << std::endl;  
+        return 1;  
+    }  
+  
+    int num_requests = std::stoi(argv[1]);  
+    if (num_requests <= 0) {  
+        std::cerr << "Invalid number of requests" << std::endl;  
+        return 1;  
+    }  
+  
+    std::vector<std::thread> threads;  
+  
+    // 假设我们想要限制并发线程数，这里为了简单起见，我们直接创建num_requests个线程  
+    for (int i = 0; i < num_requests; ++i) {  
+        threads.emplace_back(send_message, 1); // 每个线程只发送一个请求  
+    }  
+  
+    // 等待所有线程完成  
+    for (auto& t : threads) {  
+        t.join();  
+    }  
+  
+    return 0;  
+}
+```
+
+编译：`g++ client.cpp -o client -std=c++11 -lpthread`
+
+### 观察过程
+
+1. 服务端代码编译后运行，`./server`
+
+```sh
+[root@iZ2ze45jbqveelsasuub53Z ~]# netstat -anpt|grep 8080
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name
+tcp        0      0 0.0.0.0:8080            0.0.0.0:*               LISTEN      18330/./server
+
+[root@iZ2ze45jbqveelsasuub53Z ~]# ss -anpt|grep 8080
+State     Recv-Q Send-Q  Local Address:Port     Peer Address:Port Process 
+LISTEN    0      5   0.0.0.0:8080            0.0.0.0:*     users:(("server",pid=18330,fd=3))  
+```
+
+2. 开启两端抓包
+
+客户端：`tcpdump -i eth0 port 8080 -w 8080_client139.cap -v`
+
+服务端：`tcpdump -i eth0 port 8080 -w 8080_server138.cap -v`
+
+3. 客户端并发10个请求，`./client 10`
+
+```sh
+[root@iZ2ze45jbqveelsasuub53Z ~]# netstat -s|grep -i list
+    6 times the listen queue of a socket overflowed
+    6 SYNs to LISTEN sockets dropped
+
+[root@iZ2ze45jbqveelsasuub53Z ~]# netstat -anpt|grep 8080
+tcp        6      0 0.0.0.0:8080            0.0.0.0:*               LISTEN      19906/./server      
+tcp       11      0 172.23.133.138:8080     172.23.133.139:35074    CLOSE_WAIT  -                   
+tcp       11      0 172.23.133.138:8080     172.23.133.139:35060    CLOSE_WAIT  -                   
+tcp       11      0 172.23.133.138:8080     172.23.133.139:35044    CLOSE_WAIT  -                   
+tcp       11      0 172.23.133.138:8080     172.23.133.139:35026    CLOSE_WAIT  -                   
+tcp       11      0 172.23.133.138:8080     172.23.133.139:35032    CLOSE_WAIT  -                   
+tcp       11      0 172.23.133.138:8080     172.23.133.139:35072    CLOSE_WAIT  -                   
+[root@iZ2ze45jbqveelsasuub53Z ~]# ss -anpt|grep 8080
+LISTEN     6      5             0.0.0.0:8080          0.0.0.0:*     users:(("server",pid=19906,fd=3))                       
+CLOSE-WAIT 11     0      172.23.133.138:8080   172.23.133.139:35074                                                         
+CLOSE-WAIT 11     0      172.23.133.138:8080   172.23.133.139:35060                                                         
+CLOSE-WAIT 11     0      172.23.133.138:8080   172.23.133.139:35044                                                         
+CLOSE-WAIT 11     0      172.23.133.138:8080   172.23.133.139:35026                                                         
+CLOSE-WAIT 11     0      172.23.133.138:8080   172.23.133.139:35032                                                         
+CLOSE-WAIT 11     0      172.23.133.138:8080   172.23.133.139:35072                                                         
+
+# 多了8个drop
+[root@iZ2ze45jbqveelsasuub53Z ~]# netstat -s|grep -i list
+    14 times the listen queue of a socket overflowed
+    14 SYNs to LISTEN sockets dropped
+```
+
+
+## 6. 源码中各阶段简要流程
+
+### 6.1. listen流程
 
 结合内核源码跟踪流程，具体见：[笔记记录](https://github.com/xiaodongQ/devNoteBackup/blob/master/%E5%90%84%E5%88%86%E7%B1%BB%E8%AE%B0%E5%BD%95/Linux%E5%86%85%E6%A0%B8%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0.md)
 
@@ -283,38 +497,44 @@ static void tcp_diag_get_info(struct sock *sk, struct inet_diag_msg *r,
 int __sys_listen(int fd, int backlog)
 {
     // socket 定义在 include\linux\net.h
-	struct socket *sock;
-	int err, fput_needed;
-	int somaxconn;
+    struct socket *sock;
+    int err, fput_needed;
+    int somaxconn;
 
     // 根据fd从fdtable里找到对应struct fd(file.h中定义)，并返回其中的socket相关数据成员(file结构的void* private_data成员)，此处即struct socket结构
-	sock = sockfd_lookup_light(fd, &err, &fput_needed);
-	if (sock) {
+    sock = sockfd_lookup_light(fd, &err, &fput_needed);
+    if (sock) {
         // 获取sysctl配置的 net.core.somaxconn 参数
-		somaxconn = sock_net(sock->sk)->core.sysctl_somaxconn;
+        somaxconn = sock_net(sock->sk)->core.sysctl_somaxconn;
         // 取min(传入的backlog, 系统net.core.somaxconn)
-		if ((unsigned int)backlog > somaxconn)
-			backlog = somaxconn;
+        if ((unsigned int)backlog > somaxconn)
+            backlog = somaxconn;
 
-		err = security_socket_listen(sock, backlog);
-		if (!err)
+        err = security_socket_listen(sock, backlog);
+        if (!err)
             // ops里是一系列socket操作的函数指针(如bind/accept)，inet_init(void)网络协议初始化时会设置
             // 其中，tcp协议的结构是 inet_stream_ops，里面的listen函数指针赋值为：inet_listen
-			err = sock->ops->listen(sock, backlog);
+            err = sock->ops->listen(sock, backlog);
 
-		fput_light(sock->file, fput_needed);
-	}
-	return err;
+        fput_light(sock->file, fput_needed);
+    }
+    return err;
 }
 
 // linux-5.10.10/net/ipv4/af_inet.c
 int inet_listen(struct socket *sock, int backlog)
 {
-    
+    struct sock *sk = sock->sk;
+    lock_sock(sk);
+    ...
+    // __sys_listen(linux-5.10.176\net\socket.c)调用时，传进来的的backlog值是min(调__sys_listen传入的backlog, 系统net.core.somaxconn)
+    // 此处设置到struct socket中struct sock相应成员中： sk_max_ack_backlog
+    WRITE_ONCE(sk->sk_max_ack_backlog, backlog);
+    ...
 }
 ```
 
-## 5. 参考
+## 7. 参考
 
 1、[从一次线上问题说起，详解 TCP 半连接队列、全连接队列](https://mp.weixin.qq.com/s/YpSlU1yaowTs-pF6R43hMw?poc_token=HKCgSGaji2dgAtvVc7gzTQykh3Aw6neDWcojHyB8)
 
