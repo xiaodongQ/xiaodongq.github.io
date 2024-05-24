@@ -320,9 +320,7 @@ g++ composite.cpp -o composite -std=c++11
 3. **装饰器（Decorator）**：持有一个指向抽象组件的引用，并实现了抽象组件的接口。装饰器可以向组件添加额外的职责。
 4. **具体装饰器（ConcreteDecorator）**：扩展了装饰器类，添加了具体的职责。
 
-### 6.1. C++ 示例
-
-假设我们有一个咖啡的抽象类（Component），以及一个具体的咖啡类（ConcreteComponent）。我们想要通过装饰器来增加额外的功能，比如加牛奶、加糖等。
+示例：假设我们有一个咖啡的抽象类（Component），以及一个具体的咖啡类（ConcreteComponent）。我们想要通过装饰器来增加额外的功能，比如加牛奶、加糖等。
 
 ```cpp
 #include <iostream>  
