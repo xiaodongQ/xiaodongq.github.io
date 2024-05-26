@@ -422,6 +422,8 @@ int main(int argc, char *argv[]) {
 
 ### 5.2. 观察过程
 
+#### 5.2.1. 程序运行并抓包
+
 1、服务端代码编译后运行，`./server`
 
 ```sh
@@ -446,7 +448,7 @@ LISTEN    0      5   0.0.0.0:8080            0.0.0.0:*     users:(("server",pid=
 
 服务端信息如下：
 
-* 可看到当前全连接队列中当前还有6个连接，且有6个`CLOSE_WAIT`状态的连接
+* 可看到当前全连接队列中当前还有6个连接，全连接最大值为5(实际允许5+1)，且有6个`CLOSE_WAIT`状态的连接
 * `netstat -s`中有半连接drop(SYN drop)及全连接drop(listen queue)
 
 ```sh
@@ -480,27 +482,107 @@ tcp   CLOSE-WAIT 11     0         172.23.133.140:8080         172.23.133.141:416
     17 SYNs to LISTEN sockets dropped
 ```
 
-4、结果分析
+抓包文件：[服务端140抓包](/images/srcfiles/8080_server140.cap)、[客户端141抓包](/images/srcfiles/8080_client141.cap)
 
-抓包文件：[服务端140抓包](/images/srcfiles/8080_server140.cap)、[客户端141抓包](/images/srcfiles/8080_server141.cap)
+#### 5.2.2. 客户端抓包分析
 
-先看客户端抓包结果，能观察到下面几种情况
+先看客户端抓包结果，能观察到下面几种情况。
 
-1、情况1：成功建立连接，发送数据成功
+* 1、情况1：成功建立连接，客户端发送FIN关闭成功
 
-![成功建立连接和发送数据](/images/client1_ok.png)
+由于只有10次请求，都查看一下，其中tcp.stream 0/1/2/4/5/9均是这种情况。(和上述6个`CLOSE_WAIT`对应)
 
-如上所示，客户端正常发起三次握手，发送完数据后客户端进行close，主动发起FIN。但是由于服务端没有accept，所以全连接队列中并不会移除连接。会进行这些处理：
+![成功建立连接和发送数据](/images/2024-05-19-client_case1.png)
 
-1. 客户端发起SYN，服务端接收到SYN后将连接存到`半连接队列`，而后应答SYN+ACK
-2. 客户端收到后，应答ACK，服务端收到ACK后，把连接从`半连接队列`取出，放入`全连接队列`
+有时FIN可能隐藏在某个PSH包里，通过`Flow Graph`查看具体发包过程：
+
+![case1 flow graph](/images/2024-05-26-case1_flowgraph.png)
+
+如上所示，客户端正常发起三次握手，发送完数据后客户端进行close，主动发起FIN。但是由于服务端没有accept，所以全连接队列中并不会移除连接。
+
+交互过程如下：
+
+1. 客户端发起SYN(SYN_SENT)，服务端接收到SYN后(SYN_RECV)将连接存到`半连接队列`，而后应答SYN+ACK
+2. ~~客户端收到后(ESTABLISHED)，应答ACK，服务端收到ACK后(ESTABLISHED)，把连接从`半连接队列`取出，放入`全连接队列`~~ 基于case2分析更正：  
+   客户端收到后(ESTABLISHED)，应答ACK，服务端收到ACK后，**把连接从`半连接队列`取出，放入`全连接队列`，然后才ESTABLISHED完成完整三次握手**
 3. **服务端没有`accept()`，全连接队列中并不会移除连接**
 4. 客户端发送数据；发送完成后，`close()`发起关闭，发送FIN
 5. 服务端收到FIN后应答ACK
-6. **服务端没有`accept()`处理请求，所以也不会`close()`，一直保持CLOSE_WAIT状态**
+6. **服务端没有`accept()`处理请求，所以也不会`close()`这次连接，服务端连接一直保持CLOSE_WAIT状态**
+7. 客户端收到ACK后，按开头的tcp流程应该处于FIN_WAIT2，并等待该状态超时(也为2MSL)，不过60s内netstat看客户端已经没8080相关的连接了(原因待定，TODO)
 
-2、情况2：
+* 2、情况2：成功建立连接，客户端重传FIN+PSH+ACK，最后收到服务端的RST
 
+由于只有10次请求，都查看一下，其中tcp.stream 3是这种情况。
+
+客户端抓包：  
+![case2 客户端重传FIN](/images/2024-05-26-case2_client.png)
+
+如上所示，客户端发完数据后，发起FIN关闭，但是服务端没应答ACK，于是重传FIN。
+
+FIN重传次数由`tcp_orphan_retries`控制，可以看到环境里为0(默认值)，默认时会重传8次。
+
+抓包中可看到重传间隔每次翻倍(0.2/0.4/0.8/1.6/3.2/6.4)，只重传了7次，最后一次没重传是由于重传间隔(12.8s)前，收到服务端的RST，于是客户端关闭连接。
+
+```sh
+[root@iZ2zejee6e4h8ysmmjwj1nZ ~]# sysctl -a|grep tcp_orphan_retries
+net.ipv4.tcp_orphan_retries = 0
+```
+
+抓包中另外两种异常包：
+
+1. 服务端(133.140)重传两次了`SYN+ACK`包
+2. 客户端(133.141)两次提示重复接收了`ACK`
+
+TCP协议的Seq显示修改成原始值(Protocol->TCP->取消相对Seq)，能更明确看出来这些包的关系：
+
+![case2 客户端包_原始seq的过程](/images/2024-05-26-case2_seq.png)
+
+通过Seq和Ack值可以看出，**此处重传的包是三次握手时服务端应答的`SYN+ACK`，重复接收`ACK`也是针对这个重传包的提示**，重传两次是由于`net.ipv4.tcp_synack_retries = 2`
+
+再看一下服务端抓包中对应的这个tcp stream处理(根据`tcp.seq eq 4135119230`找一下然后follow流)：
+
+![case2 服务端包](/images/case2_server_package.png)
+
+抓到的包是一样的，一样的三次握手过程，也有重传`SYN+ACK`。此处疑问：
+
+1. **内核drop掉的包，是否会被tcpdump抓到？(待定，TODO)**
+2. **全连接队列溢出导致内核drop掉的包，是否会被tcpdump抓到？**
+
+查资料上述两种情况若是drop了包，应该就抓不到包，所以包没有被drop掉。问题是服务端既然收到了客户端对于其`SYN+ACK`的`ACK`确认包，就应该是握手成功两端都`ESTABLISHED`了，为什么还要重传`SYN+ACK`呢？
+
+再理解了一下参考文章，所以还是我理解后画的图有问题，应该明确客户端回应`ACK`后服务端处理的先后顺序：此处应该为收到`ACK`->从半连接取连接放到全连接->状态`ESTABLISHED`，完成三次握手。如果是这样就理顺了。 (待定：跟踪源码确定这块的逻辑 TODO)
+
+所以**交互过程**如下：
+
+1. 客户端发起SYN(SYN_SENT)，服务端接收到SYN后(SYN_RECV)将连接存到`半连接队列`，而后应答SYN+ACK
+2. 客户端收到后(ESTABLISHED)，应答ACK，客户端侧当作握手成功；服务端收到ACK后，本应把连接从`半连接队列`取出，放入`全连接队列`，此处**应该由于全连接队列满导致服务端未完成握手成功**。
+3. 于是客户端发送数据，发送完成后便发送FIN结束。而实际上服务端均未处理，于是客户端进行重传(都计入drop？ TODO)。  
+   重传报文中Seq并未加10，说明PSH那个10长度的包未成功，展开看重传包中包含Len=10的数据也可以看出  
+   下面的`FIN+PSH+ACK`是由于发送数据及发送FIN都未处理，所以一起重传了，且两者ACK一样的。  
+   Info信息：`[TCP Retransmission] 41688 → 8080 [FIN, PSH, ACK] Seq=4087467239 Ack=4135119231 Win=64256 Len=10 TSval=3079987828 TSecr=2148341601`
+4. 对于服务端侧，由于一直没握手成功变成ESTABLISHED，重传`SYN+ACK`尝试继续握手。而客户端侧认为TCP连接已建立完成，收到的`SYN+ACK`当作重复包并不继续按握手处理(计入drop？ TODO)
+5. 于是服务端重传2次`SYN+ACK`(net.ipv4.tcp_synack_retries = 2)，均未继续握手
+6. 最后，服务端发送`RST`，客户端收到后关闭客户端侧的连接
+
+至此，第2种情况流程分析结束。这个情况并不会产生服务端的`CLOSE_WAIT`状态，**会发生包drop（待定，TODO）**
+
+* 3、情况3：收到服务端的RST
+
+由于只有10次请求，都查看一下，其中tcp.stream 6/7/8是这种情况。
+
+查看抓包，客户端和服务端抓到的包也一样：
+
+客户端抓包：  
+![case3_client 收到服务端RST](/images/2024-05-27-case3_client.png)
+
+服务端抓包：  
+![case3_server 收到服务端RST](/images/2024-05-27-case3_server.png)
+
+**交互过程**如下：
+
+
+#### 5.2.3. 服务端抓包分析
 
 ## 6. 源码中各阶段简要流程
 
