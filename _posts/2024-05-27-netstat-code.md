@@ -16,7 +16,7 @@ tags: Linux 网络
 
 [分析某环境中ss结果中Send-Q为0的原因](https://xiaodongq.github.io/2024/05/20/ss-sendq-0/)中，最后没分析`netstat`中为什么不展示全连接队列，本篇博客进行跟踪分析。
 
-## netstat源码
+## 2. netstat源码
 
 1、环境中执行结果
 
@@ -104,7 +104,7 @@ static void tcp_do_one(int lnr, const char *line, const char *prot)
 
 netstat展示信息会解析/proc/net/tcp (暂不管tcp6)，`Recv-Q`对应`rx_queue`，`Send-Q`对应`tx_queue`
 
-## /proc/net/tcp文件更新逻辑
+## 3. /proc/net/tcp文件更新逻辑
 
 这里的/proc/net/tcp，是Linux的一种序列文件(`seq_file`，内核顺序读取和写入的文件)，其更新逻辑在内核代码中查看。
 
@@ -114,7 +114,7 @@ netstat展示信息会解析/proc/net/tcp (暂不管tcp6)，`Recv-Q`对应`rx_qu
 
 里面先展示listen状态的TCP连接，然后展示所有established的连接，然后是其他状态的连接。
 
-### 代码流程
+### 3.1. 代码流程
 
 * 1、 初始化：`tcp4_proc_init_net()`，里面会创建/proc/net/tcp文件
 
