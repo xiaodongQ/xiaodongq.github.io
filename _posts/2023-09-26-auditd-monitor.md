@@ -61,7 +61,7 @@ type=PROCTITLE msg=audit(1695710251.567:366042): proctitle=73680078646B696C6C2E7
 
 ```sh
 # ausearch的结果，打印了一下转换后的时间戳，相对直观一点（对比看内容是一样的）
-[root@localhost qiuxiaodong]# ausearch -sc kill
+[root@localhost qxd]# ausearch -sc kill
 ----
 time->Tue Sep 26 14:37:31 2023
 type=PROCTITLE msg=audit(1695710251.567:366042): proctitle=73680078646B696C6C2E7368
