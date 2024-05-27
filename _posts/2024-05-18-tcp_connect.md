@@ -80,8 +80,8 @@ LISTEN         0           128     0.0.0.0:22              0.0.0.0:*          us
     * 对于 非LISTEN状态 的socket，表示已收到但未被应用程序读取的字节数，表示在接收缓冲区中等待处理的数据量。
 * `Send-Q`
     * 已发送但未收到确认的字节数
-* 疑问：针对监听和非监听端口，netstat中的`Recv-Q`和`Send-Q`的含义是否有区别？待定，后续分析netstat的源码(TODO)
-    * 已更新上述描述
+* 疑问：针对监听和非监听端口，netstat中的`Recv-Q`和`Send-Q`的含义是否有区别？~~待定，后续分析netstat的源码(TODO)~~
+    * 已更新上述描述，参考[分析netstat中的Send-Q和Recv-Q](https://xiaodongq.github.io/2024/05/27/netstat-code)
 
 在`ss`中：
 
