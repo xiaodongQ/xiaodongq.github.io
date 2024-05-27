@@ -175,7 +175,7 @@ static const struct proc_ops proc_net_seq_ops = {
 
 跟踪`seq_read`，里面涉及序列文件的操作流程
 
-可以看到里面流程很复杂，一个vfs层面的`open`操作，就涉及到序列文件的`show`、`next`、`stop`、`start`，包含了上面`tcp4_seq_ops`中的所有操作。
+可以看到里面流程很复杂，一个vfs层面的`read`操作，就涉及到序列文件的`show`、`next`、`stop`、`start`，包含了上面`tcp4_seq_ops`中的所有操作。
 
 ```cpp
 // linux-5.10.10/fs/seq_file.c

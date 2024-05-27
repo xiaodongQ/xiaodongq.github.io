@@ -569,7 +569,7 @@ TCP协议的Seq显示修改成原始值(Protocol->TCP->取消相对Seq)，能更
 5. 于是服务端重传2次`SYN+ACK`(net.ipv4.tcp_synack_retries = 2)，均未继续握手
 6. 最后，服务端发送`RST`，客户端收到后关闭客户端侧的连接
 
-至此，第2种情况流程分析结束。这个情况并不会产生服务端的`CLOSE_WAIT`状态，**会发生包drop（待定，TODO）**
+至此，第2种情况流程分析结束。这个情况并不会产生服务端的`CLOSE_WAIT`状态，**会发生包drop（待定，ebpf跟踪下包drop TODO）**
 
 * 3、情况3：收到服务端的RST
 
