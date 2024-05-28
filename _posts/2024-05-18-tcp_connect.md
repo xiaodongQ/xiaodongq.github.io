@@ -595,6 +595,28 @@ TCP协议的Seq显示修改成原始值(Protocol->TCP->取消相对Seq)，能更
 
 ## 6. 源码中各阶段简要流程
 
+stream类型协议相关的op接口，截取部分如下：
+
+```cpp
+// linux-5.10.10/net/ipv4/af_inet.c
+const struct proto_ops inet_stream_ops = {
+	.family		   = PF_INET,
+    ...
+	.bind		   = inet_bind,
+	.connect	   = inet_stream_connect,
+	.accept		   = inet_accept,
+	.poll		   = tcp_poll,
+	.ioctl		   = inet_ioctl,
+	.listen		   = inet_listen,
+	.shutdown	   = inet_shutdown,
+	.setsockopt	   = sock_common_setsockopt,
+	.getsockopt	   = sock_common_getsockopt,
+	.sendmsg	   = inet_sendmsg,
+	.recvmsg	   = inet_recvmsg,
+    ...
+}
+```
+
 ### 6.1. listen流程
 
 结合内核源码跟踪流程，具体见：[笔记记录](https://github.com/xiaodongQ/devNoteBackup/blob/master/%E5%90%84%E5%88%86%E7%B1%BB%E8%AE%B0%E5%BD%95/Linux%E5%86%85%E6%A0%B8%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0.md)
@@ -640,6 +662,68 @@ int inet_listen(struct socket *sock, int backlog)
     // __sys_listen(linux-5.10.176\net\socket.c)调用时，传进来的的backlog值是min(调__sys_listen传入的backlog, 系统net.core.somaxconn)
     // 此处设置到struct socket中struct sock相应成员中： sk_max_ack_backlog
     WRITE_ONCE(sk->sk_max_ack_backlog, backlog);
+    ...
+}
+```
+
+### 6.2. connect 流程
+
+按`__sys_xxx`方式搜索系统调用，connect调用如下：
+
+```cpp
+// linux-5.10.10/net/socket.c
+int __sys_connect(int fd, struct sockaddr __user *uservaddr, int addrlen)
+{
+	int ret = -EBADF;
+	struct fd f;
+
+	f = fdget(fd);
+	if (f.file) {
+		struct sockaddr_storage address;
+
+		// 用户态结构：sockaddr，拷贝到内核空间结构：sockaddr_storage
+		ret = move_addr_to_kernel(uservaddr, addrlen, &address);
+		if (!ret)
+			// 里面调用对应协议注册的 connect op操作，对于tcp是 inet_stream_connect
+			ret = __sys_connect_file(f.file, &address, addrlen, 0);
+		fdput(f);
+	}
+
+	return ret;
+}
+```
+
+```cpp
+// linux-5.10.10/net/ipv4/af_inet.c
+int inet_stream_connect(struct socket *sock, struct sockaddr *uaddr,
+			int addr_len, int flags)
+{
+	int err;
+
+	lock_sock(sock->sk);
+	err = __inet_stream_connect(sock, uaddr, addr_len, flags, 0);
+	release_sock(sock->sk);
+	return err;
+}
+```
+
+跟踪`__inet_stream_connect`及socket创建等过程，可知tcp协议实际会调用 `tcp_v4_connect`
+(具体跟踪过程可参考：[Linux内核学习笔记](https://github.com/xiaodongQ/devNoteBackup/blob/master/%E5%90%84%E5%88%86%E7%B1%BB%E8%AE%B0%E5%BD%95/Linux%E5%86%85%E6%A0%B8%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0.md))
+
+```cpp
+// linux-5.10.10/net/ipv4/tcp_ipv4.c
+int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
+{
+    ...
+    // 先设置SYN_SENT
+	tcp_set_state(sk, TCP_SYN_SENT);
+	err = inet_hash_connect(tcp_death_row, sk);
+	if (err)
+		goto failure;
+    ...
+    // 再发起实际数据发送
+    // Build a SYN and send it off
+	err = tcp_connect(sk);
     ...
 }
 ```
