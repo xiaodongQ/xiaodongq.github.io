@@ -108,6 +108,8 @@ netstat展示信息会解析/proc/net/tcp (暂不管tcp6)，`Recv-Q`对应`rx_qu
 
 这里的/proc/net/tcp，是Linux的一种序列文件(`seq_file`，内核顺序读取和写入的文件)，其更新逻辑在内核代码中查看。
 
+**proc文件系统，只有在读取文件内容时，才动态生成相应的信息**
+
 在内核源码的Documentation中，有其文件内容格式介绍：`Documentation/networking/proc_net_tcp.rst`  
 
 ![/proc/net/tcp文件格式](/images/2024-05-27-proc_tcp.png)
