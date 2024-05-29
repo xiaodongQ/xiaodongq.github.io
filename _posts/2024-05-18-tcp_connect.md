@@ -1,6 +1,6 @@
 ---
 layout: post
-title: TCP三次握手相关过程
+title: TCP建立连接相关过程
 categories: 网络
 tags: 网络
 ---
@@ -8,7 +8,7 @@ tags: 网络
 * content
 {:toc}
 
-梳理学习TCP三次握手相关过程，结合相关配置进行实验。
+梳理学习TCP建立连接相关过程，结合相关配置进行实验。
 
 
 
@@ -38,6 +38,8 @@ tags: 网络
 
 ![TCP握手断开过程和相关控制参数](/images/tcp-connect-close.png)  
 基于[出处1](https://mp.weixin.qq.com/s/YpSlU1yaowTs-pF6R43hMw?poc_token=HKCgSGaji2dgAtvVc7gzTQykh3Aw6neDWcojHyB8)、[出处2](https://time.geekbang.org/column/article/284912)
+
+说明：三次握手时，客户端先设置`SYN_SENT`状态再发`SYN`
 
 上图中TCP相关参数配置说明：![TCP参数配置](/images/tcp_param_suggest.png)  
 [出处](https://time.geekbang.org/column/article/284912)
@@ -76,44 +78,44 @@ LISTEN         0           128     0.0.0.0:22              0.0.0.0:*          us
 在`netstat`中：
 
 * `Recv-Q`
-    * 对于 LISTEN状态 的socket，表示全连接队列大小
-    * 对于 非LISTEN状态 的socket，表示已收到但未被应用程序读取的字节数，表示在接收缓冲区中等待处理的数据量。
+	* 对于 LISTEN状态 的socket，表示全连接队列大小
+	* 对于 非LISTEN状态 的socket，表示已收到但未被应用程序读取的字节数，表示在接收缓冲区中等待处理的数据量。
 * `Send-Q`
-    * 已发送但未收到确认的字节数
+	* 已发送但未收到确认的字节数
 * 疑问：针对监听和非监听端口，netstat中的`Recv-Q`和`Send-Q`的含义是否有区别？~~待定，后续分析netstat的源码(TODO)~~
-    * 已更新上述描述，参考[分析netstat中的Send-Q和Recv-Q](https://xiaodongq.github.io/2024/05/27/netstat-code)
+	* 已更新上述描述，参考[分析netstat中的Send-Q和Recv-Q](https://xiaodongq.github.io/2024/05/27/netstat-code)
 
 在`ss`中：
 
 * 对于 LISTEN 状态的 socket
-    * `Recv-Q`：当前全连接队列的大小，即已完成三次握手等待应用程序 accept() 的 TCP 链接  
-    * `Send-Q`：全连接队列的最大长度，即全连接队列的大小  
+	* `Recv-Q`：当前全连接队列的大小，即已完成三次握手等待应用程序 accept() 的 TCP 链接  
+	* `Send-Q`：全连接队列的最大长度，即全连接队列的大小  
 
 * 对于非 LISTEN 状态的 socket
-    * `Recv-Q`：已收到但未被应用程序读取的字节数，表示在接收缓冲区中等待处理的数据量。  
-    * `Send-Q`：已发送但未收到确认的字节数  
+	* `Recv-Q`：已收到但未被应用程序读取的字节数，表示在接收缓冲区中等待处理的数据量。  
+	* `Send-Q`：已发送但未收到确认的字节数  
 
 上面SimpleHTTPServer服务的全连接队列最大长度只有5，可以查看其源码：/usr/lib64/python2.7/SimpleHTTPServer.py。一步步跟踪代码可以看到其默认队列长度就是`5`，如下：
 
 ```py
 # /usr/lib64/python2.7/SocketServer.py
 class TCPServer(BaseServer):
-    ...
-    request_queue_size = 5
-    ...
-    def __init__(self, server_address, RequestHandlerClass, bind_and_activate=True):
-        """Constructor.  May be extended, do not override."""
-        BaseServer.__init__(self, server_address, RequestHandlerClass)
-        self.socket = socket.socket(self.address_family,
-                                    self.socket_type)
-        if bind_and_activate:
-            self.server_bind()
-            self.server_activate()
-    ...
-    def server_activate(self):
-        # 此处listen指定的backlog全连接最大长度默认就是5
-        self.socket.listen(self.request_queue_size)
-    ...
+	...
+	request_queue_size = 5
+	...
+	def __init__(self, server_address, RequestHandlerClass, bind_and_activate=True):
+		"""Constructor.  May be extended, do not override."""
+		BaseServer.__init__(self, server_address, RequestHandlerClass)
+		self.socket = socket.socket(self.address_family,
+									self.socket_type)
+		if bind_and_activate:
+			self.server_bind()
+			self.server_activate()
+	...
+	def server_activate(self):
+		# 此处listen指定的backlog全连接最大长度默认就是5
+		self.socket.listen(self.request_queue_size)
+	...
 ```
 
 ### 4.2. listen队列溢出
@@ -125,8 +127,8 @@ class TCPServer(BaseServer):
 2、向上述http服务进行并发请求，请求前开启两端的抓包
 
 `ab -n 100 -c 10 http://172.23.133.138:8000/`  
-    -n 100 表示总共发送100个请求。  
-    -c 10 表示并发数为10，也就是同时尝试建立1000个连接
+	-n 100 表示总共发送100个请求。  
+	-c 10 表示并发数为10，也就是同时尝试建立1000个连接
 
 客户端：`tcpdump -i eth0 port 8000 -w 8000_client139.cap -v`
 
@@ -136,8 +138,8 @@ class TCPServer(BaseServer):
 
 ```sh
 [root@iZ2ze45jbqveelsasuub53Z ~]# netstat -s|grep -i listen
-    6 times the listen queue of a socket overflowed
-    6 SYNs to LISTEN sockets dropped
+	6 times the listen queue of a socket overflowed
+	6 SYNs to LISTEN sockets dropped
 ```
 
 `SYNs to LISTEN sockets dropped` 这是半连接队列溢出
@@ -248,28 +250,28 @@ net-tools-2.0-0.52.20160912git.1.al8.x86_64
 ```c
 // linux-5.10.10/net/ipv4/tcp_diag.c
 static void tcp_diag_get_info(struct sock *sk, struct inet_diag_msg *r,
-                  void *_info)
+				  void *_info)
 {
-    struct tcp_info *info = _info;
+	struct tcp_info *info = _info;
 
-    if (inet_sk_state_load(sk) == TCP_LISTEN) {
-        // socket 状态是 LISTEN 时
-        // 当前全连接队列个数 (RECV-Q会用这个)
-        r->idiag_rqueue = READ_ONCE(sk->sk_ack_backlog);
-        // 当前全连接队列最大个数 (SEND-Q会用这个)
-        r->idiag_wqueue = READ_ONCE(sk->sk_max_ack_backlog);
-    } else if (sk->sk_type == SOCK_STREAM) {
-        // SOCK_STREAM(典型如TCP) socket 状态是其他状态时，
-        const struct tcp_sock *tp = tcp_sk(sk);
+	if (inet_sk_state_load(sk) == TCP_LISTEN) {
+		// socket 状态是 LISTEN 时
+		// 当前全连接队列个数 (RECV-Q会用这个)
+		r->idiag_rqueue = READ_ONCE(sk->sk_ack_backlog);
+		// 当前全连接队列最大个数 (SEND-Q会用这个)
+		r->idiag_wqueue = READ_ONCE(sk->sk_max_ack_backlog);
+	} else if (sk->sk_type == SOCK_STREAM) {
+		// SOCK_STREAM(典型如TCP) socket 状态是其他状态时，
+		const struct tcp_sock *tp = tcp_sk(sk);
 
-        // 已收到但未被应用程序读取处理的字节数
-        r->idiag_rqueue = max_t(int, READ_ONCE(tp->rcv_nxt) -
-                         READ_ONCE(tp->copied_seq), 0);
-        // 已发送但未收到确认的字节数
-        r->idiag_wqueue = READ_ONCE(tp->write_seq) - tp->snd_una;
-    }
-    if (info)
-        tcp_get_info(sk, info);
+		// 已收到但未被应用程序读取处理的字节数
+		r->idiag_rqueue = max_t(int, READ_ONCE(tp->rcv_nxt) -
+						 READ_ONCE(tp->copied_seq), 0);
+		// 已发送但未收到确认的字节数
+		r->idiag_wqueue = READ_ONCE(tp->write_seq) - tp->snd_una;
+	}
+	if (info)
+		tcp_get_info(sk, info);
 }
 ```
 
@@ -298,42 +300,42 @@ const int PORT = 8080;
 const int BACKLOG = 5;
   
 int main() {  
-    int server_fd, new_socket;  
-    struct sockaddr_in address;  
-    int addrlen = sizeof(address);  
+	int server_fd, new_socket;  
+	struct sockaddr_in address;  
+	int addrlen = sizeof(address);  
   
-    // 创建socket  
-    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {  
-        perror("socket failed");  
-        exit(EXIT_FAILURE);  
-    }  
+	// 创建socket  
+	if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {  
+		perror("socket failed");  
+		exit(EXIT_FAILURE);  
+	}  
   
-    address.sin_family = AF_INET;  
-    address.sin_addr.s_addr = INADDR_ANY;  
-    address.sin_port = htons(PORT);  
+	address.sin_family = AF_INET;  
+	address.sin_addr.s_addr = INADDR_ANY;  
+	address.sin_port = htons(PORT);  
   
-    // 绑定  
-    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {  
-        perror("bind failed");  
-        exit(EXIT_FAILURE);  
-    }  
+	// 绑定  
+	if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {  
+		perror("bind failed");  
+		exit(EXIT_FAILURE);  
+	}  
   
-    // 监听  
-    if (listen(server_fd, BACKLOG) < 0) {  
-        perror("listen");  
-        exit(EXIT_FAILURE);  
-    }  
+	// 监听  
+	if (listen(server_fd, BACKLOG) < 0) {  
+		perror("listen");  
+		exit(EXIT_FAILURE);  
+	}  
   
-    std::cout << "Server listening on port " << PORT << std::endl;  
+	std::cout << "Server listening on port " << PORT << std::endl;  
   
-    // 注意：服务器不会接受连接，而是保持监听状态  
+	// 注意：服务器不会接受连接，而是保持监听状态  
   
-    // 您可以添加代码来让服务器持续运行，例如：  
-    while (true) {  
-        sleep(1); // 模拟服务器持续运行  
-    }  
+	// 您可以添加代码来让服务器持续运行，例如：  
+	while (true) {  
+		sleep(1); // 模拟服务器持续运行  
+	}  
   
-    return 0;  
+	return 0;  
 }
 ```
 
@@ -354,71 +356,71 @@ char SERVER_IP[64] = "";
 const int PORT = 8080;  
   
 void send_message(int num_requests) {  
-    for (int i = 0; i < num_requests; ++i) {  
-        int sock = 0;  
-        struct sockaddr_in serv_addr;  
+	for (int i = 0; i < num_requests; ++i) {  
+		int sock = 0;  
+		struct sockaddr_in serv_addr;  
   
-        // 创建socket  
-        if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {  
-            std::cerr << "Socket creation error" << std::endl;  
-            return;  
-        }  
+		// 创建socket  
+		if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {  
+			std::cerr << "Socket creation error" << std::endl;  
+			return;  
+		}  
   
-        serv_addr.sin_family = AF_INET;  
-        serv_addr.sin_port = htons(PORT);  
+		serv_addr.sin_family = AF_INET;  
+		serv_addr.sin_port = htons(PORT);  
   
-        // 将服务器的IP地址转换为网络字节序  
-        if (inet_pton(AF_INET, SERVER_IP, &serv_addr.sin_addr) <= 0) {  
-            std::cerr << "Invalid address/ Address not supported" << std::endl;  
-            close(sock);  
-            return;  
-        }  
+		// 将服务器的IP地址转换为网络字节序  
+		if (inet_pton(AF_INET, SERVER_IP, &serv_addr.sin_addr) <= 0) {  
+			std::cerr << "Invalid address/ Address not supported" << std::endl;  
+			close(sock);  
+			return;  
+		}  
   
-        // 连接到服务器  
-        if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {  
-            std::cerr << "Connection Failed" << std::endl;  
-            close(sock);  
-            return;  
-        }  
+		// 连接到服务器  
+		if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {  
+			std::cerr << "Connection Failed" << std::endl;  
+			close(sock);  
+			return;  
+		}  
   
-        std::string message = "helloworld";  
-        // 发送消息  
-        if (send(sock, message.c_str(), message.length(), 0) < 0) {  
-            std::cerr << "Send failed" << std::endl;  
-        } else {  
-            std::cout << "Message sent: " << message << std::endl;  
-        }  
+		std::string message = "helloworld";  
+		// 发送消息  
+		if (send(sock, message.c_str(), message.length(), 0) < 0) {  
+			std::cerr << "Send failed" << std::endl;  
+		} else {  
+			std::cout << "Message sent: " << message << std::endl;  
+		}  
   
-        close(sock);  
-    }  
+		close(sock);  
+	}  
 }  
   
 int main(int argc, char *argv[]) {  
-    if (argc != 3) {  
-        std::cerr << "Usage: " << argv[0] << " <server_ip> <num_requests>" << std::endl;  
-        return 1;  
-    }  
-    strncpy(SERVER_IP, argv[1], sizeof(SERVER_IP));
+	if (argc != 3) {  
+		std::cerr << "Usage: " << argv[0] << " <server_ip> <num_requests>" << std::endl;  
+		return 1;  
+	}  
+	strncpy(SERVER_IP, argv[1], sizeof(SERVER_IP));
 
-    int num_requests = std::stoi(argv[2]);  
-    if (num_requests <= 0) {  
-        std::cerr << "Invalid number of requests" << std::endl;  
-        return 1;  
-    }  
+	int num_requests = std::stoi(argv[2]);  
+	if (num_requests <= 0) {  
+		std::cerr << "Invalid number of requests" << std::endl;  
+		return 1;  
+	}  
   
-    std::vector<std::thread> threads;  
+	std::vector<std::thread> threads;  
   
-    // 假设我们想要限制并发线程数，这里为了简单起见，我们直接创建num_requests个线程  
-    for (int i = 0; i < num_requests; ++i) {  
-        threads.emplace_back(send_message, 1); // 每个线程只发送一个请求  
-    }  
+	// 假设我们想要限制并发线程数，这里为了简单起见，我们直接创建num_requests个线程  
+	for (int i = 0; i < num_requests; ++i) {  
+		threads.emplace_back(send_message, 1); // 每个线程只发送一个请求  
+	}  
   
-    // 等待所有线程完成  
-    for (auto& t : threads) {  
-        t.join();  
-    }  
+	// 等待所有线程完成  
+	for (auto& t : threads) {  
+		t.join();  
+	}  
   
-    return 0;  
+	return 0;  
 }
 ```
 
@@ -482,8 +484,8 @@ tcp   CLOSE-WAIT 11     0         172.23.133.140:8080         172.23.133.141:416
 # 客户端请求结束后，服务端统计信息
 # 多了17个drop
 [root@iZ2zejee6e4h8ysmmjwj1nZ ~]# netstat -s|grep -i listen
-    17 times the listen queue of a socket overflowed
-    17 SYNs to LISTEN sockets dropped
+	17 times the listen queue of a socket overflowed
+	17 SYNs to LISTEN sockets dropped
 ```
 
 抓包文件：[服务端140抓包](/images/srcfiles/8080_server140.cap)、[客户端141抓包](/images/srcfiles/8080_client141.cap)
@@ -569,7 +571,10 @@ TCP协议的Seq显示修改成原始值(Protocol->TCP->取消相对Seq)，能更
 5. 于是服务端重传2次`SYN+ACK`(net.ipv4.tcp_synack_retries = 2)，均未继续握手
 6. 最后，服务端发送`RST`，客户端收到后关闭客户端侧的连接
 
-至此，第2种情况流程分析结束。这个情况并不会产生服务端的`CLOSE_WAIT`状态，**会发生包drop（待定，ebpf跟踪下包drop TODO）**
+至此，第2种情况流程分析结束。这个情况并不会产生服务端的`CLOSE_WAIT`状态，**会发生包drop**
+
+（待定，ebpf跟踪下包drop TODO，可参考：[一张图感受真实的 TCP 状态转移](https://segmentfault.com/a/1190000043834899)）
+
 
 * 3、情况3：收到服务端的RST
 
@@ -601,7 +606,7 @@ stream类型协议相关的op接口，截取部分如下：
 // linux-5.10.10/net/ipv4/af_inet.c
 const struct proto_ops inet_stream_ops = {
 	.family		   = PF_INET,
-    ...
+	...
 	.bind		   = inet_bind,
 	.connect	   = inet_stream_connect,
 	.accept		   = inet_accept,
@@ -613,7 +618,7 @@ const struct proto_ops inet_stream_ops = {
 	.getsockopt	   = sock_common_getsockopt,
 	.sendmsg	   = inet_sendmsg,
 	.recvmsg	   = inet_recvmsg,
-    ...
+	...
 }
 ```
 
@@ -628,41 +633,41 @@ const struct proto_ops inet_stream_ops = {
 // linux-5.10.10/net/socket.c(不同内核版本可能有部分差异，不影响流程)
 int __sys_listen(int fd, int backlog)
 {
-    // socket 定义在 include\linux\net.h
-    struct socket *sock;
-    int err, fput_needed;
-    int somaxconn;
+	// socket 定义在 include\linux\net.h
+	struct socket *sock;
+	int err, fput_needed;
+	int somaxconn;
 
-    // 根据fd从fdtable里找到对应struct fd(file.h中定义)，并返回其中的socket相关数据成员(file结构的void* private_data成员)，此处即struct socket结构
-    sock = sockfd_lookup_light(fd, &err, &fput_needed);
-    if (sock) {
-        // 获取sysctl配置的 net.core.somaxconn 参数
-        somaxconn = sock_net(sock->sk)->core.sysctl_somaxconn;
-        // 取min(传入的backlog, 系统net.core.somaxconn)
-        if ((unsigned int)backlog > somaxconn)
-            backlog = somaxconn;
+	// 根据fd从fdtable里找到对应struct fd(file.h中定义)，并返回其中的socket相关数据成员(file结构的void* private_data成员)，此处即struct socket结构
+	sock = sockfd_lookup_light(fd, &err, &fput_needed);
+	if (sock) {
+		// 获取sysctl配置的 net.core.somaxconn 参数
+		somaxconn = sock_net(sock->sk)->core.sysctl_somaxconn;
+		// 取min(传入的backlog, 系统net.core.somaxconn)
+		if ((unsigned int)backlog > somaxconn)
+			backlog = somaxconn;
 
-        err = security_socket_listen(sock, backlog);
-        if (!err)
-            // ops里是一系列socket操作的函数指针(如bind/accept)，inet_init(void)网络协议初始化时会设置
-            // 其中，tcp协议的结构是 inet_stream_ops，里面的listen函数指针赋值为：inet_listen
-            err = sock->ops->listen(sock, backlog);
+		err = security_socket_listen(sock, backlog);
+		if (!err)
+			// ops里是一系列socket操作的函数指针(如bind/accept)，inet_init(void)网络协议初始化时会设置
+			// 其中，tcp协议的结构是 inet_stream_ops，里面的listen函数指针赋值为：inet_listen
+			err = sock->ops->listen(sock, backlog);
 
-        fput_light(sock->file, fput_needed);
-    }
-    return err;
+		fput_light(sock->file, fput_needed);
+	}
+	return err;
 }
 
 // linux-5.10.10/net/ipv4/af_inet.c
 int inet_listen(struct socket *sock, int backlog)
 {
-    struct sock *sk = sock->sk;
-    lock_sock(sk);
-    ...
-    // __sys_listen(linux-5.10.176\net\socket.c)调用时，传进来的的backlog值是min(调__sys_listen传入的backlog, 系统net.core.somaxconn)
-    // 此处设置到struct socket中struct sock相应成员中： sk_max_ack_backlog
-    WRITE_ONCE(sk->sk_max_ack_backlog, backlog);
-    ...
+	struct sock *sk = sock->sk;
+	lock_sock(sk);
+	...
+	// __sys_listen(linux-5.10.176\net\socket.c)调用时，传进来的的backlog值是min(调__sys_listen传入的backlog, 系统net.core.somaxconn)
+	// 此处设置到struct socket中struct sock相应成员中： sk_max_ack_backlog
+	WRITE_ONCE(sk->sk_max_ack_backlog, backlog);
+	...
 }
 ```
 
@@ -714,19 +719,85 @@ int inet_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 // linux-5.10.10/net/ipv4/tcp_ipv4.c
 int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
-    ...
-    // 先设置SYN_SENT
+	...
+	// 先设置SYN_SENT
 	tcp_set_state(sk, TCP_SYN_SENT);
 	err = inet_hash_connect(tcp_death_row, sk);
 	if (err)
 		goto failure;
-    ...
-    // 再发起实际数据发送
-    // Build a SYN and send it off
+	...
+	// 再发起实际数据发送
+	// Build a SYN and send it off
 	err = tcp_connect(sk);
-    ...
+	...
 }
 ```
+
+所以开头中的流程图中，三次握手时应该调整成先设置`SYN_SENT`再发送`SYN`。
+
+### 6.1. 接收流程
+
+在网络协议`inet_init`初始化时，`(inet_add_protocol(&tcp_protocol, IPPROTO_TCP)`注册了TCP协议的接收处理api：`tcp_v4_rcv`
+
+```cpp
+// linux-5.10.10/net/ipv4/tcp_ipv4.c
+int tcp_v4_rcv(struct sk_buff *skb)
+{
+	...
+	// TCP协议头
+	// sk_buff结构里的data是`unsigned char*` 类型
+	th = (const struct tcphdr *)skb->data;
+	// IP协议头
+	iph = ip_hdr(skb);
+	...
+process:
+	// TIME_WAIT状态处理
+	if (sk->sk_state == TCP_TIME_WAIT)
+		goto do_time_wait;
+	if (sk->sk_state == TCP_NEW_SYN_RECV) {
+		...
+	}
+	...
+}
+```
+
+关于上面的TCP协议头和IP协议头，可在wireshark中对照查看(设置->Appearance->Layout->Pane3选Packet Diagram)：  
+
+![协议示意图](/images/2024-05-29-protocol-diagram.png)
+
+```cpp
+// linux-5.10.10/include/uapi/linux/tcp.h
+// TCP协议头信息
+struct tcphdr {
+	__be16	source;
+	__be16	dest;
+	__be32	seq;
+	__be32	ack_seq;
+	// 大小端字节序，flag位置不同(网络字节序为大端)
+#if defined(__LITTLE_ENDIAN_BITFIELD)
+	__u16	res1:4,
+		...
+#elif defined(__BIG_ENDIAN_BITFIELD)
+	__u16	doff:4,
+		...
+#endif	
+	__be16	window;
+	__sum16	check;
+	__be16	urg_ptr;
+};
+```
+
+可以看到里面已经是对各种状态的处理，那么`SYN_RECV`状态是哪里设置的？
+
+查资料后，流程如下：
+
+> 在服务器接收了SYN之后，会调用`tcp_conn_request`来处理连接请求，其中调用`inet_reqsk_alloc`来创建请求控制块，可见请求控制块的`ireq_state`被初始化为`TCP_NEW_SYN_RECV`；
+
+> `tcp_v4_rcv`函数中会对`TCP_NEW_SYN_RECV`进行处理，如果连接检查成功，则需要新建控制块来处理连接，这个新建控制块的状态将会使用`TCP_SYN_RECV`状态；
+
+> IPv4携带的TCP报文最终会进入到`tcp_v4_do_rcv`函数
+
+流程比较复杂，本文先有个概念，后续再具体跟踪梳理流程。
 
 ## 7. 参考
 
@@ -739,3 +810,9 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 4、[极客时间：如何提升TCP三次握手的性能？](https://time.geekbang.org/column/article/237612)
 
 5、[ss源代码调试&原理分析](https://blog.spoock.com/2019/07/06/ss-learn/)
+
+6、[TCP 之 TCP_NEW_SYN_RECV状态](https://www.cnblogs.com/wanpengcoder/p/11751740.html)
+
+7、[TCP输入 之 tcp_v4_rcv](https://www.cnblogs.com/wanpengcoder/p/11751763.html)
+
+8、[TCP被动打开 之 第一次握手-接收SYN](https://www.cnblogs.com/wanpengcoder/p/11750747.html)
