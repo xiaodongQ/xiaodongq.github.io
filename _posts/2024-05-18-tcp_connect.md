@@ -548,7 +548,7 @@ TCP协议的Seq显示修改成原始值(Protocol->TCP->取消相对Seq)，能更
 
 再看一下服务端抓包中对应的这个tcp stream处理(根据`tcp.seq eq 4135119230`找一下然后follow流)：
 
-![case2 服务端包](/images/case2_server_package.png)
+![case2 服务端包](/images/2024-05-26-case2-server.png)
 
 抓到的包是一样的，一样的三次握手过程，也有重传`SYN+ACK`。此处疑问：
 
