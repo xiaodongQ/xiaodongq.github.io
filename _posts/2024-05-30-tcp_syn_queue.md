@@ -1,6 +1,6 @@
 ---
 layout: post
-title: TCP半连接队列溢出实验及分析
+title: TCP半连接队列溢出实验及分析（一） -- 半连接队列香港代码逻辑
 categories: 网络
 tags: 网络
 ---
@@ -8,7 +8,7 @@ tags: 网络
 * content
 {:toc}
 
-半连接队列溢出分析及实验，并用工具跟踪
+半连接队列溢出分析及实验，并用工具跟踪。本文先分析半连接相关代码逻辑。
 
 
 
@@ -23,6 +23,8 @@ tags: 网络
 3. systemtap/ebpf跟踪TCP状态变化，跟踪上述drop事件
 4. 上述全连接实验case1中，2MSL内没观察到客户端连接`FIN_WAIT2`状态，为什么？
 
+本文先分析梳理代码逻辑。
+
 ## 2. 前置说明
 
 主要基于这篇文章："[从一次线上问题说起，详解 TCP 半连接队列、全连接队列](https://mp.weixin.qq.com/s/YpSlU1yaowTs-pF6R43hMw?poc_token=HKCgSGaji2dgAtvVc7gzTQykh3Aw6neDWcojHyB8)"，进行学习和扩展。
@@ -31,17 +33,15 @@ tags: 网络
 
 基于5.10内核代码跟踪流程，上下文均基于IPV4，暂不考虑IPV6
 
-## 3. 分析半连接
-
-上篇文章中自己的实验没抓到`SYN`发出后继续重发的情况，先跟着参考文章分析TCP半连接队列流程，再进行实验复现。
-
-### 3.1. 重要前提：先认识几种不同种类的sock结构
+## 3. 重要前提：先认识几种不同种类的sock结构
 
 网络初始化、处理接口逻辑等过程中，涉及到几种不同的sock结构，前置了解再梳理代码流程会清晰很多。
 
-下述几种sock类型，可以当作是`父类-子类`关系，C语言中结构体里的内存是连续的，将要继承的"父类"，放到结构体的第一位，然后就可以通过强制转换进行继承访问。比如：`struct sock *sk`类型转为`tcp_sock`，可用`(struct tcp_sock *)sk`转换后使用。
+下述几种sock类型，可以当作是`父类-子类`关系，C语言中结构体里的内存是连续的，将要继承的"父类"，放到结构体的第一位，然后就可以通过强制转换进行继承访问。
 
 ![sock种类](/images/2024-06-03-sock_type.png)
+
+对于TCP的`socket`来说，`sock`对象实际上是一个`tcp_sock`。因此TCP中的`sock`对象随时可以强制类型转化为`tcp_sock`（`(struct tcp_sock *)sk`形式）、`inet_connection_sock`、`inet_sock`来使用。
 
 * 1、`sock`是最基础的结构，维护一些任何协议都有可能会用到的收发数据缓冲区。
 
@@ -87,20 +87,20 @@ struct sock {
 ```cpp
 // linux-5.10.10/include/net/inet_sock.h
 struct inet_sock {
-	/* sk and pinet6 has to be the first two members of inet_sock */
-	struct sock		sk;
+    /* sk and pinet6 has to be the first two members of inet_sock */
+    struct sock		sk;
 #if IS_ENABLED(CONFIG_IPV6)
-	struct ipv6_pinfo	*pinet6;
+    struct ipv6_pinfo	*pinet6;
 #endif
-	/* Socket demultiplex comparisons on incoming packets. */
+    /* Socket demultiplex comparisons on incoming packets. */
 #define inet_daddr		sk.__sk_common.skc_daddr
 #define inet_rcv_saddr		sk.__sk_common.skc_rcv_saddr
 #define inet_dport		sk.__sk_common.skc_dport
 #define inet_num		sk.__sk_common.skc_num
     ...
-	__u8			min_ttl;
-	__u8			mc_ttl;
-	...
+    __u8			min_ttl;
+    __u8			mc_ttl;
+    ...
 };
 ```
 
@@ -111,13 +111,13 @@ struct inet_sock {
 ```cpp
 // linux-5.10.10/include/net/inet_connection_sock.h
 struct inet_connection_sock {
-	/* inet_sock has to be the first member! */
-	struct inet_sock	  icsk_inet;
-	// 全连接队列，已经 ESTABLISHED 的队列：FIFO of established children
-	struct request_sock_queue icsk_accept_queue;
-	struct inet_bind_bucket	  *icsk_bind_hash;
-	unsigned long		  icsk_timeout;
-	...
+    /* inet_sock has to be the first member! */
+    struct inet_sock	  icsk_inet;
+    // 全连接队列，已经 ESTABLISHED 的队列：FIFO of established children
+    struct request_sock_queue icsk_accept_queue;
+    struct inet_bind_bucket	  *icsk_bind_hash;
+    unsigned long		  icsk_timeout;
+    ...
 };
 ```
 
@@ -128,21 +128,131 @@ struct inet_connection_sock {
 ```cpp
 // linux-5.10.10/include/linux/tcp.h
 struct tcp_sock {
-	/* inet_connection_sock has to be the first member of tcp_sock */
-	struct inet_connection_sock	inet_conn;
-	u16	tcp_header_len;	/* Bytes of tcp header to send		*/
-	u16	gso_segs;	/* Max number of segs per GSO packet	*/
+    /* inet_connection_sock has to be the first member of tcp_sock */
+    struct inet_connection_sock	inet_conn;
+    u16	tcp_header_len;	/* Bytes of tcp header to send		*/
+    u16	gso_segs;	/* Max number of segs per GSO packet	*/
     ...
     u32	snd_wnd;	/* The window we expect to receive	*/
-	u32	max_window;	/* Maximal window ever seen from peer	*/
+    u32	max_window;	/* Maximal window ever seen from peer	*/
     ...
     u32	snd_cwnd;	/* Sending congestion window		*/
-	u32	snd_cwnd_cnt;	/* Linear increase counter		*/
+    u32	snd_cwnd_cnt;	/* Linear increase counter		*/
     ...
 }
 ```
 
-### 3.2. SYN接收处理接口是哪个？是何时注册的？
+## 4. `inet_listen`服务端监听流程进一步分析
+
+在说明全连接队列最大长度时，简单提到过`listen`系统调用，会调用到TCP协议注册的`inet_listen`，此处进一步分析其逻辑。
+
+```c
+// linux-5.10.10/net/socket.c(不同内核版本可能有部分差异，不影响流程)
+int __sys_listen(int fd, int backlog)
+{
+    ...
+    sock = sockfd_lookup_light(fd, &err, &fput_needed);
+    if (sock) {
+        // 获取sysctl配置的 net.core.somaxconn 参数
+        somaxconn = sock_net(sock->sk)->core.sysctl_somaxconn;
+        // 取min(传入的backlog, 系统net.core.somaxconn)
+        if ((unsigned int)backlog > somaxconn)
+            backlog = somaxconn;
+
+        err = security_socket_listen(sock, backlog);
+        if (!err)
+            // ops里是一系列socket操作的函数指针(如bind/accept)，inet_init(void)网络协议初始化时会设置
+            // 其中，tcp协议的结构是 inet_stream_ops，里面的listen函数指针赋值为：inet_listen
+            err = sock->ops->listen(sock, backlog);
+        ...
+    }
+    ...
+}
+
+// linux-5.10.10/net/ipv4/af_inet.c
+int inet_listen(struct socket *sock, int backlog)
+{
+    struct sock *sk = sock->sk;
+    lock_sock(sk);
+    ...
+    // __sys_listen(linux-5.10.176\net\socket.c)调用时，传进来的的backlog值是`min(调__sys_listen传入的backlog, 系统net.core.somaxconn)`
+    // 此处设置到struct socket中struct sock相应成员中： sk_max_ack_backlog
+    WRITE_ONCE(sk->sk_max_ack_backlog, backlog);
+
+    if (old_state != TCP_LISTEN) {
+        // 先不管 fastopen
+        tcp_fastopen = sock_net(sk)->ipv4.sysctl_tcp_fastopen;
+        ...
+        // 监听操作的核心逻辑
+		err = inet_csk_listen_start(sk, backlog);
+		if (err)
+			goto out;
+        ...
+    }
+    ...
+}
+```
+
+下面具体分析调用到的`inet_csk_listen_start`函数
+
+```cpp
+// linux-5.10.10/net/ipv4/inet_connection_sock.c
+int inet_csk_listen_start(struct sock *sk, int backlog)
+{
+	// 转换成面向连接的sock
+	struct inet_connection_sock *icsk = inet_csk(sk);
+	// 转换成基于网络的sock
+	struct inet_sock *inet = inet_sk(sk);
+	int err = -EADDRINUSE;
+    ...
+}
+```
+
+5.10内核的`request_sock_queue`结构里，只有全连接队列（网络上的文章说明不少是3.10内核，注意版本对应）
+
+```cpp
+// linux-5.10.10/include/net/request_sock.h
+struct request_sock_queue {
+	spinlock_t		rskq_lock;
+	u8			rskq_defer_accept;
+
+	u32			synflood_warned;
+	atomic_t		qlen;
+	atomic_t		young;
+
+	struct request_sock	*rskq_accept_head;
+	struct request_sock	*rskq_accept_tail;
+	struct fastopen_queue	fastopenq;  /* Check max_qlen != 0 to determine
+					     * if TFO is enabled.
+					     */
+};
+```
+
+作为对比，linux 3.10内核的`request_sock_queue`队列结构，里面包含了全连接和半连接队列：
+
+```cpp
+// linux-3.10.89/include/net/request_sock.h
+struct request_sock_queue {
+    // 全连接队列
+	struct request_sock	*rskq_accept_head;
+	struct request_sock	*rskq_accept_tail;
+	rwlock_t		syn_wait_lock;
+	u8			rskq_defer_accept;
+	/* 3 bytes hole, try to pack */
+    // 里面包含了半连接队列
+	struct listen_sock	*listen_opt;
+	struct fastopen_queue	*fastopenq; /* This is non-NULL iff TFO has been
+					     * enabled on this listener. Check
+					     * max_qlen != 0 in fastopen_queue
+					     * to determine if TFO is enabled
+					     * right at this moment.
+					     */
+};
+```
+
+## 5. 分析TCP请求处理
+
+### 5.1. SYN接收处理接口是哪个？是何时注册的？
 
 对于TCP，第一次接收处理时即处理三次握手的第一次`SYN`，先梳理其注册的处理接口
 
@@ -188,7 +298,7 @@ const struct inet_connection_sock_af_ops ipv4_specific = {
 
 所以解答小标题问题：初始化网络协议时，注册SYN处理函数为`tcp_v4_conn_request`
 
-### 3.3. tcp_v4_conn_request 逻辑
+### 5.2. tcp_v4_conn_request 逻辑
 
 然后就可以看下处理握手时第一次请求`SYN`的处理：
 
@@ -286,18 +396,22 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 // 判断全连接队列是否已满
 static inline int inet_csk_reqsk_queue_is_full(const struct sock *sk)
 {
-	// sk->sk_max_ack_backlog，之前跟踪listen，可以看到是将 min(backlog,somaxconn) 赋值给了它
-	// 全连接队列 >= 最大全连接队列数量
-	return inet_csk_reqsk_queue_len(sk) >= sk->sk_max_ack_backlog;
+    // sk->sk_max_ack_backlog，之前跟踪listen，可以看到是将 min(backlog,somaxconn) 赋值给了它
+    // 全连接队列 >= 最大全连接队列数量
+    return inet_csk_reqsk_queue_len(sk) >= sk->sk_max_ack_backlog;
 }
 ```
 
-## 4. 小结
+## 6. 小结
 
-## 5. 参考
+## 7. 参考
 
 1、[从一次线上问题说起，详解 TCP 半连接队列、全连接队列](https://mp.weixin.qq.com/s/YpSlU1yaowTs-pF6R43hMw?poc_token=HKCgSGaji2dgAtvVc7gzTQykh3Aw6neDWcojHyB8)
 
 2、[不为人知的网络编程(十五)：深入操作系统，一文搞懂Socket到底是什么](https://developer.aliyun.com/article/1173904)
 
-3、GPT
+3、[为什么服务端程序都需要先 listen 一下？](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247485737&idx=1&sn=baba45ad4fb98afe543bdfb06a5720b8&scene=21#wechat_redirect)
+
+4、[能将三次握手理解到这个深度，面试官拍案叫绝！](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247485862&idx=1&sn=1f3a92b8fd5fbc14c4d073d04c6d44ed&chksm=a6e3089d9194818bbd9ab3582bd7e7b7f2d83892833d088d8d1c514cbf145b9ee8f0f3b4be81&scene=178&cur_album_id=1532487451997454337#rd)
+
+5、GPT
