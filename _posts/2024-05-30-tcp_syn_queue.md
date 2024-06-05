@@ -180,13 +180,11 @@ int inet_listen(struct socket *sock, int backlog)
     WRITE_ONCE(sk->sk_max_ack_backlog, backlog);
 
     if (old_state != TCP_LISTEN) {
-        // 先不管 fastopen
-        tcp_fastopen = sock_net(sk)->ipv4.sysctl_tcp_fastopen;
         ...
         // 监听操作的核心逻辑
-		err = inet_csk_listen_start(sk, backlog);
-		if (err)
-			goto out;
+        err = inet_csk_listen_start(sk, backlog);
+        if (err)
+            goto out;
         ...
     }
     ...
@@ -199,97 +197,33 @@ int inet_listen(struct socket *sock, int backlog)
 // linux-5.10.10/net/ipv4/inet_connection_sock.c
 int inet_csk_listen_start(struct sock *sk, int backlog)
 {
-	// 转换成面向连接的sock
-	struct inet_connection_sock *icsk = inet_csk(sk);
-	// 转换成基于网络的sock
-	struct inet_sock *inet = inet_sk(sk);
-	int err = -EADDRINUSE;
+    // 转换成面向连接的sock
+    struct inet_connection_sock *icsk = inet_csk(sk);
+    // 转换成基于网络的sock
+    struct inet_sock *inet = inet_sk(sk);
+    int err = -EADDRINUSE;
     ...
 }
 ```
 
-5.10内核的`request_sock_queue`结构里，只有全连接队列（网络上的文章说明不少是3.10内核，注意版本对应）
+5.10内核的`request_sock_queue`结构里，只有全连接队列（网络上的文章很多是3.10内核，注意版本对应）
+
+和3.10内核的对比，见下面3.10的单独章节。
 
 ```cpp
 // linux-5.10.10/include/net/request_sock.h
 struct request_sock_queue {
-	spinlock_t		rskq_lock;
-	u8			rskq_defer_accept;
+    spinlock_t		rskq_lock;
+    u8			rskq_defer_accept;
 
-	u32			synflood_warned;
-	atomic_t		qlen;
-	atomic_t		young;
+    u32			synflood_warned;
+    atomic_t		qlen;
+    atomic_t		young;
 
-	struct request_sock	*rskq_accept_head;
-	struct request_sock	*rskq_accept_tail;
-	struct fastopen_queue	fastopenq;  /* Check max_qlen != 0 to determine
-					     * if TFO is enabled.
-					     */
+    struct request_sock	*rskq_accept_head;
+    struct request_sock	*rskq_accept_tail;
+    struct fastopen_queue	fastopenq;
 };
-```
-
-作为对比，linux 3.10内核的`request_sock_queue`队列结构，里面包含了全连接和半连接队列：
-
-```cpp
-// linux-3.10.89/include/net/request_sock.h
-struct request_sock_queue {
-    // 全连接队列
-	struct request_sock	*rskq_accept_head;
-	struct request_sock	*rskq_accept_tail;
-	rwlock_t		syn_wait_lock;
-	u8			rskq_defer_accept;
-	/* 3 bytes hole, try to pack */
-    // 里面包含了半连接队列
-	struct listen_sock	*listen_opt;
-	struct fastopen_queue	*fastopenq; /* This is non-NULL iff TFO has been
-					     * enabled on this listener. Check
-					     * max_qlen != 0 in fastopen_queue
-					     * to determine if TFO is enabled
-					     * right at this moment.
-					     */
-};
-```
-
-```cpp
-// linux-3.10.89/net/core/request_sock.c
-// nr_table_entries传入的是 backlog(listen时传入的参数)
-int reqsk_queue_alloc(struct request_sock_queue *queue,
-		      unsigned int nr_table_entries)
-{
-	size_t lopt_size = sizeof(struct listen_sock);
-	struct listen_sock *lopt;
-
-	// min(backlog, tcp_max_syn_backlog)
-	nr_table_entries = min_t(u32, nr_table_entries, sysctl_max_syn_backlog);
-	// 比8大
-	nr_table_entries = max_t(u32, nr_table_entries, 8);
-	// 2倍（结果按2^n取整)
-	nr_table_entries = roundup_pow_of_two(nr_table_entries + 1);
-	lopt_size += nr_table_entries * sizeof(struct request_sock *);
-	if (lopt_size > PAGE_SIZE)
-		lopt = vzalloc(lopt_size);
-	else
-		lopt = kzalloc(lopt_size, GFP_KERNEL);
-	if (lopt == NULL)
-		return -ENOMEM;
-
-	// 此处含义：取 max( 3, log2(nr_table_entries) )
-	// 每次 1<<max_qlen_log即乘2，直到>=nr_table_entries，即nr_table_entries以2为底
-	for (lopt->max_qlen_log = 3;
-	     (1 << lopt->max_qlen_log) < nr_table_entries;
-	     lopt->max_qlen_log++);
-
-	get_random_bytes(&lopt->hash_rnd, sizeof(lopt->hash_rnd));
-	rwlock_init(&queue->syn_wait_lock);
-	queue->rskq_accept_head = NULL;
-	lopt->nr_table_entries = nr_table_entries;
-
-	write_lock_bh(&queue->syn_wait_lock);
-	queue->listen_opt = lopt;
-	write_unlock_bh(&queue->syn_wait_lock);
-
-	return 0;
-}
 ```
 
 ## 5. 分析TCP请求处理
@@ -347,6 +281,7 @@ const struct inet_connection_sock_af_ops ipv4_specific = {
 ```cpp
 // linux-5.10.10/net/ipv4/tcp_ipv4.c
 // 初始化时注册的处理第一次SYN的函数
+// sk是socket， skb是请求？
 int tcp_v4_conn_request(struct sock *sk, struct sk_buff *skb)
 {
     // 如果是广播或者组播的SYN请求包，直接drop
@@ -444,9 +379,183 @@ static inline int inet_csk_reqsk_queue_is_full(const struct sock *sk)
 }
 ```
 
-## 6. 小结
+## 6. 3.10内核对比
 
-## 7. 参考
+### 6.1. 概要说明
+
+网上很多文章关于半连接都是基于3.x的内核，跟踪上述5.10内核过程中一直疑惑`icsk_accept_queue`算是全连接还是半连接队列。
+
+对比3.10内核中`request_sock_queue`里既有全连接又有半连接，5.10内核里似乎没有单独的半连接，而是通过引用计数加1减1，共享同一个队列（类似享元模式？）。
+
+带着怀疑在技术讨论群搜半连接队列，碰巧历史记录里有人提到：4.4之后的内核改了syn_queue半连接队列逻辑，半连接队列成为一个概念没有了，统一保存到`ehash table` 中，维护半连接长度就放到`icsk_accept_queue->qlen`。
+
+而且带了陈硕大佬的一篇文章参考链接：[Linux 4.4 之后 TCP 三路握手的新流程](https://zhuanlan.zhihu.com/p/25313903)
+
+### 6.2. inet_listen流程
+
+下述逻辑可用下图概括：
+
+![icsk_accept_queue](/images/2024-06-05-3.10-icsk_accept_queue.png)
+
+[出处](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247485737&idx=1&sn=baba45ad4fb98afe543bdfb06a5720b8&scene=21#wechat_redirect)
+
+```cpp
+// linux-3.10.89/net/ipv4/af_inet.c
+int inet_listen(struct socket *sock, int backlog)
+{
+    struct sock *sk = sock->sk;
+    unsigned char old_state;
+    int err;
+    ...
+    if (old_state != TCP_LISTEN) {
+        ...
+        // 初始化半连接队列和
+        err = inet_csk_listen_start(sk, backlog);
+        if (err)
+            goto out;
+    }
+    sk->sk_max_ack_backlog = backlog;
+    err = 0;
+    ...
+}
+```
+
+```cpp
+// linux-3.10.89/net/ipv4/inet_connection_sock.c
+// nr_table_entries传入的是 backlog
+int inet_csk_listen_start(struct sock *sk, const int nr_table_entries)
+{
+    struct inet_sock *inet = inet_sk(sk);
+    struct inet_connection_sock *icsk = inet_csk(sk);
+    // 申请半连接队列的空间，初始化全连接队列为NULL
+    int rc = reqsk_queue_alloc(&icsk->icsk_accept_queue, nr_table_entries);
+    ...
+    // 设置socket状态为 LISTEN
+    sk->sk_state = TCP_LISTEN;
+    // TCP协议初始化时指定了： inet_csk_get_port
+    // 用来处理TCP端口绑定操作，里面逻辑比较复杂，本文先不涉及
+    if (!sk->sk_prot->get_port(sk, inet->inet_num)) {
+        inet->inet_sport = htons(inet->inet_num);
+
+        sk_dst_reset(sk);
+        // inet_hash
+        sk->sk_prot->hash(sk);
+
+        return 0;
+    }
+    ...
+}
+```
+
+先说明下上述`icsk->icsk_accept_queue`队列，其定义为：`struct request_sock_queue icsk_accept_queue;`队列结构，里面包含了全连接和半连接队列：
+
+```cpp
+// linux-3.10.89/include/net/request_sock.h
+struct request_sock_queue {
+    // 全连接队列，是一个先进先出(FIFO)的链表结构
+    struct request_sock	*rskq_accept_head;
+    struct request_sock	*rskq_accept_tail;
+    rwlock_t		syn_wait_lock;
+    u8			rskq_defer_accept;
+    /* 3 bytes hole, try to pack */
+    // 里面包含了半连接队列
+    struct listen_sock	*listen_opt;
+    struct fastopen_queue	*fastopenq; 
+};
+
+struct listen_sock {
+    // 半连接队列长度的log2对数
+    u8			max_qlen_log;
+    u8			synflood_warned;
+    /* 2 bytes hole, try to use */
+    int			qlen;
+    int			qlen_young;
+    int			clock_hand;
+    u32			hash_rnd;
+    // 半连接队列长度
+    u32			nr_table_entries;
+    // 此处实际以hash表方式管理，用于第三次握手时快速地查找出来第一次握手时留存的`request_sock`对象
+    struct request_sock	*syn_table[0];
+};
+```
+
+继续看上面`inet_csk_listen_start`里初始化半连接队列的具体操作：
+
+```cpp
+// linux-3.10.89/net/core/request_sock.c
+// nr_table_entries传入的是 backlog(listen时传入的参数)
+int reqsk_queue_alloc(struct request_sock_queue *queue,
+              unsigned int nr_table_entries)
+{
+    size_t lopt_size = sizeof(struct listen_sock);
+    struct listen_sock *lopt;
+
+    // min(backlog, tcp_max_syn_backlog)
+    nr_table_entries = min_t(u32, nr_table_entries, sysctl_max_syn_backlog);
+    // 取 max(8, nr_table_entries)
+    nr_table_entries = max_t(u32, nr_table_entries, 8);
+    // 2倍（结果按2^n取整)
+    nr_table_entries = roundup_pow_of_two(nr_table_entries + 1);
+    // 申请空间
+    lopt_size += nr_table_entries * sizeof(struct request_sock *);
+    if (lopt_size > PAGE_SIZE)
+        lopt = vzalloc(lopt_size);
+    else
+        lopt = kzalloc(lopt_size, GFP_KERNEL);
+    if (lopt == NULL)
+        return -ENOMEM;
+
+    // 此处含义：取 max( 3, log2(nr_table_entries) )
+    // 每次 1<<max_qlen_log即乘2，直到>=nr_table_entries，即nr_table_entries以2为底
+    for (lopt->max_qlen_log = 3;
+         (1 << lopt->max_qlen_log) < nr_table_entries;
+         lopt->max_qlen_log++);
+
+    get_random_bytes(&lopt->hash_rnd, sizeof(lopt->hash_rnd));
+    rwlock_init(&queue->syn_wait_lock);
+    // 全连接队列 头
+    queue->rskq_accept_head = NULL;
+    // 上述计算的半连接长度限制
+    lopt->nr_table_entries = nr_table_entries;
+
+    write_lock_bh(&queue->syn_wait_lock);
+    // struct listen_sock *lopt; 即我们常说的 半连接队列
+    queue->listen_opt = lopt;
+    write_unlock_bh(&queue->syn_wait_lock);
+
+    return 0;
+}
+```
+
+可看到，相比于5.10内核，此处额外申请了一个半连接队列的空间。
+
+上面计算描述有点抽象，举个例子（来自参考链接里的：`为什么服务端程序都需要先 listen 一下？`）：
+
+* 假设：某服务器上内核参数 `net.core.somaxconn` 为 128， `net.ipv4.tcp_max_syn_backlog` 为 8192。那么当用户 backlog 传入 5 时，半连接队列到底是多长呢？
+
+和代码一样，我们还把计算分为四步，最终结果为 16。
+
+```c
+min (backlog, somaxconn)  = min (5, 128) = 5
+min (5, tcp_max_syn_backlog) = min (5, 8192) = 5
+max (5, 8) = 8
+roundup_pow_of_two (8 + 1) = 16
+```
+
+* somaxconn 和 `tcp_max_syn_backlog` 保持不变，listen 时的 backlog 加大到 `512`，再算一遍，结果为 `256`。
+
+```c
+min (backlog, somaxconn)  = min (512, 128) = 128
+min (128, tcp_max_syn_backlog) = min (128, 8192) = 128
+max (128, 8) = 128
+roundup_pow_of_two (128 + 1) = 256
+```
+
+> **把半连接队列长度的计算归纳成一句话，半连接队列的长度是 `min(backlog, somaxconn, tcp_max_syn_backlog) + 1 再上取整到 2 的幂次`，但最小不能小于`16`。**
+
+## 7. 小结
+
+## 8. 参考
 
 1、[从一次线上问题说起，详解 TCP 半连接队列、全连接队列](https://mp.weixin.qq.com/s/YpSlU1yaowTs-pF6R43hMw?poc_token=HKCgSGaji2dgAtvVc7gzTQykh3Aw6neDWcojHyB8)
 
@@ -456,4 +565,6 @@ static inline int inet_csk_reqsk_queue_is_full(const struct sock *sk)
 
 4、[能将三次握手理解到这个深度，面试官拍案叫绝！](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247485862&idx=1&sn=1f3a92b8fd5fbc14c4d073d04c6d44ed&chksm=a6e3089d9194818bbd9ab3582bd7e7b7f2d83892833d088d8d1c514cbf145b9ee8f0f3b4be81&scene=178&cur_album_id=1532487451997454337#rd)
 
-5、GPT
+5、[Linux 4.4 之后 TCP 三路握手的新流程](https://zhuanlan.zhihu.com/p/25313903)
+
+6、GPT
