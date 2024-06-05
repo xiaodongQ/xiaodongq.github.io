@@ -1,6 +1,6 @@
 ---
 layout: post
-title: TCP半连接队列溢出实验及分析（一） -- 半连接队列香港代码逻辑
+title: TCP半连接队列相关过程系列（一） -- 半连接队列代码逻辑
 categories: 网络
 tags: 网络
 ---
@@ -8,7 +8,7 @@ tags: 网络
 * content
 {:toc}
 
-半连接队列溢出分析及实验，并用工具跟踪。本文先分析半连接相关代码逻辑。
+半连接队列相关过程分析及实验，并用工具跟踪。本文先分析半连接相关代码逻辑。
 
 
 
@@ -16,7 +16,7 @@ tags: 网络
 
 在“[TCP建立连接相关过程](https://xiaodongq.github.io/2024/05/18/tcp_connect/)”这篇文章中，进行了全连接队列溢出的实验，并且遗留了几个问题。
 
-本博客实验分析半连接队列溢出情况，并探究上述文章中的遗留问题。
+本博客跟踪分析半连接队列相关过程，并探究上述文章中的遗留问题。
 
 1. 半连接队列溢出情况分析，服务端接收具体处理逻辑
 2. 内核drop包的时机，以及跟抓包的关系。哪些情况可能会抓不到drop的包？
@@ -33,7 +33,7 @@ tags: 网络
 
 基于5.10内核代码跟踪流程，上下文均基于IPV4，暂不考虑IPV6
 
-## 3. 重要前提：先认识几种不同种类的sock结构
+## 3. 前提：先认识几种不同种类的sock结构
 
 网络初始化、处理接口逻辑等过程中，涉及到几种不同的sock结构，前置了解再梳理代码流程会清晰很多。
 
@@ -142,7 +142,7 @@ struct tcp_sock {
 }
 ```
 
-## 4. `inet_listen`服务端监听流程进一步分析
+## 4. inet_listen服务端监听流程进一步分析
 
 在说明全连接队列最大长度时，简单提到过`listen`系统调用，会调用到TCP协议注册的`inet_listen`，此处进一步分析其逻辑。
 
@@ -387,9 +387,7 @@ static inline int inet_csk_reqsk_queue_is_full(const struct sock *sk)
 
 对比3.10内核中`request_sock_queue`里既有全连接又有半连接，5.10内核里似乎没有单独的半连接，而是通过引用计数加1减1，共享同一个队列（类似享元模式？）。
 
-带着怀疑在技术讨论群搜半连接队列，碰巧历史记录里有人提到：4.4之后的内核改了syn_queue半连接队列逻辑，半连接队列成为一个概念没有了，统一保存到`ehash table` 中，维护半连接长度就放到`icsk_accept_queue->qlen`。
-
-而且带了陈硕大佬的一篇文章参考链接：[Linux 4.4 之后 TCP 三路握手的新流程](https://zhuanlan.zhihu.com/p/25313903)
+带着怀疑在技术讨论群搜半连接队列，碰巧历史记录里有人提到：4.4之后的内核改了syn_queue半连接队列逻辑，半连接队列成为一个概念没有了，统一保存到`ehash table` 中，维护半连接长度就放到`icsk_accept_queue->qlen`，并附了一篇陈硕大佬的文章链接：[Linux 4.4 之后 TCP 三路握手的新流程](https://zhuanlan.zhihu.com/p/25313903)
 
 ### 6.2. inet_listen流程
 
@@ -397,7 +395,7 @@ static inline int inet_csk_reqsk_queue_is_full(const struct sock *sk)
 
 ![icsk_accept_queue](/images/2024-06-05-3.10-icsk_accept_queue.png)
 
-[出处](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247485737&idx=1&sn=baba45ad4fb98afe543bdfb06a5720b8&scene=21#wechat_redirect)
+图片出处：[为什么服务端程序都需要先 listen 一下？](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247485737&idx=1&sn=baba45ad4fb98afe543bdfb06a5720b8&scene=21#wechat_redirect)
 
 ```cpp
 // linux-3.10.89/net/ipv4/af_inet.c
@@ -529,7 +527,7 @@ int reqsk_queue_alloc(struct request_sock_queue *queue,
 
 可看到，相比于5.10内核，此处额外申请了一个半连接队列的空间。
 
-上面计算描述有点抽象，举个例子（来自参考链接里的：`为什么服务端程序都需要先 listen 一下？`）：
+上面计算描述有点抽象，举个例子（来自参考链接里的：[为什么服务端程序都需要先 listen 一下？](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247485737&idx=1&sn=baba45ad4fb98afe543bdfb06a5720b8&scene=21#wechat_redirect)）：
 
 * 假设：某服务器上内核参数 `net.core.somaxconn` 为 128， `net.ipv4.tcp_max_syn_backlog` 为 8192。那么当用户 backlog 传入 5 时，半连接队列到底是多长呢？
 
