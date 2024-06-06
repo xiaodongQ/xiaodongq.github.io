@@ -732,7 +732,7 @@ drop:
 
 ### 7.3. `netstat -s`中的溢出统计说明(纠错)
 
-之前提到`netstat -s`里统计的溢出和drop，一个是全连接，一个是半连接，其实是错的。
+之前提到`netstat -s`里统计的溢出和drop，一个是全连接一个是半连接，其实是不准确的。
 
 先说结论：
 
@@ -745,7 +745,7 @@ drop:
     6 SYNs to LISTEN sockets dropped
 ```
 
-上面`tcp_v4_conn_request`里，`NET_INC_STATS_BH`即统计这些SNMP信息，netstat根据SNMP进行解析打印。
+上面SYN处理函数`tcp_v4_conn_request`里面，`NET_INC_STATS_BH`(5.10中为`NET_INC_STATS`)函数用于统计SNMP信息，netstat根据SNMP进行解析打印。
 
 伪代码简化如下。
 
@@ -753,6 +753,7 @@ drop:
 2. 半连接队列满时，只累加`LINUX_MIB_LISTENDROPS`
 
 ```c
+// 3.10
 tcp_v4_conn_request()
 {
     ...
