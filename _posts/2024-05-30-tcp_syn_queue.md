@@ -41,7 +41,7 @@ tags: 网络
 
 对于TCP的`socket`来说，`sock`对象实际上是一个`tcp_sock`。因此TCP中的`sock`对象随时可以强制类型转化为`tcp_sock`（`(struct tcp_sock *)sk`形式）、`inet_connection_sock`、`inet_sock`来使用。
 
-* 1、`sock`是最基础的结构，维护一些任何协议都有可能会用到的收发数据缓冲区。
+1、`sock`是最基础的结构，维护一些任何协议都有可能会用到的收发数据缓冲区。
 
 ```cpp
 // linux-5.10.176\include\net\sock.h
@@ -71,11 +71,10 @@ socket创建流程中，涉及创建`struct sock`结构
 * 在网络内核中，它允许多个线程或进程同时读取共享数据，而不需要获取锁，从而提高了并发性能。
 * 读：允许多个线程或进程同时读取共享数据，而不需要获取锁
 * 写：RCU也确保了在写操作进行时，读操作能够访问到一致的数据
+* 应用场景：路由表、套接字数据结构、网络缓冲区
 
-应用场景：路由表、套接字数据结构、网络缓冲区
 
-
-* 2、`inet_sock`，特指用了网络传输功能的`sock`，在sock的基础上还加入了TTL，端口，IP地址这些跟网络传输相关的字段信息。
+2、`inet_sock`，特指用了网络传输功能的`sock`，在sock的基础上还加入了TTL，端口，IP地址这些跟网络传输相关的字段信息。
 
 相对的，有些sock不是用网络传输的，比如Unix domain socket，用于本机进程之间的通信，直接读写文件，不需要经过网络协议栈。
 
@@ -99,7 +98,7 @@ struct inet_sock {
 };
 ```
 
-* 3、`inet_connection_sock` 是指面向连接的`sock`，在`inet_sock`的基础上加入面向连接的协议里相关字段，比如accept队列，数据包分片大小，握手失败重试次数等。
+3、`inet_connection_sock` 是指面向连接的`sock`，在`inet_sock`的基础上加入面向连接的协议里相关字段，比如accept队列，数据包分片大小，握手失败重试次数等。
 
 从其成员变量的命名形式：`icsk_xxx`可看出其为`inet connection sock`的简写，按变量命名能知道其所属的sock层级
 
@@ -118,7 +117,7 @@ struct inet_connection_sock {
 
 注意>=4.4的内核版本，相比之前的版本，`struct request_sock_queue icsk_accept_queue;`差异比较大。
 
-* 4、`tcp_sock`就是tcp协议专用的sock结构，在`inet_connection_sock`基础上还加入了tcp特有的滑动窗口、拥塞避免等功能。
+4、`tcp_sock`就是tcp协议专用的sock结构，在`inet_connection_sock`基础上还加入了tcp特有的滑动窗口、拥塞避免等功能。
 
 该结构中内容很多，近250多行(5.10.10内核)
 
@@ -139,19 +138,31 @@ struct tcp_sock {
 }
 ```
 
-### 3.1. 不同内核版本半连接队列的特别说明
+## 4. 不同内核版本半连接队列的特别说明
 
 网上很多文章关于半连接都是基于3.x的内核，跟踪5.10内核过程中一直疑惑`icsk_accept_queue`算是全连接还是半连接队列。
 
 对比3.10内核中`request_sock_queue`里既有全连接又有半连接，5.10内核里似乎没有单独的半连接，而是通过引用计数加1减1，共享同一个队列（类似享元模式？）。
 
-带着怀疑在技术讨论群搜半连接队列，碰巧历史记录里有人提到：4.4之后的内核改了syn_queue半连接队列逻辑，半连接队列成为一个概念没有了，统一保存到`ehash table` 中，维护半连接长度就放到`icsk_accept_queue->qlen`，并附了一篇陈硕大佬的相关文章链接：[Linux 4.4 之后 TCP 三路握手的新流程](https://zhuanlan.zhihu.com/p/25313903)
+带着怀疑在技术讨论群搜半连接队列，碰巧历史记录里有人提到：4.4之后的内核改了syn_queue半连接队列逻辑，半连接队列成为一个概念没有了，统一保存到`ehash table` 中，维护半连接长度就放到`icsk_accept_queue->qlen`，并附了一篇陈硕大佬关于这块介绍的文章链接：[Linux 4.4 之后 TCP 三路握手的新流程](https://zhuanlan.zhihu.com/p/25313903)
 
-差异：
+> Linux 网络协议栈中的 TCP 协议控制块（protocol control block）有三种：tcp_request_sock、tcp_sock、tcp_timewait_sock。
 
-> 原来是把 tcp_request_sock 挂在 listen socket 下，收到 ACK 之后从 listening_hash 找到 listen socket 再进一步找到 tcp_request_sock；新的做法是直接把 tcp_request_sock 挂在 ehash 中，这样收到 ACK 之后可以直接找到 tcp_request_sock，减少了锁的争用（contention）。
+![TCP 协议控制块](/images/2024-06-06-sock-pcb.png)
 
-## 4. inet_listen监听流程分析
+> Linux 的 TCP 协议栈用全局的 3 个哈希表（位于 tcp_hashinfo 对象，定义于 net/ipv4/tcp_ipv4.c）来管理全部的 TCP 协议控制块。
+
+* ehash负责established的 socket
+* bhash 负责端口分配，b表示bind
+* listening_hash 负责侦听(listening) socket
+
+**差异：**
+
+> **原来是把 tcp_request_sock 挂在 listen socket 下，收到 ACK 之后从 listening_hash 找到 listen socket 再进一步找到 tcp_request_sock；新的做法是直接把 tcp_request_sock 挂在 ehash 中，这样收到 ACK 之后可以直接找到 tcp_request_sock，减少了锁的争用（contention）。**
+
+详情见参考文章。
+
+## 5. inet_listen监听流程
 
 在说明全连接队列最大长度时，简单提到过`listen`系统调用，会调用到TCP协议注册的`inet_listen`，此处进一步分析其逻辑。
 
@@ -234,7 +245,7 @@ int inet_csk_listen_start(struct sock *sk, int backlog)
 }
 ```
 
-5.10内核的`request_sock_queue`结构里，只有全连接队列（网络上的文章很多是3.10内核，注意版本对应），和3.10内核的对比，见下面3.10的单独章节。
+5.10内核的`request_sock_queue`结构里，只有全连接队列（网络上的文章很多是3.10内核，注意版本对应），和3.10内核的对比，见下面”3.10内核对比“小节。
 
 ```cpp
 // linux-5.10.10/net/core/request_sock.c
@@ -273,9 +284,9 @@ struct request_sock_queue {
 };
 ```
 
-## 5. 分析TCP请求处理
+## 6. TCP连接请求处理
 
-### 5.1. SYN接收处理接口是哪个？是何时注册的？
+### 6.1. SYN接收处理接口是哪个？何时注册的？
 
 对于TCP，第一次接收处理时即处理三次握手的第一次`SYN`，先梳理其注册的处理接口
 
@@ -321,9 +332,9 @@ const struct inet_connection_sock_af_ops ipv4_specific = {
 
 所以解答小标题问题：初始化网络协议时，注册SYN处理函数为`tcp_v4_conn_request`
 
-### 5.2. tcp_v4_conn_request 逻辑
+### 6.2. SYN请求处理流程
 
-然后就可以看下处理握手时第一次请求`SYN`的处理：
+然后看下三次握手时第一次请求`SYN`的处理函数：
 
 ```cpp
 // linux-5.10.10/net/ipv4/tcp_ipv4.c
@@ -480,9 +491,9 @@ static inline int inet_csk_reqsk_queue_is_full(const struct sock *sk)
 }
 ```
 
-## 6. 3.10内核对比
+## 7. 3.10内核对比
 
-### 6.1. inet_listen流程
+### 7.1. inet_listen流程
 
 下述逻辑可用下图概括：
 
@@ -644,9 +655,9 @@ roundup_pow_of_two (128 + 1) = 256
 
 > **把半连接队列长度的计算归纳成一句话，半连接队列的长度是 `min(backlog, somaxconn, tcp_max_syn_backlog) + 1 再上取整到 2 的幂次`，但最小不能小于`16`。**
 
-### 6.2. 处理SYN请求流程
+### 7.2. SYN请求处理流程
 
-和5.10内核同样的，SYN接收处理接口在`ipv4_specific`中指定为`tcp_v4_conn_request`
+和5.10内核一样，SYN处理接口在`ipv4_specific`中指定为`tcp_v4_conn_request`
 
 ```cpp
 // linux-3.10.89/net/ipv4/tcp_ipv4.c
@@ -719,7 +730,7 @@ drop:
 }
 ```
 
-### 6.3. `netstat -s`中的溢出统计说明(纠错)
+### 7.3. `netstat -s`中的溢出统计说明(纠错)
 
 之前提到`netstat -s`里统计的溢出和drop，一个是全连接，一个是半连接，其实是错的。
 
@@ -802,13 +813,13 @@ struct entry Tcpexttab[] =
 
 生产环境中，`tcp_syncookies`一般是开启的，所以关闭的观察实验就先不做了。后续用ebpf跟踪其他关键过程。
 
-## 7. 小结
+## 8. 小结
 
-跟踪代码，梳理了服务端监听和处理SYN请求的大概流程。3.10和5.10版本内核在网络这块的差异比较大，而差异点在之前版本(如linux 4.4)就引入了。
+跟踪代码，梳理了服务端监听和处理SYN请求的大概流程。3.10和5.10版本内核在半连接这块的差异比较大，而差异点在之前版本(如linux 4.4)就引入了。
 
-本想一篇文章中介绍半连接队列并简单实验，过程中发现梳理起来没那么简单，发现了不少高质量的文章和博主，需要持续学习。
+本想一篇文章中介绍半连接队列并简单实验，过程中发现梳理起来没那么简单。另外过程中发现了不少高质量的文章，还需要持续学习。
 
-## 8. 参考
+## 9. 参考
 
 1、[从一次线上问题说起，详解 TCP 半连接队列、全连接队列](https://mp.weixin.qq.com/s/YpSlU1yaowTs-pF6R43hMw?poc_token=HKCgSGaji2dgAtvVc7gzTQykh3Aw6neDWcojHyB8)
 
