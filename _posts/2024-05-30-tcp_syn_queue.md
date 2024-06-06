@@ -821,6 +821,13 @@ struct entry Tcpexttab[] =
 
 本想一篇文章中介绍半连接队列并简单实验，过程中发现梳理起来没那么简单。另外过程中发现了不少高质量的文章，还需要持续学习。
 
+本文当作第1、2个问题的部分解答，不过只涉及服务端接收SYN后的部分处理流程，及全连接半连接队列drop包的场景，"具体"逻辑待持续深入。
+
+1. 半连接队列溢出情况分析，服务端接收 ~~具体~~ 概要处理逻辑
+2. 内核drop包的时机，以及跟抓包的关系。哪些情况可能会抓不到drop的包？
+3. systemtap/ebpf跟踪TCP状态变化，跟踪上述drop事件
+4. 上述全连接实验case1中，2MSL内没观察到客户端连接`FIN_WAIT2`状态，为什么？
+
 ## 9. 参考
 
 1、[从一次线上问题说起，详解 TCP 半连接队列、全连接队列](https://mp.weixin.qq.com/s/YpSlU1yaowTs-pF6R43hMw?poc_token=HKCgSGaji2dgAtvVc7gzTQykh3Aw6neDWcojHyB8)
