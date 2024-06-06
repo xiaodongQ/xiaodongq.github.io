@@ -142,9 +142,10 @@ class TCPServer(BaseServer):
     6 SYNs to LISTEN sockets dropped
 ```
 
-`SYNs to LISTEN sockets dropped` 这是半连接队列溢出
-
-`times the listen queue of a socket overflowed` 这是全连接队列溢出？
+* `times the listen queue of a socket overflowed` 这是全连接队列溢出(listen queue)
+* `SYNs to LISTEN sockets dropped` ~~这是半连接队列溢出~~
+    - 此处说半连接drop(SYN drop)其实不准确，SYN drop不只是半连接满才累加。
+    - 具体分析见：[TCP半连接队列系列（一） -- 半连接队列代码逻辑](https://xiaodongq.github.io/2024/05/30/tcp_syn_queue/)。
 
 4、查看抓包情况
 
@@ -455,9 +456,6 @@ LISTEN    0      5   0.0.0.0:8080            0.0.0.0:*     users:(("server",pid=
 服务端信息如下：
 
 * 可看到当前全连接队列中当前还有6个连接，全连接最大值为5(实际允许5+1)，且有6个`CLOSE_WAIT`状态的连接
-* `netstat -s`中有半连接drop(SYN drop)及全连接drop(listen queue)
-    * 此处说的半连接drop其实不准确，SYN drop不只是半连接满才累加。具体分析见半连接系列内容。
-    * 此处全连接drop的统计是准确的
 
 ```sh
 # 客户端发请求前，服务端的统计信息，没有溢出信息
