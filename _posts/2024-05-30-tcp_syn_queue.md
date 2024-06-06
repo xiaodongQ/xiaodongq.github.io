@@ -1,6 +1,6 @@
 ---
 layout: post
-title: TCP半连接队列相关过程系列（一） -- 半连接队列代码逻辑
+title: TCP半连接队列系列（一） -- 半连接队列代码逻辑
 categories: 网络
 tags: 网络
 ---
@@ -29,11 +29,9 @@ tags: 网络
 
 主要基于这篇文章："[从一次线上问题说起，详解 TCP 半连接队列、全连接队列](https://mp.weixin.qq.com/s/YpSlU1yaowTs-pF6R43hMw?poc_token=HKCgSGaji2dgAtvVc7gzTQykh3Aw6neDWcojHyB8)"，进行学习和扩展。
 
-环境：起两个阿里云抢占式实例，Alibaba Cloud Linux 3.2104 LTS 64位（内核版本：5.10.134-16.1.al8.x86_64）
-
 基于5.10内核代码跟踪流程，上下文均基于IPV4，暂不考虑IPV6
 
-## 3. 前提：先认识几种不同种类的sock结构
+## 3. 先认识几种不同种类的sock结构
 
 网络初始化、处理接口逻辑等过程中，涉及到几种不同的sock结构，前置了解再梳理代码流程会清晰很多。
 
@@ -61,7 +59,7 @@ struct sock {
 }
 ```
 
-前面也提到过的socket创建流程中，涉及创建`struct sock`结构
+socket创建流程中，涉及创建`struct sock`结构
 
 `__sys_socket` -> `sock_create` -> `__sock_create` -> (net_proto_family结构)`pf->create`，实际调用到`inet_create`
 
@@ -74,11 +72,8 @@ struct sock {
 * 读：允许多个线程或进程同时读取共享数据，而不需要获取锁
 * 写：RCU也确保了在写操作进行时，读操作能够访问到一致的数据
 
-应用场景：
+应用场景：路由表、套接字数据结构、网络缓冲区
 
-1. 路由表：网络内核使用RCU来管理路由表，允许多个线程或进程同时读取路由表信息，而不需要加锁。这可以提高路由查找和转发的效率。
-2. 套接字数据结构：在网络协议栈中，RCU被用于管理套接字数据结构，如连接表、监听队列等。这可以确保在多个进程或线程之间共享套接字信息时，不会出现数据不一致或竞争条件。
-3. 网络缓冲区：在网络数据包处理过程中，RCU可以用于管理网络缓冲区，允许多个处理线程同时读取和修改数据包。这可以提高数据包处理的吞吐量和效率。
 
 * 2、`inet_sock`，特指用了网络传输功能的`sock`，在sock的基础上还加入了TTL，端口，IP地址这些跟网络传输相关的字段信息。
 
@@ -106,7 +101,7 @@ struct inet_sock {
 
 * 3、`inet_connection_sock` 是指面向连接的`sock`，在`inet_sock`的基础上加入面向连接的协议里相关字段，比如accept队列，数据包分片大小，握手失败重试次数等。
 
-从其成员变量的命名形式：`icsk_xxx`就可看出其为`inet connection sock`的简写，后续梳理逻辑看变量命名就能知道其所属的sock层级
+从其成员变量的命名形式：`icsk_xxx`可看出其为`inet connection sock`的简写，按变量命名能知道其所属的sock层级
 
 ```cpp
 // linux-5.10.10/include/net/inet_connection_sock.h
@@ -120,6 +115,8 @@ struct inet_connection_sock {
     ...
 };
 ```
+
+注意>=4.4的内核版本，相比之前的版本，`struct request_sock_queue icsk_accept_queue;`差异比较大。
 
 * 4、`tcp_sock`就是tcp协议专用的sock结构，在`inet_connection_sock`基础上还加入了tcp特有的滑动窗口、拥塞避免等功能。
 
@@ -142,7 +139,19 @@ struct tcp_sock {
 }
 ```
 
-## 4. inet_listen服务端监听流程进一步分析
+### 3.1. 不同内核版本半连接队列的特别说明
+
+网上很多文章关于半连接都是基于3.x的内核，跟踪5.10内核过程中一直疑惑`icsk_accept_queue`算是全连接还是半连接队列。
+
+对比3.10内核中`request_sock_queue`里既有全连接又有半连接，5.10内核里似乎没有单独的半连接，而是通过引用计数加1减1，共享同一个队列（类似享元模式？）。
+
+带着怀疑在技术讨论群搜半连接队列，碰巧历史记录里有人提到：4.4之后的内核改了syn_queue半连接队列逻辑，半连接队列成为一个概念没有了，统一保存到`ehash table` 中，维护半连接长度就放到`icsk_accept_queue->qlen`，并附了一篇陈硕大佬的相关文章链接：[Linux 4.4 之后 TCP 三路握手的新流程](https://zhuanlan.zhihu.com/p/25313903)
+
+差异：
+
+> 原来是把 tcp_request_sock 挂在 listen socket 下，收到 ACK 之后从 listening_hash 找到 listen socket 再进一步找到 tcp_request_sock；新的做法是直接把 tcp_request_sock 挂在 ehash 中，这样收到 ACK 之后可以直接找到 tcp_request_sock，减少了锁的争用（contention）。
+
+## 4. inet_listen监听流程分析
 
 在说明全连接队列最大长度时，简单提到过`listen`系统调用，会调用到TCP协议注册的`inet_listen`，此处进一步分析其逻辑。
 
@@ -202,16 +211,53 @@ int inet_csk_listen_start(struct sock *sk, int backlog)
     // 转换成基于网络的sock
     struct inet_sock *inet = inet_sk(sk);
     int err = -EADDRINUSE;
+    
+    // icsk_accept_queue 是全连接队列，已经`ESTABLISHED`的队列（FIFO of established children）
+    // 此处仅初始化了一些成员变量，不同版本内核实现有差异（参考链接里是3.10，里面做了内存申请，实现差异较大）
+    reqsk_queue_alloc(&icsk->icsk_accept_queue);
+    ...
+    // 设置 socket 状态为 LISTEN
+    inet_sk_state_store(sk, TCP_LISTEN);
+    // TCP协议初始化时，注册的函数为 inet_csk_get_port
+    // 用来处理TCP端口绑定操作，里面逻辑比较复杂，本文先不涉及
+    if (!sk->sk_prot->get_port(sk, inet->inet_num)) {
+        inet->inet_sport = htons(inet->inet_num);
+
+        sk_dst_reset(sk);
+        // TCP注册的函数是 inet_hash
+        err = sk->sk_prot->hash(sk);
+
+        if (likely(!err))
+            return 0;
+    }
     ...
 }
 ```
 
-5.10内核的`request_sock_queue`结构里，只有全连接队列（网络上的文章很多是3.10内核，注意版本对应）
+5.10内核的`request_sock_queue`结构里，只有全连接队列（网络上的文章很多是3.10内核，注意版本对应），和3.10内核的对比，见下面3.10的单独章节。
 
-和3.10内核的对比，见下面3.10的单独章节。
+```cpp
+// linux-5.10.10/net/core/request_sock.c
+// 这里仅初始化全连接，相对而言3.10内核里逻辑更复杂
+void reqsk_queue_alloc(struct request_sock_queue *queue)
+{
+    spin_lock_init(&queue->rskq_lock);
+
+    spin_lock_init(&queue->fastopenq.lock);
+    queue->fastopenq.rskq_rst_head = NULL;
+    queue->fastopenq.rskq_rst_tail = NULL;
+    queue->fastopenq.qlen = 0;
+
+    // 全连接队列头初始化
+    queue->rskq_accept_head = NULL;
+}
+```
+
+可查看`request_sock_queue`具体结构：
 
 ```cpp
 // linux-5.10.10/include/net/request_sock.h
+// 而3.10中，还包含了表示半连接队列的：`struct listen_sock *listen_opt;`
 struct request_sock_queue {
     spinlock_t		rskq_lock;
     u8			rskq_defer_accept;
@@ -220,6 +266,7 @@ struct request_sock_queue {
     atomic_t		qlen;
     atomic_t		young;
 
+    // 全连接队列 头
     struct request_sock	*rskq_accept_head;
     struct request_sock	*rskq_accept_tail;
     struct fastopen_queue	fastopenq;
@@ -365,6 +412,60 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
             goto drop;
     }
     ...
+    // 检查当前 sock 的全连接队列是否满
+    /*
+        和上面的全连接队列判断区别
+        上面是：inet_csk(sk)->icsk_accept_queue->qlen，判断的是inet_connection_sock（面向连接的sock）
+        下面是：sk->sk_ack_backlog，判断的是 sock
+    */ 
+    if (sk_acceptq_is_full(sk)) {
+        NET_INC_STATS(sock_net(sk), LINUX_MIB_LISTENOVERFLOWS);
+        goto drop;
+    }
+    // 创建一个request_sock，socket状态为：TCP_NEW_SYN_RECV;
+    // 里面包含一个引用计数，涉及sock的管理，4.4做的内存优化，暂忽略
+    // 这里第3个参数，如果没开启cookie则传入true，一般是开的，所以传false
+    req = inet_reqsk_alloc(rsk_ops, sk, !want_cookie);
+    if (!req)
+        goto drop;
+    ...
+    if (!want_cookie && !isn) {
+        // 没开启syncookies时，若 `max_syn_backlog - 全连接长度` < max_syn_backlog>>2，则丢弃请求包
+        if (!net->ipv4.sysctl_tcp_syncookies &&
+            (net->ipv4.sysctl_max_syn_backlog - inet_csk_reqsk_queue_len(sk) <
+             (net->ipv4.sysctl_max_syn_backlog >> 2)) &&
+            !tcp_peer_is_proven(req, dst)) {
+            ...
+            goto drop_and_release;
+        }
+        ...
+    }
+    ...
+    // 发送SYN+ACK，TCP协议注册的是 tcp_v4_send_synack 里面会生成应答报文
+    if (fastopen_sk) {
+        ...
+        af_ops->send_synack(fastopen_sk, dst, &fl, req,
+                    &foc, TCP_SYNACK_FASTOPEN, skb);
+        ...
+    }else {
+        ...
+        af_ops->send_synack(sk, dst, &fl, req, &foc,
+                !want_cookie ? TCP_SYNACK_NORMAL : TCP_SYNACK_COOKIE, skb);
+        ...
+    }
+    // 减少一个引用
+    // 5.10新内核 共用一份空间 ？
+    reqsk_put(req);
+    return 0;
+
+drop_and_release:
+    dst_release(dst);
+drop_and_free:
+    __reqsk_free(req);
+drop:
+    // 丢弃包
+    tcp_listendrop(sk);
+    return 0;
 }
 ```
 
@@ -374,22 +475,14 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 static inline int inet_csk_reqsk_queue_is_full(const struct sock *sk)
 {
     // sk->sk_max_ack_backlog，之前跟踪listen，可以看到是将 min(backlog,somaxconn) 赋值给了它
-    // 全连接队列 >= 最大全连接队列数量，半连接队列？？？ TODO
+    // 全连接队列 >= 最大全连接队列数量
     return inet_csk_reqsk_queue_len(sk) >= sk->sk_max_ack_backlog;
 }
 ```
 
 ## 6. 3.10内核对比
 
-### 6.1. 概要说明
-
-网上很多文章关于半连接都是基于3.x的内核，跟踪上述5.10内核过程中一直疑惑`icsk_accept_queue`算是全连接还是半连接队列。
-
-对比3.10内核中`request_sock_queue`里既有全连接又有半连接，5.10内核里似乎没有单独的半连接，而是通过引用计数加1减1，共享同一个队列（类似享元模式？）。
-
-带着怀疑在技术讨论群搜半连接队列，碰巧历史记录里有人提到：4.4之后的内核改了syn_queue半连接队列逻辑，半连接队列成为一个概念没有了，统一保存到`ehash table` 中，维护半连接长度就放到`icsk_accept_queue->qlen`，并附了一篇陈硕大佬的文章链接：[Linux 4.4 之后 TCP 三路握手的新流程](https://zhuanlan.zhihu.com/p/25313903)
-
-### 6.2. inet_listen流程
+### 6.1. inet_listen流程
 
 下述逻辑可用下图概括：
 
@@ -551,7 +644,169 @@ roundup_pow_of_two (128 + 1) = 256
 
 > **把半连接队列长度的计算归纳成一句话，半连接队列的长度是 `min(backlog, somaxconn, tcp_max_syn_backlog) + 1 再上取整到 2 的幂次`，但最小不能小于`16`。**
 
+### 6.2. 处理SYN请求流程
+
+和5.10内核同样的，SYN接收处理接口在`ipv4_specific`中指定为`tcp_v4_conn_request`
+
+```cpp
+// linux-3.10.89/net/ipv4/tcp_ipv4.c
+int tcp_v4_conn_request(struct sock *sk, struct sk_buff *skb)
+{
+    ...
+    struct request_sock *req;
+    struct inet_request_sock *ireq;
+    struct tcp_sock *tp = tcp_sk(sk);
+    ...
+    struct sk_buff *skb_synack;
+    ...
+    // 半连接队列是否满了
+    // queue->listen_opt->qlen >> queue->listen_opt->max_qlen_log
+    // queue是指：&inet_csk(sk)->icsk_accept_queue
+    if (inet_csk_reqsk_queue_is_full(sk) && !isn) {
+        want_cookie = tcp_syn_flood_action(sk, skb, "TCP");
+        if (!want_cookie)
+            goto drop;
+    }
+
+    // 全连接队列是否满了 （若满，且有 young_ack，则直接丢弃）
+    // sk->sk_ack_backlog > sk->sk_max_ack_backlog
+    if (sk_acceptq_is_full(sk) && inet_csk_reqsk_queue_young(sk) > 1) {
+        NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_LISTENOVERFLOWS);
+        goto drop;
+    }
+
+    // 都未超出限制，则申请空间
+    req = inet_reqsk_alloc(&tcp_request_sock_ops);
+    if (!req)
+        goto drop;
+    ...
+    // 生成需要应答的SYN+ACK报文
+    skb_synack = tcp_make_synack(sk, dst, req,
+        fastopen_cookie_present(&valid_foc) ? &valid_foc : NULL);
+
+    if (skb_synack) {
+        // 检查报文
+        __tcp_v4_send_check(skb_synack, ireq->loc_addr, ireq->rmt_addr);
+        skb_set_queue_mapping(skb_synack, skb_get_queue_mapping(skb));
+    } else
+        goto drop_and_free;
+
+    if (likely(!do_fastopen)) {
+        int err;
+        // 发送报文，IP层
+        err = ip_build_and_send_pkt(skb_synack, sk, ireq->loc_addr,
+             ireq->rmt_addr, ireq->opt);
+        err = net_xmit_eval(err);
+        if (err || want_cookie)
+            goto drop_and_free;
+
+        tcp_rsk(req)->snt_synack = tcp_time_stamp;
+        tcp_rsk(req)->listener = NULL;
+        // 加到半连接队列中 (SYN队列，实际是hash表)
+        inet_csk_reqsk_queue_hash_add(sk, req, TCP_TIMEOUT_INIT);
+        ...
+    }
+    ...
+    return 0;
+
+drop_and_release:
+    dst_release(dst);
+drop_and_free:
+    reqsk_free(req);
+drop:
+    NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_LISTENDROPS);
+    return 0;
+}
+```
+
+### 6.3. `netstat -s`中的溢出统计说明(纠错)
+
+之前提到`netstat -s`里统计的溢出和drop，一个是全连接，一个是半连接，其实是错的。
+
+先说结论：
+
+1. `times the listen queue of a socket overflowed`，全连接队列溢出，统计是正确的
+2. `SYNs to LISTEN sockets dropped`，不仅仅只是在半连接队列发生溢出的时候会增加该值(比如全连接队列溢出时也增加)
+
+```sh
+[root@iZ2ze45jbqveelsasuub53Z ~]# netstat -s|grep -i listen
+    6 times the listen queue of a socket overflowed
+    6 SYNs to LISTEN sockets dropped
+```
+
+上面`tcp_v4_conn_request`里，`NET_INC_STATS_BH`即统计这些SNMP信息，netstat根据SNMP进行解析打印。
+
+伪代码简化如下。
+
+1. 全连接队列满时，累加`LINUX_MIB_LISTENOVERFLOWS`和`LINUX_MIB_LISTENDROPS`
+2. 半连接队列满时，只累加`LINUX_MIB_LISTENDROPS`
+
+```c
+tcp_v4_conn_request()
+{
+    ...
+    if 半连接队列满 && 不开cookie
+        goto drop;
+    if 全连接队列满
+        NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_LISTENOVERFLOWS);
+        goto drop;
+drop:
+    NET_INC_STATS_BH(sock_net(sk), LINUX_MIB_LISTENDROPS);
+    return 0;
+}
+```
+
+```cpp
+// linux-3.10.89/include/uapi/linux/snmp.h
+/* linux mib definitions */
+enum
+{
+    LINUX_MIB_NUM = 0,
+    ...
+    LINUX_MIB_LISTENOVERFLOWS,		/* ListenOverflows */
+    LINUX_MIB_LISTENDROPS,			/* ListenDrops */
+    ...
+}
+```
+
+netstat代码在net-tools中，按上述key搜索可知
+
+```cpp
+// statistics.c
+struct entry Tcpexttab[] =
+{
+    ...
+    { "ListenOverflows", N_("%u times the listen queue of a socket overflowed"),
+      opt_number },
+    { "ListenDrops", N_("%u SYNs to LISTEN sockets dropped"), opt_number },
+    ...
+}
+```
+
+所以：
+
+**全连接队列溢出：**
+
+1. `ListenOverflows`，对应`netstat -s`里的`times the listen queue of a socket overflowed`
+2. linux内核代码中全局搜索`LINUX_MIB_LISTENOVERFLOWS`，另一个场景累加是在`tcp_v4_syn_recv_sock`(三次握手成功后的处理)中，也是判断全连接队列满才累加
+3. `netstat -s`统计的全连接队列溢出次数是准确的
+
+**半连接队列溢出：**
+
+1. `ListenDrops`，对应`netstat -s`里的`SYNs to LISTEN sockets dropped`
+2. 全局搜索`LINUX_MIB_LISTENDROPS`，除了`tcp_v4_conn_request`和`tcp_v4_syn_recv_sock`中类似情况，还有`tcp_v4_err`
+3. 可看到全连接队列溢出时，该值也会累加，所以不能简单当作半连接队列溢出。且4.4之后内核中，没有明确的半连接队列了。
+
+> **对于半连接队列来说，只要保证 `tcp_syncookies` 这个内核参数是`1`就能保证不会有因为半连接队列满而发生的丢包。**
+> 如果确实较真就像看一看，`netstat -s | grep "SYNs"` 这个是没有办法说明问题的。还需要你自己计算一下半连接队列的长度，再看下当前 `SYN_RECV` 状态的连接的数量。
+
+生产环境中，`tcp_syncookies`一般是开启的，所以关闭的观察实验就先不做了。后续用ebpf跟踪其他关键过程。
+
 ## 7. 小结
+
+跟踪代码，梳理了服务端监听和处理SYN请求的大概流程。3.10和5.10版本内核在网络这块的差异比较大，而差异点在之前版本(如linux 4.4)就引入了。
+
+本想一篇文章中介绍半连接队列并简单实验，过程中发现梳理起来没那么简单，发现了不少高质量的文章和博主，需要持续学习。
 
 ## 8. 参考
 
@@ -565,4 +820,6 @@ roundup_pow_of_two (128 + 1) = 256
 
 5、[Linux 4.4 之后 TCP 三路握手的新流程](https://zhuanlan.zhihu.com/p/25313903)
 
-6、GPT
+6、[如何正确查看线上半/全连接队列溢出情况？](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247486097&idx=1&sn=189f6b51c6ce50bf56c42bef6cce8d24&chksm=a6e30baa919482bc6c6fb1aba395dd57fb133ef219b36afe55cf8d19e9a2dc1a874015762212&scene=178&cur_album_id=1532487451997454337#rd)
+
+7、GPT
