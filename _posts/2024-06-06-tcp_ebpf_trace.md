@@ -23,11 +23,11 @@ tags: 网络
 
 本文学习并使用ebpf工具进行跟踪分析。
 
-## 2. 基本介绍
+## 2. eBPF基本介绍
 
 eBPF（Extended Berkeley Packet Filter）是一个在Linux内核中实现的强大工具，允许用户空间程序通过加载BPF（Berkeley Packet Filter）字节码到内核，安全地执行各种网络、追踪和安全相关的任务。
 
-### 2.1. eBPF 提供了`四种`不同的操作机制
+### 2.1. eBPF 提供了四种不同的操作机制
 
 1. **内核跟踪点(Kernel Tracepoints)**：内核跟踪点是由内核开发人员预定义的事件，可以使用 `TRACE_EVENT` 宏在内核代码中设置。这些跟踪点允许 eBPF 程序挂接到特定的内核事件，并捕获相关数据进行分析和监控。
 2. **USDT（User Statically Defined Tracing）**：USDT 是一种机制，允许开发人员在应用程序代码中设置预定义的跟踪点。通过在代码中插入特定的标记，eBPF 程序可以挂接到这些跟踪点，并捕获与应用程序相关的数据，以实现更细粒度的观测和分析。
@@ -39,16 +39,16 @@ eBPF（Extended Berkeley Packet Filter）是一个在Linux内核中实现的强�
 **部分 Linux Event 和 BPF 版本支持见下图：**
 
 ![linux_kernel_event_bpf](/images/linux_kernel_event_bpf.png)  
-出处：[【BPF入门系列-1】eBPF 技术简介](https://www.ebpf.top/post/ebpf_intro/)
+[出处](https://www.ebpf.top/post/ebpf_intro/)
 
 性能分析大师 Brendan Gregg 等编写了**诸多的 BCC 或 BPFTrace 的工具集**可以拿来直接使用，可以满足很多我们日常问题分析和排查。
 
 CentOS安装：`yum install bcc`，而后在`/usr/share/bcc/tools/`可查看。工具集示意图如下：
 
 ![bcc tools 60s](/images/ebpf_60s.png)  
-出处：[【BPF入门系列-1】eBPF 技术简介](https://www.ebpf.top/post/ebpf_intro/)
+[出处](https://www.ebpf.top/post/ebpf_intro/)
 
-起一个ECS实例，安装bcc，可看到bcc-tools等依赖及大小(单独安装bcc-tools也一样的依赖)，安装后可看到上述工具(里面内容为python)
+起一个ECS实例，安装bcc，可看到bcc-tools等依赖及大小(单独安装bcc-tools大概也要300多M)，安装后可看到上述工具(里面内容为python)
 
 ![安装bcc](/images/2024-06-07-yum_install_bcc.png)
 
@@ -84,15 +84,144 @@ BPF演进了这么多年，虽然一直在努力提高，但BPF程序的开发�
 3. 下面是一个关于`ebpf`不错的教程
     * 系列教程链接：[eBPF 开发实践教程：基于 CO-RE，通过小工具快速上手 eBPF 开发](https://eunomia.dev/zh/tutorials/)
     * 提供了从入门到进阶的 eBPF 开发实践，包括基本概念、代码实例、实际应用等内容。和 BCC 不同的是，我们使用 `libbpf`、`Cilium`、`libbpf-rs`、`eunomia-bpf` 等框架进行开发，包含 C、Go、Rust 等语言的示例。
-    * 其中：[关于如何学习 eBPF 相关的开发的一些建议](https://eunomia.dev/zh/tutorials/0-introduce/#2-ebpf)
+    * 其中的学习建议：[关于如何学习 eBPF 相关的开发的一些建议](https://eunomia.dev/zh/tutorials/0-introduce/#2-ebpf)
     * 里面也有：`bcc` 和 `bpftrace`相关简单教程
 
 通过上面的梳理，我们可以知道`bcc`和`bcc libbpf`是不同的，内核提供了`BTF`、`CO-RE`技术，封装在`libbpf`中，而在这之上又有多种基于`libbpf`框架可选择。
 
 下面基于 `libbpf-bootstrap` 学习梳理，并进行实验。
 
-## 3. libbpf-bootstrap基本使用
+## 3. 基于libbpf-bootstrap基本开发示例
 
+一个以开发BPF程序为目的的工程通常由**两类**源文件组成
+
+1. 一类是运行于内核态的BPF程序的源代码文件
+2. 另外一类则是用于向内核加载BPF程序、从内核卸载BPF程序、与内核态进行数据交互、展现用户态程序逻辑的用户态程序的源代码文件
+
+目前运行于内核态的BPF程序只能用C语言开发(对应于第一类源代码文件)，更准确地说只能用受限制的C语法进行开发，**并且可以完善地将C源码编译成BPF目标文件的只有clang编译器**(clang是一个C、C++、Objective-C等编程语言的编译器前端，采用LLVM作为后端)。
+
+### 安装依赖
+
+安装`clang` (上面安装bcc只是有clang的lib库)
+
+```sh
+[root@iZ2zeh7m46vtyf29xmdw90Z tools]# clang -v
+clang version 15.0.7 ( 15.0.7-1.0.3.al8)
+Target: x86_64-koji-linux-gnu
+Thread model: posix
+```
+
+### 下载libbpf-bootstrap
+
+临时开的ECS里连不上github，下面操作在本地搞完打包传ECS了。
+
+1、下载 libbpf-bootstrap
+
+`git clone https://github.com/libbpf/libbpf-bootstrap.git`
+
+2、初始化和更新libbpf-bootstrap的依赖
+
+libbpf-bootstrap将其依赖的libbpf、bpftool以git submodule的形式配置到其项目中，可查看`.gitmodules`
+
+`git submodule update --init --recursive`
+
+### hello world级BPF程序
+
+到 `libbpf-bootstrap/examples/c` 下创建文件
+
+1、helloworld.bpf.c
+
+```c
+#include <linux/bpf.h>
+#include <bpf/bpf_helpers.h>
+
+SEC("tracepoint/syscalls/sys_enter_execve")
+
+int bpf_prog(void *ctx) {
+  char msg[] = "Hello, World!";
+  bpf_printk("invoke bpf_prog: %s\n", msg);
+  return 0;
+}
+
+char LICENSE[] SEC("license") = "Dual BSD/GPL";
+```
+
+2、helloworld.c
+
+```c
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/resource.h>
+#include <bpf/libbpf.h>
+#include "helloworld.skel.h"
+
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
+{
+    return vfprintf(stderr, format, args);
+}
+
+int main(int argc, char **argv)
+{
+    struct helloworld_bpf *skel;
+    int err;
+
+    libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
+    /* Set up libbpf errors and debug info callback */
+    libbpf_set_print(libbpf_print_fn);
+
+    /* Open BPF application */
+    skel = helloworld_bpf__open();
+    if (!skel) {
+        fprintf(stderr, "Failed to open BPF skeleton\n");
+        return 1;
+    }   
+
+    /* Load & verify BPF programs */
+    err = helloworld_bpf__load(skel);
+    if (err) {
+        fprintf(stderr, "Failed to load and verify BPF skeleton\n");
+        goto cleanup;
+    }
+
+    /* Attach tracepoint handler */
+    err = helloworld_bpf__attach(skel);
+    if (err) {
+        fprintf(stderr, "Failed to attach BPF skeleton\n");
+        goto cleanup;
+    }
+
+    printf("Successfully started! Please run `sudo cat /sys/kernel/debug/tracing/trace_pipe` "
+           "to see output of the BPF programs.\n");
+
+    for (;;) {
+        /* trigger our BPF program */
+        fprintf(stderr, ".");
+        sleep(1);
+    }
+
+cleanup:
+    helloworld_bpf__destroy(skel);
+    return -err;
+}
+```
+
+3、libbpf_bootstrap/examples/c/Makefile里的`APPS`，加个helloworld
+
+```sh
+APPS = helloworld minimal minimal_legacy bootstrap uprobe kprobe fentry
+```
+
+4、编译：`make`
+
+```sh
+In file included from bpf.c:37:
+libbpf_internal.h:19:10: fatal error: libelf.h: No such file or directory
+   19 | #include <libelf.h>
+      |          ^~~~~~~~~~
+compilation terminated.
+make[1]: *** [Makefile:134: /home/xd/libbpf-bootstrap/examples/c/.output//libbpf/staticobjs/bpf.o] Error 1
+make: *** [Makefile:87: /home/xd/libbpf-bootstrap/examples/c/.output/libbpf.a] Error 2
+```
 
 
 ## 4. 小结
