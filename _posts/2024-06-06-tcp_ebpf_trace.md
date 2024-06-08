@@ -89,7 +89,7 @@ BPF演进了这么多年，虽然一直在努力提高，但BPF程序的开发�
 
 通过上面的梳理，我们可以知道`bcc`和`bcc libbpf`是不同的，内核提供了`BTF`、`CO-RE`技术，封装在`libbpf`中，而在这之上又有多种基于`libbpf`框架可选择。
 
-下面基于 `libbpf-bootstrap` 学习梳理，并进行实验。
+下面基于 `libbpf-bootstrap` 学习梳理，并进行实验。([详细的入门操作介绍](https://nakryiko.com/posts/libbpf-bootstrap/))
 
 ## 3. 基于libbpf-bootstrap基本开发示例
 
@@ -100,7 +100,7 @@ BPF演进了这么多年，虽然一直在努力提高，但BPF程序的开发�
 
 目前运行于内核态的BPF程序只能用C语言开发(对应于第一类源代码文件)，更准确地说只能用受限制的C语法进行开发，**并且可以完善地将C源码编译成BPF目标文件的只有clang编译器**(clang是一个C、C++、Objective-C等编程语言的编译器前端，采用LLVM作为后端)。
 
-### 安装依赖
+### 3.1. 安装依赖
 
 安装`clang` (上面安装bcc只是有clang的lib库)
 
@@ -111,7 +111,7 @@ Target: x86_64-koji-linux-gnu
 Thread model: posix
 ```
 
-### 下载libbpf-bootstrap
+### 3.2. 下载libbpf-bootstrap
 
 临时开的ECS里连不上github，下面操作在本地搞完打包传ECS了。
 
@@ -125,7 +125,7 @@ libbpf-bootstrap将其依赖的libbpf、bpftool以git submodule的形式配置�
 
 `git submodule update --init --recursive`
 
-### hello world级BPF程序
+### 3.3. hello world级BPF程序
 
 到 `libbpf-bootstrap/examples/c` 下创建文件
 
@@ -205,13 +205,15 @@ cleanup:
 }
 ```
 
-3、libbpf_bootstrap/examples/c/Makefile里的`APPS`，加个helloworld
+3、libbpf_bootstrap/examples/c/Makefile 里的`APPS`，加个helloworld
 
 ```sh
 APPS = helloworld minimal minimal_legacy bootstrap uprobe kprobe fentry
 ```
 
 4、编译：`make`
+
+编译报错：
 
 ```sh
 In file included from bpf.c:37:
@@ -223,16 +225,137 @@ make[1]: *** [Makefile:134: /home/xd/libbpf-bootstrap/examples/c/.output//libbpf
 make: *** [Makefile:87: /home/xd/libbpf-bootstrap/examples/c/.output/libbpf.a] Error 2
 ```
 
+需要依赖`zlib`和`libelf`
 
-## 4. 小结
+> Your system should also have zlib (libz-dev or zlib-devel package) and libelf (libelf-dev or elfutils-libelf-devel package) installed. Those are dependencies of libbpf necessary to compile and run it properly.  ([Building BPF applications with libbpf-bootstrap](https://nakryiko.com/posts/libbpf-bootstrap/))
+
+安装：`yum install zlib-devel elfutils-libelf-devel`
+
+重新编译成功。
+
+5、执行
+
+```sh
+[root@iZ2ze8x6ziml84sbvfcx20Z c]# ./helloworld 
+libbpf: loading object 'helloworld_bpf' from buffer
+libbpf: elf: section(2) .symtab, size 168, link 1, flags 0, type=2
+libbpf: elf: section(3) tracepoint/syscalls/sys_enter_execve, size 120, link 0, flags 6, type=1
+libbpf: sec 'tracepoint/syscalls/sys_enter_execve': found program 'bpf_prog' at insn offset 0 (0 bytes), code size 15 insns (120 bytes)
+libbpf: elf: section(4) .rodata.str1.1, size 14, link 0, flags 32, type=1
+...
+libbpf: prog 'bpf_prog': found data map 1 (hellowor.rodata, sec 5, off 0) for insn 9
+libbpf: object 'helloworld_bpf': failed (-22) to create BPF token from '/sys/fs/bpf', skipping optional step...
+libbpf: map '.rodata.str1.1': created successfully, fd=3
+libbpf: map 'hellowor.rodata': created successfully, fd=4
+Successfully started! Please run `sudo cat /sys/kernel/debug/tracing/trace_pipe` to see output of the BPF programs.
+..................................................
+```
+
+查看输出：
+
+```sh
+[root@iZ2ze8x6ziml84sbvfcx20Z ~]# cat /sys/kernel/debug/tracing/trace_pipe
+           <...>-7041    [000] d...  1386.056674: bpf_trace_printk: invoke bpf_prog: Hello, World!
+            bash-7045    [000] d...  1386.387547: bpf_trace_printk: invoke bpf_prog: Hello, World!
+            bash-7047    [000] d...  1386.390160: bpf_trace_printk: invoke bpf_prog: Hello, World!
+           <...>-7058    [000] d...  1386.399166: bpf_trace_printk: invoke bpf_prog: Hello, World!
+```
+
+## 4. 跟踪TCP网络交互
+
+到 `libbpf-bootstrap/examples/c` 下创建文件，并按上面的框架补充逻辑
+<!-- 
+1、trace_tcp_deal.bpf.c
+
+```c
+#include <linux/bpf.h>
+#include <bpf/bpf_helpers.h>
+
+// 使用kprobe，此处跟踪 tcp_v4_conn_request
+SEC("kprobe/tcp_v4_conn_request")
+
+int bpf_tcp_sendmsg(struct __sk_buff *skb) {  
+    // 记录或处理发送的数据  
+    return 0;  
+}  
+
+char LICENSE[] SEC("license") = "Dual BSD/GPL";
+```
+
+2、trace_tcp_deal.c
+
+```c
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/resource.h>
+#include <bpf/libbpf.h>
+#include "helloworld.skel.h"
+
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
+{
+    return vfprintf(stderr, format, args);
+}
+
+int main(int argc, char **argv)
+{
+    struct helloworld_bpf *skel;
+    int err;
+
+    libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
+    /* Set up libbpf errors and debug info callback */
+    libbpf_set_print(libbpf_print_fn);
+
+    /* Open BPF application */
+    skel = helloworld_bpf__open();
+    if (!skel) {
+        fprintf(stderr, "Failed to open BPF skeleton\n");
+        return 1;
+    }   
+
+    /* Load & verify BPF programs */
+    err = helloworld_bpf__load(skel);
+    if (err) {
+        fprintf(stderr, "Failed to load and verify BPF skeleton\n");
+        goto cleanup;
+    }
+
+    /* Attach tracepoint handler */
+    err = helloworld_bpf__attach(skel);
+    if (err) {
+        fprintf(stderr, "Failed to attach BPF skeleton\n");
+        goto cleanup;
+    }
+
+    printf("Successfully started! Please run `sudo cat /sys/kernel/debug/tracing/trace_pipe` "
+           "to see output of the BPF programs.\n");
+
+    for (;;) {
+        /* trigger our BPF program */
+        fprintf(stderr, ".");
+        sleep(1);
+    }
+
+cleanup:
+    helloworld_bpf__destroy(skel);
+    return -err;
+}
+```
+
+3、libbpf_bootstrap/examples/c/Makefile 里的`APPS`，加个helloworld -->
+
+## 5. 小结
 
 
-## 5. 参考
+## 6. 参考
 
 1、[使用C语言从头开发一个Hello World级别的eBPF程序](https://tonybai.com/2022/07/05/develop-hello-world-ebpf-program-in-c-from-scratch/)
 
 2、[【BPF入门系列-1】eBPF 技术简介](https://www.ebpf.top/post/ebpf_intro/)
 
-3、[eBPF 入门开发实践教程一：Hello World，基本框架和开发流程](https://cloud.tencent.com/developer/article/2312629)
+3、[eBPF 开发实践教程：基于 CO-RE，通过小工具快速上手 eBPF 开发](https://eunomia.dev/zh/tutorials/)
 
-4、GPT
+4、[eBPF 入门开发实践教程一：Hello World，基本框架和开发流程](https://cloud.tencent.com/developer/article/2312629)
+
+5、[Building BPF applications with libbpf-bootstrap](https://nakryiko.com/posts/libbpf-bootstrap/)
+
+6、GPT
