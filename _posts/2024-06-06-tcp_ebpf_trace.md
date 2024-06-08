@@ -131,7 +131,7 @@ libbpf-bootstrap将其依赖的libbpf、bpftool以git submodule的形式配置�
 
 具体结构说明，参考：[Building BPF applications with libbpf-bootstrap](https://nakryiko.com/posts/libbpf-bootstrap/)
 
-#### helloworld.bpf.c (BPF侧代码)
+#### 3.3.1. helloworld.bpf.c (BPF侧代码)
 
 ```c
 // <linux/bpf.h>包含一些BPF相关的、使用内核侧BPF API时必要的类型和常量
@@ -155,7 +155,7 @@ int bpf_prog(void *ctx) {
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 ```
 
-#### helloworld.c (用户空间侧代码)
+#### 3.3.2. helloworld.c (用户空间侧代码)
 
 上述BPF侧代码make过程中自动生成骨架后，两者就集成在一起了
 
@@ -223,7 +223,7 @@ cleanup:
 }
 ```
 
-#### Makefile修改
+#### 3.3.3. Makefile修改
 
 libbpf_bootstrap/examples/c/Makefile 里的`APPS`，加个helloworld
 
@@ -231,7 +231,7 @@ libbpf_bootstrap/examples/c/Makefile 里的`APPS`，加个helloworld
 APPS = helloworld minimal minimal_legacy bootstrap uprobe kprobe fentry
 ```
 
-#### 编译：`make`
+#### 3.3.4. 编译：`make`
 
 编译报错：
 
@@ -253,7 +253,7 @@ make: *** [Makefile:87: /home/xd/libbpf-bootstrap/examples/c/.output/libbpf.a] E
 
 重新编译成功。
 
-#### 执行
+#### 3.3.5. 执行
 
 ```sh
 [root@iZ2ze8x6ziml84sbvfcx20Z c]# ./helloworld 
@@ -281,7 +281,7 @@ Successfully started! Please run `sudo cat /sys/kernel/debug/tracing/trace_pipe`
            <...>-7058    [000] d...  1386.399166: bpf_trace_printk: invoke bpf_prog: Hello, World!
 ```
 
-#### 附1：生成的骨架文件主要内容说明
+#### 3.3.6. 附1：生成的骨架文件主要内容说明
 
 骨架文件 helloworld.skel.h (`.skel.h`和`.o`都生成在`.output`目录里)
 
@@ -343,7 +343,7 @@ const void *helloworld_bpf::elf_bytes(size_t *sz) { return helloworld_bpf__elf_b
 #endif /* __HELLOWORLD_BPF_SKEL_H__ */
 ```
 
-#### 附2：Makefile主要内容说明
+#### 3.3.7. 附2：Makefile主要内容说明
 
 路径：examples/c/Makefile，该示例直接在原来基础上加了一个helloworld成员
 
