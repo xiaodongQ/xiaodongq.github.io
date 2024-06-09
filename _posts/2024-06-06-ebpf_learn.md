@@ -1,22 +1,24 @@
 ---
 layout: post
-title: ebpf第一课
-categories: Linux
-tags: Linux
+title: eBPF学习实践系列（一） -- 第一课
+categories: eBPF
+tags: Linux eBPF
 ---
 
 * content
 {:toc}
 
-搜集资料，学习ebpf
+eBPF学习实践，初步整理学习。
 
 
 
 ## 1. 背景
 
-在“[TCP全连接队列相关过程](https://xiaodongq.github.io/2024/05/18/tcp_connect/)”这篇文章中，进行了全连接队列溢出的实验，准备后续用ebpf跟踪过程。
+在“[TCP全连接队列相关过程](https://xiaodongq.github.io/2024/05/18/tcp_connect/)”这篇文章中，进行了全连接队列溢出的实验，准备后续用eBPF跟踪过程。
 
-在基本学习ebpf之后尝试用libbpf-bootstrap写跟踪程序，发现还差些火候。先把学习过程整理一下单独作为一篇博客，初步技术储备。
+eBPF名声在外，之前没用过时简单翻完了《Linux内核观测技术BPF》这本动物书，正好趁这个机会掌握熟悉这个技能，祛魅。
+
+在基本学习eBPF之后尝试用libbpf-bootstrap写跟踪程序，发现还差些火候。先把学习过程整理一下单独作为一篇博客，初步技术储备。索性后续eBPF学习过程作为一个系列，此为第一篇。
 
 ## 2. eBPF基本介绍
 
@@ -53,7 +55,7 @@ CentOS安装：`yum install bcc`，而后在`/usr/share/bcc/tools/`可查看。b
 
 **perf-tools：**
 
-说到Brendan Gregg，这里也提一下他创建的[perf-tools](https://github.com/brendangregg/perf-tools)，这是一个基于`ftrace`和`perf`的Linux性能分析工具集(上面的bcc tools是基于ebpf)，提供如下工具(里面内容为`shell`)：
+说到Brendan Gregg，这里也提一下他创建的[perf-tools](https://github.com/brendangregg/perf-tools)，这是一个基于`ftrace`和`perf`的Linux性能分析工具集(上面的bcc tools是基于eBPF)，提供如下工具(里面内容为`shell`)：
 
 ![perf-tools工具集](/images/perf-tools_2016.png)
 
@@ -90,7 +92,7 @@ BPF演进了这么多年，虽然一直在努力提高，但BPF程序的开发�
 2. `eunomia-bpf` 是一个开源的 eBPF 动态加载运行时和开发工具链，它的目的是简化 eBPF 程序的开发、构建、分发、运行。
     * 它基于 `libbpf` 的 `CO-RE`(Compile Once – Run Everywhere) 轻量级开发框架，支持通过用户态 WASM 虚拟机控制 eBPF 程序的加载和执行，并将预编译的 eBPF 程序打包为通用的 JSON 或 WASM 模块进行分发。
     * 网站：[eunomia-bpf 用户手册: 让 eBPF 程序的开发和部署尽可能简单](https://eunomia.dev/zh/eunomia-bpf/manual/)
-3. 下面是一个关于`ebpf`不错的教程
+3. 下面是一个关于eBPF不错的教程
     * 系列教程链接：[eBPF 开发实践教程：基于 CO-RE，通过小工具快速上手 eBPF 开发](https://eunomia.dev/zh/tutorials/)
     * 提供了从入门到进阶的 eBPF 开发实践，包括基本概念、代码实例、实际应用等内容。和 BCC 不同的是，我们使用 `libbpf`、`Cilium`、`libbpf-rs`、`eunomia-bpf` 等框架进行开发，包含 C、Go、Rust 等语言的示例。
     * 其中的学习建议：[关于如何学习 eBPF 相关的开发的一些建议](https://eunomia.dev/zh/tutorials/0-introduce/#2-ebpf)
@@ -457,11 +459,11 @@ compaction    fs_dax            intel_iommu     mce          oom      regmap    
 
 ## 4. 小结
 
-学习ebpf，简单了解了其演变过程，存在的移植性问题及为此推出的`CO-RE`和`BTF`技术。
+初步学习eBPF，简单了解了其演变过程，存在的移植性问题及为此推出的`CO-RE`和`BTF`技术。
 
-了解了常用的几种开发框架，跟着libbpf-bootstrap练习了一个hello world示例。
+了解了常用的几种开发框架，跟着`libbpf-bootstrap`练习了一个`hello world`示例。
 
-准备上手发现离实际开发还有点距离，框架封装了很多信息。下一步带着问题“自底向上”学习，先熟悉下基本ebpf的机制。
+准备上手发现离实际开发还有点距离，框架封装了很多信息。下一步带着问题“自底向上”学习，先熟悉下基本eBPF的机制。
 
 ## 5. 参考
 
