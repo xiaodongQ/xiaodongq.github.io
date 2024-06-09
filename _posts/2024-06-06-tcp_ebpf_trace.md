@@ -39,7 +39,7 @@ eBPF（Extended Berkeley Packet Filter）是一个在Linux内核中实现的强�
 **部分 Linux Event 和 BPF 版本支持见下图：**
 
 ![linux_kernel_event_bpf](/images/linux_kernel_event_bpf.png)  
-[出处](https://www.ebpf.top/post/ebpf_intro/)
+[参考](https://www.ebpf.top/post/ebpf_intro/)
 
 **bcc tools：**
 
@@ -48,7 +48,7 @@ eBPF（Extended Berkeley Packet Filter）是一个在Linux内核中实现的强�
 CentOS安装：`yum install bcc`，而后在`/usr/share/bcc/tools/`可查看。bcc中工具集示意图如下：
 
 ![bcc tools 60s](/images/ebpf_60s.png)  
-[出处](https://www.ebpf.top/post/ebpf_intro/)
+[参考](https://www.ebpf.top/post/ebpf_intro/)
 
 起一个ECS实例，安装bcc，可看到bcc-tools等依赖及大小(单独安装bcc-tools大概也要300多M)，安装后可看到上述工具(里面内容为`python`)
 
