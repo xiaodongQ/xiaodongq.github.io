@@ -41,16 +41,28 @@ eBPF（Extended Berkeley Packet Filter）是一个在Linux内核中实现的强�
 ![linux_kernel_event_bpf](/images/linux_kernel_event_bpf.png)  
 [出处](https://www.ebpf.top/post/ebpf_intro/)
 
+**bcc tools：**
+
 性能分析大师 Brendan Gregg 等编写了**诸多的 BCC 或 BPFTrace 的工具集**可以拿来直接使用，可以满足很多我们日常问题分析和排查。
 
-CentOS安装：`yum install bcc`，而后在`/usr/share/bcc/tools/`可查看。工具集示意图如下：
+CentOS安装：`yum install bcc`，而后在`/usr/share/bcc/tools/`可查看。bcc中工具集示意图如下：
 
 ![bcc tools 60s](/images/ebpf_60s.png)  
 [出处](https://www.ebpf.top/post/ebpf_intro/)
 
-起一个ECS实例，安装bcc，可看到bcc-tools等依赖及大小(单独安装bcc-tools大概也要300多M)，安装后可看到上述工具(里面内容为python)
+起一个ECS实例，安装bcc，可看到bcc-tools等依赖及大小(单独安装bcc-tools大概也要300多M)，安装后可看到上述工具(里面内容为`python`)
 
 ![安装bcc](/images/2024-06-07-yum_install_bcc.png)
+
+**perf-tools：**
+
+说到Brendan Gregg，这里也提一下他创建的[perf-tools](https://github.com/brendangregg/perf-tools)，这是一个基于`ftrace`和`perf`的Linux性能分析工具集(上面的bcc tools是基于ebpf)，提供如下工具(里面内容为`shell`)：
+
+![perf-tools工具集](/images/perf-tools_2016.png)
+
+可以看到`perf tools`里面有些工具和上面的`bcc tools`功能相同，也有不同的，如：`funcgraph`(可跟踪内核函数的调用子流程)。
+
+这里有个结合两者定位问题的案例：[eBPF/Ftrace 双剑合璧：no space left on device 无处遁形](https://mp.weixin.qq.com/s/VuD20JgMQlbf-RIeCGniaA)
 
 ### 2.2. BPF程序的开发方式
 
@@ -223,17 +235,15 @@ cleanup:
 }
 ```
 
-#### 3.3.3. Makefile修改
+#### 3.3.3. Makefile修改，编译并执行
 
-libbpf_bootstrap/examples/c/Makefile 里的`APPS`，加个helloworld
+1、libbpf_bootstrap/examples/c/Makefile 里的`APPS`，加个helloworld
 
 ```sh
 APPS = helloworld minimal minimal_legacy bootstrap uprobe kprobe fentry
 ```
 
-#### 3.3.4. 编译：`make`
-
-编译报错：
+2、`make`进行编译，编译报错：
 
 ```sh
 In file included from bpf.c:37:
@@ -253,7 +263,7 @@ make: *** [Makefile:87: /home/xd/libbpf-bootstrap/examples/c/.output/libbpf.a] E
 
 重新编译成功。
 
-#### 3.3.5. 执行
+3、执行
 
 ```sh
 [root@iZ2ze8x6ziml84sbvfcx20Z c]# ./helloworld 
@@ -281,7 +291,7 @@ Successfully started! Please run `sudo cat /sys/kernel/debug/tracing/trace_pipe`
            <...>-7058    [000] d...  1386.399166: bpf_trace_printk: invoke bpf_prog: Hello, World!
 ```
 
-#### 3.3.6. 附1：生成的骨架文件主要内容说明
+#### 3.3.4. 附1：生成的骨架文件说明
 
 骨架文件 helloworld.skel.h (`.skel.h`和`.o`都生成在`.output`目录里)
 
@@ -343,7 +353,7 @@ const void *helloworld_bpf::elf_bytes(size_t *sz) { return helloworld_bpf__elf_b
 #endif /* __HELLOWORLD_BPF_SKEL_H__ */
 ```
 
-#### 3.3.7. 附2：Makefile主要内容说明
+#### 3.3.5. 附2：Makefile说明
 
 路径：examples/c/Makefile，该示例直接在原来基础上加了一个helloworld成员
 
@@ -426,9 +436,13 @@ $(APPS): %: $(OUTPUT)/%.o $(LIBBPF_OBJ) | $(OUTPUT)
 ...
 ```
 
-## 4. 跟踪TCP网络交互
+## 4. eBPF跟踪TCP网络交互
 
 到 `libbpf-bootstrap/examples/c` 下创建文件，并按上面的框架补充逻辑
+
+有时不确定当前系统支持的接口符号名称，可以在 `/proc/kallsyms` 中查看。
+
+`kallsyms`是Linux内核中的一个重要组件，它提供了内核中所有导出的符号表信息。可以通过查看`/proc/kallsyms`文件来获取`kallsyms`的符号表信息。(内核里是否启用了kallsyms功能，可以在内核配置里查看，如`/boot/config-4.18.0-348.el8.x86_64`)
 
 1、trace_tcp_deal.bpf.c
 
@@ -438,7 +452,6 @@ $(APPS): %: $(OUTPUT)/%.o $(LIBBPF_OBJ) | $(OUTPUT)
 
 // 使用kprobe，此处跟踪 tcp_v4_conn_request
 SEC("kprobe/tcp_v4_conn_request")
-
 int bpf_tcp_sendmsg(struct __sk_buff *skb) {  
     // 记录或处理发送的数据  
     return 0;  
