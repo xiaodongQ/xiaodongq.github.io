@@ -1,38 +1,35 @@
 ---
 layout: post
-title: TCP半连接队列系列（二） -- ebpf跟踪内核关键流程
-categories: 网络
-tags: 网络
+title: ebpf第一课
+categories: Linux
+tags: Linux
 ---
 
 * content
 {:toc}
 
-学习ebpf，并使用ebpf跟踪内核中网络的关键过程
+搜集资料，学习ebpf
 
 
 
 ## 1. 背景
 
-在“[TCP建立连接相关过程](https://xiaodongq.github.io/2024/05/18/tcp_connect/)”这篇文章中，进行了全连接队列溢出的实验，并且遗留了几个问题。
+在“[TCP全连接队列相关过程](https://xiaodongq.github.io/2024/05/18/tcp_connect/)”这篇文章中，进行了全连接队列溢出的实验，准备后续用ebpf跟踪过程。
 
-1. ~~半连接队列溢出情况分析，服务端接收具体处理逻辑~~
-2. ~~内核drop包的时机~~，以及跟抓包的关系。哪些情况可能会抓不到drop的包？
-3. systemtap/ebpf跟踪TCP状态变化，跟踪上述drop事件
-4. 上述全连接实验case1中，2MSL内没观察到客户端连接`FIN_WAIT2`状态，为什么？
-
-本文学习并使用ebpf工具进行跟踪分析。
+在基本学习ebpf之后尝试用libbpf-bootstrap写跟踪程序，发现还差些火候。先把学习过程整理一下单独作为一篇博客，初步技术储备。
 
 ## 2. eBPF基本介绍
 
 eBPF（Extended Berkeley Packet Filter）是一个在Linux内核中实现的强大工具，允许用户空间程序通过加载BPF（Berkeley Packet Filter）字节码到内核，安全地执行各种网络、追踪和安全相关的任务。
 
-### 2.1. eBPF 提供了四种不同的操作机制
+### 2.1. eBPF提供了四种不同的操作机制
 
 1. **内核跟踪点(Kernel Tracepoints)**：内核跟踪点是由内核开发人员预定义的事件，可以使用 `TRACE_EVENT` 宏在内核代码中设置。这些跟踪点允许 eBPF 程序挂接到特定的内核事件，并捕获相关数据进行分析和监控。
 2. **USDT（User Statically Defined Tracing）**：USDT 是一种机制，允许开发人员在应用程序代码中设置预定义的跟踪点。通过在代码中插入特定的标记，eBPF 程序可以挂接到这些跟踪点，并捕获与应用程序相关的数据，以实现更细粒度的观测和分析。
 3. **Kprobes（Kernel Probes）**：Kprobes 是一种内核探针机制，允许 eBPF 程序在**运行时动态挂接**到内核代码的任何部分。通过在目标内核函数的入口或出口处插入探针，eBPF 程序可以捕获函数调用和返回的参数、返回值等信息，从而实现对内核行为的监控和分析。
 4. **Uprobes（User Probes）**：Uprobes 是一种用户探针机制，允许 eBPF 程序在运行时动态挂接到用户空间应用程序的任何部分。通过在目标用户空间函数的入口或出口处插入探针，eBPF 程序可以捕获函数调用和返回的参数、返回值等信息，以实现对应用程序的可观察性和调试能力。
+
+### 2.2. eBPF内核版本支持说明
 
 > 由于 eBPF 还在快速发展期，内核中的功能也日趋增强，一般推荐基于`Linux 4.4+ (4.9 以上会更好)`内核的来使用 eBPF。
 
@@ -64,7 +61,7 @@ CentOS安装：`yum install bcc`，而后在`/usr/share/bcc/tools/`可查看。b
 
 这里有个结合两者定位问题的案例：[eBPF/Ftrace 双剑合璧：no space left on device 无处遁形](https://mp.weixin.qq.com/s/VuD20JgMQlbf-RIeCGniaA)
 
-### 2.2. BPF程序的开发方式
+### 2.3. BPF程序的开发方式
 
 参考：[使用C语言从头开发一个Hello World级别的eBPF程序](https://tonybai.com/2022/07/05/develop-hello-world-ebpf-program-in-c-from-scratch/)
 
@@ -101,7 +98,7 @@ BPF演进了这么多年，虽然一直在努力提高，但BPF程序的开发�
 
 通过上面的梳理，我们可以知道`bcc`和`bcc libbpf`是不同的，内核提供了`BTF`、`CO-RE`技术，封装在`libbpf`中，而在这之上又有多种基于`libbpf`框架可选择。
 
-下面基于 `libbpf-bootstrap` 学习梳理，并进行实验。([详细的入门操作介绍](https://nakryiko.com/posts/libbpf-bootstrap/))
+下面基于 `libbpf-bootstrap` 学习梳理，并进行实验。
 
 ## 3. 基于libbpf-bootstrap基本开发示例
 
@@ -162,14 +159,14 @@ int bpf_prog(void *ctx) {
   return 0;
 }
 
-// SEC("license")注解，license 定义BPF代码的协议，内核中要求必须指定协议
+// SEC("license")注解，license 定义BPF代码的开源协议，内核中要求必须指定许可协议
 // SEC() 是bpf_helpers.h提供的
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 ```
 
 #### 3.3.2. helloworld.c (用户空间侧代码)
 
-上述BPF侧代码make过程中自动生成骨架后，两者就集成在一起了
+上述BPF侧代码make过程中自动生成骨架，这里将两者集成在一起
 
 ```c
 #include <stdio.h>
@@ -386,7 +383,7 @@ INCLUDES := -I$(OUTPUT) -I../../libbpf/include/uapi -I$(dir $(VMLINUX)) -I$(LIBB
 CFLAGS := -g -Wall
 ALL_LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS)
 
-# 在此处新加一个app应用即可，也可以`make minimal`构建单个应用
+# 在此处新加一个app应用即可，也可以`make minimal`方式构建单个应用
 APPS = helloworld minimal minimal_legacy minimal_ns bootstrap uprobe kprobe fentry \
        usdt sockfilter tc ksyscall task_iter lsm
 ...
@@ -436,98 +433,37 @@ $(APPS): %: $(OUTPUT)/%.o $(LIBBPF_OBJ) | $(OUTPUT)
 ...
 ```
 
-## 4. eBPF跟踪TCP网络交互
+#### 3.3.6. 附3：系统tracepoint说明
 
-到 `libbpf-bootstrap/examples/c` 下创建文件，并按上面的框架补充逻辑
+内核提供的所有`tracepoint`在`/sys/kernel/debug/tracing/`下。
 
-有时不确定当前系统支持的接口符号名称，可以在 `/proc/kallsyms` 中查看。
+当前内核支持的`event`如下(找了个CentOS Linux release 8.5.2111的环境)，可以看到网络相关的`tcp`/`net`/`skb`/`sock`
 
-`kallsyms`是Linux内核中的一个重要组件，它提供了内核中所有导出的符号表信息。可以通过查看`/proc/kallsyms`文件来获取`kallsyms`的符号表信息。(内核里是否启用了kallsyms功能，可以在内核配置里查看，如`/boot/config-4.18.0-348.el8.x86_64`)
-
-1、trace_tcp_deal.bpf.c
-
-```c
-#include <linux/bpf.h>
-#include <bpf/bpf_helpers.h>
-
-// 使用kprobe，此处跟踪 tcp_v4_conn_request
-SEC("kprobe/tcp_v4_conn_request")
-int bpf_tcp_sendmsg(struct __sk_buff *skb) {  
-    // 记录或处理发送的数据  
-    return 0;  
-}  
-
-char LICENSE[] SEC("license") = "Dual BSD/GPL";
+```sh
+[root@anonymous ➜ /sys/kernel/debug/tracing/events ]$ ls   
+alarmtimer    context_tracking  ftrace          iomap        mdio     page_isolation  resctrl  syscalls   writeback
+amdgpu        cpuhp             gpu_scheduler   iommu        migrate  page_pool       rpm      task       x86_fpu
+amdgpu_dm     devlink           hda             irq          module   pagemap         rseq     tcp        xdp
+avc           dma_fence         hda_controller  irq_matrix   mptcp    percpu          rtc      thermal    xen
+block         drm               hda_intel       irq_vectors  msr      power           sched    timer      xfs
+bpf_test_run  enable            header_event    kmem         napi     printk          scsi     tlb        xhci-hcd
+bpf_trace     exceptions        header_page     kvm          neigh    qdisc           signal   ucsi
+bridge        fib               huge_memory     kvmmmu       net      random          skb      udp
+cfg80211      fib6              hyperv          kyber        netlink  ras             smbus    vmscan
+cgroup        filelock          i2c             libata       nmi      raw_syscalls    sock     vsyscall
+clk           filemap           initcall        mac80211     nvme     rcu             spi      wbt
+compaction    fs_dax            intel_iommu     mce          oom      regmap          swiotlb  workqueue
 ```
 
-2、trace_tcp_deal.c
+## 4. 小结
 
-```c
-#include <stdio.h>
-#include <unistd.h>
-#include <sys/resource.h>
-#include <bpf/libbpf.h>
-#include "helloworld.skel.h"
+学习ebpf，简单了解了其演变过程，存在的移植性问题及为此推出的`CO-RE`和`BTF`技术。
 
-static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
-{
-    return vfprintf(stderr, format, args);
-}
+了解了常用的几种开发框架，跟着libbpf-bootstrap练习了一个hello world示例。
 
-int main(int argc, char **argv)
-{
-    struct helloworld_bpf *skel;
-    int err;
+准备上手发现离实际开发还有点距离，框架封装了很多信息。下一步带着问题“自底向上”学习，先熟悉下基本ebpf的机制。
 
-    libbpf_set_strict_mode(LIBBPF_STRICT_ALL);
-    /* Set up libbpf errors and debug info callback */
-    libbpf_set_print(libbpf_print_fn);
-
-    /* Open BPF application */
-    skel = helloworld_bpf__open();
-    if (!skel) {
-        fprintf(stderr, "Failed to open BPF skeleton\n");
-        return 1;
-    }   
-
-    /* Load & verify BPF programs */
-    err = helloworld_bpf__load(skel);
-    if (err) {
-        fprintf(stderr, "Failed to load and verify BPF skeleton\n");
-        goto cleanup;
-    }
-
-    /* Attach tracepoint handler */
-    err = helloworld_bpf__attach(skel);
-    if (err) {
-        fprintf(stderr, "Failed to attach BPF skeleton\n");
-        goto cleanup;
-    }
-
-    // 经过上面 自动生成BPF骨架、准备和加载BPF程序到内核、附加处理程序 这些步骤，到此就可附加成功所需的BPF钩子了
-
-    printf("Successfully started! Please run `sudo cat /sys/kernel/debug/tracing/trace_pipe` "
-           "to see output of the BPF programs.\n");
-
-    // 死循环等待事件触发
-    for (;;) {
-        /* trigger our BPF program */
-        fprintf(stderr, ".");
-        sleep(1);
-    }
-
-cleanup:
-    helloworld_bpf__destroy(skel);
-    return -err;
-}
-```
-
-3、libbpf_bootstrap/examples/c/Makefile 里的`APPS`，加个helloworld
-
-## 5. 小结
-
-
-## 6. 参考
+## 5. 参考
 
 1、[使用C语言从头开发一个Hello World级别的eBPF程序](https://tonybai.com/2022/07/05/develop-hello-world-ebpf-program-in-c-from-scratch/)
 
