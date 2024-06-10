@@ -1,6 +1,6 @@
 ---
 layout: post
-title: eBPF学习实践系列（一） -- 第一课
+title: eBPF学习实践系列（一） -- 初识eBPF
 categories: eBPF
 tags: Linux eBPF
 ---
