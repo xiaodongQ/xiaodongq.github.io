@@ -463,11 +463,13 @@ examples:
 
 报错了："Error: Specified qdisc not found."
 
-设置丢包模拟：`tc qdisc change dev enp4s0 root netem loss 10%`
+netem模块没加载，可能要修改内核，暂放弃。用下面的iptables模拟丢包
+
+~~设置丢包模拟：`tc qdisc change dev enp4s0 root netem loss 10%`~~
 
 #### 3.8.2. iptables模拟
 
-1. Linux服务端：`iptables -A INPUT -m statistic --mode random --probability 0.5 -j DROP`
+1. Linux服务端：`iptables -A INPUT -m statistic --mode random --probability 0.2 -j DROP`
 2. Linux服务端：`python -m http.server`起`8000`端口服务，并开启`./tcpretrans`
 3. (本机)`wget 192.168.1.150:8000/tmpstrace`请求 (tmpstrace是一个2M左右的文件)
 4. `iptables -F`恢复环境(原来就没有防火墙规则，最好单条规则删除)
@@ -494,6 +496,53 @@ TIME     PID    IP LADDR:LPORT          T> RADDR:RPORT          STATE
 16:48:24 0      4  192.168.1.150:8000   R> 192.168.1.150:57870  FIN_WAIT1
 16:48:24 0      4  192.168.1.150:57870  R> 192.168.1.150:8000   LAST_ACK
 ```
+
+每次TCP重传数据包时，`tcpretrans`会打印一行记录，包含源地址和目的地址，以及当时该 TCP 连接所处的内核状态。TCP 重传会导致延迟和吞吐量方面的问题。
+
+重传通常是网络健康状况不佳的标志，这个工具对它们的调查很有用。与使用tcpdump不同，该工具的开销非常低，因为它只跟踪重传函数。
+
+`T`列：内核可能发送了一个TLP，但在某些情况下它可能最终没有被发送。
+
+* `L>`: 表示数据包是从本地地址(LADDR)发送到远程地址(RADDR)的。
+* `R>`: 表示数据包是从远程地址(RADDR)发送到本地地址(LADDR)的。
+
+通过前面`tcptracer`的追踪，可以看到`curl`时是服务端先关闭连接(8000)，`wget`可以再跟踪下
+
+```sh
+[root@anonymous ➜ /usr/share/bcc/tools ]$ ./tcptracer  -v        
+Tracing TCP established connections. Ctrl-C to end.
+TYPE         PID    COMM             IP SADDR            DADDR            SPORT  DPORT  NETNS   
+connect      9418   curl             4  192.168.1.150    192.168.1.150    56426  8000   4026531992
+accept       5110   python           4  192.168.1.150    192.168.1.150    8000   56426  4026531992
+close        5110   python           4  192.168.1.150    192.168.1.150    8000   56426  4026531992
+close        9418   curl             4  192.168.1.150    192.168.1.150    56426  8000   4026531992
+```
+
+### `tcpsubnet`：统计发送到特定子网的TCP流量
+
+`tcpsubnet`工具汇总并合计了本地主机发往子网的 IPv4 TCP 流量，并按固定间隔显示输出。该工具使用 eBPF 功能来收集并总结数据，以减少开销。
+
+### `tcpdrop`：被内核丢弃的TCP数据包跟踪
+
+每次内核丢弃 TCP 数据包和段时，`tcpdrop` 都会显示连接的详情，包括导致软件包丢弃的内核堆栈追踪。
+
+`STATE (FLAGS)`：TCP 连接的状态和相关的 TCP 标志：
+
+* `CLOSE_WAIT (FIN|ACK)`
+    * `CLOSE_WAIT` 表示本地应用程序已经接收了关闭连接的 FIN 包，但还没有发送它自己的 FIN 包来关闭连接。
+    * `FIN|ACK`标志 表示这个数据包是一个带有 FIN 和 ACK 标志的 TCP 段。这通常是在关闭连接的过程中发送的。
+* `CLOSE (ACK)`
+    * `CLOSE`状态 表示连接正在关闭，但还没有完全关闭。
+    * `ACK`标志 表示这个数据包是一个TCP确认包，用于确认之前接收到的数据包。
+
+### `tcpstates`：显示TCP状态更改信息
+
+跟踪TCP状态变化，并打印每个状态的持续时间。
+
+每次连接改变其状态时，`tcpstates`都会显示一个新行，其中包含更新的连接详情。
+
+### `tcprtt`
+
 
 
 ## 4. 小结
