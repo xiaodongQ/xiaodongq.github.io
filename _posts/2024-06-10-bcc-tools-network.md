@@ -20,7 +20,7 @@ bcc tools工具集中网络部分说明和使用。
 
 ## 2. Linux性能分析60s
 
-工具是为了能应用到实际中提升定位问题的效率，而工具已经有这么多了，我们该选用哪些呢？对于Linux下初步的性能问题定位，先说下大佬们总结的最佳实践。
+各种性能工具是为了能应用到实际中提升定位问题的效率，而工具已经有这么多了，我们该选用哪些呢？对于Linux下初步的性能问题定位，先说下大佬们总结的最佳实践。
 
 ### 2.1. 60s系列Linux命令版本
 
@@ -112,6 +112,23 @@ SEND   6701   sshd             12:socket:[65823]         13    N/A
 ### 3.2. `tcptop`：统计TCP发送/接收的吞吐量
 
 ```sh
+# man bcc-tcptop
+NAME
+       tcptop - Summarize TCP send/recv throughput by host. Top for TCP.
+
+SYNOPSIS
+       tcptop [-h] [-C] [-S] [-p PID] [--cgroupmap MAPPATH]
+                 [--mntnsmap MAPPATH] [interval] [count]
+
+DESCRIPTION
+       This is top for TCP sessions.
+
+       This summarizes TCP send/receive Kbytes by host, and prints a summary that refreshes, along other system-wide metrics.
+
+       This uses dynamic tracing of kernel TCP send/receive functions, and will need to be updated to match kernel changes.
+```
+
+```sh
 [root@anonymous ➜ /usr/share/bcc/tools ]$ ./tcptop -h
 usage: tcptop [-h] [-C] [-S] [-p PID] [--cgroupmap CGROUPMAP]
               [--mntnsmap MNTNSMAP]
@@ -155,6 +172,19 @@ PID    COMM         LADDR                 RADDR                  RX_KB  TX_KB
 
 ### 3.3. `tcplife`：TCP会话跟踪
 
+对网络负载的特征和流量计算很有帮助，可以识别当前有哪些连接、连接上有多少数据传输
+
+```sh
+# man bcc-tcplife
+DESCRIPTION
+       This tool traces TCP sessions that open and close while tracing, and prints a line of output to summarize each one. This includes the IP addresses,
+       ports, duration, and throughput for the session. This is useful for workload characterisation and flow accounting: identifying what connections are
+       happening, with the bytes transferred.
+
+       This  tool  works using the sock:inet_sock_set_state tracepoint if it exists, added to Linux 4.16, and switches to using kernel dynamic tracing for
+       older kernels. Only TCP state changes are traced, so it is expected that the overhead of this tool is much lower than typical send/receive tracing.
+```
+
 ```sh
 [root@anonymous ➜ /usr/share/bcc/tools ]$ ./tcplife -h
 usage: tcplife [-h] [-T] [-t] [-w] [-s] [-p PID] [-L LOCALPORT]
@@ -186,7 +216,7 @@ TIME     PID   COMM       LADDR           LPORT RADDR           RPORT TX_KB RX_K
 
 ### 3.4. `tcptracer`：已建立的TCP连接跟踪
 
-`man bcc-tcptracer`：
+`man bcc-tcptracer`部分内容：
 
 ```sh
 NAME
@@ -239,9 +269,9 @@ close        9418   curl             4  192.168.1.150    192.168.1.150    56426 
 
 ### 3.5. `tcpconnect`：主动的TCP连接跟踪
 
-`man bcc-tcpconnect`部分内容：
-
 跟踪主动发起(通过`connect()`)连接的TCP，所有尝试`connect`的连接都会跟踪，即使是最终失败的。注意：`accept()`是被动连接，不在此追踪范围(可通过`tcpaccept`追踪)。
+
+`man bcc-tcpconnect`部分内容：
 
 ```sh
 NAME
@@ -316,6 +346,155 @@ DESCRIPTION
 
        This tool only traces successful TCP accept()s. Connection attempts to closed ports will not be shown (those can be traced via other functions).
 ```
+
+示例：linux机器(192.168.1.150)上`python -m http.server`起`8000`端口服务。ssh到linux机器，并`curl 192.168.1.150:8000`
+
+```sh
+[root@anonymous ➜ /usr/share/bcc/tools ]$ ./tcpaccept
+PID     COMM         IP RADDR            RPORT LADDR            LPORT
+1227    sshd         4  192.168.1.2      63276 192.168.1.150    22   
+5110    python       4  192.168.1.150    57004 192.168.1.150    8000
+```
+
+### 3.7. `tcpconnlat`：跟踪TCP主动连接的延迟
+
+TCP连接延迟是建立连接所需的时间：从发出`SYN`到向对端发应答包(即三次握手时收到`SYN+ACK`后的`ACK`应答)的时间。
+
+针对的是内核TCP/IP处理和网络往返时间，而不是应用程序运行时。
+
+所有连接尝试都会追踪，即使最后是失败的(应答`RST`)
+
+```sh
+# man bcc-tcpconnlat
+NAME
+       tcpconnlat - Trace TCP active connection latency. Uses Linux eBPF/bcc.
+
+SYNOPSIS
+       tcpconnlat [-h] [-t] [-p PID] [-L] [-v] [min_ms]
+
+DESCRIPTION
+       This  tool  traces  active  TCP connections (eg, via a connect() syscall), and shows the latency (time) for the connection as measured locally: the
+       time from SYN sent to the response packet.  This is a useful performance metric that typically spans kernel TCP/IP processing and the network round
+       trip time (not application runtime).
+
+       All connection attempts are traced, even if they ultimately fail (RST packet in response).
+
+       This  tool  works  by  use of kernel dynamic tracing of TCP/IP functions, and will need updating to match any changes to these functions. This tool
+       should be updated in the future to use static tracepoints, once they are available.
+```
+
+```sh
+# -h
+examples:
+    ./tcpconnlat           # trace all TCP connect()s
+    ./tcpconnlat 1         # trace connection latency slower than 1 ms
+    ./tcpconnlat 0.1       # trace connection latency slower than 100 us
+    ./tcpconnlat -t        # include timestamps
+    ./tcpconnlat -p 181    # only trace PID 181
+    ./tcpconnlat -L        # include LPORT while printing outputs
+```
+
+示例：`python -m http.server`起`8000`端口服务，(本机)`curl ip:8000`请求；
+
+并发起一个不存在端口的请求，`curl ip:12345`
+
+```sh
+# -L 同时展示本端端口，默认不会展示
+# 追踪的是主动发起连接的记录
+[root@anonymous ➜ /usr/share/bcc/tools ]$ ./tcpconnlat -L
+PID    COMM         IP SADDR            LPORT  DADDR            DPORT LAT(ms)
+12326  curl         4  192.168.1.150    57406  192.168.1.150    8000  0.09
+12331  curl         4  192.168.1.150    51656  192.168.1.150    12345 0.08
+```
+
+### 3.8. `tcpretrans`：重传的TCP连接跟踪
+
+动态追踪内核中的 `tcp_retransmit_skb()` 和 `tcp_send_loss_probe()`函数 (可能更新以匹配不同内核版本)
+
+```sh
+# man bcc-tcpretrans
+DESCRIPTION
+       This  traces  TCP retransmits, showing address, port, and TCP state information, and sometimes the PID (although usually not, since retransmits are
+       usually sent by the kernel on timeouts). To keep overhead very low, only the TCP retransmit functions are traced. This does not trace every  packet
+       (like  tcpdump(8)  or  a  packet sniffer). Optionally, it can count retransmits over a user signalled interval to spot potentially dropping network
+       paths the flows are traversing.
+
+       This uses dynamic tracing of the kernel tcp_retransmit_skb() and tcp_send_loss_probe() functions, and will need  to  be  updated  to  match  kernel
+       changes to these functions.
+```
+
+可以查看内核符号中是否匹配：
+
+```sh
+[root@anonymous ➜ /home ]$ grep -wE "tcp_retransmit_skb|tcp_send_loss_probe" /proc/kallsyms
+ffffffff99075720 T tcp_send_loss_probe
+ffffffff99075910 T tcp_retransmit_skb
+```
+
+用法：
+
+```sh
+[root@anonymous ➜ /usr/share/bcc/tools ]$ ./tcpretrans -h
+usage: tcpretrans [-h] [-l] [-c]
+
+Trace TCP retransmits
+
+optional arguments:
+  -h, --help       show this help message and exit
+  -l, --lossprobe  include tail loss probe attempts
+  -c, --count      count occurred retransmits per flow
+
+examples:
+    ./tcpretrans           # trace TCP retransmits
+    # TLP：tail loss probe，TCP发送端用于处理尾包丢失场景的算法
+    # 目的是使用快速重传取代RTO（重传超时）超时重传来处理尾包丢失，以减少因尾包丢失带来的延迟，提高TCP性能。
+    ./tcpretrans -l        # include TLP attempts
+```
+
+示例：通过构造丢包场景来进行实验
+
+#### 3.8.1. tc模拟
+
+1、先安装`tc`：`yum install iproute-tc`，并构造丢包(实验环境网卡为`enp4s0`)
+
+查看qdisc设置：`tc qdisc show dev enp4s0`
+
+2、添加队列规则：`tc qdisc add dev enp4s0 root netem`
+
+报错了："Error: Specified qdisc not found."
+
+设置丢包模拟：`tc qdisc change dev enp4s0 root netem loss 10%`
+
+#### 3.8.2. iptables模拟
+
+1. Linux服务端：`iptables -A INPUT -m statistic --mode random --probability 0.5 -j DROP`
+2. Linux服务端：`python -m http.server`起`8000`端口服务，并开启`./tcpretrans`
+3. (本机)`wget 192.168.1.150:8000/tmpstrace`请求 (tmpstrace是一个2M左右的文件)
+4. `iptables -F`恢复环境(原来就没有防火墙规则，最好单条规则删除)
+
+出现了重传，结果如下：
+
+```sh
+[root@anonymous ➜ /usr/share/bcc/tools ]$ ./tcpretrans
+Tracing retransmits ... Hit Ctrl-C to end
+TIME     PID    IP LADDR:LPORT          T> RADDR:RPORT          STATE
+16:48:23 0      4  192.168.1.150:57870  R> 192.168.1.150:8000   ESTABLISHED
+16:48:23 5110   4  192.168.1.150:8000   R> 192.168.1.150:57870  ESTABLISHED
+16:48:23 0      4  192.168.1.150:8000   R> 192.168.1.150:57870  FIN_WAIT1
+16:48:23 0      4  192.168.1.150:8000   R> 192.168.1.150:57870  FIN_WAIT1
+16:48:23 0      4  192.168.1.150:8000   R> 192.168.1.150:57870  FIN_WAIT1
+16:48:23 0      4  192.168.1.150:8000   R> 192.168.1.150:57870  FIN_WAIT1
+16:48:23 0      4  192.168.1.150:8000   R> 192.168.1.150:57870  FIN_WAIT1
+16:48:23 0      4  192.168.1.150:8000   R> 192.168.1.150:57870  FIN_WAIT1
+16:48:23 0      4  192.168.1.150:8000   R> 192.168.1.150:57870  FIN_WAIT1
+16:48:24 0      4  192.168.1.150:8000   R> 192.168.1.150:57870  FIN_WAIT1
+16:48:24 0      4  192.168.1.150:8000   R> 192.168.1.150:57870  FIN_WAIT1
+16:48:24 0      4  192.168.1.150:8000   R> 192.168.1.150:57870  FIN_WAIT1
+16:48:24 0      4  192.168.1.150:8000   R> 192.168.1.150:57870  FIN_WAIT1
+16:48:24 0      4  192.168.1.150:8000   R> 192.168.1.150:57870  FIN_WAIT1
+16:48:24 0      4  192.168.1.150:57870  R> 192.168.1.150:8000   LAST_ACK
+```
+
 
 ## 4. 小结
 
