@@ -31,7 +31,7 @@ eBPF（Extended Berkeley Packet Filter）是一个在Linux内核中实现的强�
 3. **Kprobes（Kernel Probes）**：Kprobes 是一种内核探针机制，允许 eBPF 程序在**运行时动态挂接**到内核代码的任何部分。通过在目标内核函数的入口或出口处插入探针，eBPF 程序可以捕获函数调用和返回的参数、返回值等信息，从而实现对内核行为的监控和分析。
 4. **Uprobes（User Probes）**：Uprobes 是一种用户探针机制，允许 eBPF 程序在运行时动态挂接到用户空间应用程序的任何部分。通过在目标用户空间函数的入口或出口处插入探针，eBPF 程序可以捕获函数调用和返回的参数、返回值等信息，以实现对应用程序的可观察性和调试能力。
 
-### 2.2. eBPF内核版本支持说明
+### 2.2. eBPF内核版本支持及实用工具
 
 > 由于 eBPF 还在快速发展期，内核中的功能也日趋增强，一般推荐基于`Linux 4.4+ (4.9 以上会更好)`内核的来使用 eBPF。
 
@@ -46,7 +46,7 @@ eBPF（Extended Berkeley Packet Filter）是一个在Linux内核中实现的强�
 
 CentOS安装：`yum install bcc`，而后在`/usr/share/bcc/tools/`可查看。bcc中工具集示意图如下：
 
-![bcc tools 60s](/images/ebpf_60s.png)  
+![bcc tools 2019](/images/bcc-tools-2019.png)  
 [参考](https://www.ebpf.top/post/ebpf_intro/)
 
 起一个ECS实例，安装bcc，可看到bcc-tools等依赖及大小(单独安装bcc-tools大概也要300多M)，安装后可看到上述工具(里面内容为`python`)
