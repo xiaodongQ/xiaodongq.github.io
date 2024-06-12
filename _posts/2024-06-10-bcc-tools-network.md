@@ -459,11 +459,24 @@ examples:
 
 查看qdisc设置：`tc qdisc show dev enp4s0`
 
-2、添加队列规则：`tc qdisc add dev enp4s0 root netem`
+2、添加队列规则：`tc qdisc add dev enp4s0 root netem loss 10%`
 
 报错了："Error: Specified qdisc not found."
 
-netem模块没加载，可能要修改内核，暂放弃。用下面的iptables模拟丢包
+查看没有`sch_netem`模块，`modprobe`加载，报错
+
+```sh
+[root@anonymous ➜ /root ]$ lsmod | grep netem
+[root@anonymous ➜ /root ]$ modprobe sch_netem
+modprobe: FATAL: Module sch_netem not found in directory /lib/modules/4.18.0-348.el8.x86_64
+[root@anonymous ➜ /root ]$
+```
+
+安装`kernel-modules-extra`(提示`/boot`空间不够了)，而后再`modprobe sch_netem`
+
+解决方式：[RTNETLINK answers: No such file or directory¶](https://tcconfig.readthedocs.io/en/latest/pages/troubleshooting.html)
+
+~~netem模块没加载，可能要修改内核，暂放弃。~~ 可用下面的iptables模拟丢包
 
 ~~设置丢包模拟：`tc qdisc change dev enp4s0 root netem loss 10%`~~
 
