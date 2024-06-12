@@ -280,7 +280,9 @@ tmpfs                3.1G     0  3.1G   0% /run/user/0
 [root@anonymous ➜ / ]$ 
 ```
 
-几个LV分区都是xfs文件系统，用`xfs_growfs`增加空间，`df -h`查看`/`已经从85G变成89G了
+上面扩展了LV大小，文件系统是未感知到的。
+
+几个LV分区都是xfs文件系统，用`xfs_growfs`扩展文件系统的空间，`df -h`查看`/`已经从85G变成89G了
 
 ```sh
 [root@desktop-mme7h3a ➜ /root ]$ cat /etc/fstab 
@@ -365,7 +367,7 @@ df -h    （df-Th）       加上TYPE 类型
 LVM完成
 ```
 
-## 3. Windows+CentOS双系统，从Windows匀一下
+### 2.4. Windows+CentOS双系统，从Windows匀一下
 
 从windows上压缩空间分配给centos的 /boot (单独分区，没有在LVM里)
 
@@ -546,7 +548,7 @@ tmpfs                3.1G     0  3.1G   0% /run/user/0
 
 重启系统，卧豁没起来。。。 (要去上班了，晚上继续)
 
-## 4. 重装Linux系统
+## 3. 重装Linux系统
 
 晚上下班回来，看PC已经找不到启动项了，先不折腾了。上次Rufus做的系统U盘还在，重新装CentOS系统。
 
@@ -568,7 +570,7 @@ tmpfs                3.1G     0  3.1G   0% /run/user/0
 
 3、安装oh-my-zsh、vim插件
 
-## 5. 安装`kernel-modules-extra`
+## 4. 安装`kernel-modules-extra`
 
 不忘初心，，把`tc`依赖的`kernel-modules-extra`装起来，看有91M左右
 
@@ -596,11 +598,11 @@ Installed size: 91 M
 
 `tc`模拟和bcc tools学习实验，在其他文章继续。
 
-## 6. 小结
+## 5. 小结
 
 折腾了一下LVM操作，又重新装了一次机。
 
-## 7. 参考
+## 6. 参考
 
 1、[LVM----从CentOS7默认安装的/home中转移空间到根目录/](https://www.cnblogs.com/user-sunli/p/15484345.html)
 
