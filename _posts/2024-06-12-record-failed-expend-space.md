@@ -560,11 +560,20 @@ tmpfs                3.1G     0  3.1G   0% /run/user/0
 
 1、设置免密登录 `ssh-copy-id -i ~/.ssh/id_rsa.pub root@192.168.1.150`
 
-2、修改yum源为阿里
+2、修改yum源为阿里云
 
 /etc/yum.repos.d/下配置都移走
 
-`curl -o /etc/yum.repos.d/CentOS-Base.repo http://mirrors.aliyun.com/repo/Centos-8.repo`
+~~`curl -o /etc/yum.repos.d/CentOS-Base.repo http://mirrors.aliyun.com/repo/Centos-8.repo`~~
+
+上面的yum源，下载的内核版本是`4.18.0-348.7.1.el8_5.x86_64`，而系统实际是`4.18.0-348.el8.x86_64`，小版本不一样，修改为下述源
+
+```sh
+[root@desktop-mme7h3a ➜ /root ]$ cat /etc/system-release
+CentOS Linux release 8.5.2111
+
+[root@desktop-mme7h3a ➜ /root ]wget -O /etc/yum.repos.d/CentOS-Base.repo https://mirrors.aliyun.com/repo/Centos-vault-8.5.2111.repo
+```
 
 `yum clean all; yum makecache`
 
@@ -572,21 +581,20 @@ tmpfs                3.1G     0  3.1G   0% /run/user/0
 
 ## 4. 安装`kernel-modules-extra`
 
-不忘初心，，把`tc`依赖的`kernel-modules-extra`装起来，看有91M左右
+回归原始需求，把`tc`依赖的`kernel-modules-extra`装起来，看有91M左右
 
 ```sh
 [root@desktop-mme7h3a ➜ /root ]$ yum install kernel-modules-extra
 Failed to set locale, defaulting to C.UTF-8
-Last metadata expiration check: 0:23:21 ago on Wed Jun 12 14:51:34 2024.
+Last metadata expiration check: 0:00:27 ago on Wed Jun 12 23:19:41 2024.
 Dependencies resolved.
 ===============================================================================================
  Package                      Architecture   Version                        Repository    Size
 ===============================================================================================
 Installing:
- kernel-modules-extra         x86_64         4.18.0-348.7.1.el8_5           base         7.6 M
-Installing dependencies:
  kernel-core                  x86_64         4.18.0-348.7.1.el8_5           base          38 M
  kernel-modules               x86_64         4.18.0-348.7.1.el8_5           base          30 M
+ kernel-modules-extra         x86_64         4.18.0-348.7.1.el8_5           base         7.6 M
 
 Transaction Summary
 ===============================================================================================
@@ -594,7 +602,10 @@ Install  3 Packages
 
 Total download size: 75 M
 Installed size: 91 M
+Is this ok [y/N]: 
 ```
+
+小版本还是不对应，系统内核为：`4.18.0-348.el8.x86_64`，找了一圈yum源好像都不对，后面再尝试更新内核。
 
 `tc`模拟和bcc tools学习实验，在其他文章继续。
 
