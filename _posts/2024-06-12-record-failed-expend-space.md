@@ -14,7 +14,7 @@ CentOS的`/boot`分区空间不够用了，记录失败的扩容过程。
 
 ## 1. 背景
 
-在“[eBPF学习实践系列（二） -- bcc tools网络工具集](https://xiaodongq.github.io/2024/06/10/bcc-tools-network/)”里，实验`tcpretrans`时想用`tc`构造重传的场景。需要安装`kernel-modules-extra`，提示`/boot`空间不够了，之前装系统只分配了220M左右。
+在“[eBPF学习实践系列（二） -- bcc tools网络工具集](https://xiaodongq.github.io/2024/06/10/bcc-tools-network/)”里，实验`tcpretrans`时想用`tc`构造重传的场景。需要安装`kernel-modules-extra`，提示`/boot`空间不够了，之前装系统只分配了220M左右（Windows+CentOS8.5的双系统）。
 
 于是准备进行扩容，虽然最终失败，但是熟练了操作，下一次装机能更快。。
 

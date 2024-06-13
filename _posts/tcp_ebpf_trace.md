@@ -1,6 +1,6 @@
 <!-- ---
 layout: post
-title: TCP半连接队列系列（二） -- ebpf跟踪内核关键流程
+title: TCP半连接队列系列（三） -- ebpf跟踪内核关键流程
 categories: 网络
 tags: 网络
 ---
@@ -14,7 +14,7 @@ tags: 网络
 
 ## 1. 背景
 
-在“[TCP全连接队列相关过程](https://xiaodongq.github.io/2024/05/18/tcp_connect/)”这篇文章中，进行了全连接队列溢出的实验，并且遗留了几个问题。
+在“[TCP半连接全连接队列系列（一） -- TCP全连接队列相关过程](https://xiaodongq.github.io/2024/05/18/tcp_connect/)”这篇文章中，进行了全连接队列溢出的实验，并且遗留了几个问题。
 
 1. ~~半连接队列溢出情况分析，服务端接收具体处理逻辑~~
 2. ~~内核drop包的时机~~，以及跟抓包的关系。哪些情况可能会抓不到drop的包？
