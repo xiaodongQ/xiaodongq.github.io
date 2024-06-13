@@ -14,7 +14,7 @@ eBPF学习实践，初步整理学习。
 
 ## 1. 背景
 
-在“[TCP全连接队列相关过程](https://xiaodongq.github.io/2024/05/18/tcp_connect/)”这篇文章中，进行了全连接队列溢出的实验，准备后续用eBPF跟踪过程。
+在“[TCP半连接全连接队列系列（一） -- TCP全连接队列相关过程](https://xiaodongq.github.io/2024/05/18/tcp_connect/)”这篇文章中，进行了全连接队列溢出的实验，准备后续用eBPF跟踪过程。
 
 eBPF名声在外，之前没用过时简单翻完了《Linux内核观测技术BPF》这本动物书，正好趁这个机会掌握熟悉这个技能，祛魅。
 
@@ -67,7 +67,7 @@ CentOS安装：`yum install bcc`，而后在`/usr/share/bcc/tools/`可查看。b
 
 参考：[使用C语言从头开发一个Hello World级别的eBPF程序](https://tonybai.com/2022/07/05/develop-hello-world-ebpf-program-in-c-from-scratch/)
 
-(后续如无特别指出，BPF指的就是新一代的eBPF技术)
+(后续如无特别指出，BPF指的就是新一代的eBPF技术，传统BPF称为cBPF)
 
 BPF演进了这么多年，虽然一直在努力提高，但BPF程序的开发与构建体验依然不够理想。为此社区也创建了像`BPF Compiler Collection(BCC)`这样的用于简化BPF开发的框架和库集合，以及像`bpftrace`这样的提供高级BPF开发语言的项目(可以理解是开发BPF的`DSL`语言，Domain Specific Language)。
 
@@ -98,7 +98,7 @@ BPF演进了这么多年，虽然一直在努力提高，但BPF程序的开发�
     * 其中的学习建议：[关于如何学习 eBPF 相关的开发的一些建议](https://eunomia.dev/zh/tutorials/0-introduce/#2-ebpf)
     * 里面也有：`bcc` 和 `bpftrace`相关简单教程
 
-通过上面的梳理，我们可以知道`bcc`和`bcc libbpf`是不同的，内核提供了`BTF`、`CO-RE`技术，封装在`libbpf`中，而在这之上又有多种基于`libbpf`框架可选择。
+小结：为简化eBPF开发，发展出了`bcc`、`bpftrace`。为解决移植性问题，内核提供了`BTF`、`CO-RE`技术，封装在`libbpf`中。在这之上又有多种基于`libbpf`框架可选择(当前`bcc`中也集成了`libbpf`?)。
 
 下面基于 `libbpf-bootstrap` 学习梳理，并进行实验。
 
@@ -477,4 +477,8 @@ compaction    fs_dax            intel_iommu     mce          oom      regmap    
 
 5、[Building BPF applications with libbpf-bootstrap](https://nakryiko.com/posts/libbpf-bootstrap/)
 
-6、GPT
+6、[BCC 到 libbpf 的转换指南【译】](https://www.ebpf.top/post/bcc-to-libbpf-guid/)
+
+7、[BPF 二进制文件：BTF，CO-RE 和 BPF 性能工具的未来【译】](https://www.ebpf.top/post/bpf-co-re-btf-libbpf/)
+
+8、GPT
