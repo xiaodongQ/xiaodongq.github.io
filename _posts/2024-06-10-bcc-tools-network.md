@@ -476,9 +476,9 @@ modprobe: FATAL: Module sch_netem not found in directory /lib/modules/4.18.0-348
 
 解决方式：[RTNETLINK answers: No such file or directory¶](https://tcconfig.readthedocs.io/en/latest/pages/troubleshooting.html)
 
-~~netem模块没加载，可能要修改内核，暂放弃。~~ 可用下面的iptables模拟丢包
+~~netem模块没加载，可能要修改内核，暂放弃。~~ 也可用下节的iptables模拟丢包。
 
-~~设置丢包模拟：`tc qdisc change dev enp4s0 root netem loss 10%`~~
+`/boot`空间不够的问题，尝试扩容失败了，重装后`tc`使用正常。(踩坑过程：[记一次失败的/boot分区扩容](https://xiaodongq.github.io/2024/06/12/record-failed-expend-space/))
 
 #### 3.8.2. iptables模拟
 
@@ -531,13 +531,82 @@ close        5110   python           4  192.168.1.150    192.168.1.150    8000  
 close        9418   curl             4  192.168.1.150    192.168.1.150    56426  8000   4026531992
 ```
 
-### `tcpsubnet`：统计发送到特定子网的TCP流量
+### 3.9. `tcpsubnet`：统计发送到特定子网的TCP流量
 
 `tcpsubnet`工具汇总并合计了本地主机发往子网的 IPv4 TCP 流量，并按固定间隔显示输出。该工具使用 eBPF 功能来收集并总结数据，以减少开销。
 
-### `tcpdrop`：被内核丢弃的TCP数据包跟踪
+```sh
+examples:
+    ./tcpsubnet                 # Trace TCP sent to the default subnets:
+                                # 127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,
+                                # 192.168.0.0/16,0.0.0.0/0
+    ./tcpsubnet -f K            # Trace TCP sent to the default subnets
+                                # aggregated in KBytes.
+    ./tcpsubnet 10.80.0.0/24    # Trace TCP sent to 10.80.0.0/24 only
+    ./tcpsubnet -J              # Format the output in JSON.
+```
+
+示例：
+
+```sh
+[root@desktop-mme7h3a ➜ /usr/share/bcc/tools ]$ ./tcpsubnet  
+Tracing... Output every 1 secs. Hit Ctrl-C to end
+[06/13/24 14:33:36]
+192.168.0.0/16           224
+[06/13/24 14:33:37]
+192.168.0.0/16           200
+[06/13/24 14:33:38]
+192.168.0.0/16           200
+[06/13/24 14:33:39]
+192.168.0.0/16           224
+```
+
+### 3.10. `tcpdrop`：被内核丢弃的TCP数据包跟踪
 
 每次内核丢弃 TCP 数据包和段时，`tcpdrop` 都会显示连接的详情，包括导致软件包丢弃的内核堆栈追踪。
+
+示例：
+`python -m http.server`起`8000`端口服务，用`ab`工具(`yum install httpd-tools`)压测
+
+`ab -n 100 -c 6 http://192.168.1.150:8000/`，6并发请求100次，注意url后面的`/`不能少
+
+监测结果：
+
+```sh
+[root@desktop-mme7h3a ➜ /usr/share/bcc/tools ]$ ./tcpdrop                                
+TIME     PID    IP SADDR:SPORT          > DADDR:DPORT          STATE (FLAGS)
+15:11:36 9433   4  192.168.1.150:8000   > 192.168.1.150:33166  CLOSE (ACK)
+	b'tcp_drop+0x1'
+	b'tcp_rcv_state_process+0xb2'
+	b'tcp_v4_do_rcv+0xb4'
+	b'__release_sock+0x7c'
+	b'__tcp_close+0x180'
+	b'tcp_close+0x1f'
+	b'inet_release+0x42'
+	b'__sock_release+0x3d'
+	b'sock_close+0x11'
+	b'__fput+0xbe'
+	b'task_work_run+0x8a'
+	b'exit_to_usermode_loop+0xeb'
+	b'do_syscall_64+0x198'
+	b'entry_SYSCALL_64_after_hwframe+0x65'
+
+15:11:36 9433   4  192.168.1.150:8000   > 192.168.1.150:33168  CLOSE (ACK)
+	b'tcp_drop+0x1'
+	b'tcp_rcv_state_process+0xb2'
+	b'tcp_v4_do_rcv+0xb4'
+	b'__release_sock+0x7c'
+	b'__tcp_close+0x180'
+	b'tcp_close+0x1f'
+	b'inet_release+0x42'
+	b'__sock_release+0x3d'
+	b'sock_close+0x11'
+	b'__fput+0xbe'
+	b'task_work_run+0x8a'
+	b'exit_to_usermode_loop+0xeb'
+	b'do_syscall_64+0x198'
+	b'entry_SYSCALL_64_after_hwframe+0x65'
+```
 
 `STATE (FLAGS)`：TCP 连接的状态和相关的 TCP 标志：
 
@@ -548,15 +617,111 @@ close        9418   curl             4  192.168.1.150    192.168.1.150    56426 
     * `CLOSE`状态 表示连接正在关闭，但还没有完全关闭。
     * `ACK`标志 表示这个数据包是一个TCP确认包，用于确认之前接收到的数据包。
 
-### `tcpstates`：显示TCP状态更改信息
+### 3.11. `tcpstates`：显示TCP状态更改信息
 
 跟踪TCP状态变化，并打印每个状态的持续时间。
 
 每次连接改变其状态时，`tcpstates`都会显示一个新行，其中包含更新的连接详情。
 
-### `tcprtt`
+```sh
+usage: tcpstates [-h] [-T] [-t] [-w] [-s] [-L LOCALPORT] [-D REMOTEPORT] [-Y]
 
+Trace TCP session state changes and durations
 
+examples:
+    ./tcpstates           # trace all TCP state changes
+    ./tcpstates -t        # include timestamp column
+    ./tcpstates -T        # include time column (HH:MM:SS)
+    ./tcpstates -w        # wider columns (fit IPv6)
+    ./tcpstates -stT      # csv output, with times & timestamps
+    ./tcpstates -Y        # log events to the systemd journal
+    ./tcpstates -L 80     # only trace local port 80
+    ./tcpstates -L 80,81  # only trace local ports 80 and 81
+    ./tcpstates -D 80     # only trace remote port 80
+```
+
+示例：`python -m http.server`起`8000`端口服务，(本机)`curl ip:8000`请求，跟踪8000端口
+
+```sh
+[root@desktop-mme7h3a ➜ /usr/share/bcc/tools ]$ ./tcpstates -L 8000
+SKADDR           C-PID C-COMM     LADDR           LPORT RADDR           RPORT OLDSTATE    -> NEWSTATE    MS
+ffff9e64e0769380 8531  curl       0.0.0.0         8000  0.0.0.0         0     LISTEN      -> SYN_RECV    0.000
+ffff9e64e0769380 8531  curl       192.168.1.150   8000  192.168.1.150   32894 SYN_RECV    -> ESTABLISHED 0.004
+ffff9e64e0769380 8463  python3    192.168.1.150   8000  192.168.1.150   32894 ESTABLISHED -> FIN_WAIT1   1.303
+ffff9e64e0769380 8463  python3    192.168.1.150   8000  192.168.1.150   32894 FIN_WAIT1   -> FIN_WAIT1   0.008
+ffff9e64e0769380 8531  curl       192.168.1.150   8000  192.168.1.150   32894 FIN_WAIT1   -> CLOSING     0.010
+ffff9e64e0769380 8531  curl       192.168.1.150   8000  192.168.1.150   32894 CLOSING     -> CLOSE       0.012
+```
+
+### 3.12. `tcprtt`
+
+`tcprtt`可以监控TCP连接的往返时间，从而评估网络质量，帮助用户找出可能的问题所在。可以打印直方图形式的时间分布。
+
+```sh
+usage: tcprtt [-h] [-i INTERVAL] [-d DURATION] [-T] [-m] [-p LPORT] [-P RPORT]
+              [-a LADDR] [-A RADDR] [-b] [-B] [-D]
+
+Summarize TCP RTT as a histogram
+
+examples:
+    ./tcprtt            # summarize TCP RTT
+    ./tcprtt -i 1 -d 10 # print 1 second summaries, 10 times
+    ./tcprtt -m -T      # summarize in millisecond, and timestamps
+    ./tcprtt -p         # filter for local port
+       -p LPORT, --lport LPORT
+    ./tcprtt -P         # filter for remote port
+       -P RPORT, --rport RPORT
+    ./tcprtt -a         # filter for local address
+       -a LADDR, --laddr LADDR
+    ./tcprtt -A         # filter for remote address
+       -A RADDR, --raddr RADDR
+    ./tcprtt -b         # show sockets histogram by local address
+       -b, --byladdr
+    ./tcprtt -B         # show sockets histogram by remote address
+       -B, --byraddr
+    ./tcprtt -D         # show debug bpf text
+       -D, --debug
+```
+
+示例1：总体RTT分布
+
+```sh
+[root@desktop-mme7h3a ➜ /usr/share/bcc/tools ]$ ./tcprtt -i 1 -d 10 -m
+Tracing TCP RTT... Hit Ctrl-C to end.
+
+     msecs               : count     distribution
+         0 -> 1          : 1        |****************************************|
+
+     msecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 0        |                                        |
+         4 -> 7          : 1        |****************************************|
+         8 -> 15         : 0        |                                        |
+        16 -> 31         : 1        |****************************************|
+```
+
+示例2：按远端IP展示
+
+```sh
+[root@desktop-mme7h3a ➜ /usr/share/bcc/tools ]$ ./tcprtt -i 3 -m --lport 8000 --byraddr
+Tracing TCP RTT... Hit Ctrl-C to end.
+
+Remote Address:  = b'192.168.1.150'
+     msecs               : count     distribution
+         0 -> 1          : 3        |****************************************|
+
+Remote Address:  = b'192.168.1.150'
+     msecs               : count     distribution
+         0 -> 1          : 300      |****************************************|
+
+Remote Address:  = b'192.168.1.150'
+     msecs               : count     distribution
+         0 -> 1          : 3        |****************************************|
+
+Remote Address:  = b'192.168.1.150'
+     msecs               : count     distribution
+         0 -> 1          : 3        |****************************************|
+```
 
 ## 4. 小结
 

@@ -605,9 +605,32 @@ Installed size: 91 M
 Is this ok [y/N]: 
 ```
 
-小版本还是不对应，系统内核为：`4.18.0-348.el8.x86_64`，找了一圈yum源好像都不对，后面再尝试更新内核。
+小版本还是不对应，系统内核为：`4.18.0-348.el8.x86_64`，但是上面是`4.18.0-348.7.1.el8_5`。找了一圈yum源只有这个版本内核了。
 
-`tc`模拟和bcc tools学习实验，在其他文章继续。
+```sh
+[root@desktop-mme7h3a ➜ /etc/yum.repos.d ]$ uname -a
+Linux desktop-mme7h3a 4.18.0-348.el8.x86_64 #1 SMP Tue Oct 19 15:14:17 UTC 2021 x86_64 x86_64 x86_64 GNU/Linux
+```
+
+默认内核调整成新装的版本，刚刚yum安装时好像自动就设置了，重启系统，看内核已经是新版本了。
+
+```sh
+[root@desktop-mme7h3a ➜ /root ]$ uname -a
+Linux desktop-mme7h3a 4.18.0-348.7.1.el8_5.x86_64 #1 SMP Wed Dec 22 13:25:12 UTC 2021 x86_64 x86_64 x86_64 GNU/Linux
+```
+
+加载内核模块：`sch_netem`，加载成功。使用`tc`模拟丢包，成功
+
+```sh
+[root@desktop-mme7h3a ➜ /root ]$ modprobe sch_netem
+[root@desktop-mme7h3a ➜ /root ]$ 
+[root@desktop-mme7h3a ➜ /root ]$ tc qdisc add dev enp4s0 root netem loss 10%   
+[root@desktop-mme7h3a ➜ /root ]$ tc qdisc show                              
+qdisc noqueue 0: dev lo root refcnt 2 
+qdisc netem 8002: dev enp4s0 root refcnt 2 limit 1000 loss 10%
+[root@desktop-mme7h3a ➜ /root ]$ tc qdisc change dev enp4s0 root netem loss 20%
+[root@desktop-mme7h3a ➜ /root ]$ tc qdisc show 
+```
 
 ## 5. 小结
 
