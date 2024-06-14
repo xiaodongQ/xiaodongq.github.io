@@ -1,6 +1,6 @@
 ---
 layout: post
-title: TCP半连接全连接队列系列（二） -- 半连接队列代码逻辑
+title: TCP半连接全连接（二） -- 半连接队列代码逻辑
 categories: 网络
 tags: 网络 TCP
 ---
@@ -14,7 +14,7 @@ tags: 网络 TCP
 
 ## 1. 背景
 
-在“[TCP建立连接相关过程](https://xiaodongq.github.io/2024/05/18/tcp_connect/)”这篇文章中，进行了全连接队列溢出的实验，并且遗留了几个问题。
+在“[TCP半连接全连接（一） -- 全连接队列相关过程](https://xiaodongq.github.io/2024/05/18/tcp_connect/)”这篇文章中，进行了全连接队列溢出的实验，并且遗留了几个问题。
 
 本博客跟踪分析半连接队列相关过程，并探究上述文章中的遗留问题。
 
