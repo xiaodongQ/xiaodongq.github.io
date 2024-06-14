@@ -96,7 +96,7 @@ examples:
     ./sofdsnoop -n main   # only print process names containing "main"
 ```
 
-执行结果示例如下：
+执行结果示例如下：通过ssh连接192.168.1.150，并退出ssh登录
 
 ```sh
 [root@anonymous ➜ /usr/share/bcc/tools ]$ ./sofdsnoop 
@@ -174,6 +174,8 @@ PID    COMM         LADDR                 RADDR                  RX_KB  TX_KB
 
 对网络负载的特征和流量计算很有帮助，可以识别当前有哪些连接、连接上有多少数据传输
 
+追踪tracepoint：`sock:inet_sock_set_state`(4.16起)；之前内核版本则利用其他动态追踪方式
+
 ```sh
 # man bcc-tcplife
 DESCRIPTION
@@ -212,22 +214,36 @@ TIME     PID   COMM       LADDR           LPORT RADDR           RPORT TX_KB RX_K
 14:33:27 8981  curl       192.168.1.150   56164 192.168.1.150   8000      0     2 0.70
 ```
 
-另外试了下`-L 8000`和`-D 8000`，单独都能抓到；`||`条件没办法，`-L 8000 -D 8000`是`&&`的关系，没法抓到上述包
+另外试了下`-L 8000`和`-D 8000`，单独都能抓到，`-L 8000 -D 8000`是`&&`的关系
 
 ### 3.4. `tcptracer`：已建立的TCP连接跟踪
 
-`man bcc-tcptracer`部分内容：
+追踪已建立连接的TCP socket，每个`connect`/`accept`/`close`事件都会作为一条记录打印。只会追踪已建立连接的socket。
 
 ```sh
 NAME
        tcptracer - Trace TCP established connections. Uses Linux eBPF/bcc.
 
-SYNOPSIS
-       tcptracer [-h] [-v] [-p PID] [-N NETNS] [--cgroupmap MAPPATH] [--mntnsmap MAPPATH]
-
 DESCRIPTION
-       This  tool  traces established TCP connections that open and close while tracing, and prints a line of output per connect, accept and close events.
-       This includes the type of event, PID, IP addresses and ports.
+       This  tool  traces established TCP connections that open and close while tracing, and prints a line of
+       output per connect, accept and close events. This includes the type of event, PID,  IP  addresses  and
+       ports.
+
+       This tool works by using kernel dynamic tracing, and will need to be updated if the kernel implementa-
+       tion changes. Only established TCP connections are traced, so it is expected that the overhead of this
+       tool is rather low.
+```
+
+```sh
+usage: tcptracer [-h] [-t] [-p PID] [-N NETNS] [--cgroupmap CGROUPMAP]
+                 [--mntnsmap MNTNSMAP] [-v]
+
+examples:(从man中汇总)
+    ./tcptracer                # Trace all TCP established connections
+    ./tcptracer -v             # Trace all TCP established connections with verbose lines
+    ./tcptracer -p 181         # Trace PID 181 only
+    ./tcptracer -N 4026531969  # Trace connections in network namespace 4026531969 only
+    ./tcptracer --cgroupmap /sys/fs/bpf/test01  # Trace a set of cgroups only
 ```
 
 示例：`python -m http.server`起`8000`端口服务，(本机)`curl ip:8000`请求
@@ -269,9 +285,10 @@ close        9418   curl             4  192.168.1.150    192.168.1.150    56426 
 
 ### 3.5. `tcpconnect`：主动的TCP连接跟踪
 
-跟踪主动发起(通过`connect()`)连接的TCP，所有尝试`connect`的连接都会跟踪，即使是最终失败的。注意：`accept()`是被动连接，不在此追踪范围(可通过`tcpaccept`追踪)。
+跟踪主动发起(通过`connect()`)连接的TCP，所有尝试`connect`的连接都会跟踪，即使是最终失败的。  
+注意：`accept()`是被动连接，不在此追踪范围(可通过`tcpaccept`追踪)。
 
-`man bcc-tcpconnect`部分内容：
+追踪的函数是：`tcp_v4_connect()` 和 `tcp_v6_connect()`
 
 ```sh
 NAME
@@ -330,12 +347,13 @@ PID    COMM         IP SADDR            DADDR            DPORT
 
 ### 3.6. `tcpaccept`：被动的TCP连接跟踪
 
+追踪被动连接，且只追踪成功的TCP accept
+
+追踪的函数是：`inet_csk_accept()`(注册在`tcp_prot.accept`中)
+
 ```sh
 NAME
        tcpaccept - Trace TCP passive connections (accept()). Uses Linux eBPF/bcc.
-
-SYNOPSIS
-       tcpaccept [-h] [-T] [-t] [-p PID] [-P PORTS] [--cgroupmap MAPPATH] [--mntnsmap MAPPATH]
 
 DESCRIPTION
        This  tool  traces  passive  TCP  connections (eg, via an accept() syscall; connect() are active connections). This can be useful for general trou-
@@ -345,6 +363,16 @@ DESCRIPTION
        changes.
 
        This tool only traces successful TCP accept()s. Connection attempts to closed ports will not be shown (those can be traced via other functions).
+```
+
+```sh
+examples:
+    ./tcpaccept           # trace all TCP accept()s
+    ./tcpaccept -t        # include timestamps
+    ./tcpaccept -P 80,81  # only trace port 80 and 81
+    ./tcpaccept -p 181    # only trace PID 181
+    ./tcpaccept --cgroupmap mappath  # only trace cgroups in this BPF map
+    ./tcpaccept --mntnsmap mappath   # only trace mount namespaces in the map
 ```
 
 示例：linux机器(192.168.1.150)上`python -m http.server`起`8000`端口服务。ssh到linux机器，并`curl 192.168.1.150:8000`
@@ -419,25 +447,14 @@ DESCRIPTION
        (like  tcpdump(8)  or  a  packet sniffer). Optionally, it can count retransmits over a user signalled interval to spot potentially dropping network
        paths the flows are traversing.
 
+       # 可以查看内核符号中是否匹配：
+       # grep -wE "tcp_retransmit_skb|tcp_send_loss_probe" /proc/kallsyms
        This uses dynamic tracing of the kernel tcp_retransmit_skb() and tcp_send_loss_probe() functions, and will need  to  be  updated  to  match  kernel
        changes to these functions.
 ```
 
-可以查看内核符号中是否匹配：
-
 ```sh
-[root@anonymous ➜ /home ]$ grep -wE "tcp_retransmit_skb|tcp_send_loss_probe" /proc/kallsyms
-ffffffff99075720 T tcp_send_loss_probe
-ffffffff99075910 T tcp_retransmit_skb
-```
-
-用法：
-
-```sh
-[root@anonymous ➜ /usr/share/bcc/tools ]$ ./tcpretrans -h
 usage: tcpretrans [-h] [-l] [-c]
-
-Trace TCP retransmits
 
 optional arguments:
   -h, --help       show this help message and exit
@@ -472,13 +489,58 @@ modprobe: FATAL: Module sch_netem not found in directory /lib/modules/4.18.0-348
 [root@anonymous ➜ /root ]$
 ```
 
-安装`kernel-modules-extra`(提示`/boot`空间不够了)，而后再`modprobe sch_netem`
+需安装`kernel-modules-extra`，而后再`modprobe sch_netem`  
+参考解决方式：[RTNETLINK answers: No such file or directory¶](https://tcconfig.readthedocs.io/en/latest/pages/troubleshooting.html)
 
-解决方式：[RTNETLINK answers: No such file or directory¶](https://tcconfig.readthedocs.io/en/latest/pages/troubleshooting.html)
+但是安装上述内核包时提示`/boot`空间不够，尝试扩容失败了，最后重装系统使用`tc`使用正常。(踩坑过程：[记一次失败的/boot分区扩容](https://xiaodongq.github.io/2024/06/12/record-failed-expend-space/))
 
-~~netem模块没加载，可能要修改内核，暂放弃。~~ 也可用下节的iptables模拟丢包。
+尝试在本机大量请求：`ab -n 10000 -c 2 http://192.168.1.150:8000/` (`python -m http.server`先起服务)，但是没抓到重传包。
 
-`/boot`空间不够的问题，尝试扩容失败了，重装后`tc`使用正常。(踩坑过程：[记一次失败的/boot分区扩容](https://xiaodongq.github.io/2024/06/12/record-failed-expend-space/))
+抓到的都是ssh的重传，指定本地ip应该走了lo回环。
+
+```sh
+[root@desktop-mme7h3a ➜ /root ]$ tc qdisc add dev enp4s0 root netem loss 30%
+[root@desktop-mme7h3a ➜ /root ]$ tc qdisc show     
+qdisc noqueue 0: dev lo root refcnt 2 
+qdisc netem 8001: dev enp4s0 root refcnt 2 limit 1000 loss 30%
+```
+
+恢复上面的enp4s0丢包，设置lo丢包：
+
+```sh
+[root@desktop-mme7h3a ➜ /root ]$ tc qdisc del dev enp4s0 root netem loss 30%
+[root@desktop-mme7h3a ➜ /root ]$ tc qdisc add dev lo root netem loss 20%
+[root@desktop-mme7h3a ➜ /root ]$ tc qdisc show
+qdisc netem 8003: dev lo root refcnt 2 limit 1000 loss 20%
+```
+
+本机上进行请求：`ab -n 5 -c 1 http://192.168.1.150:8000/`
+
+可抓到下述重传包了：
+
+```sh
+[root@localhost.localdomain ➜ /usr/share/bcc/tools ]$ ./tcpretrans    
+Tracing retransmits ... Hit Ctrl-C to end
+TIME     PID    IP LADDR:LPORT          T> RADDR:RPORT          STATE
+15:41:10 13096  4  192.168.1.150:8000   R> 192.168.1.150:50390  FIN_WAIT1
+15:41:10 0      4  192.168.1.150:8000   R> 192.168.1.150:50390  FIN_WAIT1
+15:41:10 0      4  192.168.1.150:8000   R> 192.168.1.150:50392  FIN_WAIT1
+15:41:11 0      4  192.168.1.150:8000   R> 192.168.1.150:50392  FIN_WAIT1
+15:41:11 13096  4  192.168.1.150:8000   R> 192.168.1.150:50394  FIN_WAIT1
+15:41:11 0      4  192.168.1.150:22     R> 192.168.1.3:28309    ESTABLISHED
+15:41:12 0      4  192.168.1.150:50396  R> 192.168.1.150:8000   SYN_SENT
+15:41:12 0      4  192.168.1.150:8000   R> 192.168.1.150:50396  FIN_WAIT1
+15:41:13 0      4  192.168.1.150:50400  R> 192.168.1.150:8000   SYN_SENT
+15:41:13 0      4  192.168.1.150:22     R> 192.168.1.3:28386    ESTABLISHED
+15:41:13 0      4  192.168.1.150:22     R> 192.168.1.3:28309    ESTABLISHED
+15:41:13 0      4  192.168.1.150:50400  R> 192.168.1.150:8000   LAST_ACK
+15:41:13 0      4  192.168.1.150:8000   R> 192.168.1.150:50400  FIN_WAIT1
+15:41:13 0      4  192.168.1.150:50400  R> 192.168.1.150:8000   LAST_ACK
+15:41:13 0      4  192.168.1.150:50400  R> 192.168.1.150:8000   LAST_ACK
+15:41:14 0      4  192.168.1.150:50396  R> 192.168.1.150:8000   LAST_ACK
+```
+
+也可用下节的iptables模拟丢包。
 
 #### 3.8.2. iptables模拟
 
@@ -519,21 +581,12 @@ TIME     PID    IP LADDR:LPORT          T> RADDR:RPORT          STATE
 * `L>`: 表示数据包是从本地地址(LADDR)发送到远程地址(RADDR)的。
 * `R>`: 表示数据包是从远程地址(RADDR)发送到本地地址(LADDR)的。
 
-通过前面`tcptracer`的追踪，可以看到`curl`时是服务端先关闭连接(8000)，`wget`可以再跟踪下
-
-```sh
-[root@anonymous ➜ /usr/share/bcc/tools ]$ ./tcptracer  -v        
-Tracing TCP established connections. Ctrl-C to end.
-TYPE         PID    COMM             IP SADDR            DADDR            SPORT  DPORT  NETNS   
-connect      9418   curl             4  192.168.1.150    192.168.1.150    56426  8000   4026531992
-accept       5110   python           4  192.168.1.150    192.168.1.150    8000   56426  4026531992
-close        5110   python           4  192.168.1.150    192.168.1.150    8000   56426  4026531992
-close        9418   curl             4  192.168.1.150    192.168.1.150    56426  8000   4026531992
-```
 
 ### 3.9. `tcpsubnet`：统计发送到特定子网的TCP流量
 
-`tcpsubnet`工具汇总并合计了本地主机发往子网的 IPv4 TCP 流量，并按固定间隔显示输出。该工具使用 eBPF 功能来收集并总结数据，以减少开销。
+`tcpsubnet`工具汇总并合计了本地主机发往子网的 IPv4 TCP 流量，并按固定间隔显示输出。
+
+该工具使用 eBPF 功能来收集并总结数据，以减少开销。
 
 ```sh
 examples:
