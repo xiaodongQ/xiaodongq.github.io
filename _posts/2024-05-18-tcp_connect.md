@@ -1,6 +1,6 @@
 ---
 layout: post
-title: TCP半连接全连接队列系列（一） -- TCP全连接队列相关过程
+title: TCP半连接全连接（一） -- 全连接队列相关过程
 categories: 网络
 tags: 网络
 ---
