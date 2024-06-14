@@ -653,7 +653,7 @@ ffff9e64e0769380 8531  curl       192.168.1.150   8000  192.168.1.150   32894 FI
 ffff9e64e0769380 8531  curl       192.168.1.150   8000  192.168.1.150   32894 CLOSING     -> CLOSE       0.012
 ```
 
-### 3.12. `tcprtt`
+### 3.12. `tcprtt`：TCP连接往返时间跟踪
 
 `tcprtt`可以监控TCP连接的往返时间，从而评估网络质量，帮助用户找出可能的问题所在。可以打印直方图形式的时间分布。
 
@@ -723,6 +723,190 @@ Remote Address:  = b'192.168.1.150'
          0 -> 1          : 3        |****************************************|
 ```
 
+### 3.13. `tcpsynbl`：SYN backlog 队列长度跟踪
+
+跟踪`SYN`请求到来时，统计`SYN`队列的长度，并根据最大限制数量分类展示，多个最大数量相同的端口归集到一个(看下面的示例结果，这里表示的是全连接队列)
+
+跟踪的内核函数是`tcp_v4_syn_recv_sock()`/`tcp_v6_syn_recv_sock()`
+
+示例：
+
+* 跟踪一段时间`Ctrl-C`结束，查看统计结果
+* 期间通过`python -m http.server`起8000服务，`ab`并发请求：`ab -n 100 -c 6 http://192.168.1.150:8000/`
+* 并测试2次：`curl 192.168.1.150:22`
+
+结果如下：可看到http服务的全连接队列最大长度是5，追踪到全部100个请求；22端口最大全连接队列长度128，也追踪到了这2次请求
+
+```sh
+[root@localhost.localdomain ➜ /usr/share/bcc/tools ]$ ./tcpsynbl
+Tracing SYN backlog size. Ctrl-C to end.
+^C
+
+backlog_max = 5
+     backlog             : count     distribution
+         0 -> 1          : 4        |*                                       |
+         2 -> 3          : 2        |                                        |
+         4 -> 7          : 94       |****************************************|
+
+backlog_max = 128
+     backlog             : count     distribution
+         0 -> 1          : 2        |****************************************|
+```
+
+```sh
+[root@localhost.localdomain ➜ /usr/share/bcc/tools ]$ ss -ltn
+State       Recv-Q       Send-Q             Local Address:Port              Peer Address:Port      Process      
+LISTEN      0            128                      0.0.0.0:22                     0.0.0.0:*                      
+LISTEN      0            5                        0.0.0.0:8000                   0.0.0.0:*                      
+LISTEN      0            5                      127.0.0.1:44321                  0.0.0.0:*                      
+LISTEN      0            5                      127.0.0.1:4330                   0.0.0.0:*                      
+LISTEN      0            128                         [::]:22                        [::]:*                      
+LISTEN      0            5                          [::1]:44321                     [::]:*                      
+LISTEN      0            5                          [::1]:4330                      [::]:*
+```
+
+### 3.14. `solisten`：listen操作跟踪
+
+所有的listen操作都被跟踪，即便最后失败也一样
+
+```sh
+NAME
+       solisten - Trace listening socket
+
+SYNOPSIS
+       usage: solisten [-h] [--show-netns] [-p PID] [-n NETNS]
+
+DESCRIPTION
+       All IPv4 and IPv6 listen attempts are traced, even if they ultimately fail or the listening program is
+       not willing to accept().
+```
+
+```sh
+usage: solisten [-h] [--show-netns] [-p PID] [-n NETNS]
+
+Stream sockets listen
+
+Examples:
+    ./solisten              # Stream socket listen
+    ./solisten -p 1234      # Stream socket listen for specified PID only
+    ./solisten --netns 4242 # " for the specified network namespace ID only
+    ./solisten --show-netns # Show network ns ID (useful for containers)
+```
+
+示例：分别用不同端口起监听服务
+
+* `python -m http.server`
+* `python -m http.server 8001`
+* `nc -l 8080`
+
+可看到上述监听尝试都追踪到了，并会展示IPV4/IPV6和对应的全连接队列长度限制
+
+```sh
+[root@localhost.localdomain ➜ /usr/share/bcc/tools ]$ ./solisten
+PID    COMM         PROTO  BACKLOG  PORT  ADDR                                   
+11271  python       TCPv4  5        8000  0.0.0.0                                
+11292  python       TCPv4  5        8001  0.0.0.0                                
+11316  nc           TCPv6  10       8080  ::                                     
+11316  nc           TCPv4  10       8080  0.0.0.0
+```
+
+### 3.15. `netqtop`：网口发送/接收队列数据包跟踪
+
+跟踪指定网口的发送队列和接收队列的数据包，结果按数据包大小分类并统计每类的包个数，可以基于此检查网络负载是否平衡。
+
+```sh
+usage: netqtop [-h] [--name NAME] [--interval INTERVAL] [--throughput]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --name NAME, -n NAME
+  --interval INTERVAL, -i INTERVAL
+  --throughput, -t
+```
+
+tracepoints：`net:net_dev_start_xmit` 和 `net:netif_receive_skb`
+
+示例：指定网口，间隔3s统计，并打印对应的`BPS`(Bits Per Second)和`PPS`(Packets Per Second)
+
+```sh
+[root@localhost.localdomain ➜ /usr/share/bcc/tools ]$ ./netqtop -n enp4s0 -i 3 -t
+Fri Jun 14 14:19:15 2024
+TX
+ QueueID    avg_size   [0, 64)    [64, 512)  [512, 2K)  [2K, 16K)  [16K, 64K) BPS        PPS        
+ 0          90.0       1          2          0          0          0          90.0       1.0        
+ Total      90.0       1          2          0          0          0          90.0       1.0        
+
+RX
+ QueueID    avg_size   [0, 64)    [64, 512)  [512, 2K)  [2K, 16K)  [16K, 64K) BPS        PPS        
+ 0          58.8       4          1          0          0          0          98.0       1.67       
+ Total      58.8       4          1          0          0          0          98.0       1.67       
+-----------------------------------------------------------------------------------------------
+Fri Jun 14 14:19:18 2024
+TX
+ QueueID    avg_size   [0, 64)    [64, 512)  [512, 2K)  [2K, 16K)  [16K, 64K) BPS        PPS        
+ 0          243.33     0          6          0          0          0          486.67     2.0        
+ Total      244.4      0          5          0          0          0          407.33     1.67       
+
+RX
+ QueueID    avg_size   [0, 64)    [64, 512)  [512, 2K)  [2K, 16K)  [16K, 64K) BPS        PPS        
+ 0          52.0       3          1          0          0          0          69.33      1.33       
+ Total      52.0       3          1          0          0          0          69.33      1.33       
+-----------------------------------------------------------------------------------------------
+```
+
+### 3.16. `softirqs` 软中断时间统计
+
+跟踪统计各个软中断事件的汇总时间。
+
+追踪`tracepoint`点：`irq:softirq_enter` 和 `irq:softirq_exit`
+
+```sh
+usage: softirqs [-h] [-T] [-N] [-d] [interval] [count]
+
+Summarize soft irq event time as histograms.
+
+examples:
+    ./softirqs            # sum soft irq event time
+    ./softirqs -d         # show soft irq event time as histograms
+    ./softirqs 1 10       # print 1 second summaries, 10 times
+    ./softirqs -NT 1      # 1s summaries, nanoseconds, and timestamps
+```
+
+```sh
+[root@localhost.localdomain ➜ /usr/share/bcc/tools ]$ ./softirqs 3   
+Tracing soft irq event time... Hit Ctrl-C to end.
+
+SOFTIRQ          TOTAL_usecs
+net_tx                     1
+rcu                       25
+sched                    486
+timer                    996
+net_rx                  1058
+
+SOFTIRQ          TOTAL_usecs
+net_rx                   159
+rcu                      433
+sched                    798
+timer                   1255
+```
+
+`-d`展示直方图形式
+
+```sh
+[root@localhost.localdomain ➜ /usr/share/bcc/tools ]$ ./softirqs -d 3
+Tracing soft irq event time... Hit Ctrl-C to end.
+...
+softirq = net_rx
+     usecs               : count     distribution
+         0 -> 1          : 0        |                                        |
+         2 -> 3          : 1        |********************                    |
+         4 -> 7          : 0        |                                        |
+         8 -> 15         : 1        |********************                    |
+        16 -> 31         : 0        |                                        |
+        32 -> 63         : 2        |****************************************|
+...
+```
+
 ## 4. 小结
 
 学习bcc tools工具集中网络相关的部分工具，并在环境中实践工具效果。
@@ -733,4 +917,4 @@ Remote Address:  = b'192.168.1.150'
 
 2、[TCP 连接排故:使用 BPF BCC工具包进行网络跟踪](https://mp.weixin.qq.com/s/HMbAkc2g9vBZRZ_1AnL1Tw)
 
-3、[使用 BPF 编译器集合进行网络追踪](https://docs.redhat.com/zh_hans/documentation/red_hat_enterprise_linux/9/html-single/configuring_and_managing_networking/index#network-tracing-using-the-bpf-compiler-collection_configuring-and-managing-networking)
+3、GPT
