@@ -107,8 +107,6 @@ SEND   6701   sshd             12:socket:[65823]         10    /dev/ptmx
 SEND   6701   sshd             12:socket:[65823]         13    N/A
 ```
 
-另外用`python -m http.server`起服务，`curl ip:8000`请求，但是没抓到fd，为什么？(**TODO**)
-
 ### 3.2. `tcptop`：统计TCP发送/接收的吞吐量
 
 ```sh
@@ -338,11 +336,11 @@ PID    COMM         IP SADDR            DADDR            DPORT
 10194  curl         4  192.168.1.150    192.168.1.150    8000
 ```
 
-另外一个案例待定位(**TODO**)：主机1(MAC电脑，192.168.1.2) ssh到 主机2(Linux PC机，即上面的192.168.1.150)，`python -m http.server`起服务都是在Linux操作的，但是从MAC上`curl 192.168.1.150:8000`不通。
+另外一个案例待定位(**~~TODO~~下面小节里已定位**)：主机1(MAC电脑，192.168.1.2) ssh到 主机2(Linux PC机，即上面的192.168.1.150)，`python -m http.server`起服务都是在Linux操作的，但是从MAC上`curl 192.168.1.150:8000`不通。
 
 * MAC上ping 192.168.1.150 正常
 * curl时，能抓到客户端发送了`SYN`，同时服务端能收到`SYN`，不过没后续应答了
-* ~~Linux机器上`tcpconnect`没抓到 connect 请求(有`SYN`为什么不算connect？)~~ 混淆了，服务端就是抓不到主动connect(上面抓到只是因为在同一台机器发起的连接)
+* ~~Linux机器上`tcpconnect`没抓到 connect 请求(有`SYN`为什么不算connect？)~~ 混淆了，服务端上`tcpconnect`就是抓不到主动connect(上面抓到只是因为在同一台机器发起的连接)
 * Linux机器上，自己curl(`curl 192.168.1.150:8000`)时http应答都是正常的
 
 ### 3.6. `tcpaccept`：被动的TCP连接跟踪
@@ -618,6 +616,8 @@ Tracing... Output every 1 secs. Hit Ctrl-C to end
 
 每次内核丢弃 TCP 数据包和段时，`tcpdrop` 都会显示连接的详情，包括导致软件包丢弃的内核堆栈追踪。
 
+追踪的是`tcp_drop()`内核函数
+
 示例：
 `python -m http.server`起`8000`端口服务，用`ab`工具(`yum install httpd-tools`)压测
 
@@ -676,6 +676,19 @@ TIME     PID    IP SADDR:SPORT          > DADDR:DPORT          STATE (FLAGS)
 
 每次连接改变其状态时，`tcpstates`都会显示一个新行，其中包含更新的连接详情。
 
+追踪的是tracepoint：`sock:inet_sock_set_state`
+
+```sh
+DESCRIPTION
+       This  tool  traces  TCP  session  state  changes  while tracing, and prints details including the duration in each state. This can help explain the
+       latency of TCP connections: whether the time is spent in the ESTABLISHED state (data transfer), or initialization state (SYN_SENT), etc.
+
+       This tool works using the sock:inet_sock_set_state tracepoint, which was added to Linux 4.16. Linux 4.16 also included extra state  transitions  so
+       that all TCP transitions could be observed by this tracepoint.
+
+       Only TCP state changes are traced, so it is expected that the overhead of this tool is much lower than typical send/receive tracing.
+```
+
 ```sh
 usage: tcpstates [-h] [-T] [-t] [-w] [-s] [-L LOCALPORT] [-D REMOTEPORT] [-Y]
 
@@ -708,7 +721,13 @@ ffff9e64e0769380 8531  curl       192.168.1.150   8000  192.168.1.150   32894 CL
 
 ### 3.12. `tcprtt`：TCP连接往返时间跟踪
 
-`tcprtt`可以监控TCP连接的往返时间，从而评估网络质量，帮助用户找出可能的问题所在。可以打印直方图形式的时间分布。
+`tcprtt`可以监控TCP连接(已建立连接的socket)的往返时间，从而评估网络质量，帮助用户找出可能的问题所在。可以打印直方图形式的时间分布。
+
+```sh
+DESCRIPTION
+       This  tool traces established connections RTT(round-trip time) to analyze the quality of network. This can be useful for general troubleshooting to
+       distinguish the network latency is from user process or physical network.
+```
 
 ```sh
 usage: tcprtt [-h] [-i INTERVAL] [-d DURATION] [-T] [-m] [-p LPORT] [-P RPORT]
@@ -778,9 +797,19 @@ Remote Address:  = b'192.168.1.150'
 
 ### 3.13. `tcpsynbl`：SYN backlog 队列长度跟踪
 
-跟踪`SYN`请求到来时，统计`SYN`队列的长度，并根据最大限制数量分类展示，多个最大数量相同的端口归集到一个(看下面的示例结果，这里表示的是全连接队列)
+跟踪统计`SYN`队列的长度，并根据最大限制数量分类展示，多个最大数量相同的端口归集到一个(看下面的示例结果，这里表示的应该是全连接队列)
 
 跟踪的内核函数是`tcp_v4_syn_recv_sock()`/`tcp_v6_syn_recv_sock()`
+
+```sh
+DESCRIPTION
+       This tool shows the TCP SYN backlog size during SYN arrival as a histogram.  This lets you see how close your applications are to hitting the back-
+       log limit and dropping SYNs (causing performance issues with SYN retransmits), and is a measure of workload saturation. The histogram shown is mea-
+       sured at the time of SYN received, and a separate histogram is shown for each backlog limit.
+
+       This  works  by tracing the tcp_v4_syn_recv_sock() and tcp_v6_syn_recv_sock() kernel functions using dynamic instrumentation. Since these functions
+       may change in future kernels, this tool may need maintenance to keep working.
+```
 
 示例：
 
@@ -960,11 +989,106 @@ softirq = net_rx
 ...
 ```
 
-## 4. 小结
+## 4. TODO问题定位(乌龙)
+
+上面的实验过程的疑问，本小节进行定位
+
+> 另外一个案例待定位(**TODO**)：主机1(MAC电脑，192.168.1.2) ssh到 主机2(Linux PC机，即上面的192.168.1.150)，`python -m http.server`起服务都是在Linux操作的，但是从MAC上`curl 192.168.1.150:8000`不通。互相ping是通的。
+
+1、服务端(192.168.1.150)起服务；
+
+两端都开启8000端口抓包，并在服务端追踪`tcpdrop`(丢包)和`./tcpstates -L 8000`(8000端口的socket)
+
+2、客户端(192.168.1.2)发起curl请求
+
+3、观察结果如下，客户端和服务端都抓到唯一的`SYN`包；且用上述`tcpdrop`和`./tcpstates`均未抓到任何记录
+
+```sh
+# 客户端
+➜  /Users/xd/Documents/workspace ✗ tcpdump -i en0 port 8000 -nn
+tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+listening on en0, link-type EN10MB (Ethernet), capture size 262144 bytes
+
+15:49:30.403293 IP 192.168.1.2.60055 > 192.168.1.150.8000: Flags [S], seq 78903990, win 65535, options [mss 1460,nop,wscale 6,nop,nop,TS val 1880147800 ecr 0,sackOK,eol], length 0
+```
+
+```sh
+# 服务端
+[root@xdlinux ➜ /root ]$ tcpdump -i any port 8000 -nn
+dropped privs to tcpdump
+tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+listening on any, link-type LINUX_SLL (Linux cooked v1), capture size 262144 bytes
+
+07:49:29.461703 IP 192.168.1.2.60055 > 192.168.1.150.8000: Flags [S], seq 78903990, win 65535, options [mss 1460,nop,wscale 6,nop,nop,TS val 1880147800 ecr 0,sackOK,eol], length 0
+```
+
+4、分析：服务端收到SYN，但是没应答`SYN+ACK`
+
+再次检查防火墙，关闭后重试(`iptables -F`)，成功了。。。明明记得之前应该是试过关防火墙的，当时还是不通。**搞了个乌龙。**
+
+先把客户端IP加到防火墙白名单。CentOS7中用`iptables`服务管理防火墙，CentOS8里默认用`firewalld`服务，通过`firewall-cmd`命令。
+
+**失败的设置：**
+
+```sh
+[root@xdlinux ➜ /home/workspace/ ]$ firewall-cmd --permanent --add-source=192.168.1.0/24
+[root@xdlinux ➜ /home/workspace/ ]$ firewall-cmd --reload
+[root@xdlinux ➜ /home/workspace/ ]$ iptables -nL|grep 192
+IN_public  all  --  192.168.1.0/24       0.0.0.0/0           [goto] 
+FWDI_public  all  --  192.168.1.0/24       0.0.0.0/0           [goto] 
+FWDO_public  all  --  0.0.0.0/0            192.168.1.0/24      [goto] 
+
+[root@xdlinux ➜ /home/workspace/ ]$ firewall-cmd --list-all
+public (active)
+  target: default
+  icmp-block-inversion: no
+  interfaces: enp4s0
+  sources: 192.168.1.0/24
+  services: cockpit dhcpv6-client ssh
+  ports: 
+  protocols: 
+  forward: no
+  masquerade: no
+  forward-ports: 
+  source-ports: 
+  icmp-blocks: 
+  rich rules: 
+```
+
+把`192.168.1.0/24`都加到白名单，设置后客户端还是curl不通
+
+**成功的设置：**
+
+问GPT，需要在`public`区域（zone）设置端口白名单活着设置**富规则（rich rules）**。下述设置富规则后，客户端连接正常。
+
+```sh
+[root@xdlinux ➜ /home/workspace/ ]$ firewall-cmd --permanent --zone=public --add-rich-rule='rule family="ipv4" source address="192.168.1.0/24" accept'
+[root@xdlinux ➜ /home/workspace/ ]$ firewall-cmd --reload
+[root@xdlinux ➜ /home/workspace/ ]$ firewall-cmd --list-all
+public (active)
+  target: default
+  icmp-block-inversion: no
+  interfaces: enp4s0
+  sources: 192.168.1.0/24 192.168.1.2
+  services: cockpit dhcpv6-client ssh
+  ports: 
+  protocols: 
+  forward: no
+  masquerade: no
+  forward-ports: 
+  source-ports: 
+  icmp-blocks: 
+  rich rules: 
+	rule family="ipv4" source address="192.168.1.0/24" accept
+```
+
+具体IP层的防火墙过滤逻辑，后面文章再分析整理。
+
+## 5. 小结
 
 学习bcc tools工具集中网络相关的部分工具，并在环境中实践工具效果。
 
-## 5. 参考
+## 6. 参考
 
 1、[【BPF入门系列-1】eBPF 技术简介](https://www.ebpf.top/post/ebpf_intro/)
 
