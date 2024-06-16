@@ -107,6 +107,52 @@ SEND   6701   sshd             12:socket:[65823]         10    /dev/ptmx
 SEND   6701   sshd             12:socket:[65823]         13    N/A
 ```
 
+#### 3.1.1. 释疑：“通过socket传递的文件描述符”是什么意思
+
+实验现象：  
+`python -m http.server`起一个8000端口服务，另一台通过`curl ip:8000`的请求，`sofdsnoop`没有追踪到记录，为什么？
+
+疑问：`sofdsnoop`到底追踪的是什么，man里面没有过多解释，网上搜索没找到解答，看代码逻辑也没太看清楚。
+(后续：问GPT后发现应该先理解清楚`通过socket传递的文件描述符`是指什么)
+
+ASK：
+
+* Q1：你了解下这个热门项目 https://github.com/iovisor/bcc，帮我解释下tools/sofdsnoop
+* Q2：详细说明下sofdsnoop里内核侧的代码逻辑
+* Q3：python -m http.server起一个8000端口服务，另一台机器curl发起一个socket连接请求，sofdsnoop能追踪到吗
+* Q4：文件描述符的传递 没搞懂，是什么场景
+
+GPT Q3解答：
+
+```md
+`python -m http.server` 命令用于在本地启动一个简单的 HTTP 服务器，默认监听在 8000 端口（如果 8000 端口没有被其他服务占用的话）。这个服务器是基于 Python 的 `http.server` 模块实现的，它会响应 HTTP 请求，而不是原始的 socket 连接。
+
+`sofdsnoop` 工具是用于追踪通过 UNIX 域套接字或 TCP/UDP 套接字传递文件描述符的情况。但是，`http.server` 启动的 HTTP 服务器并不直接涉及文件描述符的传递（除非在 HTTP 请求的某些特定部分中，但通常这不是 HTTP 协议的一部分）。
+
+当你使用 `curl` 从另一台机器发起一个 HTTP 请求到 `python -m http.server` 启动的服务器时，你实际上是在建立一个 TCP 连接，并通过这个连接发送 HTTP 请求和接收 HTTP 响应。但是，这个过程中并没有文件描述符的传递（至少从 HTTP 协议的角度看是这样）。
+
+因此，**sofdsnoop 无法追踪到通过 `curl` 发起的 HTTP 请求**，因为这些请求并不涉及文件描述符的传递。`sofdsnoop` 主要用于追踪那些通过 socket 传递文件描述符的情况，比如使用 UNIX 域套接字或 TCP/UDP 套接字发送 SCM_RIGHTS 消息。
+
+如果你想要追踪 TCP/UDP 连接本身（而不是文件描述符的传递），你可能需要使用其他工具，如 `tcpdump`、`ss`、`netstat` 或 `lsof` 等。这些工具可以帮助你查看和分析网络连接和套接字状态。
+```
+
+GPT Q4解答后，基本就明白了：
+
+* 文件描述符的传递是在操作系统中一种重要的进程间通信（IPC）机制，特别是在UNIX和类UNIX系统中。
+* 文件描述符的传递是指一个进程将其打开的文件、套接字或管道的文件描述符发送给另一个进程，使得接收进程可以直接使用该文件描述符来访问对应的资源，而无需重新打开或建立连接。
+* 场景
+    * **进程间通信**：通过传递文件描述符，两个进程可以共享对同一个文件、套接字或管道的访问权限，从而实现进程间的数据交换和同步。
+    * **网络服务**：在服务器和客户端之间的通信中，服务器可以将已建立的套接字连接的文件描述符传递给子进程，由子进程负责处理具体的请求和响应，从而提高并发性能。
+    * 文件共享：通过传递文件描述符，多个进程可以共同访问和修改同一个文件，实现文件共享和协作编辑等功能。
+* 实现方式
+    * **UNIX域套接字**：UNIX域套接字是一种在同一台机器上的进程间通信机制。通过UNIX域套接字，一个进程可以将其打开的文件、套接字或管道的文件描述符发送给另一个进程。接收进程在接收到文件描述符后，可以直接使用该文件描述符来访问对应的资源。
+    * **SCM_RIGHTS消息**：在UNIX和类UNIX系统中，有一种特殊的消息类型称为SCM_RIGHTS消息，它允许进程在发送消息时附带一个或多个文件描述符。接收进程在接收到SCM_RIGHTS消息后，可以从消息中提取出文件描述符，并使用它们来访问对应的资源。
+* 注意事项：文件描述符的传递通常只适用于同一台机器上的进程间通信。如果需要在不同机器上的进程间传递文件描述符，需要使用其他机制，如网络套接字或共享内存等。
+
+结合实验观察到的ssh登录时的追踪记录，对应的应该是服务端收到请求后，通过`进程间通信`传递`12`这个socket进行处理。
+
+一上来就来了个王炸。。
+
 ### 3.2. `tcptop`：统计TCP发送/接收的吞吐量
 
 ```sh
@@ -1059,7 +1105,7 @@ public (active)
 
 **成功的设置：**
 
-问GPT，需要在`public`区域（zone）设置端口白名单活着设置**富规则（rich rules）**。下述设置富规则后，客户端连接正常。
+问GPT，需要在`public`区域（zone）设置端口白名单活着设置**富规则（rich rules）**。下述设置富规则后，客户端连接正常，`tcpstates`也能追踪到了。
 
 ```sh
 [root@xdlinux ➜ /home/workspace/ ]$ firewall-cmd --permanent --zone=public --add-rich-rule='rule family="ipv4" source address="192.168.1.0/24" accept'
@@ -1080,6 +1126,17 @@ public (active)
   icmp-blocks: 
   rich rules: 
 	rule family="ipv4" source address="192.168.1.0/24" accept
+```
+
+```sh
+[root@xdlinux ➜ /usr/share/bcc/tools ]$ ./tcpstates -L 8000
+SKADDR           C-PID C-COMM     LADDR           LPORT RADDR           RPORT OLDSTATE    -> NEWSTATE    MS
+ffff9f20324930c0 0     swapper/9  0.0.0.0         8000  0.0.0.0         0     LISTEN      -> SYN_RECV    0.000
+ffff9f20324930c0 0     swapper/9  192.168.1.150   8000  192.168.1.2     61537 SYN_RECV    -> ESTABLISHED 0.016
+ffff9f20324930c0 8111  python     192.168.1.150   8000  192.168.1.2     61537 ESTABLISHED -> FIN_WAIT1   2.280
+ffff9f20324930c0 8111  python     192.168.1.150   8000  192.168.1.2     61537 FIN_WAIT1   -> FIN_WAIT1   0.036
+ffff9f20324930c0 0     swapper/9  192.168.1.150   8000  192.168.1.2     61537 FIN_WAIT1   -> FIN_WAIT2   1.381
+ffff9f20324930c0 0     swapper/9  192.168.1.150   8000  192.168.1.2     61537 FIN_WAIT2   -> CLOSE       0.006
 ```
 
 具体IP层的防火墙过滤逻辑，后面文章再分析整理。
