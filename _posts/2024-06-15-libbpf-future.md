@@ -24,12 +24,56 @@ Brendan Gregg大佬也提到libbpf的趋势
 
 > 对于 BPF 性能工具，你应该从运行 BCC 和 bpftrace 工具开始，然后在 bpftrace 中进行编码。 BCC 工具最终应该在后台实现上从 Python 切换到 libbpf C，但是仍然可以正常使用。现在，随着我们转向带有 BTF 和 CO-RE 的libbpf C，已经不赞成使用 BCC Python 中的性能工具（尽管我们仍需要继续完善库的功能，例如对 USDT 的支持，因此需要一段时间才能使用 Python 版本）。 -- [BPF 二进制文件：BTF，CO-RE 和 BPF 性能工具的未来【译】](https://www.ebpf.top/post/bpf-co-re-btf-libbpf/)
 
+## 2. 示例学习
+
+跟着：[eBPF动手实践系列三：基于原生libbpf库的eBPF编程改进方案](https://mp.weixin.qq.com/s/R70hmc965cA8X3WUZRp2hQ)里的demo学习。
+
+1、下载里面的仓库
+
+```sh
+git clone https://github.com/alibaba/sreworks-ext.git
+```
+
+其中libbpf的demo在`sreworks-ext/demos/native_libbpf_guide`目录下面。  
+![2024-06-16-20240616140328](master/images/2024-06-16-20240616140328.png)
+
+看到有个docker的demo，正好在新重装的CentOS8上配置一下docker。配置、构建镜像、新建并启动容器正常。
+
+```sh
+[root@xdlinux ➜ /home/workspace/sreworks-ext/demos/nginx git:(main) ✗ ]$ docker build -t testnginx .
+[+] Building 0.2s (8/8) FINISHED                                                        docker:default
+ => [internal] load build definition from Dockerfile                                          0.0s
+ => => transferring dockerfile: 341B                                                          0.0s
+ => [internal] load metadata for docker.io/library/nginx:latest                               0.1s
+ => [internal] load .dockerignore                                                             0.0s
+ => => transferring context: 2B                                                               0.0s
+ => [1/3] FROM docker.io/library/nginx:latest@sha256:56b388b0d79c738f4cf51bbaf184a14fab19337f4819ceb2cae7d94100262de8         0.0s
+ => [internal] load build context                                                             0.0s
+ => => transferring context: 179B                                                             0.0s
+ => CACHED [2/3] COPY index.html /usr/share/nginx/html/index.html                             0.0s
+ => CACHED [3/3] COPY nginx.conf /etc/nginx/nginx.conf                                        0.0s
+ => exporting to image                                                                        0.0s
+ => => exporting layers                                                                       0.0s
+ => => writing image sha256:2d3d2bb36614748a9cab7dcff3d9ad6677e9f5d878f11aea575202c19181d537  0.0s
+ => => naming to docker.io/library/testnginx
+
+[root@xdlinux ➜ /home/workspace/sreworks-ext/demos/nginx git:(main) ✗ ]$ docker images
+REPOSITORY    TAG       IMAGE ID       CREATED         SIZE
+testnginx     latest    2d3d2bb36614   5 minutes ago   188MB
+hello-world   latest    d2c94e258dcb   13 months ago   13.3kB
+
+[root@xdlinux ➜ /home/workspace/sreworks-ext/demos/nginx git:(main) ✗ ]$ docker run -d --name xdnginx testnginx
+4a03bcc4da5dc0ecedd3e68ff51ce4e43e5299f61332e90cfdfcb9dfed609dae
+[root@xdlinux ➜ /home/workspace/sreworks-ext/demos/nginx git:(main) ✗ ]$ docker ps
+CONTAINER ID   IMAGE       COMMAND                   CREATED         STATUS         PORTS     NAMES
+4a03bcc4da5d   testnginx   "/docker-entrypoint.…"   3 seconds ago   Up 3 seconds   80/tcp    xdnginx
+```
 
 
-## 4. 小结
+## 3. 小结
 
 
-## 5. 参考
+## 4. 参考
 
 1、[eBPF动手实践系列三：基于原生libbpf库的eBPF编程改进方案](https://mp.weixin.qq.com/s/R70hmc965cA8X3WUZRp2hQ)
 
