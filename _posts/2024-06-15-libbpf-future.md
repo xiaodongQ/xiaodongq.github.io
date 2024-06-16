@@ -37,7 +37,7 @@ git clone https://github.com/alibaba/sreworks-ext.git
 其中libbpf的demo在`sreworks-ext/demos/native_libbpf_guide`目录下面。  
 ![2024-06-16-20240616140328](/images/2024-06-16-20240616140328.png)
 
-看到有个docker的demo，正好在新重装的CentOS8上配置一下docker。配置、构建镜像、新建并启动容器正常。
+追个兔子：看到有个docker的demo，正好在新重装的CentOS8上配置一下docker。配置、构建镜像、新建并启动容器正常。
 
 ```sh
 [root@xdlinux ➜ /home/workspace/sreworks-ext/demos/nginx git:(main) ✗ ]$ docker build -t testnginx .
