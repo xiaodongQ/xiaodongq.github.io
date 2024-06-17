@@ -17,6 +17,7 @@ bcc tools工具集中网络部分说明和使用。
 上篇([eBPF学习实践系列（一） -- 初识eBPF](https://xiaodongq.github.io/2024/06/06/ebpf_learn/#22-ebpf%E5%86%85%E6%A0%B8%E7%89%88%E6%9C%AC%E6%94%AF%E6%8C%81%E8%AF%B4%E6%98%8E))中提到性能分析大师`Brendan Gregg`等编写了**诸多的 BCC 或 BPFTrace 的工具集**可以拿来直接使用，可以满足很多我们日常问题分析和排查，本篇先学习下网络相关的几个工具。
 
 ![bcc tools 2019](/images/bcc-tools-2019.png)  
+[参考](https://www.ebpf.top/post/ebpf_intro/)
 
 ## 2. Linux性能分析60s
 
@@ -56,7 +57,7 @@ top
 ### 2.2. 60s系列`BPF`版本
 
 ![bcc tools 60s](/images/ebpf_60s-bcctools2017.png)  
-[参考](https://www.ebpf.top/post/ebpf_intro/)
+[参考](https://www.ebpf.top/post/ebpf_intro/)，这里的bcc tools是2017年版本，上面是2019年版本
 
 ## 3. bcc tools网络相关工具集
 
@@ -109,11 +110,11 @@ SEND   6701   sshd             12:socket:[65823]         13    N/A
 
 #### 3.1.1. 释疑：“通过socket传递的文件描述符”是什么意思
 
-实验现象：  
-`python -m http.server`起一个8000端口服务，另一台通过`curl ip:8000`的请求，`sofdsnoop`没有追踪到记录，为什么？
+实验现象和疑问：  
+`python -m http.server`起一个8000端口服务，另一台通过`curl ip:8000`的请求，`sofdsnoop`没有追踪到记录，为什么？网络交互不是会打开文件描述符吗
 
 疑问：`sofdsnoop`到底追踪的是什么，man里面没有过多解释，网上搜索没找到解答，看代码逻辑也没太看清楚。
-(后续：问GPT后发现应该先理解清楚`通过socket传递的文件描述符`是指什么)
+(后续：问GPT理解后，回头看还是应该先理解清楚`通过socket传递的文件描述符`是指什么)
 
 ASK：
 
