@@ -145,7 +145,7 @@ class TCPServer(BaseServer):
 * `times the listen queue of a socket overflowed` 这是全连接队列溢出(listen queue)
 * `SYNs to LISTEN sockets dropped` ~~这是半连接队列溢出~~
     - 此处说半连接drop(SYN drop)其实不准确，SYN drop不只是半连接满才累加。
-    - 具体分析见：[TCP半连接队列系列（一） -- 半连接队列代码逻辑](https://xiaodongq.github.io/2024/05/30/tcp_syn_queue/)。
+    - 具体分析见：[TCP半连接全连接（二） -- 半连接队列代码逻辑](https://xiaodongq.github.io/2024/05/30/tcp_syn_queue/)。
 
 4、查看抓包情况
 
