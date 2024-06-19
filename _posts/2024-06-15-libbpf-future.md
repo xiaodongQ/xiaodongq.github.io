@@ -30,10 +30,10 @@ tags: eBPF libbpf CO-RE
 
 ![libbpf-bootstrap结构示意图](/images/2024-06-18-libbpf-bootstrap-module.png)
 
-> libbpf是指linux内核代码库中的tools/lib/bpf，这是内核提供给外部开发者的C库，用于创建BPF用户态的程序。  
+> libbpf是指linux内核代码库中的**tools/lib/bpf**，这是内核提供给外部开发者的C库，用于创建BPF用户态的程序。  
 > bpf内核开发者为了方便开发者使用libbpf库，特地在github.com上为libbpf建立了镜像仓库：github.com/libbpf/libbpf，这样BPF开发者可以不用下载全量的Linux Kernel代码。
 
-> bpftool对应的是linux内核代码库中的tools/bpf/bpftool，也是在github上创建的对应的镜像库(github.com/libbpf/bpftool)，这是一个bpf辅助工具程序，在libbpf-bootstrap中用于生成xx.skel.h。
+> bpftool对应的是linux内核代码库中的**tools/bpf/bpftool**，也是在github上创建的对应的镜像库(github.com/libbpf/bpftool)，这是一个bpf辅助工具程序，在libbpf-bootstrap中用于生成xx.skel.h。
 
 > helloworld.bpf.c是bpf程序对应的源码，通过clang -target=bpf编译成BPF字节码ELF文件helloworld.bpf.o。libbpf-bootstrap并没有使用用户态加载程序直接去加载helloworld.bpf.o，而是通过bpftool gen命令基于helloworld.bpf.o生成helloworld.skel.h文件，在生成的helloworld.skel.h文件中包含了BPF程序的字节码以及加载、卸载对应BPF程序的函数，我们在用户态程序直接调用即可。
 
