@@ -335,7 +335,11 @@ qwen2:1.5b             	f6daf2b25194	934 MB	6 minutes ago
 
 不过试了下效果，风扇呼呼的转，还是算了，改成了指向PC机。
 
-## 8. 参考
+## 8. 小结
+
+基于Ollama+AnythingLLM搭建了简单的文档知识库。不过总体效果还没达到预期。
+
+## 9. 参考
 
 1、[利用AI解读本地TXT、WORD、PDF文档](https://www.bilibili.com/read/cv33858702/)
 
