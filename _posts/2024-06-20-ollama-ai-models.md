@@ -1,6 +1,6 @@
 ---
 layout: post
-title: ollama搭建个人知识库
+title: ollama搭建本地个人知识库
 categories: 大模型
 tags: 工具 大模型
 ---
@@ -8,7 +8,7 @@ tags: 工具 大模型
 * content
 {:toc}
 
-ollama搭建个人知识库
+ollama搭建本地个人知识库
 
 
 
@@ -28,6 +28,8 @@ ollama搭建个人知识库
 **基于ollama搭建**，最后结构如下：
 
 ![ollama-anythingLLM结构](/images/2024-06-20-ollama-anythingLLM.png)
+
+最后的最后：笔记本本地也安装ollama并下载模型，这才是"本地"
 
 ## 2. 安装ollama
 
@@ -66,7 +68,7 @@ tcp        0      0 127.0.0.1:11434         0.0.0.0:*               LISTEN      
 
 配置局域网内访问：
 
-.zshrc里添加，`export OLLAMA_HOST=0.0.0.0:11434`，然后重启服务，貌似没用
+~~.zshrc里添加，`export OLLAMA_HOST=0.0.0.0:11434`，然后重启服务，貌似没用~~ **失败**
 
 ```sh
 [root@xdlinux ➜ /root ]$ service ollama restart
@@ -76,7 +78,7 @@ tcp        0      0 127.0.0.1:11434         0.0.0.0:*               LISTEN      
 [root@xdlinux ➜ /root ]$
 ```
 
-在unit文件`/etc/systemd/system/ollama.service`里设置环境变量，每个环境变量各自一行
+在unit文件里设置环境变量`OLLAMA_HOST=0.0.0.0:11434`，每个环境变量各自一行（**成功**）
 
 ```sh
 [root@xdlinux ➜ /root ]$ systemctl cat ollama.service 
@@ -127,7 +129,7 @@ tcp6       0      0 :::11434                :::*                    LISTEN      
 
 到Ollama官网，点击右上角的Models即进入：[ollama library](https://ollama.com/library)。Ollama支持流行的开源大语言模型，包括llama2和它的众多衍生品。
 
-暂时使用阿里的通义千问：qwen2 1.5b 实验。
+暂时使用阿里的通义千问：`qwen2 1.5b` 实验。
 
 复制网页提示的命令，此处为`ollama run qwen2:1.5b`，到linux终端运行。也可以分两步：`ollama pull qwen2:1.5b`再`ollama pull qwen2:1.5b`
 
@@ -241,9 +243,9 @@ qwen2:0.5b             	6f48b936a09f	352 MB	18 minutes ago
 
 1、按提示进行必要设置，设置邮箱、工作空间名等
 
-2、进入workspace后，左下角有配置按钮，选择`LLM Preference`
+2、进入workspace后，左下角有配置按钮，选择`LLM Preference`选项卡
 
-3、`LLM Provider`的下拉中，选择`Ollama`，并进行配置后保存
+3、在`LLM Provider`的下拉中，选择`Ollama`，并进行配置后保存
 
 * Ollama Base URL：`http://192.168.1.150:11434`
 * Chat Model Selection：`qwen2:1.5b`
@@ -268,12 +270,75 @@ qwen2:0.5b             	6f48b936a09f	352 MB	18 minutes ago
 
 2、在`Vector Database Provider`下拉中，选择LanceDB作为后端。这是一个内置的向量数据库。
 
-## 6. 小结
+## 6. 使用AnythingLLM上传文档和问答
 
+1、基本问答：可以直接开始问答
 
+效果有点差，哪里配置还要优化下。
 
-## 7. 参考
+直接使用命令行效果还不错。
+
+2、上传文档
+
+![上传文档](/images/2024-06-21-anythingLLM-upload-file.png)
+
+上传完成后，选中相应的文档，并点击 Move to Workspcae。
+
+```sh
+Q：提炼文档里的网络知识
+A：根据提供的文档内容，我们可以总结出以下关于网络的知识点：
+
+1. 网络性能的实现：文档提到了如何实现网络性能，包括使用Nginx等服务器程序来提高网络性能。Nginx是一个流行的HTTP和反向代理Web服务器软件。
+
+2. TCP/IP协议：文档中提到了TCP/IP协议，这是一个广泛使用的通信协议，用于在网络之间传输数据包。
+
+3. 网络管理：文档还涉及了系统级别的网络配置、监控以及性能优化等方面的知识。例如，提供了如何设置安全限制（如fs.file-max和sysctl）的示例。
+
+4. 网络接口和地址：文档也提到了网络接口（如eth0, wlan0等）及其对应的IP地址。这通常用于网络设备上配置特定端口或接口的通信服务。
+
+5. 服务器进程：文档中提到如何使用epoll来提高Nginx处理并发请求的能力，这可能涉及如何在多线程环境中管理事件和资源。
+
+6. 网络编程和异步编程：文档提到了异步编程的概念，例如通过epoll_wait函数进行网络事件的实时处理。异步编程通常用于提高效率和减少系统阻塞现象。
+
+7. 模块化开发：文档中还涉及了模块化的编码实践，即在代码中分组不同的功能，并使用类或对象来组织这些功能。这有助于提高代码的可读性、复用性和扩展性。
+
+8. 网络测试和监控：文档中的部分内容可能涉及到网络测试工具（如Wireshark）的使用，以及如何通过监控系统性能指标（如CPU使用率、内存使用情况等）来发现潜在的问题。这些知识对于确保系统的稳定运行非常重要。
+```
+
+`Show Citations`里可以看到引用的数据。
+
+```sh
+Hide Citations
+理解了实现再谈网络性能_202202更新.pdf
+```
+
+切换为`Query`模式（不过上面没切换也能参考到文档）：
+
+点击齿轮图标，打开对应workspace的设置选项。选择Chat Settings，将对话模式更改为Query（默认是Chat）
+
+Query模式能够确保仅采用上传文档中的信息进行回答（而不会采用大模型本身的信息）。
+
+## 7. 构建"本地"应用
+
+最后发现有点不对，笔记本带出去就没法用了，于是本地再安装一下，流程一样：
+
+1. Mac上安装一下Ollama（会下载Ollama.app，440MB左右）
+2. 下载模型和向量模型（`qwen2:1.5b`和`nomic-embed-text`）
+3. 配置AnythingLLM到本机（上面各URL地址改成127.0.0.1）
+
+```sh
+➜  /Users/xd ollama list
+NAME                   	ID          	SIZE  	MODIFIED       
+nomic-embed-text:latest	0a109f422b47	274 MB	34 seconds ago	
+qwen2:1.5b             	f6daf2b25194	934 MB	6 minutes ago 
+```
+
+不过试了下效果，风扇呼呼的转，还是算了，改成了指向PC机。
+
+## 8. 参考
 
 1、[利用AI解读本地TXT、WORD、PDF文档](https://www.bilibili.com/read/cv33858702/)
 
-2、GPT
+2、[基于Ollama+AnythingLLM轻松打造本地大模型知识库](https://developer.aliyun.com/article/1490578)
+
+3、GPT

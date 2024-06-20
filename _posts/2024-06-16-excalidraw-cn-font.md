@@ -118,6 +118,8 @@ unmap q
 unmap r
 unmap t
 unmap v
+unmap g
+unmap s
 ```
 
 ## 3. 参考
