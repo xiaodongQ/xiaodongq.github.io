@@ -18,18 +18,18 @@ ollama搭建本地个人知识库
 
 由于一些因素实在忍受不了了：
 
-1. 最近碰到好几次找之前笔记没找到
-2. 而且以前的一些笔记很多都不会去看，看了几个反而不如GPT清晰，其实该更新一波了
-3. 自己笔记都用markdown记录，然后全局搜索关键词，辅助自然语言理解更高效
+1. 近期工作上碰到好几次找之前笔记没找到，明明记得之前记过就是找不到
+2. 而且以前的一些笔记很多都不会去看，看了几个反而不如GPT清晰，不用起来以后更不会看了
+3. 本地笔记用markdown记录，然后全局搜索关键词，需要精确匹配到key，自然语言理解能互补一下
 
 网上资料很多，找了一篇参考：
 [利用AI解读本地TXT、WORD、PDF文档](https://www.bilibili.com/read/cv33858702/)
 
-**基于ollama搭建**，最后结构如下：
+**基于ollama搭建**，结构如下：
 
 ![ollama-anythingLLM结构](/images/2024-06-20-ollama-anythingLLM.png)
 
-最后的最后：笔记本本地也安装ollama并下载模型，这才是"本地"
+最后：笔记本“本地”也安装ollama并下载模型
 
 ## 2. 安装ollama
 
@@ -131,7 +131,7 @@ tcp6       0      0 :::11434                :::*                    LISTEN      
 
 暂时使用阿里的通义千问：`qwen2 1.5b` 实验。
 
-复制网页提示的命令，此处为`ollama run qwen2:1.5b`，到linux终端运行。也可以分两步：`ollama pull qwen2:1.5b`再`ollama pull qwen2:1.5b`
+复制网页提示的命令，此处为`ollama run qwen2:1.5b`，到linux终端运行。也可以分两步：`ollama pull qwen2:1.5b`再`ollama run qwen2:1.5b`
 
 ```sh
 [root@xdlinux ➜ /root ]$ ollama run qwen2:1.5b
@@ -143,7 +143,7 @@ pulling 405b56374e02...  81% ▕████████████████
 ...
 ```
 
-结束后会出来交互式界面，跟平时用GPT一样问答。后续也可`ollama run qwen2:1.5b`调出来界面。试了下本地还挺快的。
+结束后会出来交互式界面，跟平时用GPT一样问答。后续也可用`ollama run qwen2:1.5b`调出来命令行界面。试了下效果本地还挺快的。
 
 ```sh
 [root@xdlinux ➜ /root ]$ ollama run qwen2:1.5b
@@ -163,7 +163,7 @@ pulling 405b56374e02...  81% ▕████████████████
 [root@xdlinux ➜ /root ]$ 
 ```
 
-可以用`ollama list`查看下载的模型：
+可以用`ollama list`查看当前已下载的模型：
 
 ```sh
 [root@xdlinux ➜ /root ]$ ollama list    
@@ -204,7 +204,7 @@ Use "ollama [command] --help" for more information about a command.
 
 ## 4. 下载向量模型
 
-向量模型是用来将Word和PDF文档转化成向量数据库的工具。通过向量模型转换之后，我们的大语言模型就可以更高效得理解文档内容。
+向量模型是用来将Word和PDF文档转化成向量数据库的工具。通过向量模型转换之后，我们的大语言模型就可以更高效地理解文档内容。
 
 在这里我们使用 `nomic-embed-text`
 
@@ -241,7 +241,7 @@ qwen2:0.5b             	6f48b936a09f	352 MB	18 minutes ago
 
 ### 5.1. 配置LLM
 
-1、按提示进行必要设置，设置邮箱、工作空间名等
+1、按提示进行必要设置，设置工作空间名
 
 2、进入workspace后，左下角有配置按钮，选择`LLM Preference`选项卡
 
@@ -274,7 +274,7 @@ qwen2:0.5b             	6f48b936a09f	352 MB	18 minutes ago
 
 1、基本问答：可以直接开始问答
 
-效果有点差，哪里配置还要优化下。
+感觉效果有点差，哪里配置还要优化下。
 
 直接使用命令行效果还不错。
 
@@ -320,7 +320,7 @@ Query模式能够确保仅采用上传文档中的信息进行回答（而不会
 
 ## 7. 构建"本地"应用
 
-最后发现有点不对，笔记本带出去就没法用了，于是本地再安装一下，流程一样：
+最后想想发现有点不对，说是"本地"应用，但笔记本带出去就没法用了，于是本地再安装一下，流程一样：
 
 1. Mac上安装一下Ollama（会下载Ollama.app，440MB左右）
 2. 下载模型和向量模型（`qwen2:1.5b`和`nomic-embed-text`）
@@ -335,14 +335,54 @@ qwen2:1.5b             	f6daf2b25194	934 MB	6 minutes ago
 
 不过试了下效果，风扇呼呼的转，还是算了，改成了指向PC机。
 
-## 8. 小结
+## 8. 离线方式搭建
+
+初衷是为了在平时工作环境先集成之前的笔记，但环境里网络受限。这里记录一下通过离线方式搭建`Ollama`+`AnythingLLM`的记录。
+
+1、下载AnythingLLM安装包，发现里面还是要下载模型，由于网络受限无法在软件内直接下载。使用Ollama方式加载离线模型
+
+2、下载Windows版本的Ollama安装包，进行安装
+
+3、下载模型
+
+**大模型下载地址**：[魔塔社区(ModelScope)](https://www.modelscope.cn/models) 或者 [Hugging Face](https://huggingface.co/)(这个要梯子)
+
+**注意**：下载的时候要选`.gguf`类型而不是`model.safetensors`，才能用下述方式加载，否则会报无法识别。搜仓库时就要区分：
+
+![模型搜索下载](/images/2024-06-21-model-download.png)
+
+3、加载离线模型
+
+Windows下模型默认放在：`C:\Users\xxx用户\.ollama\models\blobs`，也可设置`OLLAMA_MODELS`环境变量调整位置。
+
+1）此处还是拷贝下载的模型到该目录，比如下载的模型是`qwen2-1_5b-instruct-q5_k_m.gguf`
+
+2）创建`Modelfile`。这里在当前目录下创建，内容如下（若模型放置位置不同，以实际为准调整即可）：
+
+```sh
+FROM ./qwen2-1_5b-instruct-q5_k_m.gguf
+```
+
+3）执行加载：`ollama create qwen2:0.5 -f Modelfile`，可自行指定模型名称和版本
+
+完成后`ollama list`即可看到加载的模型。后续操作和上面基本就没什么差别了，配置AnythingLLM、上传文档，此处省略。
+
+4、效果说明
+
+结果：有点失望。工作电脑配置有点渣，CPU使用率高、问答慢，不如自己全局搜markdown，后续先整理精简下笔记。
+
+## 9. 小结
 
 基于Ollama+AnythingLLM搭建了简单的文档知识库。不过总体效果还没达到预期。
 
-## 9. 参考
+## 10. 参考
 
 1、[利用AI解读本地TXT、WORD、PDF文档](https://www.bilibili.com/read/cv33858702/)
 
 2、[基于Ollama+AnythingLLM轻松打造本地大模型知识库](https://developer.aliyun.com/article/1490578)
 
-3、GPT
+3、[本地离线部署大模型Ollama+AnythingLLM](https://mp.weixin.qq.com/s/NvloWxKZipXM81HmrIjPHQ)
+
+4、[AnythingLLM 本地知识库部署](https://mp.weixin.qq.com/s/eFssHdw-KSRDvGTN3oliZg)
+
+5、GPT
