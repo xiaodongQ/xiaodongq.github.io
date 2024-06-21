@@ -163,6 +163,21 @@ struct tcp_sock {
 另外可参考这篇文章对连接队列的跟踪分析（自己当前的博客风格就是fork自这位博主）：  
 [[内核源码] tcp 连接队列](https://wenfh2020.com/2022/01/22/kernel-tcp-socket-backlog/)
 
+这篇文章中描述了`TCP_NEW_SYN_RECV`状态，用bcc tools中的`tcpstates`跟踪，还是只会有`SYN_RECV`
+
+```sh
+# 192.168.1.150上：python -m http.server 起8000端口，并起tcpstates跟踪
+# 192.168.1.3上`curl 192.168.1.150:8000`请求
+[root@xdlinux ➜ /home/workspace/bcc/tools git:(v0.19.0) ✗ ]$ ./tcpstates.py 
+SKADDR           C-PID C-COMM     LADDR           LPORT RADDR           RPORT OLDSTATE    -> NEWSTATE    MS
+ffff9f2032491d40 0     swapper/9  0.0.0.0         8000  0.0.0.0         0     LISTEN      -> SYN_RECV    0.000
+ffff9f2032491d40 0     swapper/9  192.168.1.150   8000  192.168.1.3     26365 SYN_RECV    -> ESTABLISHED 0.009
+ffff9f2032491d40 64594 python     192.168.1.150   8000  192.168.1.3     26365 ESTABLISHED -> FIN_WAIT1   0.869
+ffff9f2032491d40 64594 python     192.168.1.150   8000  192.168.1.3     26365 FIN_WAIT1   -> FIN_WAIT1   0.018
+ffff9f2032491d40 0     swapper/9  192.168.1.150   8000  192.168.1.3     26365 FIN_WAIT1   -> FIN_WAIT2   1.871
+ffff9f2032491d40 0     swapper/9  192.168.1.150   8000  192.168.1.3     26365 FIN_WAIT2   -> CLOSE       0.003
+```
+
 ## 5. inet_listen监听流程
 
 在说明全连接队列最大长度时，简单提到过`listen`系统调用，会调用到TCP协议注册的`inet_listen`，此处进一步分析其逻辑。
