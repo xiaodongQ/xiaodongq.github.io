@@ -363,13 +363,17 @@ Windows下模型默认放在：`C:\Users\xxx用户\.ollama\models\blobs`，也�
 FROM ./qwen2-1_5b-instruct-q5_k_m.gguf
 ```
 
-3）执行加载：`ollama create qwen2:0.5 -f Modelfile`，可自行指定模型名称和版本
+3）执行加载：`ollama create qwen2:1.5 -f Modelfile`，可自行指定模型名称和版本
 
-完成后`ollama list`即可看到加载的模型。后续操作和上面基本就没什么差别了，配置AnythingLLM、上传文档，此处省略。
+完成后`ollama list`即可看到加载的模型。
+
+后续操作和上面基本就没什么差别了，配置AnythingLLM、上传文档，此处省略。
 
 4、效果说明
 
-结果：有点失望。工作电脑配置有点渣，CPU使用率高、问答慢，不如自己全局搜markdown，后续先整理精简下笔记。
+结果：有点失望。
+
+工作电脑配置有点渣，CPU使用率高、问答慢，不如自己全局搜markdown，后续先整理精简下笔记。
 
 ## 9. 小结
 

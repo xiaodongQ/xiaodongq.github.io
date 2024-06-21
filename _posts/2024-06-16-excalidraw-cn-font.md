@@ -29,7 +29,7 @@ Excalidraw 也是Github开源[项目](https://github.com/excalidraw/excalidraw)�
 
 有开源作者基于excalidraw，二次开发增强了“中文手绘效果”和“多画布”能力，分别创建了 [handraw](https://handraw.top/) 和 [revezone](https://revezone.com/index.html)，后者还增加了目录和多标签功能。
 
-字体效果对比（这样看自我感觉还是handraw舒服点，revezone的多目录和多标签看来不错）：  
+字体效果对比（这样看自我感觉还是handraw舒服点，revezone的多目录和多标签看起来也不错）：  
 ![字体效果对比](/images/2024-06-16-excalidraw-compare.png)
 
 另外用之前画的一张流程图做效果对比：

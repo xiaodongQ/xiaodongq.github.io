@@ -160,7 +160,8 @@ struct tcp_sock {
 
 > **原来是把 tcp_request_sock 挂在 listen socket 下，收到 ACK 之后从 listening_hash 找到 listen socket 再进一步找到 tcp_request_sock；新的做法是直接把 tcp_request_sock 挂在 ehash 中，这样收到 ACK 之后可以直接找到 tcp_request_sock，减少了锁的争用（contention）。**
 
-详情见参考文章。
+另外可参考这篇文章对连接队列的跟踪分析（自己当前的博客风格就是fork自这位博主）：  
+[[内核源码] tcp 连接队列](https://wenfh2020.com/2022/01/22/kernel-tcp-socket-backlog/)
 
 ## 5. inet_listen监听流程
 
