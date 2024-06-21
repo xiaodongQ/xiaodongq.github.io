@@ -274,7 +274,7 @@ qwen2:0.5b             	6f48b936a09f	352 MB	18 minutes ago
 
 1、基本问答：可以直接开始问答
 
-感觉效果有点差，哪里配置还要优化下。
+感觉效果有点差，内容和速度都不好，应该是哪里配置还要优化下。
 
 直接使用命令行效果还不错。
 
@@ -282,7 +282,9 @@ qwen2:0.5b             	6f48b936a09f	352 MB	18 minutes ago
 
 ![上传文档](/images/2024-06-21-anythingLLM-upload-file.png)
 
-上传完成后，选中相应的文档，并点击 Move to Workspcae。
+上传完成后，选中相应的文档，并点击 `Move to Workspcae`，然后点击 `Save and Embed`。
+
+使用：
 
 ```sh
 Q：提炼文档里的网络知识
@@ -305,7 +307,7 @@ A：根据提供的文档内容，我们可以总结出以下关于网络的知�
 8. 网络测试和监控：文档中的部分内容可能涉及到网络测试工具（如Wireshark）的使用，以及如何通过监控系统性能指标（如CPU使用率、内存使用情况等）来发现潜在的问题。这些知识对于确保系统的稳定运行非常重要。
 ```
 
-`Show Citations`里可以看到引用的数据。
+点击下面的 `Show Citations`，可以看到引用的文档。
 
 ```sh
 Hide Citations
@@ -363,9 +365,9 @@ Windows下模型默认放在：`C:\Users\xxx用户\.ollama\models\blobs`，也�
 FROM ./qwen2-1_5b-instruct-q5_k_m.gguf
 ```
 
-3）执行加载：`ollama create qwen2:1.5 -f Modelfile`，可自行指定模型名称和版本
+3）执行 `ollama create qwen2:1.5 -f Modelfile` 加载模型，可自行指定模型名称和版本
 
-完成后`ollama list`即可看到加载的模型。
+完成后 `ollama list` 即可看到加载的模型。
 
 后续操作和上面基本就没什么差别了，配置AnythingLLM、上传文档，此处省略。
 
@@ -373,7 +375,7 @@ FROM ./qwen2-1_5b-instruct-q5_k_m.gguf
 
 结果：有点失望。
 
-工作电脑配置有点渣，CPU使用率高、问答慢，不如自己全局搜markdown，后续先整理精简下笔记。
+工作电脑配置有点渣，CPU使用率高、问答慢(无法忍受)，不如自己全局搜markdown+线上GPT，后续先整理精简下笔记。
 
 ## 9. 小结
 
