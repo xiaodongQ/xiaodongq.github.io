@@ -113,7 +113,7 @@ SEND   6701   sshd             12:socket:[65823]         13    N/A
 实验现象和疑问：  
 `python -m http.server`起一个8000端口服务，另一台通过`curl ip:8000`的请求，`sofdsnoop`没有追踪到记录，为什么？网络交互不是会打开文件描述符吗
 
-疑问：`sofdsnoop`到底追踪的是什么，man里面没有过多解释，网上搜索没找到解答，看代码逻辑也没太看清楚。
+疑问：`sofdsnoop`到底追踪的是什么，man里面没有过多解释，网上搜索也没大找到明确解答，看代码逻辑也没太看清楚。
 (后续：问GPT理解后，回头看还是应该先理解清楚`通过socket传递的文件描述符`是指什么)
 
 ASK：
@@ -513,7 +513,7 @@ examples:
     ./tcpretrans -l        # include TLP attempts
 ```
 
-示例：通过构造丢包场景来进行实验
+示例：下面通过构造丢包场景来进行实验
 
 #### 3.8.1. tc模拟
 
@@ -541,7 +541,7 @@ modprobe: FATAL: Module sch_netem not found in directory /lib/modules/4.18.0-348
 
 尝试在本机大量请求：`ab -n 10000 -c 2 http://192.168.1.150:8000/` (`python -m http.server`先起服务)，但是没抓到重传包。
 
-抓到的都是ssh的重传，指定本地ip应该走了lo回环。
+抓到的都是ssh的重传，指定本地ip进行请求时应该走了lo回环。
 
 ```sh
 [root@desktop-mme7h3a ➜ /root ]$ tc qdisc add dev enp4s0 root netem loss 30%
@@ -561,7 +561,7 @@ qdisc netem 8003: dev lo root refcnt 2 limit 1000 loss 20%
 
 本机上进行请求：`ab -n 5 -c 1 http://192.168.1.150:8000/`
 
-可抓到下述重传包了：
+果然可抓到下述重传包了：
 
 ```sh
 [root@localhost.localdomain ➜ /usr/share/bcc/tools ]$ ./tcpretrans    

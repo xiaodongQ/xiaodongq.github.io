@@ -20,13 +20,13 @@ tags: eBPF libbpf CO-RE
 
 [使用C语言从头开发一个Hello World级别的eBPF程序](https://tonybai.com/2022/07/05/develop-hello-world-ebpf-program-in-c-from-scratch/)
 
-[eBPF动手实践系列三：基于原生libbpf库的eBPF编程改进方案](https://mp.weixin.qq.com/s/R70hmc965cA8X3WUZRp2hQ)里的demo学习。
+[eBPF动手实践系列三：基于原生libbpf库的eBPF编程改进方案](https://mp.weixin.qq.com/s/R70hmc965cA8X3WUZRp2hQ)
 
 ## 2. 基于libbpf开发hello world级BPF程序
 
 脱离开libbpf-bootstrap框架，构建一个独立的BPF项目。
 
-[上篇](https://xiaodongq.github.io/2024/06/06/ebpf_learn/)学习libbpf-bootstrap时，没具体看其结构。示意图如下，我们看下哪些工作可以从框架里抽离出来。
+[上篇](https://xiaodongq.github.io/2024/06/06/ebpf_learn/) 学习libbpf-bootstrap时，没具体看其结构。示意图如下，我们看下哪些工作可以从框架里抽离出来。
 
 ![libbpf-bootstrap结构示意图](/images/2024-06-18-libbpf-bootstrap-module.png)
 
@@ -151,7 +151,7 @@ features: libbfd, skeletons
 
 ### 2.3. 编写helloworld BPF程序
 
-任意目录创建helloworld目录，创建`helloworld.bpf.c`和`helloworld.c`文件，内容和"[eBPF学习实践系列（一） -- 初识eBPF](https://xiaodongq.github.io/2024/06/06/ebpf_learn/)"中的示例一样。
+任意目录创建helloworld目录，创建`helloworld.bpf.c`和`helloworld.c`文件，内容和 "[eBPF学习实践系列（一） -- 初识eBPF](https://xiaodongq.github.io/2024/06/06/ebpf_learn/)" 中的示例一样。
 
 创建Makefile：
 
@@ -302,8 +302,6 @@ git clone https://github.com/alibaba/sreworks-ext.git
 | `./tools/include/` | 来自于libbpf-1.3.0/include/的头文件 |
 | `./tools/build/` | 项目构建时一些feature探测代码 |
 | `./tools/scripts/` | 项目Makefile所依赖的一些功能函数 |
-
-请注意，这个表格是基于您提供的信息直接生成的，如果有需要进一步调整或细化之处，请随时告知。
 
 #### 3.1.1. 如何查看libbpf版本
 
