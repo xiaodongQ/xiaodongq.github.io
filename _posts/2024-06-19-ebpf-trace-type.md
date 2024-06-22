@@ -171,6 +171,22 @@ cpuhp             hda_intel       kvm          nmi       regmap          tcp    
 devlink           header_event    kvmmmu       nvme      resctrl         thermal
 ```
 
+另外，在`/sys/kernel/debug/tracing/available_events`文件里可以看到汇总
+
+```sh
+[root@xdlinux ➜ /sys/kernel/debug/tracing ]$ tail /sys/kernel/debug/tracing/available_events
+devlink:devlink_health_report
+devlink:devlink_hwerr
+devlink:devlink_hwmsg
+netlink:netlink_extack
+bpf_test_run:bpf_test_finish
+fib6:fib6_table_lookup
+mptcp:subflow_check_data_avail
+mptcp:ack_update_msk
+mptcp:get_mapping_status
+mptcp:mptcp_subflow_get_send
+```
+
 * 使用 `bpftrace` 获取内核函数、内核跟踪点
 
 ```sh
@@ -242,7 +258,7 @@ List of pre-defined events (to be used in -e):
 
 以系统调用的`sys_enter_openat`为例，查看调试信息下的`format`文件
 
-可看到其数据结构
+可看到其数据结构（前8个字节在Tracepoint 中不可访问）
 
 ```sh
 [root@xdlinux ➜ /root ]$ cat /sys/kernel/debug/tracing/events/syscalls/sys_enter_openat/format
@@ -263,6 +279,105 @@ format:
 print fmt: "dfd: 0x%08lx, filename: 0x%08lx, flags: 0x%08lx, mode: 0x%08lx", ((unsigned long)(REC->dfd)), ((unsigned long)(REC->filename)), ((unsigned long)(REC->flags)), ((unsigned long)(REC->mode))
 ```
 
+* 使用bpftrace获取
+
+```sh
+# -l 搜索，-v 附加信息
+[root@xdlinux ➜ /root ]$ bpftrace -lv tracepoint:syscalls:sys_enter_openat
+tracepoint:syscalls:sys_enter_openat
+    int __syscall_nr
+    int dfd
+    const char * filename
+    int flags
+    umode_t mode
+[root@xdlinux ➜ /root ]$
+```
+
+### 寻找应用的插桩点
+
+#### 如何查询用户进程的跟踪点？
+
+* 使用`readelf`、`objdump`、`nm`查询
+
+静态编译语言通过`-g`编译选项保留调试信息，应用程序二进制会包含 DWARF（Debugging With Attributed Record Format），有了调试信息，可以通过  readelf、objdump、nm 等工具，查询可用于跟踪的函数、变量等符号列表
+
+比如socket编程服务端demo（`g++ server.cpp -g -o server`）：
+
+```sh
+# readelf - Displays information about ELF files.
+
+# 查询符号表
+# -s --syms/--symbols    Display the symbol table
+[root@xdlinux ➜ /home/workspace/prog-playground/network/tcp_connect git:(main) ✗ ]$ readelf -s server|head -n10
+
+Symbol table '.dynsym' contains 20 entries:
+   Num:    Value          Size Type    Bind   Vis      Ndx Name
+     0: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT  UND 
+     1: 0000000000000000     0 FUNC    GLOBAL DEFAULT  UND htons@GLIBC_2.2.5 (2)
+     2: 0000000000000000     0 FUNC    GLOBAL DEFAULT  UND bind@GLIBC_2.2.5 (2)
+     3: 0000000000000000     0 FUNC    GLOBAL DEFAULT  UND socket@GLIBC_2.2.5 (2)
+     4: 0000000000000000     0 FUNC    GLOBAL DEFAULT  UND sleep@GLIBC_2.2.5 (2)
+     5: 0000000000000000     0 FUNC    GLOBAL DEFAULT  UND perror@GLIBC_2.2.5 (2)
+     6: 0000000000000000     0 FUNC    GLOBAL DEFAULT  UND __cxa_atexit@GLIBC_2.2.5 (2)
+
+# 查询USDT信息
+# -n --notes    Display the core notes (if present)
+[root@xdlinux ➜ /home/workspace/prog-playground/network/tcp_connect git:(main) ✗ ]$ readelf -n server 
+
+Displaying notes found in: .note.ABI-tag
+  Owner                 Data size	Description
+  GNU                  0x00000010	NT_GNU_ABI_TAG (ABI version tag)
+    OS: Linux, ABI: 3.2.0
+
+Displaying notes found in: .note.gnu.build-id
+  Owner                 Data size	Description
+  GNU                  0x00000014	NT_GNU_BUILD_ID (unique build ID bitstring)
+    Build ID: e49d7bd32fff054ae3d4d6ec0f96451c70b58f52
+
+Displaying notes found in: .gnu.build.attributes
+  Owner                 Data size	Description
+  GA$<version>3p965    0x00000010	OPEN
+    Applies to region from 0x4009bf to 0x4009bf (.annobin_init.c)
+  GA$<tool>running gcc 0x00000000	OPEN
+...
+```
+
+```sh
+# objdump - display information from object files.
+
+# -t, --syms    Display the contents of the symbol table(s)
+[root@xdlinux ➜ /home/workspace/prog-playground/network/tcp_connect git:(main) ✗ ]$ objdump -t server
+
+server:     file format elf64-x86-64
+
+SYMBOL TABLE:
+0000000000400238 l    d  .interp	0000000000000000              .interp
+0000000000400254 l    d  .note.ABI-tag	0000000000000000              .note.ABI-tag
+0000000000400274 l    d  .note.gnu.build-id	0000000000000000              .note.gnu.build-id
+0000000000400298 l    d  .gnu.hash	0000000000000000              .gnu.hash
+00000000004002c8 l    d  .dynsym	0000000000000000              .dynsym
+...
+```
+
+```sh
+# nm - list symbols from object files
+
+# -a, --debug-syms    Display debugger-only symbols
+[root@xdlinux ➜ /home/workspace/prog-playground/network/tcp_connect git:(main) ✗ ]$ nm -a server
+0000000000000000 a 
+0000000000400c35 t .annobin___libc_csu_fini.end
+0000000000400c25 t .annobin___libc_csu_fini.start
+...
+0000000000400878 T _init
+0000000000400990 T _start
+                 U bind@@GLIBC_2.2.5
+00000000006021b0 b completed.7294
+...
+```
+
+* 使用bpftrace查询
+
+
 
 ## 4. 小结
 
@@ -274,6 +389,10 @@ print fmt: "dfd: 0x%08lx, filename: 0x%08lx, flags: 0x%08lx, mode: 0x%08lx", ((u
 
 2、[06事件触发：各类eBPF程序的触发机制及其应用场景](https://time.geekbang.org/column/article/483364)
 
-3、[BPF 跟踪机制之原始跟踪点 rawtracepoint 介绍、使用和样例](https://www.ebpf.top/post/bpf_rawtracepoint/)
+3、[ebpf/libbpf 程序使用 tracepoint 的常见问题](https://mozillazg.com/2022/05/ebpf-libbpf-tracepoint-common-questions.html)
+
+[[BPF 入门] 使用 libbpf 获取 C 程序参数](https://mp.weixin.qq.com/s/b4tyW4n8-2IzpwD7i66AgQ)
+
+[[BPF 入门] 使用 libbpf 编写 Tracepoint 程序](https://mp.weixin.qq.com/s/ohCJUsjoKQ1IqQYhHAHjFQ)
 
 4、GPT
