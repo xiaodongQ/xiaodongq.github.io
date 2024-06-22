@@ -20,7 +20,7 @@ tags: 网络
 
 平时都写C++，涉及到python的只是一些胶水脚本，所以暂时阻塞在怀疑业务逻辑某处卡死导致没最后发FIN关闭进而丢弃新的SYN，具体哪里出问题受限于python方面学艺不精就没辙定位了。
 
-另一个背景是知识星球里正好有个案例，涉及定位过程中一些知识点和工具，一些概念发现自己还是掌握得不够清晰和深入。
+另一个背景是[知识星球-程序员踩坑案例分享](https://wx.zsxq.com/dweb2/index/group/15552551584552)里正好有个案例，涉及定位过程中一些知识点和工具，一些概念发现自己还是掌握得不够清晰和深入。
 
 趁此机会，重新全面梳理一下网络相关流程，加之近期也折腾学习过了一些工具（systemtap/ebpf/packagedrill/scapy），进行一些实验。
 
@@ -426,6 +426,8 @@ int main(int argc, char *argv[]) {
 ```
 
 编译：`g++ client.cpp -o client -std=c++11 -lpthread`
+
+上述代码和编译脚本也可从[github处](https://github.com/xiaodongQ/prog-playground/tree/main/network/tcp_connect)获取。
 
 ### 5.2. 观察过程
 

@@ -328,12 +328,7 @@ Displaying notes found in: .note.ABI-tag
   Owner                 Data size	Description
   GNU                  0x00000010	NT_GNU_ABI_TAG (ABI version tag)
     OS: Linux, ABI: 3.2.0
-
-Displaying notes found in: .note.gnu.build-id
-  Owner                 Data size	Description
-  GNU                  0x00000014	NT_GNU_BUILD_ID (unique build ID bitstring)
-    Build ID: e49d7bd32fff054ae3d4d6ec0f96451c70b58f52
-
+...
 Displaying notes found in: .gnu.build.attributes
   Owner                 Data size	Description
   GA$<version>3p965    0x00000010	OPEN
