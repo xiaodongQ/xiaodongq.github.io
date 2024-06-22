@@ -339,7 +339,7 @@ qwen2:1.5b             	f6daf2b25194	934 MB	6 minutes ago
 
 ## 8. 离线方式搭建
 
-初衷是为了在平时工作环境先集成之前的笔记，但环境里网络受限。这里记录一下通过离线方式搭建`Ollama`+`AnythingLLM`的记录。
+初衷是为了在平时工作环境先集成之前的笔记，但环境里网络受限。这里记录一下通过离线方式搭建`Ollama`+`AnythingLLM`的过程。
 
 1、下载AnythingLLM安装包，发现里面还是要下载模型，由于网络受限无法在软件内直接下载。使用Ollama方式加载离线模型
 
@@ -349,7 +349,7 @@ qwen2:1.5b             	f6daf2b25194	934 MB	6 minutes ago
 
 **大模型下载地址**：[魔塔社区(ModelScope)](https://www.modelscope.cn/models) 或者 [Hugging Face](https://huggingface.co/)(这个要梯子)
 
-**注意**：下载的时候要选`.gguf`类型而不是`model.safetensors`，才能用下述方式加载，否则会报无法识别。搜仓库时就要区分：
+**注意**：下载的时候要选`.gguf`类型而不是`model.safetensors`，才能用下述Modelfile方式加载，否则会报无法识别。搜仓库时就要区分：
 
 ![模型搜索下载](/images/2024-06-21-model-download.png)
 
@@ -357,7 +357,7 @@ qwen2:1.5b             	f6daf2b25194	934 MB	6 minutes ago
 
 Windows下模型默认放在：`C:\Users\xxx用户\.ollama\models\blobs`，也可设置`OLLAMA_MODELS`环境变量调整位置。
 
-1）此处还是拷贝下载的模型到该目录，比如下载的模型是`qwen2-1_5b-instruct-q5_k_m.gguf`
+1）此处还是拷贝下载的模型到默认目录，这里下载的模型是`qwen2-1_5b-instruct-q5_k_m.gguf`
 
 2）创建`Modelfile`。这里在当前目录下创建，内容如下（若模型放置位置不同，以实际为准调整即可）：
 
@@ -375,7 +375,7 @@ FROM ./qwen2-1_5b-instruct-q5_k_m.gguf
 
 结果：有点失望。
 
-工作电脑配置有点渣，CPU使用率高、问答慢(无法忍受)，不如自己全局搜markdown+线上GPT，后续先整理精简下笔记。
+工作电脑配置有点渣，CPU使用率高、问答慢(无法忍受)，还不如自己全局搜markdown+线上GPT的体验好，后续先整理精简下笔记。
 
 ## 9. 小结
 
