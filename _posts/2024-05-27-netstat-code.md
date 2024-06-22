@@ -325,7 +325,15 @@ static void get_tcp4_sock(struct sock *sk, struct seq_file *f, int i)
     * `Send-Q`表示已发送未收到确认的字节数 (无论连接是哪种socket状态)
     * `Recv-Q`，对于监听端口，表示全连接队列长度；对于非监听端口，表示已接收未被读取字节数
 
-## 5. 参考
+## 5. 更新
+
+`netstat -s`中，对于监听状态的socket，`Send-Q`里并未和`ss`一样展示**全连接队列的最大长度**，**这是内核的一个bug**。
+
+已经提交了 [patch](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=e7073830cc8b52ef3df7dd150e4dac7706e0e104)。
+
+信息来自：[知识星球-程序员踩坑案例分享](https://wx.zsxq.com/dweb2/index/group/15552551584552)，推荐一下星主的干货博客：[plantegg](https://plantegg.github.io/)
+
+## 6. 参考
 
 1、[linux /proc/net/tcp 文件分析](https://blog.csdn.net/whatday/article/details/100693051)
 
