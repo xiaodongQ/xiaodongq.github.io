@@ -40,42 +40,42 @@ eBPF 程序通常包含用户态和内核态两部分：用户态程序通过 BP
 
 在libbpf的`include/uapi/linux/bpf.h`中，查看`bpf_prog_type`即可看到类型。
 
-5.10.10内核（LIBBPF_0.2.0）中的类型定义如下，其中有30种，高版本可能更多。
+5.10.10内核（LIBBPF_0.2.0）中的类型定义如下，这里多达30种，高版本可能更多。
 
 ```sh
 # linux-5.10.10/tools/include/uapi/linux/bpf.h
 enum bpf_prog_type {
-	BPF_PROG_TYPE_UNSPEC,
-	BPF_PROG_TYPE_SOCKET_FILTER,
-	BPF_PROG_TYPE_KPROBE,
-	BPF_PROG_TYPE_SCHED_CLS,
-	BPF_PROG_TYPE_SCHED_ACT,
-	BPF_PROG_TYPE_TRACEPOINT,
-	BPF_PROG_TYPE_XDP,
-	BPF_PROG_TYPE_PERF_EVENT,
-	BPF_PROG_TYPE_CGROUP_SKB,
-	BPF_PROG_TYPE_CGROUP_SOCK,
-	BPF_PROG_TYPE_LWT_IN,
-	BPF_PROG_TYPE_LWT_OUT,
-	BPF_PROG_TYPE_LWT_XMIT,
-	BPF_PROG_TYPE_SOCK_OPS,
-	BPF_PROG_TYPE_SK_SKB,
-	BPF_PROG_TYPE_CGROUP_DEVICE,
-	BPF_PROG_TYPE_SK_MSG,
-	BPF_PROG_TYPE_RAW_TRACEPOINT,
-	BPF_PROG_TYPE_CGROUP_SOCK_ADDR,
-	BPF_PROG_TYPE_LWT_SEG6LOCAL,
-	BPF_PROG_TYPE_LIRC_MODE2,
-	BPF_PROG_TYPE_SK_REUSEPORT,
-	BPF_PROG_TYPE_FLOW_DISSECTOR,
-	BPF_PROG_TYPE_CGROUP_SYSCTL,
-	BPF_PROG_TYPE_RAW_TRACEPOINT_WRITABLE,
-	BPF_PROG_TYPE_CGROUP_SOCKOPT,
-	BPF_PROG_TYPE_TRACING,
-	BPF_PROG_TYPE_STRUCT_OPS,
-	BPF_PROG_TYPE_EXT,
-	BPF_PROG_TYPE_LSM,
-	BPF_PROG_TYPE_SK_LOOKUP,
+    BPF_PROG_TYPE_UNSPEC,
+    BPF_PROG_TYPE_SOCKET_FILTER,
+    BPF_PROG_TYPE_KPROBE,
+    BPF_PROG_TYPE_SCHED_CLS,
+    BPF_PROG_TYPE_SCHED_ACT,
+    BPF_PROG_TYPE_TRACEPOINT,
+    BPF_PROG_TYPE_XDP,
+    BPF_PROG_TYPE_PERF_EVENT,
+    BPF_PROG_TYPE_CGROUP_SKB,
+    BPF_PROG_TYPE_CGROUP_SOCK,
+    BPF_PROG_TYPE_LWT_IN,
+    BPF_PROG_TYPE_LWT_OUT,
+    BPF_PROG_TYPE_LWT_XMIT,
+    BPF_PROG_TYPE_SOCK_OPS,
+    BPF_PROG_TYPE_SK_SKB,
+    BPF_PROG_TYPE_CGROUP_DEVICE,
+    BPF_PROG_TYPE_SK_MSG,
+    BPF_PROG_TYPE_RAW_TRACEPOINT,
+    BPF_PROG_TYPE_CGROUP_SOCK_ADDR,
+    BPF_PROG_TYPE_LWT_SEG6LOCAL,
+    BPF_PROG_TYPE_LIRC_MODE2,
+    BPF_PROG_TYPE_SK_REUSEPORT,
+    BPF_PROG_TYPE_FLOW_DISSECTOR,
+    BPF_PROG_TYPE_CGROUP_SYSCTL,
+    BPF_PROG_TYPE_RAW_TRACEPOINT_WRITABLE,
+    BPF_PROG_TYPE_CGROUP_SOCKOPT,
+    BPF_PROG_TYPE_TRACING,
+    BPF_PROG_TYPE_STRUCT_OPS,
+    BPF_PROG_TYPE_EXT,
+    BPF_PROG_TYPE_LSM,
+    BPF_PROG_TYPE_SK_LOOKUP,
 };
 ```
 
@@ -116,21 +116,42 @@ eBPF program_type lsm is NOT available
 eBPF program_type sk_lookup is available
 ```
 
-这些类型主要分为3大使用场景：
+这些类型主要分为下述3大使用场景。参考：[事件触发：各类eBPF程序的触发机制及其应用场景](https://time.geekbang.org/column/article/483364)
 
-* **跟踪**
+### 2.1. 跟踪类eBPF程序
 
 tracepoint、kprobe、perf_event等，主要用于从系统中提取跟踪信息，进而为监控、排错、性能优化等提供数据支撑。
 
-* **网络**
+常见的**跟踪类 BPF 程序**：  
+![常见的跟踪类eBPF程序](/images/2024-06-23-ebpf-trace-type.png)  
 
-xdp、sock_ops、cgroup_sock_addr、sk_msg等，主要用于对网络数据包进行过滤和处理
+### 2.2. 网络类eBPF程序
 
-* **安全和其他**
+xdp、sock_ops、cgroup_sock_addr、sk_msg等，主要用于对网络数据包进行过滤和处理，进而实现网络的观测、过滤、流量控制以及性能优化等各种丰富的功能。
+
+> 根据事件触发位置的不同，网络类 eBPF 程序又可以分为 XDP（eXpress Data Path，高速数据路径）程序、TC（Traffic Control，流量控制）程序、套接字程序以及 cgroup 程序
+
+下面分别说明：
+
+* **`XDP`程序**，类型为`BPF_PROG_TYPE_XDP`，在网络驱动程序刚刚收到数据包时触发执行。可用来实现高性能的网络处理方案。
+* **`TC`程序**，类型为`BPF_PROG_TYPE_SCHED_CLS`和`BPF_PROG_TYPE_SCHED_ACT`，分别作为 Linux流量控制 的分类器和执行器。
+* **套接字程序**，用于过滤、观测或重定向套接字网络包，具体的种类也比较丰富。根据类型的不同，套接字 eBPF 程序可以挂载到套接字（socket）、控制组（cgroup）以及网络命名空间（netns）等各个位置。
+
+常见的套接字程序类型：  
+![常见的套接字程序类型](/images/2024-06-23-ebpf-socket-type.png)  
+
+* **cgroup程序**，用于对cgroup内所有进程的网络过滤、套接字选项以及转发等进行动态控制，它最典型的应用场景是对容器中运行的多个进程进行网络控制。cgroup程序的种类也比较丰富。
+
+> 这几类网络 eBPF 程序是在不同的事件触发时执行的，因此，在实际应用中我们通常可以把多个类型的 eBPF 程序结合起来，一起使用，来实现复杂的网络控制功能。比如，最流行的 Kubernetes 网络方案 Cilium 就大量使用了 XDP、TC 和套接字 eBPF 程序。
+
+### 2.3. 安全和其他类eBPF程序
 
 lsm用于安全，其他还有flow_dissector、lwt_in等
 
-## 3. eBPF最佳实践
+示例：
+![其他类型eBPF程序示例](/images/2024-06-23-ebpf-other-type.png)
+
+## 3. 各eBPF类型怎么找对应的插桩点
 
 > 从前面可以看出来 eBPF 程序本身并不困难，**困难的是为其寻找合适的事件源来触发运行**。
 
@@ -193,7 +214,7 @@ mptcp:mptcp_subflow_get_send
 # 查询所有内核插桩和跟踪点
 sudo bpftrace -l
 
-# 使用通配符查询所有的系统调用跟踪点
+# 使用通配符查询所有的系统调用跟踪点，也可结合grep过滤
 bpftrace -l 'tracepoint:syscalls:*'
 
 # 使用通配符查询所有名字包含"open"的跟踪点
@@ -258,23 +279,26 @@ List of pre-defined events (to be used in -e):
 
 以系统调用的`sys_enter_openat`为例，查看调试信息下的`format`文件
 
-可看到其数据结构（前8个字节在Tracepoint 中不可访问）
+可看到其数据结构。注意：
+
+* format 列出的字段中，前8个字节对应的字段普通的 ebpf 程序都不能直接访问（部分 bpf helpers 辅助函数可以访问），其他的字段一般都可以访问，具体以 print fmt 中引用的字段为准。
+* fmt 这里引用的这些字段都是我们可以在 ebpf 程序中获取的信息。
 
 ```sh
 [root@xdlinux ➜ /root ]$ cat /sys/kernel/debug/tracing/events/syscalls/sys_enter_openat/format
 name: sys_enter_openat
 ID: 614
 format:
-	field:unsigned short common_type;	offset:0;	size:2;	signed:0;
-	field:unsigned char common_flags;	offset:2;	size:1;	signed:0;
-	field:unsigned char common_preempt_count;	offset:3;	size:1;	signed:0;
-	field:int common_pid;	offset:4;	size:4;	signed:1;
+    field:unsigned short common_type;	offset:0;	size:2;	signed:0;
+    field:unsigned char common_flags;	offset:2;	size:1;	signed:0;
+    field:unsigned char common_preempt_count;	offset:3;	size:1;	signed:0;
+    field:int common_pid;	offset:4;	size:4;	signed:1;
 
-	field:int __syscall_nr;	offset:8;	size:4;	signed:1;
-	field:int dfd;	offset:16;	size:8;	signed:0;
-	field:const char * filename;	offset:24;	size:8;	signed:0;
-	field:int flags;	offset:32;	size:8;	signed:0;
-	field:umode_t mode;	offset:40;	size:8;	signed:0;
+    field:int __syscall_nr;	offset:8;	size:4;	signed:1;
+    field:int dfd;	offset:16;	size:8;	signed:0;
+    field:const char * filename;	offset:24;	size:8;	signed:0;
+    field:int flags;	offset:32;	size:8;	signed:0;
+    field:umode_t mode;	offset:40;	size:8;	signed:0;
 
 print fmt: "dfd: 0x%08lx, filename: 0x%08lx, flags: 0x%08lx, mode: 0x%08lx", ((unsigned long)(REC->dfd)), ((unsigned long)(REC->filename)), ((unsigned long)(REC->flags)), ((unsigned long)(REC->mode))
 ```
@@ -293,9 +317,9 @@ tracepoint:syscalls:sys_enter_openat
 [root@xdlinux ➜ /root ]$
 ```
 
-### 寻找应用的插桩点
+### 3.2. 寻找应用的插桩点
 
-#### 如何查询用户进程的跟踪点？
+#### 3.2.1. 如何查询用户进程的跟踪点？
 
 * 使用`readelf`、`objdump`、`nm`查询
 
@@ -372,13 +396,302 @@ SYMBOL TABLE:
 
 * 使用bpftrace查询
 
+```sh
+# 还是上面编译出来的 server bin程序
+# 查询uprobe
+[root@xdlinux ➜ tcp_connect git:(main) ✗ ]$ bpftrace -l 'uprobe:server:*'  
+uprobe:server:_GLOBAL__sub_I_main
+uprobe:server:_Z41__static_initialization_and_destruction_0ii
+uprobe:server:_ZNSt8ios_base4InitD1Ev
+uprobe:server:_ZNSt8ios_base4InitD1Ev@@GLIBCXX_3.4
+uprobe:server:_ZSt4endlIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_
+uprobe:server:_ZSt4endlIcSt11char_traitsIcEERSt13basic_ostreamIT_T0_ES6_@@GLIBCXX_3.4
+uprobe:server:__do_global_dtors_aux
+uprobe:server:__libc_csu_fini
+uprobe:server:__libc_csu_init
+uprobe:server:_dl_relocate_static_pie
+uprobe:server:_fini
+uprobe:server:_init
+uprobe:server:_start
+uprobe:server:deregister_tm_clones
+uprobe:server:frame_dummy
+uprobe:server:main
+uprobe:server:register_tm_clones
+```
 
+```sh
+# 查看USDT
+# server程序里没有
+[root@xdlinux ➜ tcp_connect git:(main) ✗ ]$ bpftrace -l 'usdt:server:*'
+ERROR: failed to initialize usdt context for path server
+# 查看 libc.so.6 库为例
+[root@xdlinux ➜ tcp_connect git:(main) ✗ ]$ bpftrace -l 'usdt:/lib64/libc.so.6:*'
+usdt:/lib64/libc.so.6:libc:lll_lock_wait_private
+usdt:/lib64/libc.so.6:libc:longjmp
+usdt:/lib64/libc.so.6:libc:longjmp_target
+usdt:/lib64/libc.so.6:libc:memory_arena_new
+usdt:/lib64/libc.so.6:libc:memory_arena_retry
+usdt:/lib64/libc.so.6:libc:memory_arena_reuse
+usdt:/lib64/libc.so.6:libc:memory_arena_reuse_free_list
+...
+```
 
-## 4. 小结
+## 4. eBPF追踪-实践套路
 
+通过上面的学习，已经差不多可以知道怎么查看常见追踪类型了，本小节来看下实践中具体如何使用
 
+以`tracepoint`（对应类型为：BPF_PROG_TYPE_TRACEPOINT）类型的eBPF为例，来学习追踪的套路。
 
-## 5. 参考
+主要参考：[ebpf/libbpf 程序使用 tracepoint 的常见问题](https://mozillazg.com/2022/05/ebpf-libbpf-tracepoint-common-questions.html)
+
+PS：看这个博主的libbpf仓库有不少好的案例，后续可学习参考：[hello-libbpfgo](https://github.com/mozillazg/hello-libbpfgo)
+
+### 4.1. SEC内容格式说明（tracepoint）
+
+* **SEC内容的格式**：`SEC("tracepoint/<category>/<name>")` 或者`SEC("tp/<category>/<name>")`
+
+`<category>` 和 `<name>` 的值均取值前面 `/sys/kernel/debug/tracing/available_events` 文件中列出的内容
+
+比如 bcc项目中 libbpf-tools、libbpf-bootstrap 中的示例：
+
+（bcc里各追踪类型和格式说明可参考其 [reference_guide](https://github.com/iovisor/bcc/blob/master/docs/reference_guide.md)）
+
+```c
+// bcc/libbpf-tools/execsnoop.bpf.c
+SEC("tracepoint/syscalls/sys_enter_execve")
+int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter* ctx)
+{
+    ...
+}
+
+// libbpf-bootstrap/examples/c/bootstrap.bpf.c
+SEC("tp/sched/sched_process_exec") 
+int handle_exec(struct trace_event_raw_sched_process_exec *ctx)
+{
+    ...
+}
+```
+
+```sh
+[root@xdlinux ➜ examples git:(master) ✗ ]$ cat /sys/kernel/debug/tracing/available_events | egrep -w "sys_enter_execve|sched_process_exec"
+sched:sched_process_exec
+syscalls:sys_enter_execve
+```
+
+### 4.2. 确定需要追踪的 tracepoint 事件
+
+场景：
+
+> 假设，我们想通过 tracepoint 追踪 chmod 这个命令涉及的 fchmodat 系统调用， 那么，如何确定ebpf 中事件处理函数的参数类型，以及如何获取到对应的 fchmodat 这个系统调用涉及的参数的内容， 比如拿到操作文件名称以及操作的权限 mode 的值。
+
+1、先确定 chmod 所使用的系统调用
+
+比如通过`strace`
+
+```sh
+[root@xdlinux ➜ workspace ]$ strace chmod +x minimal
+execve("/usr/bin/chmod", ["chmod", "+x", "minimal"], 0x7fffef2662f0 /* 41 vars */) = 0
+...
+fchmodat(AT_FDCWD, "minimal", 0755)     = 0
+...
+```
+
+2、找到针对这个系统调用可用的 tracepoint 事件
+
+在`/sys/kernel/debug/tracing/available_events`中查找
+
+```sh
+[root@xdlinux ➜ tracing ]$ cat /sys/kernel/debug/tracing/available_events |grep fchmodat
+syscalls:sys_exit_fchmodat
+syscalls:sys_enter_fchmodat
+```
+
+或者通过 bpftrace 查找：
+
+```sh
+[root@xdlinux ➜ tracing ]$ bpftrace -l 'tracepoint:*' |grep fchmodat
+tracepoint:syscalls:sys_enter_fchmodat
+tracepoint:syscalls:sys_exit_fchmodat
+```
+
+### 4.3. 确定事件包含的信息
+
+通过查看 `/sys/kernel/tracing/events/syscalls/xxx/format`，其中`sys_enter_xxx`对应输入参数、`sys_exit_xxx`对应输出参数
+
+此处以跟踪`sys_enter_fchmodat`为例
+
+```sh
+# 输入参数
+# 如前所述，前8个字节对应的字段普通的eBPF程序一般不能直接访问
+[root@xdlinux ➜ tracing ]$ cat /sys/kernel/tracing/events/syscalls/sys_enter_fchmodat/format 
+name: sys_enter_fchmodat
+ID: 628
+format:
+    field:unsigned short common_type;	offset:0;	size:2;	signed:0;
+    field:unsigned char common_flags;	offset:2;	size:1;	signed:0;
+    field:unsigned char common_preempt_count;	offset:3;	size:1;	signed:0;
+    field:int common_pid;	offset:4;	size:4;	signed:1;
+
+    field:int __syscall_nr;	offset:8;	size:4;	signed:1;
+    field:int dfd;	offset:16;	size:8;	signed:0;
+    field:const char * filename;	offset:24;	size:8;	signed:0;
+    field:umode_t mode;	offset:32;	size:8;	signed:0;
+
+print fmt: "dfd: 0x%08lx, filename: 0x%08lx, mode: 0x%08lx", ((unsigned long)(REC->dfd)), ((unsigned long)(REC->filename)), ((unsigned long)(REC->mode))
+
+# 返回值/输出参数，即返回值为 long ret
+[root@xdlinux ➜ bcc git:(v0.19.0) ✗ ]$ cat /sys/kernel/tracing/events/syscalls/sys_exit_fchmodat/format 
+name: sys_exit_fchmodat
+ID: 627
+format:
+    field:unsigned short common_type;	offset:0;	size:2;	signed:0;
+    field:unsigned char common_flags;	offset:2;	size:1;	signed:0;
+    field:unsigned char common_preempt_count;	offset:3;	size:1;	signed:0;
+    field:int common_pid;	offset:4;	size:4;	signed:1;
+
+    field:int __syscall_nr;	offset:8;	size:4;	signed:1;
+    field:long ret;	offset:16;	size:8;	signed:1;
+
+print fmt: "0x%lx", REC->ret
+```
+
+或者 bpftrace 方式：
+
+```sh
+# 输入参数
+[root@xdlinux ➜ tracing ]$ bpftrace -lv 'tracepoint:syscalls:sys_enter_fchmodat' 
+tracepoint:syscalls:sys_enter_fchmodat
+    int __syscall_nr
+    int dfd
+    const char * filename
+    umode_t mode
+
+# 返回值/输出参数
+[root@xdlinux ➜ bcc git:(v0.19.0) ✗ ]$ bpftrace -lv 'tracepoint:syscalls:sys_exit_fchmodat'
+tracepoint:syscalls:sys_exit_fchmodat
+    int __syscall_nr
+    long ret
+```
+
+从上面可以看到，我们可以获取 `sys_enter_fchmodat` 事件的 `dfd` 、`filename` 以及 `mode` 信息
+
+### 4.4. 确定事件处理函数的参数
+
+上述小节知道了事件本身可以提供的信息后，我们还需要知道如何在eBPF程序中读取这些信息。
+
+这涉及到eBPF事件处理函数的输入参数。可通过如下方式获取：
+
+#### 4.4.1. 方法1：基于`vmlinux.h`
+
+在`vmlinux.h`中进行查找：
+
+* 一般 `sys_enter_xx` 对应 `trace_event_raw_sys_enter`
+* `sys_exit_xx` 对应 `trace_event_raw_sys_exit`
+* 其他的一般对应 `trace_event_raw_<name>`，如果没找到的话，可以参考 trace_event_raw_sys_enter 的例子找它相近的 struct
+
+对于`sys_enter_fchmodat`，对应 `struct trace_event_raw_sys_enter`。
+
+**TODO：从bcc/libbpf-bootstrap/Cilium等几个热门仓库里把各类型对应的结构体汇总下整理成表格（前几天看到过别人整的找不到了）**
+
+这里查看bcc项目里的`vmlinux.h`
+
+```sh
+[root@xdlinux ➜ bcc git:(v0.19.0) ✗ ]$ find . -name vmlinux.h
+./libbpf-tools/powerpc/vmlinux.h
+./libbpf-tools/x86/vmlinux.h
+./libbpf-tools/arm64/vmlinux.h
+```
+
+```c
+// bcc/libbpf-tools/x86/vmlinux.h
+struct trace_event_raw_sys_enter {
+    struct trace_entry ent;
+    long int id;
+    long unsigned int args[6];
+    char __data[0];
+};
+```
+
+其中 `args` 中就存储了事件相关的我们可以获取的信息，即上述中`format`文件的`fmt`里包含的字段。
+
+因此，我们可以通过 `args[0]` 获取`dfd`，`args[1]` 获取 `filename`，以此类推。
+
+使用方式示例：  
+（完整代码可见原作者的 [github仓库](https://github.com/mozillazg/hello-libbpfgo/tree/master/07-tracepoint-args)）
+
+```c
+SEC("tracepoint/syscalls/sys_enter_fchmodat")
+int tracepoint__syscalls__sys_enter_fchmodat(struct trace_event_raw_sys_enter *ctx)
+{
+    // ...
+    char *filename_ptr = (char *) BPF_CORE_READ(ctx, args[1]);
+    bpf_core_read_user_str(&event->filename, sizeof(event->filename), filename_ptr);
+    event->mode = BPF_CORE_READ(ctx, args[2]);
+    // ...
+}
+```
+
+#### 4.4.2. 方法2：手动构造参数结构体
+
+PS：怪不得之前看别人的eBPF程序，感觉云里雾里没得到章法，有时自定义有时有内核自带结构，这里得到了解答。
+
+除了使用 `vmlinux.h` 中预定义的结构体外，我们**还可以基于第三步中 `format` 文件的内容自定义一个结构体来作为eBPF程序的参数。**
+
+对于上面的`sys_enter_fchmodat/format`：
+
+```sh
+[root@xdlinux ➜ tracing ]$ cat /sys/kernel/tracing/events/syscalls/sys_enter_fchmodat/format 
+name: sys_enter_fchmodat
+ID: 628
+format:
+    field:unsigned short common_type;	offset:0;	size:2;	signed:0;
+    field:unsigned char common_flags;	offset:2;	size:1;	signed:0;
+    field:unsigned char common_preempt_count;	offset:3;	size:1;	signed:0;
+    field:int common_pid;	offset:4;	size:4;	signed:1;
+
+    field:int __syscall_nr;	offset:8;	size:4;	signed:1;
+    field:int dfd;	offset:16;	size:8;	signed:0;
+    field:const char * filename;	offset:24;	size:8;	signed:0;
+    field:umode_t mode;	offset:32;	size:8;	signed:0;
+
+print fmt: "dfd: 0x%08lx, filename: 0x%08lx, mode: 0x%08lx", ((unsigned long)(REC->dfd)), ((unsigned long)(REC->filename)), ((unsigned long)(REC->mode))
+```
+
+自定义如下结构：只需**保证各字段偏移和上述format说明一致**。
+
+```c
+struct sys_enter_fchmodat_args {
+    // 前16个字节的内容，对应的是 format 文件中 dfd 之前的所有字段，根据dfd对应的`offset:16`可知道其偏移
+    char _[16];
+    // linux 64位机器上，long一般是8字节 (32位linux和windows机器则不同，此处不管)
+    long dfd;
+    // 指针 8字节
+    long filename_ptr;
+    // 8字节
+    long mode;
+};
+```
+
+使用方式相应调整：
+
+```c
+SEC("tracepoint/syscalls/sys_enter_fchmodat")
+int tracepoint__syscalls__sys_enter_fchmodat(struct sys_enter_fchmodat_args *ctx) {
+    // ...
+    char *filename_ptr = (char *)ctx->filename_ptr;
+    bpf_core_read_user_str(&event->filename, sizeof(event->filename), filename_ptr);
+    event->mode = (u32)ctx->mode;
+    // ...
+}
+```
+
+## 5. 小结
+
+学习梳理了eBPF各程序类型，查找追踪点的方法，进行追踪的实践套路。
+
+下一步应该可以按需开始上手了。
+
+## 6. 参考
 
 1、[深入浅出 eBPF｜你要了解的 7 个核心问题](https://developer.aliyun.com/article/985159)
 
@@ -386,8 +699,6 @@ SYMBOL TABLE:
 
 3、[ebpf/libbpf 程序使用 tracepoint 的常见问题](https://mozillazg.com/2022/05/ebpf-libbpf-tracepoint-common-questions.html)
 
-[[BPF 入门] 使用 libbpf 获取 C 程序参数](https://mp.weixin.qq.com/s/b4tyW4n8-2IzpwD7i66AgQ)
+4、[hello-libbpfgo](https://github.com/mozillazg/hello-libbpfgo)
 
-[[BPF 入门] 使用 libbpf 编写 Tracepoint 程序](https://mp.weixin.qq.com/s/ohCJUsjoKQ1IqQYhHAHjFQ)
-
-4、GPT
+5、GPT
