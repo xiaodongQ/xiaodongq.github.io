@@ -160,10 +160,17 @@ struct tcp_sock {
 
 > **原来是把 tcp_request_sock 挂在 listen socket 下，收到 ACK 之后从 listening_hash 找到 listen socket 再进一步找到 tcp_request_sock；新的做法是直接把 tcp_request_sock 挂在 ehash 中，这样收到 ACK 之后可以直接找到 tcp_request_sock，减少了锁的争用（contention）。**
 
-另外可参考这篇文章对连接队列的跟踪分析（自己当前的博客风格就是fork自这位博主）：  
+### 4.1. 分析用户态是否可观察到`TCP_NEW_SYN_RECV`状态
+
+三次握手第一次收到SYN后，服务端socket状态是`TCP_NEW_SYN_RECV`，netstat等用户态是否能观察到呢？
+
+找了几篇文章：
+
+1、参考这篇文章对连接队列的跟踪分析（自己当前的博客风格就是fork自这位博主）：  
 [[内核源码] tcp 连接队列](https://wenfh2020.com/2022/01/22/kernel-tcp-socket-backlog/)
 
-这篇文章中描述了`TCP_NEW_SYN_RECV`状态，用bcc tools中的`tcpstates`跟踪，还是只会有`SYN_RECV`
+这篇文章中描述了`TCP_NEW_SYN_RECV`状态。  
+自己用bcc tools中的`tcpstates`跟踪（特意用了bcc最新仓库），看只会看到`SYN_RECV`状态（在CentOS8.5环境，内核4.18.0-348.7.1）
 
 ```sh
 # 192.168.1.150上：python -m http.server 起8000端口，并起tcpstates跟踪
@@ -177,6 +184,158 @@ ffff9f2032491d40 64594 python     192.168.1.150   8000  192.168.1.3     26365 FI
 ffff9f2032491d40 0     swapper/9  192.168.1.150   8000  192.168.1.3     26365 FIN_WAIT1   -> FIN_WAIT2   1.871
 ffff9f2032491d40 0     swapper/9  192.168.1.150   8000  192.168.1.3     26365 FIN_WAIT2   -> CLOSE       0.003
 ```
+
+2、重新看第一篇里面留的链接：[一张图感受真实的 TCP 状态转移](https://segmentfault.com/a/1190000043834899)，里面用eBPF跟踪到`TCP_NEW_SYN_RECV`状态，里面的测试内核是 **6.1.11版本**。
+
+以及参考这篇文章：[TCP_NEW_SYN_RECV](https://abcdxyzk.github.io/blog/2020/09/10/kernel-tcp-new-syn-recv/) 里相关的描述
+
+新增`TCP_NEW_SYN_RECV`状态是在这个patch：[10feb428a5045d5eb18a5d755fbb8f0cc9645626](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/?id=10feb428a5045d5eb18a5d755fbb8f0cc9645626)
+
+对应的commit为：[commit_10feb428a5045d5eb18a5d755fbb8f0cc9645626](https://github.com/torvalds/linux/commit/10feb428a5045d5eb18a5d755fbb8f0cc9645626)
+
+试下高版本内核的情况看。
+
+1）系统：`Alibaba Cloud Linux 3.2104 LTS 64位`，内核：`5.10.134-16.3.al8.x86_64`
+
+只观察到 `SYN_RECV`
+
+```sh
+# 本地curl 8000
+[root@iZ2zefl9zh4dqju3vo1a4uZ tools]# ./tcpstates  -L 8000
+SKADDR           C-PID C-COMM     LADDR           LPORT RADDR           RPORT OLDSTATE    -> NEWSTATE    MS
+ffff8af4c3a28000 3360  python     0.0.0.0         8000  0.0.0.0         0     CLOSE       -> LISTEN      0.000
+
+ffff8af4c3a2a900 3675  curl       0.0.0.0         8000  0.0.0.0         0     LISTEN      -> SYN_RECV    0.000
+ffff8af4c3a2a900 3675  curl       172.23.133.146  8000  172.23.133.146  51068 SYN_RECV    -> ESTABLISHED 0.004
+ffff8af4c3a2a900 3675  curl       172.23.133.146  8000  172.23.133.146  51068 FIN_WAIT1   -> FIN_WAIT2   0.020
+ffff8af4c3a2a900 3675  curl       172.23.133.146  8000  172.23.133.146  51068 FIN_WAIT2   -> CLOSE       0.003
+ffff8af4c3a2a900 3360  python     172.23.133.146  8000  172.23.133.146  51068 ESTABLISHED -> FIN_WAIT1   0.796
+ffff8af4c3a2a900 3360  python     172.23.133.146  8000  172.23.133.146  51068 FIN_WAIT1   -> FIN_WAIT1   0.008
+```
+
+2）找更高版本内核，找到个6.x的。系统：`debian_12_2_x64`，内核：`6.1.0-13-amd64`
+
+参考bcc官网`apt-get install bcc`方式安装，版本为0.16.17-3.4
+
+另外安装`apt-get install clang llvm`、`apt-get install python3-bpfcc`
+
+手动上传个bcc包，最后都执行失败了，算了不折腾了。
+
+3、跟踪`netstat`代码，查看状态展示
+
+先说结论：只有`SYN_RECV`，没有`TCP_NEW_SYN_RECV`
+
+之前 [分析netstat中的Send-Q和Recv-Q](https://xiaodongq.github.io/2024/05/27/netstat-code/) 中我们分析过netstat源码，快速找到解析逻辑所在位置：`main`->`tcp_info`->`tcp_do_one`
+
+```sh
+[root@xdlinux ➜ /root ]$ netstat -anp|head -n4
+Active Internet connections (servers and established)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
+tcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN      9218/docker-proxy
+```
+
+```c
+// net-tools-2.10/netstat.c
+// sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
+//  0: 00000000:0016 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 22556 1 ffff8a4f35c39480 100 0 0 10 0
+static void tcp_do_one(int lnr, const char *line, const char *prot)
+{
+    ...
+    // /proc/net/tcp中的行解析
+    num = sscanf(line,
+    "%d: %64[0-9A-Fa-f]:%X %64[0-9A-Fa-f]:%X %X %lX:%lX %X:%lX %lX %d %d %lu %*s\n",
+         &d, local_addr, &local_port, rem_addr, &rem_port, &state,
+         &txq, &rxq, &timer_run, &time_len, &retr, &uid, &timeout, &inode);
+    ...
+    // 对应：Proto Recv-Q Send-Q Local Address           Foreign Address         State
+    printf("%-4s  %6ld %6ld %-*s %-*s %-11s",
+           prot, rxq, txq, (int)netmax(23,strlen(local_addr)), local_addr, (int)netmax(23,strlen(rem_addr)), rem_addr, _(tcp_state[state]));
+    ...
+}
+
+// 其中，tcp_state数组转换如下，并没有 TCP_NEW_SYN_RECV
+// net-tools-2.10/netstat.c
+static const char *tcp_state[] =
+{
+    "",
+    N_("ESTABLISHED"),
+    N_("SYN_SENT"),
+    N_("SYN_RECV"),
+    N_("FIN_WAIT1"),
+    N_("FIN_WAIT2"),
+    N_("TIME_WAIT"),
+    N_("CLOSE"),
+    N_("CLOSE_WAIT"),
+    N_("LAST_ACK"),
+    N_("LISTEN"),
+    N_("CLOSING")
+};
+```
+
+4、跟踪内核代码，服务端(内核)侧的`state`状态更新
+
+由上可知客户端netstat不会展示`TCP_NEW_SYN_RECV`状态。继续跟踪下内核中往`/proc/net/tcp`里写的`state`状态
+
+上面那篇netstat博客也分析过其调用路径为：序列文件的`.show`->实际注册的是`tcp4_seq_show`->`get_tcp4_sock`
+
+```c
+// linux-5.10.10/net/ipv4/tcp_ipv4.c
+static void get_tcp4_sock(struct sock *sk, struct seq_file *f, int i)
+{
+    ...
+    // 获取struct sock结构中的： sk->sk_state，实际为：__sk_common.skc_state
+    // 照理说 skc_state
+    state = inet_sk_state_load(sk);
+    ...
+    // /proc/net/tcp文件中，tx_queue:rx_queue
+    seq_printf(f, "%4d: %08X:%04X %08X:%04X %02X %08X:%08X %02X:%08lX "
+            "%08X %5u %8d %lu %d %pK %lu %lu %u %u %d",
+        i, src, srcp, dest, destp, state,
+        READ_ONCE(tp->write_seq) - tp->snd_una,
+        rx_queue, 
+        timer_active,
+        ...);
+}
+```
+
+再看`TCP_NEW_SYN_RECV`的更新，对比可知：
+
+1. 写到proc序列文件中的是取`struct sock`中的`__sk_common.skc_state`
+2. 而`TCP_NEW_SYN_RECV`状态是在`struct inet_request_sock`中的`req.__req_common.skc_state`中初始化的
+
+**根据上面协议控制块的图，可直观看到两者是不同的`TCP协议控制块`**
+
+```c
+// linux-5.10.10/net/ipv4/tcp_input.c
+// 根据请求sock申请并初始化一个 request_sock，状态为 TCP_NEW_SYN_RECV
+struct request_sock *inet_reqsk_alloc(const struct request_sock_ops *ops,
+				      struct sock *sk_listener,
+				      bool attach_listener)
+{
+	// 分配一个 request_sock，注册ops为 struct request_sock_ops tcp_request_sock_ops
+	// 开了 cookies 则 attach_listener传入的是 false
+	struct request_sock *req = reqsk_alloc(ops, sk_listener,
+					       attach_listener);
+
+	if (req) {
+		// 转变为 inet_request_sock
+		struct inet_request_sock *ireq = inet_rsk(req);
+
+        ...
+		// #define ireq_state	req.__req_common.skc_state
+		// 对应 request_sock中`struct sock_common __req_common;`成员中的 `volatile unsigned char skc_state;`变量
+		ireq->ireq_state = TCP_NEW_SYN_RECV;
+		write_pnet(&ireq->ireq_net, sock_net(sk_listener));
+		ireq->ireq_family = sk_listener->sk_family;
+	}
+
+	return req;
+}
+```
+
+于是可以得到结论：`/proc/net/tcp`序列文件里不会体现`TCP_NEW_SYN_RECV`状态，`netstat`也观测不到。
+
+`request_sock`和`sock`间的状态流转，暂时先不关注，后续其他博客中再跟踪。
 
 ## 5. inet_listen监听流程
 
@@ -858,4 +1017,8 @@ struct entry Tcpexttab[] =
 
 6、[如何正确查看线上半/全连接队列溢出情况？](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247486097&idx=1&sn=189f6b51c6ce50bf56c42bef6cce8d24&chksm=a6e30baa919482bc6c6fb1aba395dd57fb133ef219b36afe55cf8d19e9a2dc1a874015762212&scene=178&cur_album_id=1532487451997454337#rd)
 
-7、GPT
+7、[一张图感受真实的 TCP 状态转移](https://segmentfault.com/a/1190000043834899)
+
+8、[TCP_NEW_SYN_RECV](https://abcdxyzk.github.io/blog/2020/09/10/kernel-tcp-new-syn-recv/)
+
+9、GPT
