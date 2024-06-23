@@ -88,16 +88,20 @@ WantedBy=multi-user.target
 3、查看服务状态，`systemctl enable XD-Service.service`设置服务自启动
 
 ```sh
+# 设置前状态
 [root@iZ2zebfcx8h2zfz7ieqaquZ init.d]# systemctl status XD-Service.service 
 ● XD-Service.service - XD-Service
    Loaded: loaded (/etc/systemd/system/XD-Service.service; disabled; vendor preset: disabled)
    Active: inactive (dead)
+# 设置前状态，非自启动
 [root@iZ2zebfcx8h2zfz7ieqaquZ init.d]# systemctl is-enabled XD-Service.service 
 disabled
+# 设置自启动
 [root@iZ2zebfcx8h2zfz7ieqaquZ init.d]# systemctl enable XD-Service.service 
 Synchronizing state of XD-Service.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
 Executing: /usr/lib/systemd/systemd-sysv-install enable XD-Service
 Created symlink /etc/systemd/system/multi-user.target.wants/XD-Service.service → /etc/systemd/system/XD-Service.service.
+# 自启动状态
 [root@iZ2zebfcx8h2zfz7ieqaquZ init.d]# systemctl is-enabled XD-Service.service 
 enabled
 [root@iZ2zebfcx8h2zfz7ieqaquZ init.d]# 
@@ -111,11 +115,13 @@ enabled
 ```
 
 ```sh
+# 删除上述“注释”后，设置自启动，报错了
 [root@iZ2zebfcx8h2zfz7ieqaquZ init.d]# systemctl enable XD-Service.service 
 Synchronizing state of XD-Service.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
 Executing: /usr/lib/systemd/systemd-sysv-install enable XD-Service
 service XD-Service does not support chkconfig
 
+# 确实没设置成功
 [root@iZ2zebfcx8h2zfz7ieqaquZ init.d]# systemctl is-enabled XD-Service.service 
 disabled
 ```
