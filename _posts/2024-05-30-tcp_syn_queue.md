@@ -142,7 +142,7 @@ struct tcp_sock {
 
 网上很多文章关于半连接都是基于3.x的内核，跟踪5.10内核过程中一直疑惑`icsk_accept_queue`算是全连接还是半连接队列。
 
-对比3.10内核中`request_sock_queue`里既有全连接又有半连接，5.10内核里似乎没有单独的半连接，而是通过引用计数加1减1，共享同一个队列（类似享元模式？）。
+对比3.10内核中`request_sock_queue`里既有全连接又有半连接，5.10内核里似乎没有单独的半连接，而是通过引用计数加1减1，共享同一个队列~~（类似享元模式？）~~。
 
 带着怀疑在技术讨论群搜半连接队列，碰巧历史记录里有人提到：4.4之后的内核改了syn_queue半连接队列逻辑，半连接队列成为一个概念没有了，统一保存到`ehash table` 中，维护半连接长度就放到`icsk_accept_queue->qlen`，并附了一篇陈硕大佬关于这块介绍的文章链接：[Linux 4.4 之后 TCP 三路握手的新流程](https://zhuanlan.zhihu.com/p/25313903)
 
@@ -160,7 +160,7 @@ struct tcp_sock {
 
 > **原来是把 tcp_request_sock 挂在 listen socket 下，收到 ACK 之后从 listening_hash 找到 listen socket 再进一步找到 tcp_request_sock；新的做法是直接把 tcp_request_sock 挂在 ehash 中，这样收到 ACK 之后可以直接找到 tcp_request_sock，减少了锁的争用（contention）。**
 
-### 4.1. 分析用户态是否可观察到`TCP_NEW_SYN_RECV`状态
+### 4.1. （扩展）用户态是否可观察到`TCP_NEW_SYN_RECV`状态
 
 三次握手第一次收到SYN后，服务端socket状态是`TCP_NEW_SYN_RECV`，netstat等用户态是否能观察到呢？
 
