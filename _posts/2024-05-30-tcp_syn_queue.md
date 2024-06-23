@@ -284,7 +284,6 @@ static void get_tcp4_sock(struct sock *sk, struct seq_file *f, int i)
 {
     ...
     // 获取struct sock结构中的： sk->sk_state，实际为：__sk_common.skc_state
-    // 照理说 skc_state
     state = inet_sk_state_load(sk);
     ...
     // /proc/net/tcp文件中，tx_queue:rx_queue
@@ -298,7 +297,7 @@ static void get_tcp4_sock(struct sock *sk, struct seq_file *f, int i)
 }
 ```
 
-再看`TCP_NEW_SYN_RECV`的更新，对比可知：
+再看下面`TCP_NEW_SYN_RECV`的更新，对比可知：
 
 1. 写到proc序列文件中的是取`struct sock`中的`__sk_common.skc_state`
 2. 而`TCP_NEW_SYN_RECV`状态是在`struct inet_request_sock`中的`req.__req_common.skc_state`中初始化的
@@ -310,35 +309,64 @@ static void get_tcp4_sock(struct sock *sk, struct seq_file *f, int i)
 // linux-5.10.10/net/ipv4/tcp_input.c
 // 根据请求sock申请并初始化一个 request_sock，状态为 TCP_NEW_SYN_RECV
 struct request_sock *inet_reqsk_alloc(const struct request_sock_ops *ops,
-				      struct sock *sk_listener,
-				      bool attach_listener)
+                      struct sock *sk_listener,
+                      bool attach_listener)
 {
-	// 分配一个 request_sock，注册ops为 struct request_sock_ops tcp_request_sock_ops
-	// 开了 cookies 则 attach_listener传入的是 false
-	struct request_sock *req = reqsk_alloc(ops, sk_listener,
-					       attach_listener);
+    // 分配一个 request_sock，注册ops为 struct request_sock_ops tcp_request_sock_ops
+    // 开了 cookies 则 attach_listener传入的是 false
+    struct request_sock *req = reqsk_alloc(ops, sk_listener,
+                           attach_listener);
 
-	if (req) {
-		// 转变为 inet_request_sock
-		struct inet_request_sock *ireq = inet_rsk(req);
+    if (req) {
+        // 转变为 inet_request_sock
+        struct inet_request_sock *ireq = inet_rsk(req);
 
         ...
-		// #define ireq_state	req.__req_common.skc_state
-		// 对应 request_sock中`struct sock_common __req_common;`成员中的 `volatile unsigned char skc_state;`变量
-		ireq->ireq_state = TCP_NEW_SYN_RECV;
-		write_pnet(&ireq->ireq_net, sock_net(sk_listener));
-		ireq->ireq_family = sk_listener->sk_family;
-	}
+        // #define ireq_state	req.__req_common.skc_state
+        // 对应 request_sock中`struct sock_common __req_common;`成员中的 `volatile unsigned char skc_state;`变量
+        ireq->ireq_state = TCP_NEW_SYN_RECV;
+        write_pnet(&ireq->ireq_net, sock_net(sk_listener));
+        ireq->ireq_family = sk_listener->sk_family;
+    }
 
-	return req;
+    return req;
 }
 ```
 
-于是可以得到结论：`/proc/net/tcp`序列文件里不会体现`TCP_NEW_SYN_RECV`状态，`netstat`也观测不到。
-
-`request_sock`和`sock`间的状态流转，暂时先不关注，后续其他博客中再跟踪。
+于是可以得到结论（**待确定TODO**）：  
+`/proc/net/tcp`序列文件里不会体现`TCP_NEW_SYN_RECV`状态，`netstat`也观测不到。
 
 另外回头看一下上面eBPF跟踪逻辑，本身就萃取了`sock`和`request_sock`两者的信息，所以跟踪到了`TCP_NEW_SYN_RECV`状态，而并不是在同一个结构处监测到的。
+
+`request_sock`和`sock`间的状态流转，暂时先不关注，后续其他博客中再跟踪。基本过程是：
+
+> 在服务器接收了SYN之后，会调用`tcp_conn_request`来处理连接请求，其中调用`inet_reqsk_alloc`来创建请求控制块，可见请求控制块的`ireq_state`被初始化为`TCP_NEW_SYN_RECV`；
+
+> `tcp_v4_rcv`函数中会对`TCP_NEW_SYN_RECV`进行处理，如果连接检查成功，则需要新建控制块来处理连接，这个新建控制块的状态将会使用`TCP_SYN_RECV`状态；
+
+简单看了下`tcp_v4_rcv`的逻辑，里面的`struct sock`结构貌似用到了`TCP_NEW_SYN_RECV`状态。**所以上述结论还要进一步确认，先待定。**
+
+```c
+// linux-5.10.10/net/ipv4/tcp_ipv4.c
+int tcp_v4_rcv(struct sk_buff *skb)
+{
+    ...
+    struct sock *sk;
+    ...
+    // 从`struct sk_buff *skb`里返回 `struct sock *`信息
+    sk = __inet_lookup_skb(&tcp_hashinfo, skb, __tcp_hdrlen(th), th->source,
+                   th->dest, sdif, &refcounted);
+    ...
+process:
+    ...
+    if (sk->sk_state == TCP_NEW_SYN_RECV) {
+        struct request_sock *req = inet_reqsk(sk);
+        bool req_stolen = false;
+        ...
+    }
+    ...
+}
+```
 
 ## 5. inet_listen监听流程
 
