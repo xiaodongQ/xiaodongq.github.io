@@ -302,6 +302,7 @@ static void get_tcp4_sock(struct sock *sk, struct seq_file *f, int i)
 
 1. 写到proc序列文件中的是取`struct sock`中的`__sk_common.skc_state`
 2. 而`TCP_NEW_SYN_RECV`状态是在`struct inet_request_sock`中的`req.__req_common.skc_state`中初始化的
+3. tips：`__sk_common`和`__req_common`的结构都是`struct sock_common`，关键是要区分其所属的具体结构
 
 **根据上面协议控制块的图，可直观看到两者是不同的`TCP协议控制块`**
 
@@ -336,6 +337,8 @@ struct request_sock *inet_reqsk_alloc(const struct request_sock_ops *ops,
 于是可以得到结论：`/proc/net/tcp`序列文件里不会体现`TCP_NEW_SYN_RECV`状态，`netstat`也观测不到。
 
 `request_sock`和`sock`间的状态流转，暂时先不关注，后续其他博客中再跟踪。
+
+另外回头看一下上面eBPF跟踪逻辑，本身就萃取了`sock`和`request_sock`两者的信息，所以跟踪到了`TCP_NEW_SYN_RECV`状态，而并不是在同一个结构处监测到的。
 
 ## 5. inet_listen监听流程
 
