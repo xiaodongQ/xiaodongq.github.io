@@ -107,9 +107,11 @@ ffff95940742a900 5315  tcpstates  172.16.58.146   8080  172.16.58.147   43794 SY
 ffff95940742a900 5315  tcpstates  172.16.58.146   8080  172.16.58.147   43794 ESTABLISHED -> CLOSE_WAIT  0.191
 ```
 
-2）`/usr/share/bcc/tools/tcptracer -p $(pidof server)`，没抓到内容（追踪3次握手成功的连接）
+2）`/usr/share/bcc/tools/tcptracer -p $(pidof server)`，没抓到内容（追踪3次握手成功的连接，服务端没accept）
 
 3）`/usr/share/bcc/tools/tcpdrop -4`，没抓到8080相关的内容
+
+全连接队列溢出时的drop抓不到吗？（TODO）
 
 **TODO tcpdrop的应用场景没理解到位？待跟eBPF主动监测对比** 
 
@@ -212,6 +214,21 @@ tcp        0      0 172.16.58.147:43758     172.16.58.146:8080      FIN_WAIT2   
 # tcp        0      1 172.16.58.147:51998    172.16.58.146:8080     SYN_SENT    18684/./client
 ```
 
+之前相同ECS上的TCP相关内核参数：
+
+```sh
+[root@iZ2zejee6e4h8ysmmjwj1nZ ~]# sysctl -a|grep -E "syn_backlog|somaxconn|syn_retries|synack_retries|syncookies|abort_on_overflow|net.ipv4.tcp_fin_timeout|tw_buckets|tw_reuse|tw_recycle"
+net.core.somaxconn = 4096
+net.ipv4.tcp_abort_on_overflow = 0
+net.ipv4.tcp_fin_timeout = 60
+net.ipv4.tcp_max_syn_backlog = 128
+net.ipv4.tcp_max_tw_buckets = 5000
+net.ipv4.tcp_syn_retries = 6
+net.ipv4.tcp_synack_retries = 2
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_tw_reuse = 2
+```
+
 2）tcpstates跟踪远端8080端口
 
 ```sh
@@ -264,7 +281,13 @@ ffff90cd83ae0a40 5837  tcpdrop    172.16.58.147   43752 172.16.58.146   8080  FI
 ffff90cdd53cb340 0     swapper/0  172.16.58.147   43782 172.16.58.146   8080  FIN_WAIT1   -> CLOSE       12916.193
 ```
 
-我们找其中一个SKADDR跟踪，如 ffff90cdd53c8a40，可看到客户端连接正常建立，并正常发起关闭
+上面包含10个stream，我们根据`SKADDR`过滤，可跟踪到各自的流转。  
+细心看有**3种情形**：
+
+情形1：可看到客户端发起SYN连接 -> 建立连接 -> 主动发起FIN关闭 -> 收到对端ACK（因为变成了FIN_WAIT2） -> 最后成功CLOSE。
+
+且这种情形有 `6` 个stream（技巧：检索FIN_WAIT2并查看NEWSTATE列）。  
+**和系列第一篇抓包中的case1对应**
 
 ```sh
 ffff90cdd53c8a40 6099  client     172.16.58.147   0     172.16.58.146   8080  CLOSE       -> SYN_SENT    0.000
@@ -272,6 +295,30 @@ ffff90cdd53c8a40 6099  client     172.16.58.147   43794 172.16.58.146   8080  SY
 ffff90cdd53c8a40 6099  client     172.16.58.147   43794 172.16.58.146   8080  ESTABLISHED -> FIN_WAIT1   0.139
 ffff90cdd53c8a40 0     swapper/0  172.16.58.147   43794 172.16.58.146   8080  FIN_WAIT1   -> FIN_WAIT2   40.370
 ffff90cdd53c8a40 0     swapper/0  172.16.58.147   43794 172.16.58.146   8080  FIN_WAIT2   -> CLOSE       0.004
+```
+
+情形2：客户端发起SYN连接 -> 建立连接 -> 发起FIN关闭 -> 直接 CLOSE（没有走完四次挥手，应该收到了对端的RST）
+
+这种情形有 `1` 个stream（检索FIN_WAIT1   -> CLOSE）  
+**注意看其处于FIN_WAIT1状态长达近13s（12916ms），和系列第一篇抓包中的case2对应**，可知从FIN_WAIT1到CLOSE之间是重传过程，重传间隔每次翻倍(0.2/0.4/0.8/1.6/3.2/6.4)
+
+```sh
+ffff90cdd53cb340 6099  client     172.16.58.147   43782 172.16.58.146   8080  SYN_SENT    -> ESTABLISHED 0.544
+ffff90cdd53cb340 6099  client     172.16.58.147   43782 172.16.58.146   8080  SYN_SENT    -> ESTABLISHED 0.544
+ffff90cdd53cb340 6099  client     172.16.58.147   43782 172.16.58.146   8080  ESTABLISHED -> FIN_WAIT1   0.161
+ffff90cdd53cb340 0     swapper/0  172.16.58.147   43782 172.16.58.146   8080  FIN_WAIT1   -> CLOSE       12916.193
+```
+
+情形3：客户端发起SYN连接 -> 建立连接 -> 发起FIN关闭 -> 直接 CLOSE（没有走完四次挥手，应该收到了对端的RST）
+
+且这种情形有 `4` 个stream（检索FIN_WAIT1   -> CLOSE）  
+**注意看FIN_WAIT1状态持续只有0.2ms，和系列第一篇抓包中的case3对应。**
+
+```sh
+ffff90cdd53ca900 6099  client     172.16.58.147   0     172.16.58.146   8080  CLOSE       -> SYN_SENT    0.000
+ffff90cdd53ca900 6099  client     172.16.58.147   43796 172.16.58.146   8080  SYN_SENT    -> ESTABLISHED 0.554
+ffff90cdd53ca900 6099  client     172.16.58.147   43796 172.16.58.146   8080  ESTABLISHED -> FIN_WAIT1   0.136
+ffff90cdd53ca900 5967  tcptracer  172.16.58.147   43796 172.16.58.146   8080  FIN_WAIT1   -> CLOSE       0.237
 ```
 
 3）tcptracer 能跟踪到发起连接->关闭连接
@@ -301,9 +348,49 @@ X  6099   client           4  172.16.58.147    172.16.58.146    43752  8080
 X  6099   client           4  172.16.58.147    172.16.58.146    43800  8080  
 ```
 
-4）tcpdrop
+过滤端口，如 43762：
 
 ```sh
+C  6099   client           4  172.16.58.147    172.16.58.146    43762  8080  
+X  6099   client           4  172.16.58.147    172.16.58.146    43762  8080  
+```
+
+4）tcpdrop，监测到服务端发送的几种包，本地丢弃了
+
+```sh
+# 本地已是CLOSE状态，收到对端ACK，丢弃（通过43794端口看是对应case1）
+06:56:27 0       4  172.16.58.146:8080   > 172.16.58.147:43794  CLOSE (ACK)
+        b'tcp_drop+0x1'
+        b'tcp_rcv_state_process+0x97'
+        b'tcp_v4_do_rcv+0xbc'
+        b'tcp_v4_rcv+0xd02'
+        b'ip_protocol_deliver_rcu+0x2b'
+        b'ip_local_deliver_finish+0x44'
+        b'__netif_receive_skb_core+0x50b'
+        b'__netif_receive_skb_list_core+0x12f'
+        b'__netif_receive_skb_list+0xed'
+        b'netif_receive_skb_list_internal+0xec'
+        b'napi_complete_done+0x6f'
+        b'virtnet_poll+0x121'
+        b'napi_poll+0x95'
+        b'net_rx_action+0x9a'
+        b'__softirqentry_text_start+0xc4'
+        b'asm_call_sysvec_on_stack+0x12'
+        b'do_softirq_own_stack+0x37'
+        b'irq_exit_rcu+0xc4'
+        b'common_interrupt+0x77'
+        b'asm_common_interrupt+0x1e'
+        b'default_idle+0x13'
+        b'default_enter_idle+0x2f'
+        b'cpuidle_enter_state+0x8b'
+        b'cpuidle_enter+0x29'
+        b'cpuidle_idle_call+0x108'
+        b'do_idle+0x77'
+        b'cpu_startup_entry+0x19'
+        b'start_kernel+0x432'
+        b'secondary_startup_64_no_verify+0xc6'
+# 本地已经发起了FIN变成了FIN_WAIT1，后续收到对端SYN|ACK，丢弃
+# 这里的SYN|ACK是重传包，通过 43782 端口可以匹配上面tcpstates的结果，对应case2
 06:56:30 0       4  172.16.58.146:8080   > 172.16.58.147:43782  FIN_WAIT1 (SYN|ACK)
         b'tcp_drop+0x1'
         b'tcp_validate_incoming+0xe7'
@@ -335,7 +422,7 @@ X  6099   client           4  172.16.58.147    172.16.58.146    43800  8080
         b'cpu_startup_entry+0x19'
         b'start_kernel+0x432'
         b'secondary_startup_64_no_verify+0xc6'
-
+# 收到对端RST，丢弃，对应case2
 06:56:40 0       4  172.16.58.146:8080   > 172.16.58.147:43782  CLOSE (RST)
         b'tcp_drop+0x1'
         b'tcp_validate_incoming+0xe7'
@@ -369,11 +456,11 @@ X  6099   client           4  172.16.58.147    172.16.58.146    43800  8080
         b'secondary_startup_64_no_verify+0xc6'
 ```
 
-### 3.2. 实验2：nc正常实验，客户端发起关闭
+### 3.2. 实验2：nc对比实验，客户端发起关闭
 
-服务端`nc -l 8090`，客户端curl，curl一次服务端会自动关闭。
+服务端`nc -l 8090`（默认accept一个连接，-k可继续accept其他连接），客户端curl
 
-监测到服务端收到客户端主动发起的FIN关闭
+收到客户端主动发起的FIN关闭
 
 ```sh
 SKADDR           C-PID C-COMM     LADDR           LPORT RADDR           RPORT OLDSTATE    -> NEWSTATE    MS
@@ -398,7 +485,7 @@ TIME(s)  T  PID    COMM             IP SADDR            DADDR            SPORT  
 0.000    X  1214733 nc               4  172.16.58.146   172.16.58.147   8090   52948
 ```
 
-### 3.3. 实验3：正常实验，服务端发起关闭
+### 3.3. 实验3：对比实验，服务端发起关闭
 
 python起服务，客户端curl请求。
 
@@ -415,6 +502,8 @@ ffff9c04cbad57c0 0     swapper/8  172.16.58.146   8000  172.16.58.147   56292 FI
 ffff9c04cbad57c0 0     swapper/8  172.16.58.146   8000  172.16.58.147   56292 FIN_WAIT2   -> CLOSE       0.015
 ```
 
+这里的 `FIN_WAIT1   -> FIN_WAIT1`，是什么场景？（TODO）
+
 ```sh
 [root@localhost tools]# /usr/share/bcc/tools/tcptracer -p 1421971 -t
 Tracing TCP established connections. Ctrl-C to end.
@@ -423,6 +512,190 @@ TIME(s)  T  PID    COMM             IP SADDR            DADDR            SPORT  
 0.000    A  1421971 python           4  172.16.58.146   172.16.58.147   8000   56292 
 0.002    X  1421971 python           4  172.16.58.146   172.16.58.147   8000   56292
 ```
+
+#### 3.3.1. TIME_WAIT 跟踪疑惑
+
+上述python起服务正常场景的`tcpstates`结果中，没有`TIME_WAIT`状态，于是单独进行了跟踪实验。
+
+环境：服务端-192.168.1.101，客户端-192.168.1.102，服务端起python http服务。
+
+netstat看，服务端短时间内是有TIME_WAIT的，不会体现在tcpstates里
+
+```sh
+[root@localhost tools]# netstat -anp|grep 8000
+tcp        0      0 0.0.0.0:8000            0.0.0.0:*               LISTEN      256554/python       
+tcp        0      0 192.168.1.101:8000     192.168.1.102:36646    TIME_WAIT   -    
+```
+
+这个时间，之间没注意去统计，感觉并没有等到2MSL（当前linux的MSL一般为30s，2MSL即60s）
+
+于是带着几个怀疑去实验对比（统计前就去试了）
+
+#### 3.3.2. 怀疑点1：`SO_LINGER`选项
+
+是因为python简单服务端设置了`SO_LINGER`？
+
+该选项设置socket让其在关闭时避免进入TIME_WAIT或者设置该状态持续的超时时间
+
+到`/usr/lib64/python3.9`全局搜，并没有python里设置该选项，所以排除
+
+#### 3.3.3. 怀疑点2：`SO_REUSEADDR`选项
+
+跟踪了`python -m http.server`示例的基本代码，看到里面设置了`SO_REUSEADDR`
+
+这个一般是为了复用已有`TIME_WAIT`状态的socket，而不是让`TIME_WAIT`回收，**难道自己理解有偏差？**
+
+下面进行实际实验对比：
+
+代码位置：/usr/lib64/python3.9/http/server.py
+
+```python
+# /usr/lib64/python3.9/http/server.py
+class HTTPServer(socketserver.TCPServer):
+
+    allow_reuse_address = 1    # Seems to make sense in testing environment
+
+    def server_bind(self):
+        """Override server_bind to store the server name."""
+        socketserver.TCPServer.server_bind(self)
+        host, port = self.server_address[:2]
+        self.server_name = socket.getfqdn(host)
+        self.server_port = port
+```
+
+上面对应的是 socketserver.TCPServer，于是到该文件找TCPServer(父类)
+
+```python
+# /usr/lib64/python3.9/socketserver.py
+# 上面子类方法重写(override)了 `server_bind`，且把 allow_reuse_address 赋值为true
+class TCPServer(BaseServer):
+    ...
+    request_queue_size = 5
+    allow_reuse_address = False
+    ...
+    def __init__(self, server_address, RequestHandlerClass, bind_and_activate=True):
+        """Constructor.  May be extended, do not override."""
+        BaseServer.__init__(self, server_address, RequestHandlerClass)
+        self.socket = socket.socket(self.address_family,
+                                    self.socket_type)
+        if bind_and_activate:
+            try:
+                # 调用下面的函数，可能用的是子类重写的函数
+                self.server_bind()
+                self.server_activate()
+            except:
+                self.server_close()
+                raise
+
+    def server_bind(self):
+        """Called by constructor to bind the socket.
+
+        May be overridden.
+
+        """
+        if self.allow_reuse_address:
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.socket.bind(self.server_address)
+        self.server_address = self.socket.getsockname()
+
+    def server_activate(self):
+        """Called by constructor to activate the server.
+
+        May be overridden.
+
+        """
+        self.socket.listen(self.request_queue_size)
+```
+
+1）跟踪是否跟`SO_REUSEADDR`有关，备份/usr/lib64/python3.9/http/server.py并改成`allow_reuse_address=0`
+
+人工试了几次，确实就是`60s`（即2MSL）后TIME_WAIT消失，基本都是如下过程
+
+```sh
+[root@localhost http]# netstat -anp|grep 8000
+tcp        0      0 0.0.0.0:8000            0.0.0.0:*               LISTEN      3347507/python      
+tcp        0      0 192.168.1.101:8000     192.168.1.102:53484    TIME_WAIT   -
+[root@localhost http]# date; netstat -anp|grep 8000
+Tue Jun 25 05:43:46 CST 2024
+tcp        0      0 0.0.0.0:8000            0.0.0.0:*               LISTEN      3347507/python      
+tcp        0      0 192.168.1.101:8000     192.168.1.102:53484    TIME_WAIT   -
+...
+[root@localhost http]# date; netstat -anp|grep 8000
+Tue Jun 25 05:44:31 CST 2024
+tcp        0      0 0.0.0.0:8000            0.0.0.0:*               LISTEN      3347507/python      
+tcp        0      0 192.168.1.101:8000     192.168.1.102:53484    TIME_WAIT   -
+# 没有了，60s左右
+[root@localhost http]# date; netstat -anp|grep 8000
+Tue Jun 25 05:44:43 CST 2024
+tcp        0      0 0.0.0.0:8000            0.0.0.0:*               LISTEN      3347507/python
+```
+
+2）还原对比：也是维持了60s
+
+所以`TIME_WAIT`持续时间跟`SO_REUSEADDR`没关系
+
+#### 3.3.4. 怀疑点3：tcp_fin_timeout参数影响
+
+`net.ipv4.tcp_fin_timeout`参数，理论上是控制`FIN_WAIT2`的超时时间（对端发起被动FIN前的持续状态）
+
+正常应该不影响`TIME_WAIT`持续时间，**难道自己理解又有偏差？**（好像不是"又"，上一个没偏差）
+
+1）该参数默认是`net.ipv4.tcp_fin_timeout = 60`，跟2MSL区分不开
+
+2）修改为10s，再次进行验证
+
+`sysctl -w net.ipv4.tcp_fin_timeout=10`
+
+未重启进程，`TIME_WAIT`持续还是60s
+
+3）重启进程，持续还是60s
+
+结论：`TIME_WAIT`持续时间确实和`net.ipv4.tcp_fin_timeout`没关系
+
+#### 3.3.5. tcp_fin_timeout 生效场景验证
+
+上面提到`net.ipv4.tcp_fin_timeout`和`TIME_WAIT`无关，但是我想看下跟它有关的状态（即`FIN_WAIT2`）控制情况。
+
+先看下挥手过程，在文本描述示意过程时，想起来正好前几天试了个有意思的工具：[PlantUML](https://plantuml.com/zh/)，可以用类似markdown文本来画图，可以画时序图和其他UML图。觉得可以试下描述这个过程
+
+这是过程描述：
+
+```plantuml
+@startuml tcpconnect
+participant client as A
+participant server as B
+
+A ->(20) B: FIN
+note left: 主动端发起关闭
+hnote over A: FIN_WAIT1
+hnote over B: CLOSE_WAIT
+A (20)<- B: ACK
+hnote over A: FIN_WAIT2
+
+A (20)<- B: FIN
+note right: 被动端发起关闭
+hnote over B: LAST_ACK
+
+hnote over A: TIME_WAIT
+
+A ->(20) B: ACK
+hnote over B: CLOSE
+
+note over A: 2MSL(60s)
+
+hnote over A: CLOSE
+@enduml
+```
+
+这是生成的图：  
+![plantuml生成图](/images/2024-06-26-tcp-fin-plantuml.png)
+
+调起来有点费劲，劝退了。。还是草图省事，这里再放下第一篇的TCP握手和断开流程：  
+![TCP握手断开过程](/images/tcp-connect-close.png)
+
+上图可直观看出，只要前面3次握手正常，且最后被动关闭方不下发`close()`发送FIN，则主动发起方理论上就是处于`FIN_WAIT2`并等待超时。
+
+这里尝试用`scapy`进行模拟（因为有锤子，想试试效果。当然对端代码里直接不close能更快复现）
 
 ## 4. libbpf跟踪
 
