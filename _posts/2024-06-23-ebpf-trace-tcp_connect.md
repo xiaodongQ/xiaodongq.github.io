@@ -55,11 +55,11 @@ tags: 网络
 用上述github中的server和client程序：
 
 * `./server`，在服务端 172.16.58.146 上启动`8080`端口
-* `./client 172.16.58.146 10`，在客户端 172.16.58.147 上并发请求10次
+* `./client 172.16.58.146 10`，在客户端 172.16.58.147 上并发请求10次（10线程，每线程请求1次）
 
 1、服务端信息
 
-1）`/usr/share/bcc/tools/tcpstates -L 8080` （bcc tools默认安装在/usr/share/bcc/tools/目录）
+1）`/usr/share/bcc/tools/tcpstates -L 8080`
 
 服务端跟踪本地8080端口结果如下，只有6个ESTABLISHED，且最后变成 CLOSE_WAIT 就不动了。netstat也能看到8080有6个CLOSE_WAIT。
 
@@ -99,6 +99,8 @@ tcp       11      0 172.16.58.146:8080      172.16.58.147:43762     CLOSE_WAIT  
 tcp       11      0 172.16.58.146:8080      172.16.58.147:43794     CLOSE_WAIT  -
 ```
 
+服务端这里只跟踪到6个stream，另外4个请求的SYN此处未跟踪到，分析是全连接队列满drop掉了
+
 根据 SKADDR 列过滤看具体某个socket变化，如 ffff95940742a900
 
 ```sh
@@ -111,7 +113,7 @@ ffff95940742a900 5315  tcpstates  172.16.58.146   8080  172.16.58.147   43794 ES
 
 3）`/usr/share/bcc/tools/tcpdrop -4`，没抓到8080相关的内容
 
-全连接队列溢出时的drop抓不到吗？（TODO）
+全连接队列溢出时的drop在这里抓不到吗？（TODO）
 
 **TODO tcpdrop的应用场景没理解到位？待跟eBPF主动监测对比** 
 
@@ -161,7 +163,7 @@ ffff95940742a900 5348  server     172.16.58.146   8080  172.16.58.147   43794 CL
 ffff95940742c7c0 5348  server     172.16.58.146   8080  172.16.58.147   43768 CLOSE_WAIT  -> CLOSE       960007.734
 ```
 
-打断server时的服务端抓包，确实是RST，所以直接由`CLOSE_WAIT`变成`CLOSE`了
+打断server时的服务端抓包如下，确实是RST，所以直接由`CLOSE_WAIT`变成`CLOSE`了
 
 ```sh
 [root@iZbp12vk49h9xtc8lx3o3uZ ~]# tcpdump -i any port 8080 -nn
@@ -176,7 +178,7 @@ listening on any, link-type LINUX_SLL (Linux cooked v1), capture size 262144 byt
 07:12:27.783293 IP 172.16.58.146.8080 > 172.16.58.147.43768: Flags [R.], seq 1362122314, ack 2250654632, win 502, options [nop,nop,TS val 1950798553 ecr 3917065522], length 0
 ```
 
-2、客户端，也开启bcc tools跟踪，并发起请求
+2、客户端，也同步开启bcc tools跟踪，并发起请求
 
 ```sh
 # 客户端10次请求分了10个线程并发，每线程只发一次
@@ -206,7 +208,7 @@ tcp        0      0 172.16.58.147:43758     172.16.58.146:8080      FIN_WAIT2   
 [root@iZbp12vk49h9xtc8lx3o3tZ ~]# netstat -anp|grep 8080
 [root@iZbp12vk49h9xtc8lx3o3tZ ~]#
 
-# 之前的物理机环境（非本次ECS实验）里，客户端报错退出前还可观察到SYN_SENT，退出后就没有8080相关连接了
+# 之前的物理机环境（非本次ECS实验）里，客户端最后几个请求可能会阻塞，最后报错退出前还可观察到SYN_SENT，退出后就没有8080相关连接了
 # [root@localhost ~]# netstat -anp|grep client
 # tcp        0      1 172.16.58.147:52006    172.16.58.146:8080     SYN_SENT    18684/./client      
 # tcp        0      1 172.16.58.147:52020    172.16.58.146:8080     SYN_SENT    18684/./client      
@@ -281,10 +283,11 @@ ffff90cd83ae0a40 5837  tcpdrop    172.16.58.147   43752 172.16.58.146   8080  FI
 ffff90cdd53cb340 0     swapper/0  172.16.58.147   43782 172.16.58.146   8080  FIN_WAIT1   -> CLOSE       12916.193
 ```
 
-上面包含10个stream，我们根据`SKADDR`过滤，可跟踪到各自的流转。  
-细心看有**3种情形**：
+上面包含10个stream，作为对比，上面服务端tcpstates只有6个stream。服务端开启了tcp_syncookies，所以对于客户端而言三次握手走到了ESTABLISHED
 
-情形1：可看到客户端发起SYN连接 -> 建立连接 -> 主动发起FIN关闭 -> 收到对端ACK（因为变成了FIN_WAIT2） -> 最后成功CLOSE。
+我们根据`SKADDR`过滤，可跟踪到各自的流转。细心看有**3种情形**：
+
+**情形1**：可看到客户端发起SYN连接 -> 建立连接 -> 主动发起FIN关闭 -> 收到对端ACK（因为变成了FIN_WAIT2） -> 最后成功CLOSE。
 
 且这种情形有 `6` 个stream（技巧：检索FIN_WAIT2并查看NEWSTATE列）。  
 **和系列第一篇抓包中的case1对应**
@@ -297,7 +300,7 @@ ffff90cdd53c8a40 0     swapper/0  172.16.58.147   43794 172.16.58.146   8080  FI
 ffff90cdd53c8a40 0     swapper/0  172.16.58.147   43794 172.16.58.146   8080  FIN_WAIT2   -> CLOSE       0.004
 ```
 
-情形2：客户端发起SYN连接 -> 建立连接 -> 发起FIN关闭 -> 直接 CLOSE（没有走完四次挥手，应该收到了对端的RST）
+**情形2**：客户端发起SYN连接 -> 建立连接 -> 发起FIN关闭 -> 直接 CLOSE（没有走完四次挥手，应该收到了对端的RST）
 
 这种情形有 `1` 个stream（检索FIN_WAIT1   -> CLOSE）  
 **注意看其处于FIN_WAIT1状态长达近13s（12916ms），和系列第一篇抓包中的case2对应**，可知从FIN_WAIT1到CLOSE之间是重传过程，重传间隔每次翻倍(0.2/0.4/0.8/1.6/3.2/6.4)
@@ -309,7 +312,7 @@ ffff90cdd53cb340 6099  client     172.16.58.147   43782 172.16.58.146   8080  ES
 ffff90cdd53cb340 0     swapper/0  172.16.58.147   43782 172.16.58.146   8080  FIN_WAIT1   -> CLOSE       12916.193
 ```
 
-情形3：客户端发起SYN连接 -> 建立连接 -> 发起FIN关闭 -> 直接 CLOSE（没有走完四次挥手，应该收到了对端的RST）
+**情形3**：客户端发起SYN连接 -> 建立连接 -> 发起FIN关闭 -> 直接 CLOSE（没有走完四次挥手，应该收到了对端的RST）
 
 且这种情形有 `4` 个stream（检索FIN_WAIT1   -> CLOSE）  
 **注意看FIN_WAIT1状态持续只有0.2ms，和系列第一篇抓包中的case3对应。**
@@ -321,7 +324,9 @@ ffff90cdd53ca900 6099  client     172.16.58.147   43796 172.16.58.146   8080  ES
 ffff90cdd53ca900 5967  tcptracer  172.16.58.147   43796 172.16.58.146   8080  FIN_WAIT1   -> CLOSE       0.237
 ```
 
-3）tcptracer 能跟踪到发起连接->关闭连接
+3）tcptracer 能跟踪到客户端发起连接->关闭连接
+
+9次连接，10次关闭？
 
 ```sh
 [root@iZbp12vk49h9xtc8lx3o3tZ ~]# /usr/share/bcc/tools/tcptracer
@@ -529,7 +534,7 @@ tcp        0      0 192.168.1.101:8000     192.168.1.102:36646    TIME_WAIT   -
 
 这个时间，之间没注意去统计，感觉并没有等到2MSL（当前linux的MSL一般为30s，2MSL即60s）
 
-于是带着几个怀疑去实验对比（统计前就去试了）
+于是带着几个怀疑去实验对比（下述实验是假设TIME_WAIT没有等到2MSL就消失的前提喜爱做的）
 
 #### 3.3.2. 怀疑点1：`SO_LINGER`选项
 
@@ -652,8 +657,9 @@ tcp        0      0 0.0.0.0:8000            0.0.0.0:*               LISTEN      
 
 结论：`TIME_WAIT`持续时间确实和`net.ipv4.tcp_fin_timeout`没关系
 
-**到这里，可以说`TIME_WAIT`持续状态就是2MSL，和上面的这些参数都无关。**  
-（`tcp_tw_recycle`更是不建议开，且Linux 4.12版本后直接取消了这一参数，[参考](https://time.geekbang.org/column/article/238388)。上面5.10内核环境中`sysctl -a`确实没看到）
+**总结：到这里，可以说`TIME_WAIT`持续状态就是2MSL，和上面的这些参数都无关。**
+
+（`tcp_tw_recycle`更是不建议开，还是建议保持优雅关闭，且Linux 4.12版本后直接取消了这一参数，[参考](https://time.geekbang.org/column/article/238388)。上面5.10内核环境中`sysctl -a`确实没看到）
 
 #### 3.3.5. tcp_fin_timeout 生效场景验证
 
