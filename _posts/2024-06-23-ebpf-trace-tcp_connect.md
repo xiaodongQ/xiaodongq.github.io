@@ -652,6 +652,9 @@ tcp        0      0 0.0.0.0:8000            0.0.0.0:*               LISTEN      
 
 结论：`TIME_WAIT`持续时间确实和`net.ipv4.tcp_fin_timeout`没关系
 
+**到这里，可以说`TIME_WAIT`持续状态就是2MSL，和上面的这些参数都无关。**  
+（`tcp_tw_recycle`更是不建议开，且Linux 4.12版本后直接取消了这一参数，[参考](https://time.geekbang.org/column/article/238388)。上面5.10内核环境中`sysctl -a`确实没看到）
+
 #### 3.3.5. tcp_fin_timeout 生效场景验证
 
 上面提到`net.ipv4.tcp_fin_timeout`和`TIME_WAIT`无关，但是我想看下跟它有关的状态（即`FIN_WAIT2`）控制情况。
@@ -660,7 +663,7 @@ tcp        0      0 0.0.0.0:8000            0.0.0.0:*               LISTEN      
 
 这是过程描述：
 
-```plantuml
+```plaintext
 @startuml tcpconnect
 participant client as A
 participant server as B
@@ -687,10 +690,13 @@ hnote over A: CLOSE
 @enduml
 ```
 
-这是生成的图：  
+生成的图长这样：  
 ![plantuml生成图](/images/2024-06-26-tcp-fin-plantuml.png)
 
-调起来有点费劲，劝退了。。还是草图省事，这里再放下第一篇的TCP握手和断开流程：  
+调起来有点费劲且丑，劝退了。。还是草图省事。
+
+这里再放下第一篇的TCP握手和断开流程：
+
 ![TCP握手断开过程](/images/tcp-connect-close.png)
 
 上图可直观看出，只要前面3次握手正常，且最后被动关闭方不下发`close()`发送FIN，则主动发起方理论上就是处于`FIN_WAIT2`并等待超时。
