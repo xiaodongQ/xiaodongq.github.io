@@ -27,7 +27,7 @@ tags: 网络
 
 ## 2. 环境准备
 
-1、仍使用第一篇中的客户端、服务端程序，代码和编译脚步归档在 [github处](https://github.com/xiaodongQ/prog-playground/tree/main/network/tcp_connect)
+1、仍使用第一篇中的客户端、服务端程序，代码和编译脚步归档在 [github处](https://github.com/xiaodongQ/prog-playground/tree/main/network/)
 
 2、起2个阿里云抢占式ECS：Alibaba Cloud Linux 3.2104 LTS 64位（内核版本：5.10.134-16.1.al8.x86_64）
 
@@ -52,7 +52,7 @@ tags: 网络
 
 ### 3.1. 实验1：服务端listen不accept
 
-用上述github中的server和client程序：
+用上述github中tcp_connect目录的server和client程序：
 
 * `./server`，在服务端 172.16.58.146 上启动`8080`端口
 * `./client 172.16.58.146 10`，在客户端 172.16.58.147 上并发请求10次（10线程，每线程请求1次）
@@ -709,7 +709,133 @@ hnote over A: CLOSE
 
 ~~这里尝试用`scapy`进行模拟（因为有锤子，想试试效果。当然对端代码里直接不close能更快复现）~~
 
+在笔记本和linux PC间进行实验。
 
+linux PC作为客户端，参数如下：
+
+```sh
+[root@xdlinux ➜ ~ ]$ sysctl -a|grep -E "syn_backlog|somaxconn|syn_retries|synack_retries|syncookies|abort_on_overflow|net.ipv4.tcp_fin_timeout|tw_buckets|tw_reuse|tw_recycle"
+net.core.somaxconn = 128
+net.ipv4.tcp_abort_on_overflow = 0
+net.ipv4.tcp_fin_timeout = 60
+net.ipv4.tcp_max_syn_backlog = 1024
+net.ipv4.tcp_max_tw_buckets = 131072
+net.ipv4.tcp_syn_retries = 6
+net.ipv4.tcp_synack_retries = 5
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_tw_reuse = 2
+```
+
+服务端新增accept，但不close，完整代码见：[server.cpp](https://github.com/xiaodongQ/prog-playground/blob/main/network/tcp_connect_fin_wait2/server.cpp)
+
+```c
+// server.cpp
+...
+while (true) {  
+        struct sockaddr_in client_address; // 用于存储客户端地址信息
+        socklen_t client_len = sizeof(client_address);
+
+        // 使用accept函数接受连接请求
+        if ((new_socket = accept(server_fd, (struct sockaddr *)&client_address, &client_len)) < 0) {
+            perror("accept");
+            continue; // 如果接受失败，继续下一次循环尝试
+        }
+
+        char client_ip[INET_ADDRSTRLEN]; // 用于存储客户端IP的字符串形式
+        inet_ntop(AF_INET, &(client_address.sin_addr), client_ip, INET_ADDRSTRLEN);
+
+        std::cout << "Connection accepted from " << client_ip << ":" << ntohs(client_address.sin_port) << std::endl;
+
+        // 读取数据逻辑
+        char buffer[1024] = {0}; // 缓冲区用于存放接收的数据
+        int valread;
+
+        while ((valread = recv(new_socket, buffer, 1024, 0)) > 0) { // 循环读取直到没有更多数据
+            std::cout << "Client: " << buffer << std::endl; // 打印接收到的数据
+            memset(buffer, 0, 1024); // 清空缓冲区以便下一次读取
+        }
+
+        if (valread == 0) {
+            std::cout << "Client disconnected" << std::endl; // 客户端正常关闭连接
+        } else if (valread == -1) {
+            perror("recv failed"); // 读取错误处理
+        }
+
+        // 不做关闭
+    }  
+```
+
+1、客户端发起1个请求
+
+**现象及结果分析：**
+
+```sh
+[root@xdlinux ➜ tcp_connect_fin_wait2 git:(main) ✗ ]$ ./client 192.168.1.2 1
+Message sent: helloworld
+```
+
+netstat观察，FIN_WAIT2确实持续了60s
+
+```sh
+[root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
+Wed Jun 26 23:26:25 CST 2024
+tcp        0      0 192.168.1.150:58482     192.168.1.2:8080        FIN_WAIT2   -  
+[root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
+Wed Jun 26 23:26:27 CST 2024
+tcp        0      0 192.168.1.150:58482     192.168.1.2:8080        FIN_WAIT2   -
+...
+[root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
+Wed Jun 26 23:27:24 CST 2024
+tcp        0      0 192.168.1.150:58482     192.168.1.2:8080        FIN_WAIT2   -  
+[root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
+Wed Jun 26 23:27:25 CST 2024
+```
+
+```sh
+[root@xdlinux ➜ tools ]$ ./tcpstates -t -D 8080
+TIME(s)   SKADDR           C-PID C-COMM     LADDR           LPORT RADDR           RPORT OLDSTATE    -> NEWSTATE    MS
+0.000000  ffff96cb39d6a700 6657  client     192.168.1.150   0     192.168.1.2     8080  CLOSE       -> SYN_SENT    0.000
+0.007642  ffff96cb39d6a700 0     swapper/9  192.168.1.150   58482 192.168.1.2     8080  SYN_SENT    -> ESTABLISHED 7.632
+0.007804  ffff96cb39d6a700 6657  client     192.168.1.150   58482 192.168.1.2     8080  ESTABLISHED -> FIN_WAIT1   0.152
+0.011840  ffff96cb39d6a700 0     swapper/9  192.168.1.150   58482 192.168.1.2     8080  FIN_WAIT1   -> FIN_WAIT2   4.031
+0.011850  ffff96cb39d6a700 0     swapper/9  192.168.1.150   58482 192.168.1.2     8080  FIN_WAIT2   -> CLOSE       0.003
+```
+
+2、调整`sysctl -w net.ipv4.tcp_fin_timeout=10`
+
+```sh
+[root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
+Wed Jun 26 23:35:24 CST 2024
+[root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
+Wed Jun 26 23:35:31 CST 2024
+tcp        0      0 192.168.1.150:58484     192.168.1.2:8080        FIN_WAIT2   -                   
+[root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
+Wed Jun 26 23:35:32 CST 2024
+tcp        0      0 192.168.1.150:58484     192.168.1.2:8080        FIN_WAIT2   -                   
+[root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
+Wed Jun 26 23:35:33 CST 2024
+tcp        0      0 192.168.1.150:58484     192.168.1.2:8080        FIN_WAIT2   -                   
+[root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
+Wed Jun 26 23:35:34 CST 2024
+tcp        0      0 192.168.1.150:58484     192.168.1.2:8080        FIN_WAIT2   -                   
+[root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
+Wed Jun 26 23:35:35 CST 2024
+tcp        0      0 192.168.1.150:58484     192.168.1.2:8080        FIN_WAIT2   -                   
+[root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
+Wed Jun 26 23:35:36 CST 2024
+tcp        0      0 192.168.1.150:58484     192.168.1.2:8080        FIN_WAIT2   -                   
+[root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
+Wed Jun 26 23:35:37 CST 2024
+tcp        0      0 192.168.1.150:58484     192.168.1.2:8080        FIN_WAIT2   -                   
+[root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
+Wed Jun 26 23:35:38 CST 2024
+tcp        0      0 192.168.1.150:58484     192.168.1.2:8080        FIN_WAIT2   -                   
+[root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
+Wed Jun 26 23:35:39 CST 2024
+tcp        0      0 192.168.1.150:58484     192.168.1.2:8080        FIN_WAIT2   -                   
+[root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
+Wed Jun 26 23:35:39 CST 2024
+```
 
 ## 4. libbpf跟踪
 
