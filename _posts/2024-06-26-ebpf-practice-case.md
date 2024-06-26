@@ -1,8 +1,8 @@
 ---
 layout: post
-title: eBPF学习实践系列（五） -- 分析一个libbpf程序
+title: eBPF学习实践系列（五） -- 分析一个ltcplife.bpf.c程序
 categories: eBPF
-tags: eBPF libbpf
+tags: eBPF libbpf BCC
 ---
 
 * content
@@ -26,7 +26,7 @@ tags: eBPF libbpf
 
 查看有哪些可用的TCP跟踪点，检索到Brendan Gregg大佬的这篇文章：[tcp-tracepoints](https://www.brendangregg.com/blog/2018-03-22/tcp-tracepoints.html)
 
-不多，比想象中的少得多，可以通过如下方式查看：
+跟踪点不多，比想象中的少得多，可以通过如下方式查看：
 
 1、方式1：通过 /sys/kernel/debug/tracing/available_events 文件查看
 
@@ -92,9 +92,9 @@ bcc/libbpf-tools/中有很多不同的`SEC(xxx)`类型，这个和 [eBPF学习�
 * `SEC("fentry/tcp_v4_connect")`
     * bcc/libbpf-tools/tcpconnlat.bpf.c
 
-对应关系可**通过libbpf库中的`libbpf.c`中的bpf程序类型定义查看**
+**解答**：对应关系可**通过libbpf库中的`libbpf.c`中的bpf程序类型定义查看**
 
-这是内核中libbpf.c：
+这是内核中的libbpf.c：
 
 ```c
 // linux-5.10.10\tools\lib\bpf\libbpf.c
@@ -159,7 +159,7 @@ static const struct bpf_sec_def section_defs[] = {
 这里重点跟踪一下：
 
 * [bcc/libbpf-tools/tcplife.bpf.c](https://github.com/iovisor/bcc/blob/master/libbpf-tools/tcplife.bpf.c)
-* 对比 [bcc/tools/tcplife.py](https://github.com/iovisor/bcc/blob/master/tools/tcplife.py)
+* 并对比 [bcc/tools/tcplife.py](https://github.com/iovisor/bcc/blob/master/tools/tcplife.py)，内核新增tracepoint前用的是kprobe，新增后用`sock:inet_sock_set_state`跟踪点，里面做了兼容
 
 并结合这篇文章译文：[BCC 到 libbpf 的转换指南【译】](https://www.ebpf.top/post/bcc-to-libbpf-guid/)，后续碰到libbpf程序应该都可以顺利拆解了。
 
@@ -202,7 +202,7 @@ print fmt: "family=%s protocol=%s sport=%hu dport=%hu saddr=%pI4 daddr=%pI4 sadd
 [root@xdlinux ➜ ~ ]$
 ```
 
-### 4.2. 如何eBPF helper函数说明
+### 4.2. 如何查看eBPF helper函数说明
 
 系统libbpf的include下的bpf.h里可以看到各helper函数功能介绍
 
@@ -210,7 +210,7 @@ print fmt: "family=%s protocol=%s sport=%hu dport=%hu saddr=%pI4 daddr=%pI4 sadd
 
 ### 4.3. 代码分析
 
-代码整体贴过来：
+代码整体贴过来：（helper函数的功能和参数说明，均可在bpf.h查看）
 
 ```c
 // bcc/libbpf-tools/tcplife.bpf.c
@@ -346,7 +346,7 @@ int inet_sock_set_state(struct trace_event_raw_inet_sock_set_state *args)
             // map：指向要更新的eBPF映射的指针。这个映射必须已经通过bpf()系统调用或其他方式在**内核中**创建。
             // key：指向要更新的元素的键的指针。键的类型和大小取决于映射的定义。
             // value：指向新值的指针。这个值将替换映射中与给定键关联的旧值。值的类型和大小同样取决于映射的定义。
-        // ~~这里是个错误示例，通过代码跳转到了：int bpf_map_update_elem(int fd, const void *key, const void *value, __u64 flags)~~
+        // ~~这里是个错误声明示例，通过代码跳转到了：int bpf_map_update_elem(int fd, const void *key, const void *value, __u64 flags)，实际应该看bpf.h~~
         // birth是上面定义的BPF map，相当于bcc里面的BPF_HASH(birth, struct sock *, u64); 这个是创建在内核中的
         bpf_map_update_elem(&birth, &sk, &ts, BPF_ANY);
     }
