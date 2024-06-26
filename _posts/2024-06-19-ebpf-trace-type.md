@@ -583,15 +583,14 @@ tracepoint:syscalls:sys_exit_fchmodat
 
 #### 4.4.1. 方法1：基于`vmlinux.h`
 
-在`vmlinux.h`中进行查找：
+对于tracepoint，比较好确定，在`vmlinux.h`中按tracepoint点查找：
 
-* 一般 `sys_enter_xx` 对应 `trace_event_raw_sys_enter`
+* `sys_enter_xx` 对应 `trace_event_raw_sys_enter`
+    - 对于`sys_enter_fchmodat`，对应 `struct trace_event_raw_sys_enter`。
 * `sys_exit_xx` 对应 `trace_event_raw_sys_exit`
-* 其他的一般对应 `trace_event_raw_<name>`，如果没找到的话，可以参考 trace_event_raw_sys_enter 的例子找它相近的 struct
-
-对于`sys_enter_fchmodat`，对应 `struct trace_event_raw_sys_enter`。
-
-**TODO：从bcc/libbpf-bootstrap/Cilium等几个热门仓库里把各类型对应的结构体汇总下整理成表格（前几天看到过别人整的找不到了）**
+* 其他的tracepoint一般对应 `trace_event_raw_<name>`，如果没找到的话，可以参考 trace_event_raw_sys_enter 的例子找它相近的 struct
+    - 比如追踪点`tcp:tcp_retransmit_synack`，搜索可以找到：`struct trace_event_raw_tcp_retransmit_synack`
+    - 即`trace_event_raw_xxx`形式
 
 这里查看bcc项目里的`vmlinux.h`
 
@@ -684,6 +683,18 @@ int tracepoint__syscalls__sys_enter_fchmodat(struct sys_enter_fchmodat_args *ctx
     // ...
 }
 ```
+
+#### 4.4.3. 其他eBPF类型
+
+其他类型（部分），可以参考这篇：[BPF 进阶笔记（一）：BPF 程序（BPF Prog）类型详解：使用场景、函数签名、执行位置及程序示例](https://arthurchiao.art/blog/bpf-advanced-notes-1-zh)
+
+比如：`BPF_PROG_TYPE_KPROBE`
+
+Hook 位置：`kprobe_perf_func()`/`uprobe_perf_func()`、`kretprobe_perf_func()`/`uretprobe_perf_func()`
+
+对应的传入参数：`struct pt_regs *ctx`
+
+PS：ARTHURCHIAO'S BLOG，之前看网络相关内容（[Monitoring Linux Network Stack](http://arthurchiao.art/blog/monitoring-network-stack/#13-panels)），实践了一下 普罗+grafana 主动推送信息，手撸了几个面板，就是参考的这个博客，串联起来了！
 
 ## 5. 小结
 
