@@ -145,6 +145,7 @@ print fmt: "family=%s protocol=%s sport=%hu dport=%hu saddr=%pI4 daddr=%pI4 sadd
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright (c) 2022 Hengqi Chen */
 #include <vmlinux.h>
+// 在 BCC 中使用BPF_CORE_READ，请确保 bpf_core_read.h 头文件包含在最终 BPF 程序中
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
