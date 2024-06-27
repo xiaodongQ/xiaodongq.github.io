@@ -8,7 +8,7 @@ tags: eBPF libbpf BCC
 * content
 {:toc}
 
-跟踪分析bcc项目ibbpf-tools中的 `ltcplife.bpf.c` 程序
+跟踪分析bcc项目ibbpf-tools中的 `tcplife.bpf.c` 程序
 
 
 
@@ -79,80 +79,7 @@ tcp:tcp_retransmit_synack
 tcp:tcp_probe
 ```
 
-## 3. SEC(name)对应的eBPF类型
-
-bcc/libbpf-tools/中有很多不同的`SEC(xxx)`类型，这个和 [eBPF学习实践系列（四） -- eBPF的各种追踪类型](https://xiaodongq.github.io/2024/06/19/ebpf-trace-type/) 里介绍的30来种`enum bpf_prog_type`枚举值是怎么对应起来的？
-
-比如下面几个：
-
-* `SEC("tracepoint/sock/inet_sock_set_state")`
-    * bcc/libbpf-tools/tcplife.bpf.c
-* `SEC("kprobe/tcp_v4_connect")`、`SEC("kretprobe/tcp_v4_connect")`
-    * bcc/libbpf-tools/tcptracer.bpf.c
-* `SEC("fentry/tcp_v4_connect")`
-    * bcc/libbpf-tools/tcpconnlat.bpf.c
-
-**解答**：对应关系可**通过libbpf库中的`libbpf.c`中的bpf程序类型定义查看**
-
-这是内核中的libbpf.c：
-
-```c
-// linux-5.10.10\tools\lib\bpf\libbpf.c
-static const struct bpf_sec_def section_defs[] = {
-    BPF_PROG_SEC("socket",          BPF_PROG_TYPE_SOCKET_FILTER),
-    BPF_PROG_SEC("sk_reuseport",        BPF_PROG_TYPE_SK_REUSEPORT),
-    // SEC_DEF 这个宏会自动拼接BPF_PROG_TYPE_前缀：.prog_type = BPF_PROG_TYPE_##ptype
-    SEC_DEF("kprobe/", KPROBE,
-        .attach_fn = attach_kprobe),
-    BPF_PROG_SEC("uprobe/",         BPF_PROG_TYPE_KPROBE),
-    SEC_DEF("kretprobe/", KPROBE,
-        .attach_fn = attach_kprobe),
-    BPF_PROG_SEC("uretprobe/",      BPF_PROG_TYPE_KPROBE),
-    BPF_PROG_SEC("classifier",      BPF_PROG_TYPE_SCHED_CLS),
-    BPF_PROG_SEC("action",          BPF_PROG_TYPE_SCHED_ACT),
-    SEC_DEF("tracepoint/", TRACEPOINT,
-        .attach_fn = attach_tp),
-    SEC_DEF("tp/", TRACEPOINT,
-        .attach_fn = attach_tp),
-    ...
-}
-```
-
-对应可知归属eBPF程序类型分别为：
-
-* `SEC("tracepoint/sock/inet_sock_set_state")`
-    * BPF_PROG_TYPE_TRACEPOINT
-* `SEC("kprobe/tcp_v4_connect")`、`SEC("kretprobe/tcp_v4_connect")`
-    * BPF_PROG_TYPE_KPROBE
-* `SEC("fentry/tcp_v4_connect")`
-    * BPF_PROG_TYPE_TRACING
-
-这是ibbpf-bootstrap项目中的libbpf.c，展开宏后逻辑一样的：
-
-```c
-// libbpf-bootstrap-master\bpftool\libbpf\src\libbpf.c
-static const struct bpf_sec_def section_defs[] = {
-    // SEC_DEF 这个宏会自动拼接BPF_PROG_TYPE_前缀：.prog_type = BPF_PROG_TYPE_##ptype
-    SEC_DEF("socket",       SOCKET_FILTER, 0, SEC_NONE),
-    SEC_DEF("sk_reuseport/migrate", SK_REUSEPORT, BPF_SK_REUSEPORT_SELECT_OR_MIGRATE, SEC_ATTACHABLE),
-    SEC_DEF("sk_reuseport",     SK_REUSEPORT, BPF_SK_REUSEPORT_SELECT, SEC_ATTACHABLE),
-    SEC_DEF("kprobe+",      KPROBE, 0, SEC_NONE, attach_kprobe),
-    SEC_DEF("uprobe+",      KPROBE, 0, SEC_NONE, attach_uprobe),
-    ...
-    SEC_DEF("perf_event",       PERF_EVENT, 0, SEC_NONE),
-    ...
-    SEC_DEF("sk_skb",       SK_SKB, 0, SEC_NONE),
-    ...
-    SEC_DEF("cgroup/setsockopt",    CGROUP_SOCKOPT, BPF_CGROUP_SETSOCKOPT, SEC_ATTACHABLE),
-    SEC_DEF("cgroup/dev",       CGROUP_DEVICE, BPF_CGROUP_DEVICE, SEC_ATTACHABLE_OPT),
-    SEC_DEF("struct_ops+",      STRUCT_OPS, 0, SEC_NONE),
-    SEC_DEF("struct_ops.s+",    STRUCT_OPS, 0, SEC_SLEEPABLE),
-    SEC_DEF("sk_lookup",        SK_LOOKUP, BPF_SK_LOOKUP, SEC_ATTACHABLE),
-    SEC_DEF("netfilter",        NETFILTER, BPF_NETFILTER, SEC_NONE),
-};
-```
-
-## 4. 具体分析 tcplife.bpf.c
+## 3. 具体分析 tcplife.bpf.c
 
 [tcp-tracepoints](https://www.brendangregg.com/blog/2018-03-22/tcp-tracepoints.html) 中举例提及了`tcplife`在BCC和libbpf前后的对比。
 
@@ -163,7 +90,7 @@ static const struct bpf_sec_def section_defs[] = {
 
 并结合这篇文章译文：[BCC 到 libbpf 的转换指南【译】](https://www.ebpf.top/post/bcc-to-libbpf-guid/)，后续碰到libbpf程序应该都可以顺利拆解了。
 
-### 4.1. 追踪点sock:inet_sock_set_state的参数
+### 3.1. 追踪点sock:inet_sock_set_state的参数
 
 查看参数格式：（`tcptracer`工具也是用的这个追踪点）
 
@@ -202,13 +129,13 @@ print fmt: "family=%s protocol=%s sport=%hu dport=%hu saddr=%pI4 daddr=%pI4 sadd
 [root@xdlinux ➜ ~ ]$
 ```
 
-### 4.2. 如何查看eBPF helper函数说明
+### 3.2. 如何查看eBPF helper函数说明
 
 系统libbpf的include下的bpf.h里可以看到各helper函数功能介绍
 
 （linux-5.10.10\include\uapi\linux\bpf.h或者bcc-master\src\cc\libbpf\include\uapi\linux\bpf.h）
 
-### 4.3. 代码分析
+### 3.3. 代码分析
 
 代码整体贴过来：（helper函数的功能和参数说明，均可在bpf.h查看）
 
@@ -433,12 +360,14 @@ cleanup:
 char LICENSE[] SEC("license") = "GPL";
 ```
 
+## 4. 小结
+
+分析tcplife.bpf.c程序，并跟tcplife.py中的实现方式对比，熟悉了BCC和libbpf常见几个结构的转换方式
+
 ## 5. 参考
 
 1、[tcp-tracepoints](https://www.brendangregg.com/blog/2018-03-22/tcp-tracepoints.html)
 
-2、[BPF 进阶笔记（一）：BPF 程序（BPF Prog）类型详解：使用场景、函数签名、执行位置及程序示例](https://arthurchiao.art/blog/bpf-advanced-notes-1-zh)
+2、[BCC 到 libbpf 的转换指南【译】](https://www.ebpf.top/post/bcc-to-libbpf-guid/)
 
-3、[BCC 到 libbpf 的转换指南【译】](https://www.ebpf.top/post/bcc-to-libbpf-guid/)
-
-4、GPT
+3、GPT

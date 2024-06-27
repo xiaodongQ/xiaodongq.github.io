@@ -32,6 +32,17 @@ eBPF追踪类型学习整理
 * Syscall Tracing
     * 追踪系统调用的执行情况
 
+**"最佳"实践tips：**
+
+* 怎么确认 **SEC(xxx) -> eBPF类型** 的对应关系
+    - 通过libbpf库中`libbpf.c`的`struct bpf_sec_def section_defs[]`定义查看对应关系
+* 怎么确认 **eBPF类型 -> 上下文结构**
+    - 通过eBPF Docs查看：[program types (Linux)](https://ebpf-docs.dylanreimerink.nl/linux/program-type/)
+    - 上面有该类型是哪个内核版本开始新增的，还有该类型对应的具体上下文结构，以及支持的helper函数、内核侧函数等
+
+比如SEC("socket")对应的类型：  
+找libbpf.c的`section_defs`后，发现是`BPF_PROG_TYPE_SOCKET_FILTER`，然后到eBPF Docs：[Program type BPF_PROG_TYPE_SOCKET_FILTER](https://ebpf-docs.dylanreimerink.nl/linux/program-type/BPF_PROG_TYPE_SOCKET_FILTER/) 上展开分类并搜索这个type，上面会有个`3.19`的内核标签，并给出了其上下文（context）为`__sk_buff`
+
 ## 2. eBPF程序类型
 
 eBPF 程序通常包含用户态和内核态两部分：用户态程序通过 BPF 系统调用，完成 eBPF 程序的加载、事件挂载以及映射创建和更新，而内核态中的 eBPF 程序则需要通过 BPF 辅助函数完成所需的任务。
@@ -125,6 +136,23 @@ tracepoint、kprobe、perf_event等，主要用于从系统中提取跟踪信息
 常见的**跟踪类 BPF 程序**：  
 ![常见的跟踪类eBPF程序](/images/2024-06-23-ebpf-trace-type.png)  
 
+对于内核预定义的tracepoint（BPF_PROG_TYPE_TRACEPOINT），查看eBPF Docs：[Program type BPF_PROG_TYPE_TRACEPOINT](https://ebpf-docs.dylanreimerink.nl/linux/program-type/BPF_PROG_TYPE_TRACEPOINT/) 后做些说明。
+
+* tracepoint是通过`TRACE_EVENT`宏，在内核中预定义的跟踪点，可在内核代码里找到很多使用TRACE_EVENT宏的定义
+    - 比如 `TRACE_EVENT(tcp_retransmit_synack, xxx);`，linux-5.10.10\include\trace\events\tcp.h
+* 可以用`tracefs`列出所有的tracepoint跟踪点事件，在`events`目录下
+    - 一般挂载在 `/sys/kernel/tracing`，mount查看tracefs还会挂载到`/sys/kernel/debug/tracing`
+    - 目录结构一般以名称中的第一个单词来组织
+        - 如`tcp_retransmit_synack`，在`/sys/kernel/tracing/events/tcp/tcp_retransmit_synack`下
+        - 也有稍微不同的，如inet_sock_set_state在events/sock下
+
+`mount`过滤tracefs的结果：
+
+```sh
+tracefs on /sys/kernel/debug/tracing type tracefs (rw,nosuid,nodev,noexec,relatime)
+tracefs on /sys/kernel/tracing type tracefs (rw,nosuid,nodev,noexec,relatime)
+```
+
 ### 2.2. 网络类eBPF程序
 
 xdp、sock_ops、cgroup_sock_addr、sk_msg等，主要用于对网络数据包进行过滤和处理，进而实现网络的观测、过滤、流量控制以及性能优化等各种丰富的功能。
@@ -151,15 +179,86 @@ lsm用于安全，其他还有flow_dissector、lwt_in等
 示例：
 ![其他类型eBPF程序示例](/images/2024-06-23-ebpf-other-type.png)
 
-## 3. 各eBPF类型怎么找对应的插桩点
+## 3. SEC(name)对应的eBPF类型
+
+bcc/libbpf-tools/中有很多不同的`SEC(xxx)`类型，这个上面介绍的30来种`enum bpf_prog_type`枚举值是怎么对应起来的？
+
+比如下面几个：
+
+* `SEC("tracepoint/sock/inet_sock_set_state")`
+    * bcc/libbpf-tools/tcplife.bpf.c
+* `SEC("kprobe/tcp_v4_connect")`、`SEC("kretprobe/tcp_v4_connect")`
+    * bcc/libbpf-tools/tcptracer.bpf.c
+* `SEC("fentry/tcp_v4_connect")`
+    * bcc/libbpf-tools/tcpconnlat.bpf.c
+
+**解答**：对应关系可**通过libbpf库中的`libbpf.c`中的bpf程序类型定义查看**
+
+这是内核中的libbpf.c：
+
+```c
+// linux-5.10.10\tools\lib\bpf\libbpf.c
+static const struct bpf_sec_def section_defs[] = {
+    BPF_PROG_SEC("socket",          BPF_PROG_TYPE_SOCKET_FILTER),
+    BPF_PROG_SEC("sk_reuseport",        BPF_PROG_TYPE_SK_REUSEPORT),
+    // SEC_DEF 这个宏会自动拼接BPF_PROG_TYPE_前缀：.prog_type = BPF_PROG_TYPE_##ptype
+    SEC_DEF("kprobe/", KPROBE,
+        .attach_fn = attach_kprobe),
+    BPF_PROG_SEC("uprobe/",         BPF_PROG_TYPE_KPROBE),
+    SEC_DEF("kretprobe/", KPROBE,
+        .attach_fn = attach_kprobe),
+    BPF_PROG_SEC("uretprobe/",      BPF_PROG_TYPE_KPROBE),
+    BPF_PROG_SEC("classifier",      BPF_PROG_TYPE_SCHED_CLS),
+    BPF_PROG_SEC("action",          BPF_PROG_TYPE_SCHED_ACT),
+    SEC_DEF("tracepoint/", TRACEPOINT,
+        .attach_fn = attach_tp),
+    SEC_DEF("tp/", TRACEPOINT,
+        .attach_fn = attach_tp),
+    ...
+}
+```
+
+对应可知归属eBPF程序类型分别为：
+
+* `SEC("tracepoint/sock/inet_sock_set_state")`
+    * BPF_PROG_TYPE_TRACEPOINT
+* `SEC("kprobe/tcp_v4_connect")`、`SEC("kretprobe/tcp_v4_connect")`
+    * BPF_PROG_TYPE_KPROBE
+* `SEC("fentry/tcp_v4_connect")`
+    * BPF_PROG_TYPE_TRACING
+
+这是ibbpf-bootstrap项目中的libbpf.c，展开宏后逻辑一样的：
+
+```c
+// libbpf-bootstrap-master\bpftool\libbpf\src\libbpf.c
+static const struct bpf_sec_def section_defs[] = {
+    // SEC_DEF 这个宏会自动拼接BPF_PROG_TYPE_前缀：.prog_type = BPF_PROG_TYPE_##ptype
+    SEC_DEF("socket",       SOCKET_FILTER, 0, SEC_NONE),
+    SEC_DEF("sk_reuseport/migrate", SK_REUSEPORT, BPF_SK_REUSEPORT_SELECT_OR_MIGRATE, SEC_ATTACHABLE),
+    SEC_DEF("sk_reuseport",     SK_REUSEPORT, BPF_SK_REUSEPORT_SELECT, SEC_ATTACHABLE),
+    SEC_DEF("kprobe+",      KPROBE, 0, SEC_NONE, attach_kprobe),
+    SEC_DEF("uprobe+",      KPROBE, 0, SEC_NONE, attach_uprobe),
+    ...
+    SEC_DEF("perf_event",       PERF_EVENT, 0, SEC_NONE),
+    ...
+    SEC_DEF("sk_skb",       SK_SKB, 0, SEC_NONE),
+    ...
+    SEC_DEF("cgroup/setsockopt",    CGROUP_SOCKOPT, BPF_CGROUP_SETSOCKOPT, SEC_ATTACHABLE),
+    SEC_DEF("cgroup/dev",       CGROUP_DEVICE, BPF_CGROUP_DEVICE, SEC_ATTACHABLE_OPT),
+    SEC_DEF("struct_ops+",      STRUCT_OPS, 0, SEC_NONE),
+    SEC_DEF("struct_ops.s+",    STRUCT_OPS, 0, SEC_SLEEPABLE),
+    SEC_DEF("sk_lookup",        SK_LOOKUP, BPF_SK_LOOKUP, SEC_ATTACHABLE),
+    SEC_DEF("netfilter",        NETFILTER, BPF_NETFILTER, SEC_NONE),
+};
+```
+
+## 4. 各eBPF类型怎么找对应的插桩点
 
 > 从前面可以看出来 eBPF 程序本身并不困难，**困难的是为其寻找合适的事件源来触发运行**。
 
 下面说明eBPF各类型程序怎么找对应的插桩点，为实际开发提供指导。
 
-主要基于阿里云智能可观测团队的这篇文章学习：[深入浅出 eBPF｜你要了解的 7 个核心问题](https://developer.aliyun.com/article/985159)
-
-### 3.1. 寻找内核的插桩点
+### 4.1. 寻找内核的插桩点
 
 对于监控和诊断领域来说，**跟踪类** eBPF 程序的事件源包含 3 类：
 
@@ -167,7 +266,7 @@ lsm用于安全，其他还有flow_dissector、lwt_in等
 2. 内核跟踪点（tracepoint）
 3. 性能事件（perf_event）
 
-#### 3.1.1. 内核中都有哪些内核函数、内核跟踪点或性能事件？
+#### 4.1.1. 内核中都有哪些内核函数、内核跟踪点或性能事件？
 
 * 使用调试信息获取内核函数、内核跟踪点
 
@@ -271,7 +370,7 @@ List of pre-defined events (to be used in -e):
   amdgpu:amdgpu_bo_move                              [Tracepoint event]
 ```
 
-#### 3.1.2. 如何查看内核函数/跟踪点的参数和数据结构？
+#### 4.1.2. 如何查看内核函数/跟踪点的参数和数据结构？
 
 对于内核函数和内核跟踪点，在需要跟踪它们的传入参数和返回值的时候，该如何查询这些数据结构的定义格式呢？
 
@@ -317,9 +416,9 @@ tracepoint:syscalls:sys_enter_openat
 [root@xdlinux ➜ /root ]$
 ```
 
-### 3.2. 寻找应用的插桩点
+### 4.2. 寻找应用的插桩点
 
-#### 3.2.1. 如何查询用户进程的跟踪点？
+#### 4.2.1. 如何查询用户进程的跟踪点？
 
 * 使用`readelf`、`objdump`、`nm`查询
 
@@ -436,49 +535,13 @@ usdt:/lib64/libc.so.6:libc:memory_arena_reuse_free_list
 ...
 ```
 
-## 4. eBPF追踪-实践套路
+## 5. tracepoint追踪实践
 
-通过上面的学习，已经差不多可以知道怎么查看常见追踪类型了，本小节来看下实践中具体如何使用
+通过上面的学习，已经差不多可以知道怎么查看常见追踪类型了
 
-以`tracepoint`（对应类型为：BPF_PROG_TYPE_TRACEPOINT）类型的eBPF为例，来学习追踪的套路。
+本小节以`tracepoint`（对应类型为：BPF_PROG_TYPE_TRACEPOINT）类型的eBPF为例，来看下实践中具体如何使用
 
-主要参考：[ebpf/libbpf 程序使用 tracepoint 的常见问题](https://mozillazg.com/2022/05/ebpf-libbpf-tracepoint-common-questions.html)
-
-PS：看这个博主的libbpf仓库有不少好的案例，后续可学习参考：[hello-libbpfgo](https://github.com/mozillazg/hello-libbpfgo)
-
-### 4.1. SEC内容格式说明（tracepoint）
-
-* **SEC内容的格式**：`SEC("tracepoint/<category>/<name>")` 或者`SEC("tp/<category>/<name>")`
-
-`<category>` 和 `<name>` 的值均取值前面 `/sys/kernel/debug/tracing/available_events` 文件中列出的内容
-
-比如 bcc项目中 libbpf-tools、libbpf-bootstrap 中的示例：
-
-（bcc里各追踪类型和格式说明可参考其 [reference_guide](https://github.com/iovisor/bcc/blob/master/docs/reference_guide.md)）
-
-```c
-// bcc/libbpf-tools/execsnoop.bpf.c
-SEC("tracepoint/syscalls/sys_enter_execve")
-int tracepoint__syscalls__sys_enter_execve(struct trace_event_raw_sys_enter* ctx)
-{
-    ...
-}
-
-// libbpf-bootstrap/examples/c/bootstrap.bpf.c
-SEC("tp/sched/sched_process_exec") 
-int handle_exec(struct trace_event_raw_sched_process_exec *ctx)
-{
-    ...
-}
-```
-
-```sh
-[root@xdlinux ➜ examples git:(master) ✗ ]$ cat /sys/kernel/debug/tracing/available_events | egrep -w "sys_enter_execve|sched_process_exec"
-sched:sched_process_exec
-syscalls:sys_enter_execve
-```
-
-### 4.2. 确定需要追踪的 tracepoint 事件
+### 5.1. 确定需要追踪的 tracepoint 事件
 
 场景：
 
@@ -514,9 +577,10 @@ tracepoint:syscalls:sys_enter_fchmodat
 tracepoint:syscalls:sys_exit_fchmodat
 ```
 
-### 4.3. 确定事件包含的信息
+### 5.2. 确定事件包含的信息
 
-通过查看 `/sys/kernel/tracing/events/syscalls/xxx/format`，其中`sys_enter_xxx`对应输入参数、`sys_exit_xxx`对应输出参数
+通过查看 `/sys/kernel/tracing/events/syscalls/xxx/format`，其中`sys_enter_xxx`对应输入参数、`sys_exit_xxx`对应输出参数  
+（若是其他类型，可以到eBPF Docs上去查找对应的上下文结构）
 
 此处以跟踪`sys_enter_fchmodat`为例
 
@@ -575,13 +639,13 @@ tracepoint:syscalls:sys_exit_fchmodat
 
 从上面可以看到，我们可以获取 `sys_enter_fchmodat` 事件的 `dfd` 、`filename` 以及 `mode` 信息
 
-### 4.4. 确定事件处理函数的参数
+### 5.3. 确定事件处理函数的参数
 
 上述小节知道了事件本身可以提供的信息后，我们还需要知道如何在eBPF程序中读取这些信息。
 
 这涉及到eBPF事件处理函数的输入参数。可通过如下方式获取：
 
-#### 4.4.1. 方法1：基于`vmlinux.h`
+#### 5.3.1. 方法1：基于`vmlinux.h`
 
 对于tracepoint，比较好确定，在`vmlinux.h`中按tracepoint点查找：
 
@@ -592,7 +656,7 @@ tracepoint:syscalls:sys_exit_fchmodat
     - 比如追踪点`tcp:tcp_retransmit_synack`，搜索可以找到：`struct trace_event_raw_tcp_retransmit_synack`
     - 即`trace_event_raw_xxx`形式
 
-这里查看bcc项目里的`vmlinux.h`
+这里查看bcc项目里的`vmlinux.h`（不同内核版本vmlinux.h有所差异，这就体现出libbpf CO-RE的优势了）
 
 ```sh
 [root@xdlinux ➜ bcc git:(v0.19.0) ✗ ]$ find . -name vmlinux.h
@@ -630,11 +694,9 @@ int tracepoint__syscalls__sys_enter_fchmodat(struct trace_event_raw_sys_enter *c
 }
 ```
 
-#### 4.4.2. 方法2：手动构造参数结构体
+#### 5.3.2. 方法2：手动构造参数结构体
 
-PS：怪不得之前看别人的eBPF程序，感觉云里雾里没得到章法，有时自定义有时有内核自带结构，这里得到了解答。
-
-除了使用 `vmlinux.h` 中预定义的结构体外，我们**还可以基于第三步中 `format` 文件的内容自定义一个结构体来作为eBPF程序的参数。**
+除了使用 `vmlinux.h` 中预定义的结构体外，我们**还可以基于上述 `format` 文件的内容自定义一个结构体来作为eBPF程序的参数。**
 
 对于上面的`sys_enter_fchmodat/format`：
 
@@ -661,6 +723,7 @@ print fmt: "dfd: 0x%08lx, filename: 0x%08lx, mode: 0x%08lx", ((unsigned long)(RE
 ```c
 struct sys_enter_fchmodat_args {
     // 前16个字节的内容，对应的是 format 文件中 dfd 之前的所有字段，根据dfd对应的`offset:16`可知道其偏移
+    // 不确定时建议还是按format结果定义相应类型的字段
     char _[16];
     // linux 64位机器上，long一般是8字节 (32位linux和windows机器则不同，此处不管)
     long dfd;
@@ -684,25 +747,17 @@ int tracepoint__syscalls__sys_enter_fchmodat(struct sys_enter_fchmodat_args *ctx
 }
 ```
 
-#### 4.4.3. 其他eBPF类型
+#### 5.3.3. 其他eBPF类型
 
-其他类型（部分），可以参考这篇：[BPF 进阶笔记（一）：BPF 程序（BPF Prog）类型详解：使用场景、函数签名、执行位置及程序示例](https://arthurchiao.art/blog/bpf-advanced-notes-1-zh)
+上面重点展示了tracepoint对应的`的BPF_PROG_TYPE_TRACEPOINT`类型的实践方式，其他类型的eBPF程序，如篇头所述可以查询eBPF Docs：[program types (Linux)](https://ebpf-docs.dylanreimerink.nl/linux/program-type/)
 
-比如：`BPF_PROG_TYPE_KPROBE`
-
-Hook 位置：`kprobe_perf_func()`/`uprobe_perf_func()`、`kretprobe_perf_func()`/`uretprobe_perf_func()`
-
-对应的传入参数：`struct pt_regs *ctx`
-
-PS：ARTHURCHIAO'S BLOG，之前看网络相关内容（[Monitoring Linux Network Stack](http://arthurchiao.art/blog/monitoring-network-stack/#13-panels)），实践了一下 普罗+grafana 主动推送信息，手撸了几个面板，就是参考的这个博客，串联起来了！
-
-## 5. 小结
+## 6. 小结
 
 学习梳理了eBPF各程序类型，查找追踪点的方法，进行追踪的实践套路。
 
 下一步应该可以按需开始上手了。
 
-## 6. 参考
+## 7. 参考
 
 1、[深入浅出 eBPF｜你要了解的 7 个核心问题](https://developer.aliyun.com/article/985159)
 
@@ -710,6 +765,8 @@ PS：ARTHURCHIAO'S BLOG，之前看网络相关内容（[Monitoring Linux Networ
 
 3、[ebpf/libbpf 程序使用 tracepoint 的常见问题](https://mozillazg.com/2022/05/ebpf-libbpf-tracepoint-common-questions.html)
 
-4、[hello-libbpfgo](https://github.com/mozillazg/hello-libbpfgo)
+4、eBPF Docs：[program types (Linux)](https://ebpf-docs.dylanreimerink.nl/linux/program-type/)
 
-5、GPT
+5、[BPF 进阶笔记（一）：BPF 程序（BPF Prog）类型详解：使用场景、函数签名、执行位置及程序示例](https://arthurchiao.art/blog/bpf-advanced-notes-1-zh)
+
+6、GPT
