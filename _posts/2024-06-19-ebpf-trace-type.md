@@ -656,6 +656,8 @@ tracepoint:syscalls:sys_exit_fchmodat
     - 比如追踪点`tcp:tcp_retransmit_synack`，搜索可以找到：`struct trace_event_raw_tcp_retransmit_synack`
     - 即`trace_event_raw_xxx`形式
 
+不同内核可能有差异，也可以生成当前内核匹配的vmlinux.h文件：`bpftool btf dump file /sys/kernel/btf/vmlinux format c > vmlinux.h`
+
 这里查看bcc项目里的`vmlinux.h`（不同内核版本vmlinux.h有所差异，这就体现出libbpf CO-RE的优势了）
 
 ```sh
