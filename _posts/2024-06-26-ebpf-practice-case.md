@@ -1,6 +1,6 @@
 ---
 layout: post
-title: eBPF学习实践系列（五） -- 分析一个ltcplife.bpf.c程序
+title: eBPF学习实践系列（五） -- 分析tcplife.bpf.c程序
 categories: eBPF
 tags: eBPF libbpf BCC
 ---

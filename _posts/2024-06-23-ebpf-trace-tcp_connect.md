@@ -707,30 +707,14 @@ hnote over A: CLOSE
 
 上图可直观看出，只要前面3次握手正常，且最后被动关闭方不下发`close()`发送FIN，则主动发起方理论上就是处于`FIN_WAIT2`并等待超时。
 
-~~这里尝试用`scapy`进行模拟（因为有锤子，想试试效果。当然对端代码里直接不close能更快复现）~~
+~~这里尝试用`scapy`进行模拟（因为有锤子，想试试效果。当然对端代码里直接不close能更快复现）。先不折腾了，关注重点。~~
 
-在笔记本和linux PC间进行实验。
+在笔记本和linux PC间进行实验。笔记本作为服务端，linux PC作为客户端
 
-linux PC作为客户端，参数如下：
-
-```sh
-[root@xdlinux ➜ ~ ]$ sysctl -a|grep -E "syn_backlog|somaxconn|syn_retries|synack_retries|syncookies|abort_on_overflow|net.ipv4.tcp_fin_timeout|tw_buckets|tw_reuse|tw_recycle"
-net.core.somaxconn = 128
-net.ipv4.tcp_abort_on_overflow = 0
-net.ipv4.tcp_fin_timeout = 60
-net.ipv4.tcp_max_syn_backlog = 1024
-net.ipv4.tcp_max_tw_buckets = 131072
-net.ipv4.tcp_syn_retries = 6
-net.ipv4.tcp_synack_retries = 5
-net.ipv4.tcp_syncookies = 1
-net.ipv4.tcp_tw_reuse = 2
-```
-
-服务端新增accept，但不close，完整代码见：[server.cpp](https://github.com/xiaodongQ/prog-playground/blob/main/network/tcp_connect_fin_wait2/server.cpp)
+服务端新增accept处理，但不close，完整代码见：[server.cpp](https://github.com/xiaodongQ/prog-playground/blob/main/network/tcp_connect_fin_wait2/server.cpp)
 
 ```c
 // server.cpp
-...
 while (true) {  
         struct sockaddr_in client_address; // 用于存储客户端地址信息
         socklen_t client_len = sizeof(client_address);
@@ -791,6 +775,8 @@ tcp        0      0 192.168.1.150:58482     192.168.1.2:8080        FIN_WAIT2   
 Wed Jun 26 23:27:25 CST 2024
 ```
 
+tcpstates观察到的状态变化，FIN_WAIT2只有很短的时间，后面的60s没统计到这里，暂不深究了
+
 ```sh
 [root@xdlinux ➜ tools ]$ ./tcpstates -t -D 8080
 TIME(s)   SKADDR           C-PID C-COMM     LADDR           LPORT RADDR           RPORT OLDSTATE    -> NEWSTATE    MS
@@ -801,32 +787,34 @@ TIME(s)   SKADDR           C-PID C-COMM     LADDR           LPORT RADDR         
 0.011850  ffff96cb39d6a700 0     swapper/9  192.168.1.150   58482 192.168.1.2     8080  FIN_WAIT2   -> CLOSE       0.003
 ```
 
-2、调整`sysctl -w net.ipv4.tcp_fin_timeout=10`
+这是linux机器的相关内核参数，可看到tcp_fin_timeout默认是60s：
 
 ```sh
-[root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
-Wed Jun 26 23:35:24 CST 2024
+[root@xdlinux ➜ ~ ]$ sysctl -a|grep -E "syn_backlog|somaxconn|syn_retries|synack_retries|syncookies|abort_on_overflow|net.ipv4.tcp_fin_timeout|tw_buckets|tw_reuse|tw_recycle"
+net.core.somaxconn = 128
+net.ipv4.tcp_abort_on_overflow = 0
+net.ipv4.tcp_fin_timeout = 60
+net.ipv4.tcp_max_syn_backlog = 1024
+net.ipv4.tcp_max_tw_buckets = 131072
+net.ipv4.tcp_syn_retries = 6
+net.ipv4.tcp_synack_retries = 5
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_tw_reuse = 2
+```
+
+2、调整`sysctl -w net.ipv4.tcp_fin_timeout=10`，再请求观察
+
+可看到FIN_WAIT2只持续了10s，参数生效，到此结束tcp_fin_timeout观察实验
+
+```sh
+# client请求后，另一个终端开始手动统计（也可简单写个统计脚本方便点）
 [root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
 Wed Jun 26 23:35:31 CST 2024
 tcp        0      0 192.168.1.150:58484     192.168.1.2:8080        FIN_WAIT2   -                   
 [root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
 Wed Jun 26 23:35:32 CST 2024
 tcp        0      0 192.168.1.150:58484     192.168.1.2:8080        FIN_WAIT2   -                   
-[root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
-Wed Jun 26 23:35:33 CST 2024
-tcp        0      0 192.168.1.150:58484     192.168.1.2:8080        FIN_WAIT2   -                   
-[root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
-Wed Jun 26 23:35:34 CST 2024
-tcp        0      0 192.168.1.150:58484     192.168.1.2:8080        FIN_WAIT2   -                   
-[root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
-Wed Jun 26 23:35:35 CST 2024
-tcp        0      0 192.168.1.150:58484     192.168.1.2:8080        FIN_WAIT2   -                   
-[root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
-Wed Jun 26 23:35:36 CST 2024
-tcp        0      0 192.168.1.150:58484     192.168.1.2:8080        FIN_WAIT2   -                   
-[root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
-Wed Jun 26 23:35:37 CST 2024
-tcp        0      0 192.168.1.150:58484     192.168.1.2:8080        FIN_WAIT2   -                   
+...
 [root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
 Wed Jun 26 23:35:38 CST 2024
 tcp        0      0 192.168.1.150:58484     192.168.1.2:8080        FIN_WAIT2   -                   
