@@ -16,7 +16,7 @@ tags: eBPF libbpf BCC
 
 前面的eBPF学习实践系列主要是跟着别人的文章学习，积累了比较理论的知识。
 
-[TCP半连接全连接（三） -- eBPF跟踪全连接队列溢出](https://xiaodongq.github.io/2024/06/23/ebpf-trace-tcp_connect/) 这篇中，自己要写eBPF程序了，带着实践的目的去参考已有工具代码，发现视角完全变了。
+[TCP半连接全连接（三） -- eBPF跟踪全连接队列溢出（上）](https://xiaodongq.github.io/2024/06/23/bcctools-trace-tcp_connect/) 这篇中，自己要写eBPF程序了，带着实践的目的去参考已有工具代码，发现视角完全变了。
 
 之前的理论知识很多都串起来了，再次体会到如这篇文章：[举三反一--从理论知识到实际问题的推导](https://plantegg.github.io/2020/11/02/%E4%B8%BE%E4%B8%89%E5%8F%8D%E4%B8%80--%E4%BB%8E%E7%90%86%E8%AE%BA%E7%9F%A5%E8%AF%86%E5%88%B0%E5%AE%9E%E9%99%85%E9%97%AE%E9%A2%98%E7%9A%84%E6%8E%A8%E5%AF%BC/) 里说的**工程效率**和**知识效率**，理论+实践才是学习的捷径。
 
