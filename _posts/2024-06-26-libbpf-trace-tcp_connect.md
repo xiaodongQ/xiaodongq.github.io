@@ -14,7 +14,7 @@ tags: 网络
 
 ## 1. 说明
 
-继续上一篇
+继续上一篇 [TCP半连接全连接（三） -- eBPF跟踪全连接队列溢出（上）](https://xiaodongq.github.io/2024/06/23/bcctools-trace-tcp_connect/)
 
 ## 2. libbpf跟踪
 
@@ -22,9 +22,9 @@ tags: 网络
 
 这里摘抄部分内容，移植过程中可以更直观感受到BCC和libbpf（支持CO-RE）的数据结构区别，完整代码放在[这里](https://github.com/xiaodongQ/prog-playground/tree/main/network/ebpf)。
 
-先说下结果：编译成功，运行报错（还准备扩展，第一步就夭折了。。）
+先说下结果：编译成功，运行报错（还准备扩展的，第一步就夭折了。。）
 
-1、test_tcptrace.bpf.c
+### 2.1. test_tcptrace.bpf.c
 
 ```c
 // libbpf方式，不需要包含内核头文件，只要包含一个vmlinux.h和几个libbpf帮助头文件
@@ -91,7 +91,7 @@ int handle_tp(struct trace_event_raw_kfree_skb *args)
 }
 ```
 
-2、test_tcptrace.c
+### 2.2. test_tcptrace.c
 
 ```c
 int main(int argc, char **argv) {
@@ -130,7 +130,7 @@ int main(int argc, char **argv) {
 }
 ```
 
-3、拷贝到 libbpf-bootstrap/examples/c 下面，修改Makefile并编译
+### 2.3. 拷贝到 libbpf-bootstrap/examples/c 下面，修改Makefile并编译
 
 向Makefile里新增test_tcptrace：
 
@@ -138,9 +138,11 @@ int main(int argc, char **argv) {
 
 只编译这次的test_tcptrace即可：`make test_tcptrace`，编译得到二进制文件：`test_tcptrace`
 
-4、开始运行（理论上这个二进制文件可以拷贝分发到其他内核版本的机器运行了）
+### 2.4. 开始运行
 
-但是报错了：(TODO 待定位)
+理论上这个二进制文件可以拷贝分发到其他内核版本的机器运行了。
+
+先本地运行，emmm 报错了：(TODO 待定位)
 
 ```sh
 [root@xdlinux ➜ c git:(master) ✗ ]$ ./test_tcptrace 
@@ -241,18 +243,87 @@ libbpf: failed to load BPF skeleton 'test_tcptrace_bpf': -13
 Failed to load and verify BPF skeleton
 ```
 
+### 2.5. 失败心得
+
+虽然运行失败了，迁移过程还是有收获的。
+
+原来的tcpdrop里还有调用栈打印，使用是BCC里实现的`BPF_STACK_TRACE(stack_traces, 1024);`机制，其中用到了`BPF_MAP_TYPE_STACK`的eBPF程序类型。
+
+基于libbpf-bootstrap看示例里没有这个轮子，自己实现的话有点复杂。看来还是有必要用用BCC，毕竟轮子和参考示例会多不少。
+
 ## 3. bpftrace跟踪
 
-先降级使用bpftrace吧。。
+先使用bpftrace吧。。
 
+### 3.1. 基本使用
 
+1、按kprobe的方式跟踪 `kfree_skb`：
+
+`bpftrace -e 'kprobe:kfree_skb /comm=="程序名"/ {printf("kstack: %s\n", kstack);}'`
+
+```sh
+# 过滤./server，没抓包kfree_skb，先不过滤程序
+[root@xdlinux ➜ ~ ]$ bpftrace -e 'kprobe:kfree_skb  {printf("kstack: %s\n", kstack);}'
+Attaching 1 probe...
+kstack: 
+        kfree_skb+1
+        __netif_receive_skb_core+305
+        netif_receive_skb_internal+61
+        napi_gro_receive+186
+        rtl8169_poll+667
+        __napi_poll+45
+        net_rx_action+595
+        __softirqentry_text_start+215
+        irq_exit+247
+        do_IRQ+127
+        ret_from_intr+0
+        cpuidle_enter_state+219
+        cpuidle_enter+44
+        do_idle+564
+        cpu_startup_entry+111
+        start_secondary+411
+        secondary_startup_64_no_verify+194
+```
+
+2、按 tracepoint方式跟踪 `skb:kfree_skb`
+
+`bpftrace -e 'tracepoint:skb:kfree_skb { printf("%s(%d): %s %s\n", comm, pid, probe, kstack()); }'`
+
+```sh
+[root@xdlinux ➜ ~ ]$ bpftrace -e 'tracepoint:skb:kfree_skb { printf("%s(%d): %s %s\n", comm, pid, probe, kstack()); }'
+Attaching 1 probe...
+swapper/9(0): tracepoint:skb:kfree_skb 
+        kfree_skb+115
+        kfree_skb+115
+        __netif_receive_skb_core+305
+        netif_receive_skb_internal+61
+        napi_gro_receive+186
+        rtl8169_poll+667
+        __napi_poll+45
+        net_rx_action+595
+        __softirqentry_text_start+215
+        irq_exit+247
+        do_IRQ+127
+        ret_from_intr+0
+        cpuidle_enter_state+219
+        cpuidle_enter+44
+        do_idle+564
+        cpu_startup_entry+111
+        start_secondary+411
+        secondary_startup_64_no_verify+194
+```
+
+### 3.2. 全连接队列溢出跟踪
 
 
 ## 4. 小结
 
+用libbpf和bpftrace跟踪TCP全连接溢出
 
 ## 5. 参考
 
 1、[BCC 到 libbpf 的转换指南【译】](https://www.ebpf.top/post/bcc-to-libbpf-guid/)
+
+2、[深入浅出eBPF｜你要了解的7个核心问题](https://juejin.cn/post/7110139083971624997)
 
 2、BCC项目
