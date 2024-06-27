@@ -253,7 +253,7 @@ Failed to load and verify BPF skeleton
 
 ## 3. bpftrace跟踪
 
-先使用bpftrace吧。。
+先降低难度使用[bpftrace](https://github.com/bpftrace/bpftrace)吧。。
 
 ### 3.1. 基本使用
 
