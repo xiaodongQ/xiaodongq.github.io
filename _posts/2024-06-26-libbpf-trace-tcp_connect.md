@@ -91,6 +91,26 @@ int handle_tp(struct trace_event_raw_kfree_skb *args)
 }
 ```
 
+test_tcptrace.h：
+
+```c
+#define AF_INET    2
+#define AF_INET6   10
+ 
+// 作为丢包事件结构
+struct ipv4_data_t {
+    __u32 pid;
+    __u64 ip; 
+    __u32 saddr;
+    __u32 daddr;
+    __u16 sport;
+    __u16 dport;
+    __u8 state;
+    __u8 tcpflags;
+    __u32 stack_id;
+};
+```
+
 ### 2.2. test_tcptrace.c
 
 ```c
@@ -130,9 +150,9 @@ int main(int argc, char **argv) {
 }
 ```
 
-### 2.3. 拷贝到 libbpf-bootstrap/examples/c 下面，修改Makefile并编译
+### 2.3. 拷贝到libbpf-bootstrap中编译
 
-向Makefile里新增test_tcptrace：
+拷贝3个文件到 libbpf-bootstrap/examples/c，向Makefile里新增test_tcptrace：
 
 `APPS = test_tcptrace minimal minimal_legacy ...`
 
