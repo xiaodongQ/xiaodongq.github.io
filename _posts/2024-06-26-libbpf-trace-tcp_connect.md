@@ -275,7 +275,13 @@ Failed to load and verify BPF skeleton
 
 先降低难度使用[bpftrace](https://github.com/bpftrace/bpftrace)吧。。
 
-### 3.1. 基本使用
+### 3.1. 基本使用方式
+
+前面eBPF学习基础后，理解和使用bpftrace就轻松了，很多直接可用的轮子。
+
+查看github上bpftrace项目的极简使用教程：[tutorial_one_liners](https://github.com/bpftrace/bpftrace/blob/master/docs/tutorial_one_liners.md)
+
+
 
 1、按kprobe的方式跟踪 `kfree_skb`：
 
