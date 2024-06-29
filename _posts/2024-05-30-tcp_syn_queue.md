@@ -635,8 +635,7 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 {
     ...
     // tcp_syncookies：1表示当半连接队列满时才开启；2表示无条件开启功能，此处可看到就算半连接队列满了也不drop
-    // ~~废弃：inet_csk_reqsk_queue_is_full：判断accept队列(全连接队列)是否满~~
-    // inet_csk_reqsk_queue_is_full：判断半连接队列是否满(相对于4.4之前的内核，之后内核中半连接队列最大长度也和全连接队列一样)，里面判断的是：inet_connection_sock（面向连接的sock）中的队列
+    // inet_csk_reqsk_queue_is_full：判断半连接队列是否满(相对于4.4之前的内核，之后内核中半连接队列最大长度也和全连接队列一样)
     if ((net->ipv4.sysctl_tcp_syncookies == 2 ||
          inet_csk_reqsk_queue_is_full(sk)) && !isn) {
         want_cookie = tcp_syn_flood_action(sk, rsk_ops->slab_name);
@@ -646,9 +645,8 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
     ...
     // 检查当前 sock 的全连接队列是否满
     /*
-        和上面的全连接队列判断区别
-        上面是：inet_csk(sk)->icsk_accept_queue->qlen，判断的是半连接队列长度，inet_connection_sock（面向连接的sock）
-        下面是：sk->sk_ack_backlog，判断的是 sock
+        上面是：inet_csk(sk)->icsk_accept_queue->qlen，判断的是半连接队列长度
+        下面是：sk->sk_ack_backlog
     */ 
     if (sk_acceptq_is_full(sk)) {
         NET_INC_STATS(sock_net(sk), LINUX_MIB_LISTENOVERFLOWS);
