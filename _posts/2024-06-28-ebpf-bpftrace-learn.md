@@ -109,26 +109,26 @@ irqbalance /proc/irq/30/smp_affinity
 Attaching 1 probe...
 ^C
 
-@[sedispatch]: 1
-@[gmain]: 4
-@[in:imjournal]: 12
-@[sshd]: 17
-@[dockerd]: 35
-@[NetworkManager]: 44
-@[tuned]: 54
-@[bpftrace]: 64
-@[containerd]: 230
+  @[sedispatch]: 1
+  @[gmain]: 4
+  @[in:imjournal]: 12
+  @[sshd]: 17
+  @[dockerd]: 35
+  @[NetworkManager]: 44
+  @[tuned]: 54
+  @[bpftrace]: 64
+  @[containerd]: 230
 
 # 给map命名，@test
 [root@xdlinux ➜ events ]$ bpftrace -e 'tracepoint:raw_syscalls:sys_enter { @test[comm] = count(); }'
 Attaching 1 probe...
 ^C
 
-@test[sssd]: 1
-@test[sedispatch]: 2
-@test[sssd_be]: 5
-@test[sssd_nss]: 5
-@test[gmain]: 6
+  @test[sssd]: 1
+  @test[sedispatch]: 2
+  @test[sssd_be]: 5
+  @test[sssd_nss]: 5
+  @test[gmain]: 6
 ```
 
 ### 3.5. read()返回值分布统计
@@ -279,9 +279,7 @@ Attaching 25 probes...
 
 `profile:hz:99`：所有cpu都以`99`赫兹的频率采样分析内核栈。为了采集足够的内核信息，这里的`99`够用了，为什么不是正好`100`，这是由于采样频率可能与其他定时事件步调一致，所以`99`赫兹是一个理想的选择
 
-**`kstack` 返回内核调用栈**
-
-另外：**`ustack` 可以分析用户级调用栈**
+**`kstack` 返回内核调用栈**。另外`ustack`可以分析用户级调用栈**
 
 ```sh
 [root@xdlinux ➜ ~ ]$ bpftrace -e 'profile:hz:99 { @[kstack] = count(); }'
@@ -362,6 +360,8 @@ open path: retrans_time_ms
 ## 4. bpftrace tools
 
 bpftrace项目的 [tools](https://github.com/bpftrace/bpftrace/tree/master/tools) 目录下有很多直接可用的工具，作为平时使用和开发参考都是值得去看的。
+
+若是yum安装的bpftrace，tools默认安装在：`/usr/share/bpftrace/tools`
 
 过滤tcp相关的bpftrace脚步，可以用看到之前bcc tools里面的几个熟面孔
 

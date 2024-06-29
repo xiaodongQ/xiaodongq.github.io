@@ -279,10 +279,93 @@ Failed to load and verify BPF skeleton
 
 ### 3.1. 全连接队列溢出跟踪
 
-直接先试试bpftrace项目tools里的：
+#### 3.1.1. tcpdrop.bt
 
-* 要求内核5.17+：[tcpdrop.bt](https://github.com/bpftrace/bpftrace/blob/master/tools/tcpdrop.bt)
-* 低版本内核，用[old/tcpdrop.bt](https://github.com/bpftrace/bpftrace/blob/master/tools/old/tcpdrop.bt)
+直接先试试bpftrace项目tools里的tcpdrop.bt
+
+若是yum安装的bpftrace，tools默认安装在：`/usr/share/bpftrace/tools`
+
+执行`./tcpdrop.bt`报错了：
+
+```sh
+[root@xdlinux ➜ tools ]$ pwd
+/usr/share/bpftrace/tools
+[root@xdlinux ➜ tools ]$ ./tcpdrop.bt
+definitions.h:3:10: fatal error: 'net/sock.h' file not found
+```
+
+查看安装匹配的：kernel-headers
+
+```sh
+# 查看安装的kernel-headers
+[root@xdlinux ➜ tools ]$ rpm -qa|grep kernel-head
+kernel-headers-4.18.0-348.el8.x86_64
+# 和当前内核并不匹配（小版本不同）
+[root@xdlinux ➜ tools ]$ uname -r
+4.18.0-348.7.1.el8_5.x86_64
+
+# 查找安装匹配的kernel-headers
+[root@xdlinux ➜ tools ]$ yum list kernel-headers
+Last metadata expiration check: 4:30:45 ago on Sat 29 Jun 2024 07:58:12 AM CST.
+Installed Packages
+kernel-headers.x86_64             4.18.0-348.el8          @anaconda
+Available Packages
+kernel-headers.x86_64             4.18.0-348.7.1.el8_5    base
+
+# 安装成功
+[root@xdlinux ➜ tools ]$ yum install kernel-headers.x86_64 
+Last metadata expiration check: 0:05:25 ago on Sat 29 Jun 2024 12:29:12 PM CST.
+Package kernel-headers-4.18.0-348.el8.x86_64 is already installed.
+Dependencies resolved.
+=====================================================================================
+ Package           Architecture     Version                  Repository Size
+=====================================================================================
+Upgrading:
+ kernel-headers    x86_64           4.18.0-348.7.1.el8_5     base       8.3 M
+
+Transaction Summary
+=====================================================================================
+Upgrade  1 Package
+
+Total download size: 8.3 M
+Is this ok [y/N]: y
+Downloading Packages:
+kernel-headers-4.18.0-348.7.1.el8_5.x86_64.rpm       2.3 MB/s | 8.3 MB     00:03
+-------------------------------------------------------------------------------
+Total                                                2.3 MB/s | 8.3 MB     00:03
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                               1/1 
+  Upgrading        : kernel-headers-4.18.0-348.7.1.el8_5.x86_64    1/2 
+  Cleanup          : kernel-headers-4.18.0-348.el8.x86_64          2/2 
+  Verifying        : kernel-headers-4.18.0-348.7.1.el8_5.x86_64    1/2 
+  Verifying        : kernel-headers-4.18.0-348.el8.x86_64          2/2 
+
+Upgraded:
+  kernel-headers-4.18.0-348.7.1.el8_5.x86_64 
+
+Complete!
+[root@xdlinux ➜ tools ]$ 
+```
+
+重试还是报错，`yum install kernel-devel`
+
+再次重试，可以了。不过没抓到内容。
+
+查看里面跟踪的是`kprobe:tcp_drop`（bpftrace-0.12.1-3.el8.x86_64）
+
+```sh
+[root@xdlinux ➜ tools git:(master) ]$ rpm -qa|grep bpftrace
+bpftrace-0.12.1-3.el8.x86_64
+[root@xdlinux ➜ tools git:(master) ]$ bpftrace -l "kprobe:tcp_drop"
+kprobe:tcp_drop
+```
+
+
+
 
 ## 4. 小结
 
