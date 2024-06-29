@@ -277,8 +277,12 @@ Failed to load and verify BPF skeleton
 
 这里记录了bpftrace学习使用：[eBPF学习实践系列（六） -- bpftrace学习和使用](https://xiaodongq.github.io/2024/06/28/ebpf-bpftrace-learn/)
 
-### 3.2. 全连接队列溢出跟踪
+### 3.1. 全连接队列溢出跟踪
 
+直接先试试bpftrace项目tools里的：
+
+* 要求内核5.17+：[tcpdrop.bt](https://github.com/bpftrace/bpftrace/blob/master/tools/tcpdrop.bt)
+* 低版本内核，用[old/tcpdrop.bt](https://github.com/bpftrace/bpftrace/blob/master/tools/old/tcpdrop.bt)
 
 ## 4. 小结
 
