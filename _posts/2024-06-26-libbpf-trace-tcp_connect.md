@@ -353,9 +353,9 @@ Complete!
 
 重试还是报错，`yum install kernel-devel`
 
-再次重试，可以了。不过没抓到内容。
+再次重试，可以了。**不过没抓到内容。**
 
-查看里面跟踪的是`kprobe:tcp_drop`（bpftrace-0.12.1-3.el8.x86_64）
+查看当前版本的tcpdrop.bt里面跟踪的是`kprobe:tcp_drop`（bpftrace-0.12.1-3.el8.x86_64）
 
 ```sh
 [root@xdlinux ➜ tools git:(master) ]$ rpm -qa|grep bpftrace
@@ -364,7 +364,91 @@ bpftrace-0.12.1-3.el8.x86_64
 kprobe:tcp_drop
 ```
 
+#### 问题分析
 
+结果对比：
+
+* 上小节`tcpdrop.bt`没抓到服务端全连接队列满时的drop包；
+* 在[TCP半连接全连接（三） -- eBPF跟踪全连接队列溢出（上）](https://xiaodongq.github.io/2024/06/23/bcctools-trace-tcp_connect/)里用bcc的`tcpdrop`也没抓到服务端drop包，当时遗留了一个TODO项：“TODO tcpdrop的应用场景没理解到位？待跟eBPF主动监测对比”
+
+之前以为是工具理解不到位，到这里基本可以排除了。工具对应的下述两个追踪点确实就是没有触发到：
+
+* kprobe:tcp_drop
+* tracepoint/skb/kfree_skb
+
+继续来看一下内核中服务端收到SYN时的处理代码（`tcp_v4_conn_request` -> `tcp_conn_request`）
+
+```cpp
+// linux-5.10.10/net/ipv4/tcp_input.c
+// 处理第一次SYN请求
+int tcp_conn_request(struct request_sock_ops *rsk_ops,
+             const struct tcp_request_sock_ops *af_ops,
+             struct sock *sk, struct sk_buff *skb)
+{
+    ...
+    // tcp_syncookies：1表示当半连接队列满时才开启；2表示无条件开启功能，此处可看到就算半连接队列满了也不drop
+    // inet_csk_reqsk_queue_is_full：判断accept队列(全连接队列)是否满
+    if ((net->ipv4.sysctl_tcp_syncookies == 2 ||
+         inet_csk_reqsk_queue_is_full(sk)) && !isn) {
+        want_cookie = tcp_syn_flood_action(sk, rsk_ops->slab_name);
+        if (!want_cookie)
+            goto drop;
+    }
+    ...
+    // 检查当前 sock 的全连接队列是否满
+    /*
+        和上面的全连接队列判断区别
+        上面是：inet_csk(sk)->icsk_accept_queue->qlen，判断的是inet_connection_sock（面向连接的sock）
+        下面是：sk->sk_ack_backlog，判断的是 sock
+    */ 
+    if (sk_acceptq_is_full(sk)) {
+        NET_INC_STATS(sock_net(sk), LINUX_MIB_LISTENOVERFLOWS);
+        goto drop;
+    }
+    // 创建一个request_sock，socket状态为：TCP_NEW_SYN_RECV;
+    // 里面包含一个引用计数，涉及sock的管理，4.4做的内存优化，暂忽略
+    // 这里第3个参数，如果没开启cookie则传入true，一般是开的，所以传false
+    req = inet_reqsk_alloc(rsk_ops, sk, !want_cookie);
+    if (!req)
+        goto drop;
+    ...
+    if (!want_cookie && !isn) {
+        // 没开启syncookies时，若 `max_syn_backlog - 全连接长度` < max_syn_backlog>>2，则丢弃请求包
+        if (!net->ipv4.sysctl_tcp_syncookies &&
+            (net->ipv4.sysctl_max_syn_backlog - inet_csk_reqsk_queue_len(sk) <
+             (net->ipv4.sysctl_max_syn_backlog >> 2)) &&
+            !tcp_peer_is_proven(req, dst)) {
+            ...
+            goto drop_and_release;
+        }
+        ...
+    }
+    ...
+    // 发送SYN+ACK，TCP协议注册的是 tcp_v4_send_synack 里面会生成应答报文
+    if (fastopen_sk) {
+        ...
+        af_ops->send_synack(fastopen_sk, dst, &fl, req,
+                    &foc, TCP_SYNACK_FASTOPEN, skb);
+        ...
+    }else {
+        ...
+        af_ops->send_synack(sk, dst, &fl, req, &foc,
+                !want_cookie ? TCP_SYNACK_NORMAL : TCP_SYNACK_COOKIE, skb);
+        ...
+    }
+    reqsk_put(req);
+    return 0;
+
+drop_and_release:
+    dst_release(dst);
+drop_and_free:
+    __reqsk_free(req);
+drop:
+    // 丢弃包
+    tcp_listendrop(sk);
+    return 0;
+}
+```
 
 
 ## 4. 小结
@@ -377,4 +461,4 @@ kprobe:tcp_drop
 
 2、[深入浅出eBPF｜你要了解的7个核心问题](https://juejin.cn/post/7110139083971624997)
 
-2、BCC项目
+3、BCC项目
