@@ -65,14 +65,13 @@ socket创建流程中，涉及创建`struct sock`结构
 
 其中会创建`struct socket *sock`，里面会进行`struct sock`和`struct file`的创建和映射操作
 
-代码逻辑里面涉及的RCU相关解释，辅助代码理解：
+代码逻辑里面涉及的RCU概念，贴一下相关解释，辅助代码理解：
 
 * RCU（Read-Copy Update）是一种用于实现高效读取和并发更新数据结构的同步机制。
 * 在网络内核中，它允许多个线程或进程同时读取共享数据，而不需要获取锁，从而提高了并发性能。
 * 读：允许多个线程或进程同时读取共享数据，而不需要获取锁
-* 写：RCU也确保了在写操作进行时，读操作能够访问到一致的数据
+* 写：确保了在写操作进行时，读操作能够访问到一致的数据
 * 应用场景：路由表、套接字数据结构、网络缓冲区
-
 
 2、`inet_sock`，特指用了网络传输功能的`sock`，在sock的基础上还加入了TTL，端口，IP地址这些跟网络传输相关的字段信息。
 
@@ -107,7 +106,7 @@ struct inet_sock {
 struct inet_connection_sock {
     /* inet_sock has to be the first member! */
     struct inet_sock	  icsk_inet;
-    // 全连接队列？，已经 ESTABLISHED 的队列：FIFO of established children
+    // 里面包含全连接队列、以及半连接队列长度等信息
     struct request_sock_queue icsk_accept_queue;
     struct inet_bind_bucket	  *icsk_bind_hash;
     unsigned long		  icsk_timeout;
@@ -140,9 +139,11 @@ struct tcp_sock {
 
 ## 4. 不同内核版本半连接队列的特别说明
 
+### 4.1. 新内核中是否还有半连接队列？
+
 网上很多文章关于半连接都是基于3.x的内核，跟踪5.10内核过程中一直疑惑`icsk_accept_queue`算是全连接还是半连接队列。
 
-对比3.10内核中`request_sock_queue`里既有全连接又有半连接，5.10内核里似乎没有单独的半连接，而是通过引用计数加1减1，共享同一个队列~~（类似享元模式？）~~。
+自我感觉：对比3.10内核中`request_sock_queue`里既有全连接又有半连接，5.10内核里似乎没有单独的半连接，而是通过引用计数加1减1，共享同一个队列。
 
 带着怀疑在技术讨论群搜半连接队列，碰巧历史记录里有人提到：4.4之后的内核改了syn_queue半连接队列逻辑，半连接队列成为一个概念没有了，统一保存到`ehash table` 中，维护半连接长度就放到`icsk_accept_queue->qlen`，并附了一篇陈硕大佬关于这块介绍的文章链接：[Linux 4.4 之后 TCP 三路握手的新流程](https://zhuanlan.zhihu.com/p/25313903)
 
@@ -160,17 +161,23 @@ struct tcp_sock {
 
 > **原来是把 tcp_request_sock 挂在 listen socket 下，收到 ACK 之后从 listening_hash 找到 listen socket 再进一步找到 tcp_request_sock；新的做法是直接把 tcp_request_sock 挂在 ehash 中，这样收到 ACK 之后可以直接找到 tcp_request_sock，减少了锁的争用（contention）。**
 
-### 4.1. （扩展）用户态是否可观察到`TCP_NEW_SYN_RECV`状态
+另外参考 [[内核源码] tcp 连接队列](https://wenfh2020.com/2022/01/22/kernel-tcp-socket-backlog/) 这篇文章对连接队列的跟踪分析（自己当前的博客风格就是fork自这位博主）。这篇文章中也描述了`TCP_NEW_SYN_RECV`状态，以及内核中连接队列相关字段说明。对自己理解内核代码挺有帮助。
+
+结合起来可以理解为半连接队列还是存在，只是不像之前明显。且`sk_max_ack_backlog`变成了全连接和半连接队列的共同最大长度，半连接队列也受该参数直接限制，并有一个变量`icsk_accept_queue.qlen`记录半连接队列长度
+
+> listen socket 的 struct sock 数据结构 inet_connection_sock。
+> 
+> * 全连接队列和半连接队列最大长度： inet_connection_sock.icsk_inet.sock.sk_max_ack_backlog
+> * 全连接队列： inet_connection_sock.icsk_accept_queue.rskq_accept_head
+> * 当前全连接队列长度： inet_connection_sock.icsk_inet.sock.sk_ack_backlog
+> * 半连接队列（哈希表）： inet_hashinfo.inet_ehash_bucket
+> * 当前半连接队列长度： inet_connection_sock.icsk_accept_queue.qlen
+
+### 4.2. （扩展）用户态是否可观察到`TCP_NEW_SYN_RECV`状态
 
 三次握手第一次收到SYN后，服务端socket状态是`TCP_NEW_SYN_RECV`，netstat等用户态是否能观察到呢？
 
-找了几篇文章：
-
-1、参考这篇文章对连接队列的跟踪分析（自己当前的博客风格就是fork自这位博主）：  
-[[内核源码] tcp 连接队列](https://wenfh2020.com/2022/01/22/kernel-tcp-socket-backlog/)
-
-这篇文章中描述了`TCP_NEW_SYN_RECV`状态。  
-自己用bcc tools中的`tcpstates`跟踪（特意用了bcc最新仓库），看只会看到`SYN_RECV`状态（在CentOS8.5环境，内核4.18.0-348.7.1）
+1、自己先用bcc tools中的`tcpstates`跟踪（特意用了bcc最新仓库），看只会看到`SYN_RECV`状态（在CentOS8.5环境，内核4.18.0-348.7.1）
 
 ```sh
 # 192.168.1.150上：python -m http.server 起8000端口，并起tcpstates跟踪
@@ -186,6 +193,10 @@ ffff9f2032491d40 0     swapper/9  192.168.1.150   8000  192.168.1.3     26365 FI
 ```
 
 2、重新看第一篇里面留的链接：[一张图感受真实的 TCP 状态转移](https://segmentfault.com/a/1190000043834899)，里面用eBPF跟踪到`TCP_NEW_SYN_RECV`状态，里面的测试内核是 **6.1.11版本**。
+
+> 内核中 TCP_SYN_RECV 已经不是原始 TCP 协议中 server 收到第一个 syn 包的状态了，取而代之的是 TCP_NEW_SYN_RECV，TCP_SYN_RECV 本身主要被用于支持 fastopen 特性了。
+
+**疑问(TODO)**：内核里收到三次握手第一个SYN时状态是`TCP_NEW_SYN_RECV`了？只是各观测工具展示时为了兼容性还是按老的方式？
 
 以及参考这篇文章：[TCP_NEW_SYN_RECV](https://abcdxyzk.github.io/blog/2020/09/10/kernel-tcp-new-syn-recv/) 里相关的描述
 
@@ -429,7 +440,7 @@ int inet_csk_listen_start(struct sock *sk, int backlog)
     struct inet_sock *inet = inet_sk(sk);
     int err = -EADDRINUSE;
     
-    // icsk_accept_queue 是全连接队列，已经`ESTABLISHED`的队列（FIFO of established children）
+    // icsk_accept_queue里面包含全连接队列、以及半连接队列长度等信息
     // 此处仅初始化了一些成员变量，不同版本内核实现有差异（参考链接里是3.10，里面做了内存申请，实现差异较大）
     reqsk_queue_alloc(&icsk->icsk_accept_queue);
     ...
@@ -451,11 +462,12 @@ int inet_csk_listen_start(struct sock *sk, int backlog)
 }
 ```
 
-5.10内核的`request_sock_queue`结构里，只有全连接队列（网络上的文章很多是3.10内核，注意版本对应），和3.10内核的对比，见下面”3.10内核对比“小节。
+5.10内核的`request_sock_queue`结构里，包含全连接队列、以及半连接队列长度等信息（网络上的文章很多是3.10内核，注意版本对应），和3.10内核的对比，见下面”3.10内核对比“小节。
+
+如上面半连接队列特殊说明所述，半连接队列（哈希表）维护在`inet_hashinfo.inet_ehash_bucket`中，而这里是包含半连接队列的长度
 
 ```cpp
 // linux-5.10.10/net/core/request_sock.c
-// 这里仅初始化全连接，相对而言3.10内核里逻辑更复杂
 void reqsk_queue_alloc(struct request_sock_queue *queue)
 {
     spin_lock_init(&queue->rskq_lock);
@@ -463,9 +475,10 @@ void reqsk_queue_alloc(struct request_sock_queue *queue)
     spin_lock_init(&queue->fastopenq.lock);
     queue->fastopenq.rskq_rst_head = NULL;
     queue->fastopenq.rskq_rst_tail = NULL;
+    // 半连接队列长度初始化
     queue->fastopenq.qlen = 0;
 
-    // 全连接队列头初始化
+    // 全连接队列，链表头初始化
     queue->rskq_accept_head = NULL;
 }
 ```
@@ -474,16 +487,17 @@ void reqsk_queue_alloc(struct request_sock_queue *queue)
 
 ```cpp
 // linux-5.10.10/include/net/request_sock.h
-// 而3.10中，还包含了表示半连接队列的：`struct listen_sock *listen_opt;`
+// 而3.10中，还包含了显式表示半连接队列的：`struct listen_sock *listen_opt;`
 struct request_sock_queue {
     spinlock_t		rskq_lock;
     u8			rskq_defer_accept;
 
     u32			synflood_warned;
+    // 半连接队列长度
     atomic_t		qlen;
     atomic_t		young;
 
-    // 全连接队列 头
+    // 全连接队列，链表头
     struct request_sock	*rskq_accept_head;
     struct request_sock	*rskq_accept_tail;
     struct fastopen_queue	fastopenq;
@@ -621,7 +635,8 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 {
     ...
     // tcp_syncookies：1表示当半连接队列满时才开启；2表示无条件开启功能，此处可看到就算半连接队列满了也不drop
-    // inet_csk_reqsk_queue_is_full：判断accept队列(全连接队列)是否满
+    // ~~废弃：inet_csk_reqsk_queue_is_full：判断accept队列(全连接队列)是否满~~
+    // inet_csk_reqsk_queue_is_full：判断半连接队列是否满(相对于4.4之前的内核，之后内核中半连接队列最大长度也和全连接队列一样)，里面判断的是：inet_connection_sock（面向连接的sock）中的队列
     if ((net->ipv4.sysctl_tcp_syncookies == 2 ||
          inet_csk_reqsk_queue_is_full(sk)) && !isn) {
         want_cookie = tcp_syn_flood_action(sk, rsk_ops->slab_name);
@@ -632,7 +647,7 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
     // 检查当前 sock 的全连接队列是否满
     /*
         和上面的全连接队列判断区别
-        上面是：inet_csk(sk)->icsk_accept_queue->qlen，判断的是inet_connection_sock（面向连接的sock）
+        上面是：inet_csk(sk)->icsk_accept_queue->qlen，判断的是半连接队列长度，inet_connection_sock（面向连接的sock）
         下面是：sk->sk_ack_backlog，判断的是 sock
     */ 
     if (sk_acceptq_is_full(sk)) {
@@ -688,11 +703,12 @@ drop:
 
 ```cpp
 // linux-5.10.10/include/net/inet_connection_sock.h
-// 判断全连接队列是否已满
+// 判断半连接队列是否已满
 static inline int inet_csk_reqsk_queue_is_full(const struct sock *sk)
 {
     // sk->sk_max_ack_backlog，之前跟踪listen，可以看到是将 min(backlog,somaxconn) 赋值给了它
-    // 全连接队列 >= 最大全连接队列数量
+    // 半连接队列 >= 最大半连接队列数量（相对于4.4之前内核，新内核的全连接队列和半连接队列最大长度一样。队列是同一个，根据状态区分？）
+    // 半连接队列的长度，这里取的是inet_connection_sock.icsk_accept_queue.qlen
     return inet_csk_reqsk_queue_len(sk) >= sk->sk_max_ack_backlog;
 }
 ```
@@ -821,7 +837,7 @@ int reqsk_queue_alloc(struct request_sock_queue *queue,
 
     get_random_bytes(&lopt->hash_rnd, sizeof(lopt->hash_rnd));
     rwlock_init(&queue->syn_wait_lock);
-    // 全连接队列 头
+    // 全连接队列 链表头
     queue->rskq_accept_head = NULL;
     // 上述计算的半连接长度限制
     lopt->nr_table_entries = nr_table_entries;
@@ -1052,4 +1068,6 @@ struct entry Tcpexttab[] =
 
 8、[TCP_NEW_SYN_RECV](https://abcdxyzk.github.io/blog/2020/09/10/kernel-tcp-new-syn-recv/)
 
-9、GPT
+9、[[内核源码] tcp 连接队列](https://wenfh2020.com/2022/01/22/kernel-tcp-socket-backlog/)
+
+10、GPT
