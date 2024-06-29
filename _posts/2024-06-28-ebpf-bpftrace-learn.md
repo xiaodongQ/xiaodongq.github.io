@@ -341,7 +341,7 @@ path.bt脚本内容：
 #include <linux/dcache.h>
 #endif
 
-# kprobe跟踪类型
+// kprobe跟踪类型
 kprobe:vfs_open
 {
     printf("open path: %s\n", str(((struct path *)arg0)->dentry->d_name.name));
