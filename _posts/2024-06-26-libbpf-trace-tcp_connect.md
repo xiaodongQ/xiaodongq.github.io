@@ -364,7 +364,7 @@ bpftrace-0.12.1-3.el8.x86_64
 kprobe:tcp_drop
 ```
 
-#### 问题分析
+#### 3.1.2. 问题分析
 
 结果对比：
 
@@ -387,7 +387,7 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 {
     ...
     // tcp_syncookies：1表示当半连接队列满时才开启；2表示无条件开启功能，此处可看到就算半连接队列满了也不drop
-    // inet_csk_reqsk_queue_is_full：判断accept队列(全连接队列)是否满
+    // inet_csk_reqsk_queue_is_full：判断半连接队列是否满(相对于4.4之前的内核，之后内核中半连接队列最大长度也和全连接队列一样)
     if ((net->ipv4.sysctl_tcp_syncookies == 2 ||
          inet_csk_reqsk_queue_is_full(sk)) && !isn) {
         want_cookie = tcp_syn_flood_action(sk, rsk_ops->slab_name);
@@ -396,11 +396,6 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
     }
     ...
     // 检查当前 sock 的全连接队列是否满
-    /*
-        和上面的全连接队列判断区别
-        上面是：inet_csk(sk)->icsk_accept_queue->qlen，判断的是inet_connection_sock（面向连接的sock）
-        下面是：sk->sk_ack_backlog，判断的是 sock
-    */ 
     if (sk_acceptq_is_full(sk)) {
         NET_INC_STATS(sock_net(sk), LINUX_MIB_LISTENOVERFLOWS);
         goto drop;
@@ -424,19 +419,6 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
         ...
     }
     ...
-    // 发送SYN+ACK，TCP协议注册的是 tcp_v4_send_synack 里面会生成应答报文
-    if (fastopen_sk) {
-        ...
-        af_ops->send_synack(fastopen_sk, dst, &fl, req,
-                    &foc, TCP_SYNACK_FASTOPEN, skb);
-        ...
-    }else {
-        ...
-        af_ops->send_synack(sk, dst, &fl, req, &foc,
-                !want_cookie ? TCP_SYNACK_NORMAL : TCP_SYNACK_COOKIE, skb);
-        ...
-    }
-    reqsk_put(req);
     return 0;
 
 drop_and_release:
@@ -449,6 +431,29 @@ drop:
     return 0;
 }
 ```
+
+全连接、半连接溢出时都会到`tcp_listendrop`里面，查看其逻辑，确实是不涉及上述两个追踪点的。
+
+```c
+// linux-5.10.10/include/net/tcp.h
+static inline void tcp_listendrop(const struct sock *sk)
+{
+	atomic_inc(&((struct sock *)sk)->sk_drops);
+	__NET_INC_STATS(sock_net(sk), LINUX_MIB_LISTENDROPS);
+}
+```
+
+#### 3.1.3. 使用合适的追踪点
+
+那可以直接追踪`tcp_listendrop`吗？
+
+查看并没有相应追踪点：
+
+```sh
+[root@xdlinux ➜ tools ]$ bpftrace -l 'kprobe:tcp_listendrop'
+[root@xdlinux ➜ tools ]$ 
+```
+
 
 
 ## 4. 小结
