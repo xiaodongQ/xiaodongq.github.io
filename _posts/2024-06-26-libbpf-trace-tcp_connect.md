@@ -275,69 +275,7 @@ Failed to load and verify BPF skeleton
 
 先降低难度使用[bpftrace](https://github.com/bpftrace/bpftrace)吧。。
 
-### 3.1. 基本使用方式
-
-前面eBPF学习基础后，理解和使用bpftrace就轻松了，很多直接可用的轮子。
-
-查看github上bpftrace项目的极简使用教程：[tutorial_one_liners](https://github.com/bpftrace/bpftrace/blob/master/docs/tutorial_one_liners.md)
-
-
-
-1、按kprobe的方式跟踪 `kfree_skb`：
-
-`bpftrace -e 'kprobe:kfree_skb /comm=="程序名"/ {printf("kstack: %s\n", kstack);}'`
-
-```sh
-# 过滤./server，没抓包kfree_skb，先不过滤程序
-[root@xdlinux ➜ ~ ]$ bpftrace -e 'kprobe:kfree_skb  {printf("kstack: %s\n", kstack);}'
-Attaching 1 probe...
-kstack: 
-        kfree_skb+1
-        __netif_receive_skb_core+305
-        netif_receive_skb_internal+61
-        napi_gro_receive+186
-        rtl8169_poll+667
-        __napi_poll+45
-        net_rx_action+595
-        __softirqentry_text_start+215
-        irq_exit+247
-        do_IRQ+127
-        ret_from_intr+0
-        cpuidle_enter_state+219
-        cpuidle_enter+44
-        do_idle+564
-        cpu_startup_entry+111
-        start_secondary+411
-        secondary_startup_64_no_verify+194
-```
-
-2、按 tracepoint方式跟踪 `skb:kfree_skb`
-
-`bpftrace -e 'tracepoint:skb:kfree_skb { printf("%s(%d): %s %s\n", comm, pid, probe, kstack()); }'`
-
-```sh
-[root@xdlinux ➜ ~ ]$ bpftrace -e 'tracepoint:skb:kfree_skb { printf("%s(%d): %s %s\n", comm, pid, probe, kstack()); }'
-Attaching 1 probe...
-swapper/9(0): tracepoint:skb:kfree_skb 
-        kfree_skb+115
-        kfree_skb+115
-        __netif_receive_skb_core+305
-        netif_receive_skb_internal+61
-        napi_gro_receive+186
-        rtl8169_poll+667
-        __napi_poll+45
-        net_rx_action+595
-        __softirqentry_text_start+215
-        irq_exit+247
-        do_IRQ+127
-        ret_from_intr+0
-        cpuidle_enter_state+219
-        cpuidle_enter+44
-        do_idle+564
-        cpu_startup_entry+111
-        start_secondary+411
-        secondary_startup_64_no_verify+194
-```
+这里记录了bpftrace学习使用：[eBPF学习实践系列（六） -- bpftrace学习和使用](https://xiaodongq.github.io/2024/06/28/ebpf-bpftrace-learn/)
 
 ### 3.2. 全连接队列溢出跟踪
 
