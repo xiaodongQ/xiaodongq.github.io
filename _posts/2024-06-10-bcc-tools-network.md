@@ -676,36 +676,36 @@ Tracing... Output every 1 secs. Hit Ctrl-C to end
 [root@desktop-mme7h3a ➜ /usr/share/bcc/tools ]$ ./tcpdrop                                
 TIME     PID    IP SADDR:SPORT          > DADDR:DPORT          STATE (FLAGS)
 15:11:36 9433   4  192.168.1.150:8000   > 192.168.1.150:33166  CLOSE (ACK)
-	b'tcp_drop+0x1'
-	b'tcp_rcv_state_process+0xb2'
-	b'tcp_v4_do_rcv+0xb4'
-	b'__release_sock+0x7c'
-	b'__tcp_close+0x180'
-	b'tcp_close+0x1f'
-	b'inet_release+0x42'
-	b'__sock_release+0x3d'
-	b'sock_close+0x11'
-	b'__fput+0xbe'
-	b'task_work_run+0x8a'
-	b'exit_to_usermode_loop+0xeb'
-	b'do_syscall_64+0x198'
-	b'entry_SYSCALL_64_after_hwframe+0x65'
+    b'tcp_drop+0x1'
+    b'tcp_rcv_state_process+0xb2'
+    b'tcp_v4_do_rcv+0xb4'
+    b'__release_sock+0x7c'
+    b'__tcp_close+0x180'
+    b'tcp_close+0x1f'
+    b'inet_release+0x42'
+    b'__sock_release+0x3d'
+    b'sock_close+0x11'
+    b'__fput+0xbe'
+    b'task_work_run+0x8a'
+    b'exit_to_usermode_loop+0xeb'
+    b'do_syscall_64+0x198'
+    b'entry_SYSCALL_64_after_hwframe+0x65'
 
 15:11:36 9433   4  192.168.1.150:8000   > 192.168.1.150:33168  CLOSE (ACK)
-	b'tcp_drop+0x1'
-	b'tcp_rcv_state_process+0xb2'
-	b'tcp_v4_do_rcv+0xb4'
-	b'__release_sock+0x7c'
-	b'__tcp_close+0x180'
-	b'tcp_close+0x1f'
-	b'inet_release+0x42'
-	b'__sock_release+0x3d'
-	b'sock_close+0x11'
-	b'__fput+0xbe'
-	b'task_work_run+0x8a'
-	b'exit_to_usermode_loop+0xeb'
-	b'do_syscall_64+0x198'
-	b'entry_SYSCALL_64_after_hwframe+0x65'
+    b'tcp_drop+0x1'
+    b'tcp_rcv_state_process+0xb2'
+    b'tcp_v4_do_rcv+0xb4'
+    b'__release_sock+0x7c'
+    b'__tcp_close+0x180'
+    b'tcp_close+0x1f'
+    b'inet_release+0x42'
+    b'__sock_release+0x3d'
+    b'sock_close+0x11'
+    b'__fput+0xbe'
+    b'task_work_run+0x8a'
+    b'exit_to_usermode_loop+0xeb'
+    b'do_syscall_64+0x198'
+    b'entry_SYSCALL_64_after_hwframe+0x65'
 ```
 
 `STATE (FLAGS)`：TCP 连接的状态和相关的 TCP 标志：
@@ -1126,7 +1126,7 @@ public (active)
   source-ports: 
   icmp-blocks: 
   rich rules: 
-	rule family="ipv4" source address="192.168.1.0/24" accept
+    rule family="ipv4" source address="192.168.1.0/24" accept
 ```
 
 ```sh

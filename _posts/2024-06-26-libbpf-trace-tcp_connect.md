@@ -20,7 +20,7 @@ tags: 网络
 
 基于libbpf-bootstrap框架，先参考bcc项目中的 `tcpdrop.py`和`tcplife.bpf.c`进行移植，跟踪tracepoint：`skb:kfree_skb`，后面再扩展
 
-这里摘抄部分内容，移植过程中可以更直观感受到BCC和libbpf（支持CO-RE）的数据结构区别，完整代码放在[这里](https://github.com/xiaodongQ/prog-playground/tree/main/network/ebpf)。
+这里摘抄部分代码内容，移植过程中可以更直观感受到BCC和libbpf（支持CO-RE）的数据结构区别，完整代码放在[这里](https://github.com/xiaodongQ/prog-playground/tree/main/network/ebpf/libbpf_tcptrace)。
 
 先说下结果：编译成功，运行报错（还准备扩展的，第一步就夭折了。。）
 
@@ -277,11 +277,9 @@ Failed to load and verify BPF skeleton
 
 这里记录了bpftrace学习使用：[eBPF学习实践系列（六） -- bpftrace学习和使用](https://xiaodongq.github.io/2024/06/28/ebpf-bpftrace-learn/)
 
-### 3.1. 全连接队列溢出跟踪
+### 3.1. 尝试tcpdrop.bt跟踪
 
-#### 3.1.1. 尝试tcpdrop.bt
-
-直接先试试bpftrace项目tools里的tcpdrop.bt
+直接先试试bpftrace项目tools里的 tcpdrop.bt 跟踪全连接队列溢出
 
 若是yum安装的bpftrace，tools默认安装在：`/usr/share/bpftrace/tools`
 
@@ -364,7 +362,7 @@ bpftrace-0.12.1-3.el8.x86_64
 kprobe:tcp_drop
 ```
 
-#### 3.1.2. 对比bcc tools结果分析
+### 3.2. 对比bcc tools结果分析
 
 结果对比：
 
@@ -438,14 +436,14 @@ drop:
 // linux-5.10.10/include/net/tcp.h
 static inline void tcp_listendrop(const struct sock *sk)
 {
-	atomic_inc(&((struct sock *)sk)->sk_drops);
-	__NET_INC_STATS(sock_net(sk), LINUX_MIB_LISTENDROPS);
+    atomic_inc(&((struct sock *)sk)->sk_drops);
+    __NET_INC_STATS(sock_net(sk), LINUX_MIB_LISTENDROPS);
 }
 ```
 
-#### 3.1.3. bpftrace跟踪其他追踪点
+### 3.3. bpftrace跟踪其他追踪点
 
-那可以直接追踪`tcp_listendrop`吗？
+**那可以直接追踪`tcp_listendrop`吗？**
 
 查看并没有这个直接的追踪点，只有显式导出的内核函数才可以被eBPF进行动态跟踪：
 
@@ -457,7 +455,7 @@ static inline void tcp_listendrop(const struct sock *sk)
 [root@xdlinux ➜ tools ]$ 
 ```
 
-那只能间接跟踪下了，通过分析上下文后设计跟踪脚本。  
+那只能间接跟踪下了，通过分析代码里的tcp_listendrop上下文后设计跟踪脚本。  
 调用链是：`tcp_v4_conn_request` -> `tcp_conn_request` -> `tcp_listendrop`，那我们查下前面的追踪点：
 
 ```sh
@@ -486,71 +484,74 @@ kprobe:tcp_v4_conn_request
 // linux-4.18/include/net/sock.h
 static inline bool sk_acceptq_is_full(const struct sock *sk)
 {
-	return sk->sk_ack_backlog > sk->sk_max_ack_backlog;
+    return sk->sk_ack_backlog > sk->sk_max_ack_backlog;
 }
 
 // linux-5.10.10/include/net/sock.h
 static inline bool sk_acceptq_is_full(const struct sock *sk)
 {
-	return READ_ONCE(sk->sk_ack_backlog) > READ_ONCE(sk->sk_max_ack_backlog);
+    return READ_ONCE(sk->sk_ack_backlog) > READ_ONCE(sk->sk_max_ack_backlog);
 }
 ```
 
 ```c
 // linux-4.18/net/ipv4/tcp_input.c
 int tcp_conn_request(struct request_sock_ops *rsk_ops,
-		     const struct tcp_request_sock_ops *af_ops,
-		     struct sock *sk, struct sk_buff *skb);
+             const struct tcp_request_sock_ops *af_ops,
+             struct sock *sk, struct sk_buff *skb);
 
 // linux-5.10.10/net/ipv4/tcp_input.c
 int tcp_conn_request(struct request_sock_ops *rsk_ops,
-		     const struct tcp_request_sock_ops *af_ops,
-		     struct sock *sk, struct sk_buff *skb)
+             const struct tcp_request_sock_ops *af_ops,
+             struct sock *sk, struct sk_buff *skb)
 ```
 
-把`struct sock`结构中的`sk->sk_ack_backlog`和`sk->sk_max_ack_backlog`进行对比，即可满足调用`tcp_listendrop`的条件。编写bpftrace脚本[tcp_queue.bt](https://github.com/xiaodongQ/prog-playground/blob/main/network/ebpf/bpftrace_tcp_queue/tcp_queue.bt)，内容如下：
+把`struct sock`结构中的`sk->sk_ack_backlog`和`sk->sk_max_ack_backlog`进行对比，即可满足调用`tcp_listendrop`的条件。编写bpftrace脚本tcp_queue.bt（[这里](https://github.com/xiaodongQ/prog-playground/blob/main/network/ebpf/bpftrace_tcp_queue/tcp_queue.bt)有归档），内容如下：
 
-```c
+```sh
 #!/usr/bin/env bpftrace
 
 /*
 函数声明如下：
 int tcp_conn_request(struct request_sock_ops *rsk_ops,
-		     const struct tcp_request_sock_ops *af_ops,
-		     struct sock *sk, struct sk_buff *skb)
+             const struct tcp_request_sock_ops *af_ops,
+             struct sock *sk, struct sk_buff *skb)
 */
 
 kprobe:tcp_conn_request
 {
-	// 注意：arg0表示函数的第1个参数
-	$sk = (struct sock*)arg2;
-	$inet_csk=(struct inet_connection_sock *)$sk;
+    // 注意：arg0表示函数的第1个参数
+    $sk = (struct sock*)arg2;
+    $inet_csk=(struct inet_connection_sock *)$sk;
 
-	// 当前半连接队列长度，~~废弃：qlen这里貌似没办法获取到数量~~
-	// qlen定义为`atomic_t	qlen;`，而atomic_t是一个结构体，需要再qlen.counter
-	$syn_queue_num = $inet_csk->icsk_accept_queue.qlen.counter;
-	// 半连接队列最大长度，4.4+的内核和全连接最大限制一样
-	$syn_queue_max = $sk->sk_max_ack_backlog;
-	// 当前全连接队列长度
-	$accept_queue_num = $sk->sk_ack_backlog;
-	// 全连接队列最大长度
-	$accept_queue_max = $sk->sk_max_ack_backlog;
+    // 当前半连接队列长度，~~废弃：qlen这里貌似没办法获取到数量~~
+    // qlen定义为`atomic_t	qlen;`，而atomic_t是一个结构体，需要再qlen.counter获取
+    $syn_queue_num = $inet_csk->icsk_accept_queue.qlen.counter;
+    // 半连接队列最大长度，4.4+的内核和全连接最大限制一样
+    $syn_queue_max = $sk->sk_max_ack_backlog;
+    // 当前全连接队列长度
+    $accept_queue_num = $sk->sk_ack_backlog;
+    // 全连接队列最大长度
+    $accept_queue_max = $sk->sk_max_ack_backlog;
 
-	printf( "syn_queue_num:%d, syn_queue_max:%d\n accept_queue_num:%d, accept_queue_max:%d\n", 
-		$syn_queue_num, $syn_queue_max,
-		$accept_queue_num, $accept_queue_max );
-	
-	if( $accept_queue_num > $accept_queue_max ){
-		printf("call stack:%s\n", kstack);
-	}
+    printf( "syn_queue_num:%d, syn_queue_max:%d\n accept_queue_num:%d, accept_queue_max:%d\n", 
+        $syn_queue_num, $syn_queue_max,
+        $accept_queue_num, $accept_queue_max );
+    
+    if( $accept_queue_num > $accept_queue_max ){
+        printf("call stack:%s\n", kstack);
+    }
 }
 ```
 
-实验方式：`./server`起服务端并开启抓包；客户端手动测试，单次一个请求：`./client 192.168.1.150 1`
+实验方式：
+
+* `./server`起服务端并开启抓包（tcpdump -i any port 8080 -nn -w 8080.cap -v）
+* 客户端手动测试，单次一个请求：`./client 192.168.1.150 1`
 
 现象和结果分析：
 
-* 客户端，请求6次提示成功；第7次失败，且阻塞一段时间（TCP重试，见后面服务端抓包分析）
+* 客户端，请求6次提示成功；第7次失败，且阻塞一段时间（TCP重试，见后面服务端的抓包分析）
 
 ```sh
 ➜  tcp_connect git:(main) ✗ ./client 192.168.1.150 1
@@ -625,16 +626,17 @@ call stack:
 
 分析：
 
-* 全连接队列依次增加到6，即最大数量5+1（内核中从0开始计数）。
+* 全连接队列依次增加到6，即最大数量5+1（内核中从0开始计数）
 * 第7次时就开始阻塞了，而上面`call stack`打印了13次，所以这里进行了12次SYN重传，结合抓包看也是相符的（至于为什么是12次，这里客户端是mac笔记本，就先不去纠结了 ）。这也解答了第一篇中，drop的包是可以在tcpdump中抓到的。
-* 上述结果里半连接队列的长度一直是0，是由于开始半连接->全连接是正常的，半连接队列记录一直被取走；而全连接队列超出限制后，不允许新的半连接建立
+* 上述结果里半连接队列的长度一直是0，是由于开始半连接->全连接是正常的，半连接队列记录一直被实时取走；而全连接队列超出限制后，不允许新的半连接建立，半连接队列中也就没有记录了
 * **所以这里我们通过bpftrace抓取到了全连接队列溢出的情况。**
 
 ```sh
-# 服务端全连接队列
+# 服务端全连接队列情况
 [root@xdlinux ➜ workspace ]$ ss -antp|grep -E "8080|Local" 
 State  Recv-Q Send-Q Local Address:Port Peer Address:Port Process                                                 
 LISTEN 6      5            0.0.0.0:8080      0.0.0.0:*     users:(("server",pid=27846,fd=3)) 
+
 [root@xdlinux ➜ workspace ]$ netstat -anp|grep -E "8080|Local"
 Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
 tcp        6      0 0.0.0.0:8080            0.0.0.0:*               LISTEN      27846/./server 
@@ -664,7 +666,7 @@ net.ipv4.tcp_tw_reuse = 2
 
 用libbpf和bpftrace跟踪TCP全连接溢出，最后用bpftrace成功抓到了。
 
-## 5. 附加系列总结
+## 5. 附：系列总结
 
 到这里，TCP全连接、半连接学习实践先告一段落，做个小总结。
 
@@ -672,9 +674,9 @@ net.ipv4.tcp_tw_reuse = 2
 
 第一篇学习和实验过程中的疑问点和发现的问题，作为TODO项去啃。过程中发现ss/netstat在不同环境的表现差异，去跟踪源码确认；为了跟踪TCP相关过程开始学习实践eBPF，输出了eBPF学习实践系列笔记；在实验使用bcc tools构造丢包时，/boot扩容搞崩了一次环境，也作为笔记记录了一下过程。
 
-整个过程下来，常出现：之前输出的内容后面发现理解有偏差、或者表述不大好、或者低级错误，来回修改的过程也是模拟给人讲述的过程。费曼学习法是个有用的技巧，理论+实践是学习成长的捷径。
+整个过程下来，常出现：之前输出的内容后面发现理解有偏差、或者表述不大好、或者低级错误，来回修改的过程也是模拟给人讲述的过程。体会是费曼学习法是个有用的技巧，理论+实践是学习成长的捷径。
 
-过程笔记如下：
+过程笔记顺序稍作了调整如下：
 
 * [TCP半连接全连接（一） -- 全连接队列相关过程](https://xiaodongq.github.io/2024/05/18/tcp_connect/)
 * [TCP半连接全连接（二） -- 半连接队列代码逻辑](https://xiaodongq.github.io/2024/05/30/tcp_syn_queue/)

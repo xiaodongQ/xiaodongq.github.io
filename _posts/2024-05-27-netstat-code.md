@@ -183,73 +183,73 @@ static const struct proc_ops proc_net_seq_ops = {
 // linux-5.10.10/fs/seq_file.c
 ssize_t seq_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
 {
-	struct iovec iov = { .iov_base = buf, .iov_len = size};
-	struct kiocb kiocb;
-	struct iov_iter iter;
-	ssize_t ret;
+    struct iovec iov = { .iov_base = buf, .iov_len = size};
+    struct kiocb kiocb;
+    struct iov_iter iter;
+    ssize_t ret;
 
-	init_sync_kiocb(&kiocb, file);
-	iov_iter_init(&iter, READ, &iov, 1, size);
+    init_sync_kiocb(&kiocb, file);
+    iov_iter_init(&iter, READ, &iov, 1, size);
 
-	kiocb.ki_pos = *ppos;
-	ret = seq_read_iter(&kiocb, &iter);
-	*ppos = kiocb.ki_pos;
-	return ret;
+    kiocb.ki_pos = *ppos;
+    ret = seq_read_iter(&kiocb, &iter);
+    *ppos = kiocb.ki_pos;
+    return ret;
 }
 
 // 序列操作
 ssize_t seq_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 {
-	struct seq_file *m = iocb->ki_filp->private_data;
-	...
-	/* grab buffer if we didn't have one */
-	if (!m->buf) {
-		m->buf = seq_buf_alloc(m->size = PAGE_SIZE);
-		if (!m->buf)
-			goto Enomem;
-	}
-	...
-	// get a non-empty record in the buffer
-	p = m->op->start(m, &m->index);
-	while (1) {
-		err = PTR_ERR(p);
-		if (!p || IS_ERR(p))	// EOF or an error
-			break;
-		err = m->op->show(m, p);
-		if (err < 0)		// hard error
-			break;
-		if (unlikely(err))	// ->show() says "skip it"
-			m->count = 0;
-		if (unlikely(!m->count)) { // empty record
-			p = m->op->next(m, p, &m->index);
-			continue;
-		}
-		if (!seq_has_overflowed(m)) // got it
-			goto Fill;
-		// need a bigger buffer
-		m->op->stop(m, p);
-		...
-		p = m->op->start(m, &m->index);
-	}
-	// EOF or an error
-	m->op->stop(m, p);
-	m->count = 0;
-	goto Done;
+    struct seq_file *m = iocb->ki_filp->private_data;
+    ...
+    /* grab buffer if we didn't have one */
+    if (!m->buf) {
+        m->buf = seq_buf_alloc(m->size = PAGE_SIZE);
+        if (!m->buf)
+            goto Enomem;
+    }
+    ...
+    // get a non-empty record in the buffer
+    p = m->op->start(m, &m->index);
+    while (1) {
+        err = PTR_ERR(p);
+        if (!p || IS_ERR(p))	// EOF or an error
+            break;
+        err = m->op->show(m, p);
+        if (err < 0)		// hard error
+            break;
+        if (unlikely(err))	// ->show() says "skip it"
+            m->count = 0;
+        if (unlikely(!m->count)) { // empty record
+            p = m->op->next(m, p, &m->index);
+            continue;
+        }
+        if (!seq_has_overflowed(m)) // got it
+            goto Fill;
+        // need a bigger buffer
+        m->op->stop(m, p);
+        ...
+        p = m->op->start(m, &m->index);
+    }
+    // EOF or an error
+    m->op->stop(m, p);
+    m->count = 0;
+    goto Done;
 Fill:
-	while (1) {
-		p = m->op->next(m, p, &m->index);
-		...
-		err = m->op->show(m, p);
-		...
-	}
-	m->op->stop(m, p);
-	...
+    while (1) {
+        p = m->op->next(m, p, &m->index);
+        ...
+        err = m->op->show(m, p);
+        ...
+    }
+    m->op->stop(m, p);
+    ...
 Done:
-	...
-	return copied;
+    ...
+    return copied;
 Enomem:
-	err = -ENOMEM;
-	goto Done;
+    err = -ENOMEM;
+    goto Done;
 }
 ```
 
