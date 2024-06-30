@@ -42,9 +42,9 @@ tags: 网络
 // 原来BCC中的方式转换为libbpf方式的事件ring buffer，key可以传一个指针
 // BPF_PERF_OUTPUT(ipv4_events);
 struct {
- __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
- __uint(key_size, sizeof(__u32));
- __uint(value_size, sizeof(__u32));
+    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+    __uint(key_size, sizeof(__u32));
+    __uint(value_size, sizeof(__u32));
 } ipv4_events SEC(".maps");
 
 ...
@@ -55,8 +55,9 @@ int handle_tp(struct trace_event_raw_kfree_skb *args)
  struct sk_buff *skb = (struct sk_buff*)BPF_CORE_READ(args, skbaddr);
  struct sock *sk = skb->sk;
 
- if (sk == NULL)
+    if (sk == NULL)
         return 0;
+
     __u32 pid = bpf_get_current_pid_tgid() >> 32;
 
     // pull in details from the packet headers and the sock struct
@@ -292,6 +293,8 @@ Failed to load and verify BPF skeleton
 definitions.h:3:10: fatal error: 'net/sock.h' file not found
 ```
 
+[之前](https://xiaodongq.github.io/2024/06/12/record-failed-expend-space/)重装系统时内核小版本不对应，应该是内核头文件没有
+
 查看安装匹配的：kernel-headers
 
 ```sh
@@ -349,7 +352,7 @@ Complete!
 [root@xdlinux ➜ tools ]$ 
 ```
 
-重试还是报错，`yum install kernel-devel`
+重试还是报错，kernel-devel也装一下：`yum install kernel-devel`
 
 再次重试，可以了。**不过没抓到内容。**
 
