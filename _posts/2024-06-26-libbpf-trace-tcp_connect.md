@@ -626,7 +626,7 @@ call stack:
 分析：
 
 * 全连接队列依次增加到6，即最大数量5+1（内核中从0开始计数）。
-* 第7次时就开始阻塞了，而上面`call stack`打印了13次，所以这里进行了12次SYN重传，结合抓包看也是相符的（至于为什么是12次，这里客户端是mac笔记本，就先不去纠结了 ）
+* 第7次时就开始阻塞了，而上面`call stack`打印了13次，所以这里进行了12次SYN重传，结合抓包看也是相符的（至于为什么是12次，这里客户端是mac笔记本，就先不去纠结了 ）。这也解答了第一篇中，drop的包是可以在tcpdump中抓到的。
 * 上述结果里半连接队列的长度一直是0，是由于开始半连接->全连接是正常的，半连接队列记录一直被取走；而全连接队列超出限制后，不允许新的半连接建立
 * **所以这里我们通过bpftrace抓取到了全连接队列溢出的情况。**
 
@@ -667,6 +667,30 @@ net.ipv4.tcp_tw_reuse = 2
 ## 5. 附加系列总结
 
 到这里，TCP全连接、半连接学习实践先告一段落，做个小总结。
+
+从开始的全连接、半连接队列不太清晰的概念，到深入代码和实践过程，建立起了相对扎实一点的体感，以后不犯怵了。
+
+第一篇学习和实验过程中的疑问点和发现的问题，作为TODO项去啃。过程中发现ss/netstat在不同环境的表现差异，去跟踪源码确认；为了跟踪TCP相关过程开始学习实践eBPF，输出了eBPF学习实践系列笔记；在实验使用bcc tools构造丢包时，/boot扩容搞崩了一次环境，也作为笔记记录了一下过程。
+
+整个过程下来，常出现：之前输出的内容后面发现理解有偏差、或者表述不大好、或者低级错误，来回修改的过程也是模拟给人讲述的过程。费曼学习法是个有用的技巧，理论+实践是学习成长的捷径。
+
+过程笔记如下：
+
+* [TCP半连接全连接（一） -- 全连接队列相关过程](https://xiaodongq.github.io/2024/05/18/tcp_connect/)
+* [TCP半连接全连接（二） -- 半连接队列代码逻辑](https://xiaodongq.github.io/2024/05/30/tcp_syn_queue/)
+* [TCP半连接全连接（三） -- eBPF跟踪全连接队列溢出（上）](https://xiaodongq.github.io/2024/06/23/bcctools-trace-tcp_connect/)
+* [TCP半连接全连接（四） -- eBPF跟踪全连接队列溢出（下）](https://xiaodongq.github.io/2024/06/26/libbpf-trace-tcp_connect/)
+
+* [分析某环境中ss结果中Send-Q为0的原因](https://xiaodongq.github.io/2024/05/20/ss-sendq-0/)
+* [分析netstat中的Send-Q和Recv-Q](https://xiaodongq.github.io/2024/05/27/netstat-code/)
+
+* [eBPF学习实践系列（一） -- 初识eBPF](https://xiaodongq.github.io/2024/06/06/ebpf_learn/)
+* [eBPF学习实践系列（二） -- bcc tools网络工具集](https://xiaodongq.github.io/2024/06/10/bcc-tools-network/)
+* [eBPF学习实践系列（三） -- 基于libbpf开发实践](https://xiaodongq.github.io/2024/06/15/libbpf-future/)
+* [eBPF学习实践系列（四） -- eBPF的各种追踪类型](https://xiaodongq.github.io/2024/06/19/ebpf-trace-type/)
+* [eBPF学习实践系列（五） -- 分析tcplife.bpf.c程序](https://xiaodongq.github.io/2024/06/20/ebpf-practice-case/)
+* [eBPF学习实践系列（六） -- bpftrace学习和使用](https://xiaodongq.github.io/2024/06/28/ebpf-bpftrace-learn/)
+* [记一次失败的/boot分区扩容](https://xiaodongq.github.io/2024/06/12/record-failed-expend-space/)
 
 ## 6. 参考
 
