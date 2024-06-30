@@ -52,7 +52,6 @@ bpftrace提供的追踪类型：
 记录下自己运行环境的bcc和bpftrace、llvm版本（有的环境发现有问题）
 
 ```sh
-# 使用正常
 [root@xdlinux ➜ ~ ]$ rpm -qa|grep bpftr
 bpftrace-0.12.1-3.el8.x86_64
 [root@xdlinux ➜ ~ ]$ rpm -qa|grep bcc
@@ -178,13 +177,13 @@ Attaching 1 probe...
 name: sys_exit_read
 ID: 671
 format:
-	field:unsigned short common_type;	offset:0;	size:2;	signed:0;
-	field:unsigned char common_flags;	offset:2;	size:1;	signed:0;
-	field:unsigned char common_preempt_count;	offset:3;	size:1;	signed:0;
-	field:int common_pid;	offset:4;	size:4;	signed:1;
+  field:unsigned short common_type;	offset:0;	size:2;	signed:0;
+  field:unsigned char common_flags;	offset:2;	size:1;	signed:0;
+  field:unsigned char common_preempt_count;	offset:3;	size:1;	signed:0;
+  field:int common_pid;	offset:4;	size:4;	signed:1;
 
-	field:int __syscall_nr;	offset:8;	size:4;	signed:1;
-	field:long ret;	offset:16;	size:8;	signed:1;
+  field:int __syscall_nr;	offset:8;	size:4;	signed:1;
+  field:long ret;	offset:16;	size:8;	signed:1;
 
 print fmt: "0x%lx", REC->ret
 ```
@@ -500,7 +499,7 @@ END
 * map：`@name[key] = expression`，key也可以是多变量组合：`@name[key1,key2] = expression`
 * 指针：和C类似，但是bpftrace中，需要用指针的形式读取变量
 
-```c
+```sh
 struct MyStruct {
   int a;
 }

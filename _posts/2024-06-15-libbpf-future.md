@@ -183,18 +183,18 @@ build: helloworld
 # 特别注意： Makefile里面规则定义(下述形式)必须用tab，不能用空格
 # clang编译bpf字节码
 helloworld.bpf.o: helloworld.bpf.c
-	$(CLANG)  -g -O2 -target bpf -D__TARGET_ARCH_$(ARCH) $(INCLUDES) $(CLANG_BPF_SYS_INCLUDES) -c helloworld.bpf.c 
+    $(CLANG)  -g -O2 -target bpf -D__TARGET_ARCH_$(ARCH) $(INCLUDES) $(CLANG_BPF_SYS_INCLUDES) -c helloworld.bpf.c 
 
 # 根据bpf字节码，用bpftool生成骨架文件
 helloworld.skel.h: helloworld.bpf.o
-	$(BPFTOOL) gen skeleton helloworld.bpf.o > helloworld.skel.h
+    $(BPFTOOL) gen skeleton helloworld.bpf.o > helloworld.skel.h
 
 # 编译用户空间代码生成二进制程序，链接libbpf.a，代码里还会include上述骨架文件
 helloworld: helloworld.skel.h helloworld.c
-	$(CLANG)  -g -O2 -D__TARGET_ARCH_$(ARCH) $(INCLUDES) $(CLANG_BPF_SYS_INCLUDES) -o helloworld helloworld.c $(LIBBPF_LIBS) -lbpf -lelf -lz
+    $(CLANG)  -g -O2 -D__TARGET_ARCH_$(ARCH) $(INCLUDES) $(CLANG_BPF_SYS_INCLUDES) -o helloworld helloworld.c $(LIBBPF_LIBS) -lbpf -lelf -lz
 
 clean:
-	rm -rf helloworld.bpf.o helloworld
+    rm -rf helloworld.bpf.o helloworld
 ```
 
 上述`CLANG_BPF_SYS_INCLUDES`赋值结果为：
@@ -325,12 +325,12 @@ git clone https://github.com/alibaba/sreworks-ext.git
 [root@xdlinux ➜ /home/workspace ]$ tail -n20 ./sreworks-ext/demos/native_libbpf_guide/trace_execve_libbpf130/tools/lib/bpf/libbpf.map
 ...
 LIBBPF_1.3.0 {
-	global:
-		bpf_obj_pin_opts;
-		bpf_object__unpin;
-		...
-		ring__size;
-		ring_buffer__ring;
+    global:
+        bpf_obj_pin_opts;
+        bpf_object__unpin;
+        ...
+        ring__size;
+        ring_buffer__ring;
 } LIBBPF_1.2.0;
 ```
 
@@ -340,11 +340,11 @@ LIBBPF_1.3.0 {
 ➜  /Users/xd/Documents/workspace/src/cpp_path tail -40 ./linux-5.10.10/tools/lib/bpf/libbpf.map
 ...
 LIBBPF_0.2.0 {
-	global:
-		bpf_prog_bind_map;
-		bpf_prog_test_run_opts;
-		...
-		xsk_socket__create_shared;
+    global:
+        bpf_prog_bind_map;
+        bpf_prog_test_run_opts;
+        ...
+        xsk_socket__create_shared;
 } LIBBPF_0.1.0;
 ```
 
@@ -352,15 +352,15 @@ LIBBPF_0.2.0 {
 
 ```sh
 [root@xdlinux ➜ /home/workspace/libbpf-demo ]$ tail ./libbpf-demo/libbpf/src/libbpf.map
-		btf__new_split;
-		btf_ext__raw_data;
+        btf__new_split;
+        btf_ext__raw_data;
 } LIBBPF_1.3.0;
 
 LIBBPF_1.5.0 {
-	global:
-		bpf_program__attach_sockmap;
-		ring__consume_n;
-		ring_buffer__consume_n;
+    global:
+        bpf_program__attach_sockmap;
+        ring__consume_n;
+        ring_buffer__consume_n;
 } LIBBPF_1.4.0;
 ```
 
@@ -426,33 +426,33 @@ BPF_OBJECT     := $(patsubst %.c,./progs/%.bpf.o,$(SOURCES))
 .PHONY: clean
 
 clean:
-	rm -f *.ll *.o *.d .*.d $(LOADER_OBJECT) $(HELPERS_PATH)/*.o $(HELPERS_PATH)/.*.d
-	make -C ./tools/lib/bpf/ clean
-	make -C ./tools/build/feature clean
-	make -C ./progs/ clean
+    rm -f *.ll *.o *.d .*.d $(LOADER_OBJECT) $(HELPERS_PATH)/*.o $(HELPERS_PATH)/.*.d
+    make -C ./tools/lib/bpf/ clean
+    make -C ./tools/build/feature clean
+    make -C ./progs/ clean
 
 # 编译静态libbpf.a
 $(LIBBPF):
-	make -C ./tools/lib/bpf/
+    make -C ./tools/lib/bpf/
 
 # 辅助函数编译
 $(HELPER_OBJECTS): %.o:%.c
-	$(CC) -Wp,-MD,$(depfile) $(CFLAGS)  -g -c -o $@ $<
+    $(CC) -Wp,-MD,$(depfile) $(CFLAGS)  -g -c -o $@ $<
 
 # 内核态bpf程序编译，得到bpf字节码
 $(BPF_OBJECT):./progs/%.bpf.o:./progs/%.bpf.c
-	make -C ./progs/ BPF_TARGET=$(notdir $@)
+    make -C ./progs/ BPF_TARGET=$(notdir $@)
 
 # 用户态程序编译
 $(USER_OBJECT):%.o:%.c
-	$(CC) -Wp,-MD,$(depfile) $(CFLAGS)  -g -c -o $@ $<
+    $(CC) -Wp,-MD,$(depfile) $(CFLAGS)  -g -c -o $@ $<
 
 # 二进制程序，如 trace_execve，根据trace_execve.c名截取
 $(LOADER_OBJECT): %:%.o ./progs/%.bpf.o
-	$(CC) -g -o $@ $< $(HELPER_OBJECTS) $(LDLIBS)
+    $(CC) -g -o $@ $< $(HELPER_OBJECTS) $(LDLIBS)
 
 all: $(LIBBPF) $(HELPER_OBJECTS) $(LOADER_OBJECT)
-	@echo "Successfully remade target file 'all'."
+    @echo "Successfully remade target file 'all'."
 
 .DEFAULT_GOAL := all
 ```
