@@ -542,7 +542,7 @@ tcp        0      0 192.168.1.101:8000     192.168.1.102:36646    TIME_WAIT   -
 
 该选项设置socket让其在关闭时避免进入TIME_WAIT或者设置该状态持续的超时时间
 
-到`/usr/lib64/python3.9`全局搜，并没有python里设置该选项，所以排除
+到`/usr/lib64/python3.9`全局搜，python里并没有设置该选项，所以排除
 
 #### 3.3.3. 怀疑点2：`SO_REUSEADDR`选项
 
@@ -617,9 +617,11 @@ class TCPServer(BaseServer):
 人工试了几次，确实就是`60s`（即2MSL）后TIME_WAIT消失，基本都是如下过程
 
 ```sh
+# 开始有TIME_WAIT
 [root@localhost http]# netstat -anp|grep 8000
 tcp        0      0 0.0.0.0:8000            0.0.0.0:*               LISTEN      3347507/python      
 tcp        0      0 192.168.1.101:8000     192.168.1.102:53484    TIME_WAIT   -
+# 人工确认几次
 [root@localhost http]# date; netstat -anp|grep 8000
 Tue Jun 25 05:43:46 CST 2024
 tcp        0      0 0.0.0.0:8000            0.0.0.0:*               LISTEN      3347507/python      
@@ -629,7 +631,7 @@ tcp        0      0 192.168.1.101:8000     192.168.1.102:53484    TIME_WAIT   -
 Tue Jun 25 05:44:31 CST 2024
 tcp        0      0 0.0.0.0:8000            0.0.0.0:*               LISTEN      3347507/python      
 tcp        0      0 192.168.1.101:8000     192.168.1.102:53484    TIME_WAIT   -
-# 没有了，60s左右
+# 最后没有了，60s左右
 [root@localhost http]# date; netstat -anp|grep 8000
 Tue Jun 25 05:44:43 CST 2024
 tcp        0      0 0.0.0.0:8000            0.0.0.0:*               LISTEN      3347507/python
@@ -659,7 +661,7 @@ tcp        0      0 0.0.0.0:8000            0.0.0.0:*               LISTEN      
 
 **总结：到这里，可以说`TIME_WAIT`持续状态就是2MSL，和上面的这些参数都无关。**
 
-（`tcp_tw_recycle`更是不建议开，还是建议保持优雅关闭，且Linux 4.12版本后直接取消了这一参数，[参考](https://time.geekbang.org/column/article/238388)。上面5.10内核环境中`sysctl -a`确实没看到）
+（`tcp_tw_recycle`更是不建议开，还是建议保持优雅关闭，且Linux 4.12版本后直接取消了这一参数，[参考](https://time.geekbang.org/column/article/238388)。上面5.10内核环境中`sysctl -a`确实没看到该参数了）
 
 #### 3.3.5. tcp_fin_timeout 生效场景验证
 
@@ -716,37 +718,37 @@ hnote over A: CLOSE
 ```c
 // server.cpp
 while (true) {  
-        struct sockaddr_in client_address; // 用于存储客户端地址信息
-        socklen_t client_len = sizeof(client_address);
+    struct sockaddr_in client_address; // 用于存储客户端地址信息
+    socklen_t client_len = sizeof(client_address);
 
-        // 使用accept函数接受连接请求
-        if ((new_socket = accept(server_fd, (struct sockaddr *)&client_address, &client_len)) < 0) {
-            perror("accept");
-            continue; // 如果接受失败，继续下一次循环尝试
-        }
+    // 使用accept函数接受连接请求
+    if ((new_socket = accept(server_fd, (struct sockaddr *)&client_address, &client_len)) < 0) {
+        perror("accept");
+        continue; // 如果接受失败，继续下一次循环尝试
+    }
 
-        char client_ip[INET_ADDRSTRLEN]; // 用于存储客户端IP的字符串形式
-        inet_ntop(AF_INET, &(client_address.sin_addr), client_ip, INET_ADDRSTRLEN);
+    char client_ip[INET_ADDRSTRLEN]; // 用于存储客户端IP的字符串形式
+    inet_ntop(AF_INET, &(client_address.sin_addr), client_ip, INET_ADDRSTRLEN);
 
-        std::cout << "Connection accepted from " << client_ip << ":" << ntohs(client_address.sin_port) << std::endl;
+    std::cout << "Connection accepted from " << client_ip << ":" << ntohs(client_address.sin_port) << std::endl;
 
-        // 读取数据逻辑
-        char buffer[1024] = {0}; // 缓冲区用于存放接收的数据
-        int valread;
+    // 读取数据逻辑
+    char buffer[1024] = {0}; // 缓冲区用于存放接收的数据
+    int valread;
 
-        while ((valread = recv(new_socket, buffer, 1024, 0)) > 0) { // 循环读取直到没有更多数据
-            std::cout << "Client: " << buffer << std::endl; // 打印接收到的数据
-            memset(buffer, 0, 1024); // 清空缓冲区以便下一次读取
-        }
+    while ((valread = recv(new_socket, buffer, 1024, 0)) > 0) { // 循环读取直到没有更多数据
+        std::cout << "Client: " << buffer << std::endl; // 打印接收到的数据
+        memset(buffer, 0, 1024); // 清空缓冲区以便下一次读取
+    }
 
-        if (valread == 0) {
-            std::cout << "Client disconnected" << std::endl; // 客户端正常关闭连接
-        } else if (valread == -1) {
-            perror("recv failed"); // 读取错误处理
-        }
+    if (valread == 0) {
+        std::cout << "Client disconnected" << std::endl; // 客户端正常关闭连接
+    } else if (valread == -1) {
+        perror("recv failed"); // 读取错误处理
+    }
 
-        // 不做关闭
-    }  
+    // 不做关闭
+}  
 ```
 
 1、客户端发起1个请求
@@ -761,9 +763,11 @@ Message sent: helloworld
 netstat观察，FIN_WAIT2确实持续了60s
 
 ```sh
+# 客户端请求完，查看有FIN_WAIT2
 [root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
 Wed Jun 26 23:26:25 CST 2024
 tcp        0      0 192.168.1.150:58482     192.168.1.2:8080        FIN_WAIT2   -  
+# 人工定期查看
 [root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
 Wed Jun 26 23:26:27 CST 2024
 tcp        0      0 192.168.1.150:58482     192.168.1.2:8080        FIN_WAIT2   -
@@ -771,6 +775,7 @@ tcp        0      0 192.168.1.150:58482     192.168.1.2:8080        FIN_WAIT2   
 [root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
 Wed Jun 26 23:27:24 CST 2024
 tcp        0      0 192.168.1.150:58482     192.168.1.2:8080        FIN_WAIT2   -  
+# 最后没有了，基本是60s
 [root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
 Wed Jun 26 23:27:25 CST 2024
 ```
@@ -821,6 +826,7 @@ tcp        0      0 192.168.1.150:58484     192.168.1.2:8080        FIN_WAIT2   
 [root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
 Wed Jun 26 23:35:39 CST 2024
 tcp        0      0 192.168.1.150:58484     192.168.1.2:8080        FIN_WAIT2   -                   
+# 最后没有FIN_WAIT2了，距开始差不多是10s
 [root@xdlinux ➜ ~ ]$ date; netstat -anp|grep 8080
 Wed Jun 26 23:35:39 CST 2024
 ```
