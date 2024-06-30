@@ -268,7 +268,7 @@ tmpfs                3.1G     0  3.1G   0% /run/user/0
 
 ### 2.3. Oops! 匀不了
 
-上面多的3.99G，想分配给`/boot`，这是才注意到不在同一个分区的LVM上。。。
+上面多的3.99G，想分配给`/boot`，这时才注意到不在同一个分区的LVM上。。。
 
 来都来了，就分配给`/`吧，用`lvextend`分配剩下的3.99G给`/`对应的VG。
 
@@ -320,7 +320,7 @@ tmpfs                3.1G     0  3.1G   0% /run/user/0
 
 参考：[LVM----从CentOS7默认安装的/home中转移空间到根目录/](https://www.cnblogs.com/user-sunli/p/15484345.html)
 
-虽然没成功，但上面的操作步骤实操了一把也不算白浪费。小结：
+虽然没成功，但上面的操作步骤实操了一把也不算白浪费。小结操作流程：
 
 1、从lvm中某个lv释放空间给另一个lv
 
@@ -369,7 +369,7 @@ LVM完成
 
 ### 2.4. Windows+CentOS双系统，从Windows匀一下
 
-从windows上压缩空间分配给centos的 /boot (单独分区，没有在LVM里)
+尝试从Windows上压缩空间分配给CentOS的 /boot (这部分空间是单独分区的，没有在LVM里)
 
 问GPT：
 
@@ -566,7 +566,7 @@ tmpfs                3.1G     0  3.1G   0% /run/user/0
 
 ~~`curl -o /etc/yum.repos.d/CentOS-Base.repo http://mirrors.aliyun.com/repo/Centos-8.repo`~~
 
-上面的yum源，下载的内核版本是`4.18.0-348.7.1.el8_5.x86_64`，而系统实际是`4.18.0-348.el8.x86_64`，小版本不一样，修改为下述源
+上面的yum源，下载的内核版本是`4.18.0-348.7.1.el8_5.x86_64`，而系统实际是`4.18.0-348.el8.x86_64`，小版本不一样，修改为下述源（下面看貌似结果还是一样）
 
 ```sh
 [root@desktop-mme7h3a ➜ /root ]$ cat /etc/system-release
