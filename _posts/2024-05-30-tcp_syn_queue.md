@@ -660,7 +660,7 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
         goto drop;
     ...
     if (!want_cookie && !isn) {
-        // 没开启syncookies时，若 `max_syn_backlog - 全连接长度` < max_syn_backlog>>2，则丢弃请求包
+        // 没开启syncookies时，若 `max_syn_backlog - 半连接长度` < max_syn_backlog>>2，则丢弃请求包
         if (!net->ipv4.sysctl_tcp_syncookies &&
             (net->ipv4.sysctl_max_syn_backlog - inet_csk_reqsk_queue_len(sk) <
              (net->ipv4.sysctl_max_syn_backlog >> 2)) &&

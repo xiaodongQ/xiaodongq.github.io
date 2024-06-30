@@ -35,7 +35,17 @@ bpftrace内部结构示意图：
 bpftrace提供的追踪类型：  
 ![bpftrace提供的追踪类型](/images/bpftrace_probes_2018.png)
 
-## 3. 基本用法
+## 3. bpftrace/BCC/libbpf对比
+
+这三种方式各有优缺点，在实际的生产环境中都有大量的应用（[参考](https://time.geekbang.org/column/article/484207)）：
+
+> * **bpftrace 通常用在快速排查和定位系统上，它支持用单行脚本的方式来快速开发并执行一个 eBPF 程序。**不过，bpftrace 的功能有限，不支持特别复杂的 eBPF 程序，也依赖于 BCC 和 LLVM 动态编译执行。
+> * **BCC 通常用在开发复杂的 eBPF 程序中，其内置的各种小工具也是目前应用最为广泛的 eBPF 小程序。**不过，BCC 也不是完美的，它依赖于 LLVM 和内核头文件才可以动态编译和加载 eBPF 程序。
+> * **libbpf 是从内核中抽离出来的标准库，用它开发的 eBPF 程序可以直接分发执行，这样就不需要每台机器都安装 LLVM 和内核头文件了。**不过，它要求内核开启 BTF 特性，需要非常新的发行版才会默认开启（如 RHEL 8.2+ 和 Ubuntu 20.10+ 等）。
+>
+> 在实际应用中，你可以根据你的内核版本、内核配置、eBPF 程序复杂度，以及是否允许安装内核头文件和 LLVM 等编译工具等，来选择最合适的方案。
+
+## 4. 基本用法
 
 查看github上bpftrace项目的一行使用教程：[tutorial_one_liners](https://github.com/bpftrace/bpftrace/blob/master/docs/tutorial_one_liners.md)，里面提供了12个简单的使用说明。 (也可以看这篇译文：[bpftrace一行教程](https://eunomia.dev/zh/tutorials/bpftrace-tutorial/))
 
@@ -56,7 +66,7 @@ llvm-12.0.1-2.module_el8.5.0+918+ed335b90.x86_64
 
 前面eBPF学习基础后，理解和使用bpftrace就比较丝滑了，很多直接可用的轮子。
 
-### 3.1. 列出所有探针
+### 4.1. 列出所有探针
 
 `bpftrace -l 'tracepoint:syscalls:sys_enter_*'`
 
@@ -69,7 +79,7 @@ tracepoint:skb:kfree_skb
 tracepoint:skb:skb_copy_datagram_iovec
 ```
 
-### 3.2. Hello World
+### 4.2. Hello World
 
 `bpftrace -e 'BEGIN { printf("hello world\n"); }'`
 
@@ -79,7 +89,7 @@ Attaching 1 probe...
 hello world
 ```
 
-### 3.3. 探测文件打开
+### 4.3. 探测文件打开
 
 `bpftrace -e 'tracepoint:syscalls:sys_enter_openat { printf("%s %s\n", comm, str(args.filename)); }'`
 
@@ -97,7 +107,7 @@ irqbalance /proc/irq/32/smp_affinity
 irqbalance /proc/irq/30/smp_affinity
 ```
 
-### 3.4. 按进程名统计系统调用次数
+### 4.4. 按进程名统计系统调用次数
 
 `bpftrace -e 'tracepoint:raw_syscalls:sys_enter { @[comm] = count(); }'`
 
@@ -131,7 +141,7 @@ Attaching 1 probe...
   @test[gmain]: 6
 ```
 
-### 3.5. read()返回值分布统计
+### 4.5. read()返回值分布统计
 
 过滤进程pid，并进行直方图统计，这里跟踪 tracepoint
 
@@ -179,7 +189,7 @@ format:
 print fmt: "0x%lx", REC->ret
 ```
 
-### 3.6. 动态跟踪read()内核态中返回的字节数
+### 4.6. 动态跟踪read()内核态中返回的字节数
 
 `bpftrace -e 'kretprobe:vfs_read { @bytes = lhist(retval, 0, 2000, 200); }'`
 
@@ -205,7 +215,7 @@ Attaching 1 probe...
 [2000, ...)          276 |@@@@@@@@@@@@@@@                                     |
 ```
 
-### 3.7. 各进程read()调用的时间
+### 4.7. 各进程read()调用的时间
 
 `bpftrace -e 'kprobe:vfs_read { @start[tid] = nsecs; } kretprobe:vfs_read /@start[tid]/ { @ns[comm] = hist(nsecs - @start[tid]); delete(@start[tid]); }'`
 
@@ -253,7 +263,7 @@ Attaching 2 probes...
 # @start[6395]: 91660555397772
 ```
 
-### 3.8. 统计进程级别的事件
+### 4.8. 统计进程级别的事件
 
 `bpftrace -e 'tracepoint:sched:sched* { @[probe] = count(); } interval:s:5 { exit(); }'`
 
@@ -272,7 +282,7 @@ Attaching 25 probes...
 @[tracepoint:sched:sched_switch]: 1005
 ```
 
-### 3.9. 跟踪内核函数堆栈
+### 4.9. 跟踪内核函数堆栈
 
 `bpftrace -e 'profile:hz:99 { @[kstack] = count(); }'`
 
@@ -319,15 +329,15 @@ Attaching 1 probe...
 ]: 6497
 ```
 
-### 3.10. 调度器跟踪
+### 4.10. 调度器跟踪
 
 `bpftrace -e 'tracepoint:sched:sched_switch { @[kstack] = count(); }'`
 
-### 3.11. 块级别I/O跟踪
+### 4.11. 块级别I/O跟踪
 
 `bpftrace -e 'tracepoint:block:block_rq_issue { @ = hist(args.bytes); }'`
 
-### 3.12. 内核结构跟踪
+### 4.12. 内核结构跟踪
 
 使用内核动态跟踪技术跟踪`vfs_read()`函数，该函数的(`struct path *`)作为第一个参数。
 
@@ -358,7 +368,7 @@ open path: retrans_time_ms
 [...]
 ```
 
-## 4. bpftrace tools
+## 5. bpftrace tools
 
 bpftrace项目的 [tools](https://github.com/bpftrace/bpftrace/tree/master/tools) 目录下有很多直接可用的工具，作为平时使用和开发参考都是值得去看的。
 
@@ -479,11 +489,73 @@ END
 }
 ```
 
-## 5. 小结
+## 6. 基本语法
 
-了解bpftrace并实践了基本用法，跟BCC、libbpf做了简单对比
+具体见：[bpftrace(8) Manual Page](https://github.com/bpftrace/bpftrace/blob/master/man/adoc/bpftrace.adoc)
 
-## 6. 参考
+下面只列举几个语法相关示例：
+
+* 注释：`//`或者`/* */`
+* 数组：`int a[] = {1,2,3}`
+* map：`@name[key] = expression`，key也可以是多变量组合：`@name[key1,key2] = expression`
+* 指针：和C类似，但是bpftrace中，需要用指针的形式读取变量
+
+```c
+struct MyStruct {
+  int a;
+}
+
+kprobe:dummy {
+  $ptr = (struct MyStruct *) arg0;
+  $st = *$ptr;
+  print($st.a);
+  print($ptr->a);
+}
+```
+
+内建变量：
+
+* `$1`、`$2`等，传给bpftrace程序的第几个参数，如果传入的是字符串，用str()查看其内容
+* `arg0`、`arg1`等，传给待跟踪函数的参数，用于kprobes, uprobes, usdt。**注意：`arg0`是指第一个参数，即从0开始**，
+* `args`，跟踪函数的所有参数的结构体，用于tracepoint, kfunc, and uprobe
+* `comm`当前线程(current thread)
+* `cpu` 当前处理bpf程序的CPU ID
+* `func` 当前被跟踪的函数(用于kprobe、uprobe)
+* `pid` 当前进程pid（Process ID of the current thread，当前线程对应的进程）
+* `tid` 当前线程id
+* `return` 关键字，当前退出probe。和exit()的差别是return不退出bpftrace
+* `retval` 被跟踪函数的返回值（用于kretprobe, uretprobe, kretfunc）
+
+函数：
+
+* `bswap(类型)`（包含`uint8 bswap(uint8 n)`、`uint16 bswap(uint16 n)`、32、64）
+    * 按byte翻转字节序。对于8字节数，结果不变
+* `buf_t buf(void * data, [int64 length])`
+    * 从data里面读取length长度的数据，length定义类型是int64
+    * 返回的`buf_t`对象，可以用`%r`格式化输出十进制字符串：`printf("%r\n", buf(kaddr("avenrun"), 8));`
+* `void exit()` 退出程序
+* `kstack()` 内核调用栈
+    * 基于BPF的stack maps实现，即 [BPF_MAP_TYPE_STACK](https://ebpf-docs.dylanreimerink.nl/linux/map-type/BPF_MAP_TYPE_STACK/)
+    * 比如：`kprobe:ip_output { @[kstack()] = count(); }`，统计各堆栈出现次数
+* `inet_t ntop([int64 af, ] int addr)`，把ipv4/ipv6转换成点分十进制形式，也可第一个参数显式指定协议族(如AF_INET)
+* `char addr[4] pton(const string *addr_v4)` 相对于上面是反的，这里是地址转成网络序
+
+probe：
+
+* 可以在一行里追踪多个probe，如 `kprobe:tcp_reset,kprobe:tcp_v4_rcv { xxx }`
+* 也可以用通配符 `kprobe:tcp_* { xxx }`
+* `BEGIN`/`END`，是特殊的bpftrace运行时内建事件，分别在其他probe之前及之后触发
+* 大部probe类型都有缩写，如 `kprobe:f`可缩写为`k:f`，`tracepoint:f`可缩写为`t:f`（各具体小节有shortname说明）
+
+示例：
+
+跟踪短时进程：`bpftrace -e 'tracepoint:syscalls:sys_enter_execve,tracepoint:syscalls:sys_enter_execveat { printf("%-6d %-8s", pid, comm); join(args->argv);}'` （join把字符串数组格式的参数用空格拼接起来）
+
+## 7. 小结
+
+学习了解bpftrace和基本用法，跟BCC、libbpf做了简单对比
+
+## 8. 参考
 
 1、[bpftrace](https://github.com/bpftrace/bpftrace)
 
@@ -491,4 +563,8 @@ END
 
 3、[bpftrace一行教程](https://eunomia.dev/zh/tutorials/bpftrace-tutorial/)
 
-4、GPT
+4、[bpftrace(8) Manual Page](https://github.com/bpftrace/bpftrace/blob/master/man/adoc/bpftrace.adoc)
+
+5、[07 内核跟踪（上）：如何查询内核中的跟踪点？](https://time.geekbang.org/column/article/484207)
+
+6、GPT

@@ -279,7 +279,7 @@ Failed to load and verify BPF skeleton
 
 ### 3.1. 全连接队列溢出跟踪
 
-#### 3.1.1. tcpdrop.bt
+#### 3.1.1. 尝试tcpdrop.bt
 
 直接先试试bpftrace项目tools里的tcpdrop.bt
 
@@ -364,7 +364,7 @@ bpftrace-0.12.1-3.el8.x86_64
 kprobe:tcp_drop
 ```
 
-#### 3.1.2. 问题分析
+#### 3.1.2. 对比bcc tools结果分析
 
 结果对比：
 
@@ -408,7 +408,7 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
         goto drop;
     ...
     if (!want_cookie && !isn) {
-        // 没开启syncookies时，若 `max_syn_backlog - 全连接长度` < max_syn_backlog>>2，则丢弃请求包
+        // 没开启syncookies时，若 `max_syn_backlog - 半连接长度` < max_syn_backlog>>2，则丢弃请求包
         if (!net->ipv4.sysctl_tcp_syncookies &&
             (net->ipv4.sysctl_max_syn_backlog - inet_csk_reqsk_queue_len(sk) <
              (net->ipv4.sysctl_max_syn_backlog >> 2)) &&
@@ -443,27 +443,237 @@ static inline void tcp_listendrop(const struct sock *sk)
 }
 ```
 
-#### 3.1.3. 使用合适的追踪点
+#### 3.1.3. bpftrace跟踪其他追踪点
 
 那可以直接追踪`tcp_listendrop`吗？
 
-查看并没有相应追踪点：
+查看并没有这个直接的追踪点，只有显式导出的内核函数才可以被eBPF进行动态跟踪：
 
 ```sh
-[root@xdlinux ➜ tools ]$ bpftrace -l 'kprobe:tcp_listendrop'
+[root@xdlinux ➜ tools ]$ bpftrace -l | grep tcp_listendrop
+[root@xdlinux ➜ tools ]$ 
+# 系统符号里也没有
+[root@xdlinux ➜ tools ]$ grep tcp_listendrop /proc/kallsyms
 [root@xdlinux ➜ tools ]$ 
 ```
 
+那只能间接跟踪下了，通过分析上下文后设计跟踪脚本。  
+调用链是：`tcp_v4_conn_request` -> `tcp_conn_request` -> `tcp_listendrop`，那我们查下前面的追踪点：
 
+```sh
+[root@xdlinux ➜ tools ]$ bpftrace -l | grep -E "tcp_v4_conn_request|tcp_conn_request"
+kfunc:tcp_conn_request
+kfunc:tcp_v4_conn_request
+kprobe:tcp_conn_request
+kprobe:tcp_v4_conn_request
+```
+
+可以看到前两者都有，那先跟踪下 `kprobe:tcp_conn_request`。
+
+再翻看下上述`tcp_conn_request`函数的内核代码，其发生全连接队列溢出的位置如下：
+
+```c
+    // 检查当前 sock 的全连接队列是否满
+    if (sk_acceptq_is_full(sk)) {
+        NET_INC_STATS(sock_net(sk), LINUX_MIB_LISTENOVERFLOWS);
+        goto drop;
+    }
+```
+
+由于自己的实验环境有时是本地PC（4.18内核），有时是阿里云ECS（5.10内核），这里把两个版本的`sk_acceptq_is_full`和`tcp_conn_request`都贴一下。对比后差别并不大，不影响流程分析。
+
+```c
+// linux-4.18/include/net/sock.h
+static inline bool sk_acceptq_is_full(const struct sock *sk)
+{
+	return sk->sk_ack_backlog > sk->sk_max_ack_backlog;
+}
+
+// linux-5.10.10/include/net/sock.h
+static inline bool sk_acceptq_is_full(const struct sock *sk)
+{
+	return READ_ONCE(sk->sk_ack_backlog) > READ_ONCE(sk->sk_max_ack_backlog);
+}
+```
+
+```c
+// linux-4.18/net/ipv4/tcp_input.c
+int tcp_conn_request(struct request_sock_ops *rsk_ops,
+		     const struct tcp_request_sock_ops *af_ops,
+		     struct sock *sk, struct sk_buff *skb);
+
+// linux-5.10.10/net/ipv4/tcp_input.c
+int tcp_conn_request(struct request_sock_ops *rsk_ops,
+		     const struct tcp_request_sock_ops *af_ops,
+		     struct sock *sk, struct sk_buff *skb)
+```
+
+把`struct sock`结构中的`sk->sk_ack_backlog`和`sk->sk_max_ack_backlog`进行对比，即可满足调用`tcp_listendrop`的条件。编写bpftrace脚本[tcp_queue.bt](https://github.com/xiaodongQ/prog-playground/blob/main/network/ebpf/bpftrace_tcp_queue/tcp_queue.bt)，内容如下：
+
+```c
+#!/usr/bin/env bpftrace
+
+/*
+函数声明如下：
+int tcp_conn_request(struct request_sock_ops *rsk_ops,
+		     const struct tcp_request_sock_ops *af_ops,
+		     struct sock *sk, struct sk_buff *skb)
+*/
+
+kprobe:tcp_conn_request
+{
+	// 注意：arg0表示函数的第1个参数
+	$sk = (struct sock*)arg2;
+	$inet_csk=(struct inet_connection_sock *)$sk;
+
+	// 当前半连接队列长度，~~废弃：qlen这里貌似没办法获取到数量~~
+	// qlen定义为`atomic_t	qlen;`，而atomic_t是一个结构体，需要再qlen.counter
+	$syn_queue_num = $inet_csk->icsk_accept_queue.qlen.counter;
+	// 半连接队列最大长度，4.4+的内核和全连接最大限制一样
+	$syn_queue_max = $sk->sk_max_ack_backlog;
+	// 当前全连接队列长度
+	$accept_queue_num = $sk->sk_ack_backlog;
+	// 全连接队列最大长度
+	$accept_queue_max = $sk->sk_max_ack_backlog;
+
+	printf( "syn_queue_num:%d, syn_queue_max:%d\n accept_queue_num:%d, accept_queue_max:%d\n", 
+		$syn_queue_num, $syn_queue_max,
+		$accept_queue_num, $accept_queue_max );
+	
+	if( $accept_queue_num > $accept_queue_max ){
+		printf("call stack:%s\n", kstack);
+	}
+}
+```
+
+实验方式：`./server`起服务端并开启抓包；客户端手动测试，单次一个请求：`./client 192.168.1.150 1`
+
+现象和结果分析：
+
+* 客户端，请求6次提示成功；第7次失败，且阻塞一段时间（TCP重试，见后面服务端抓包分析）
+
+```sh
+➜  tcp_connect git:(main) ✗ ./client 192.168.1.150 1
+Message sent: helloworld
+➜  tcp_connect git:(main) ✗ ./client 192.168.1.150 1
+Message sent: helloworld
+➜  tcp_connect git:(main) ✗ ./client 192.168.1.150 1
+Message sent: helloworld
+➜  tcp_connect git:(main) ✗ ./client 192.168.1.150 1
+Message sent: helloworld
+➜  tcp_connect git:(main) ✗ ./client 192.168.1.150 1
+Message sent: helloworld
+➜  tcp_connect git:(main) ✗ ./client 192.168.1.150 1
+Message sent: helloworld
+➜  tcp_connect git:(main) ✗ ./client 192.168.1.150 1
+Connection Failed
+```
+
+* 服务端bpftrace结果如下，抓包文件在[这里](https://github.com/xiaodongQ/xiaodongq.github.io/tree/master/images/srcfiles/8080_server150-20240630.cap)
+
+```sh
+[root@xdlinux ➜ bpftrace_tcp_queue git:(main) ✗ ]$ ./tcp_queue.bt   
+Attaching 1 probe...
+
+syn_queue_num:0, syn_queue_max:5
+ accept_queue_num:0, accept_queue_max:5
+syn_queue_num:0, syn_queue_max:5
+ accept_queue_num:1, accept_queue_max:5
+syn_queue_num:0, syn_queue_max:5
+ accept_queue_num:2, accept_queue_max:5
+syn_queue_num:0, syn_queue_max:5
+ accept_queue_num:3, accept_queue_max:5
+syn_queue_num:0, syn_queue_max:5
+ accept_queue_num:4, accept_queue_max:5
+syn_queue_num:0, syn_queue_max:5
+ accept_queue_num:5, accept_queue_max:5
+# 这是第7次，客户端开始阻塞一段时间了，结合有13次打印，重传了12次
+syn_queue_num:0, syn_queue_max:5
+ accept_queue_num:6, accept_queue_max:5
+call stack:
+        tcp_conn_request+1
+        tcp_rcv_state_process+532
+        tcp_v4_do_rcv+180
+        tcp_v4_rcv+3089
+        ip_protocol_deliver_rcu+44
+        ip_local_deliver_finish+77
+        ip_local_deliver+224
+        ip_rcv+635
+        __netif_receive_skb_core+2963
+        netif_receive_skb_internal+61
+        napi_gro_receive+186
+        rtl8169_poll+667
+        __napi_poll+45
+        net_rx_action+595
+        __softirqentry_text_start+215
+        irq_exit+247
+        do_IRQ+127
+        ret_from_intr+0
+        cpuidle_enter_state+219
+        cpuidle_enter+44
+        do_idle+564
+        cpu_startup_entry+111
+        start_secondary+411
+        secondary_startup_64_no_verify+194
+
+syn_queue_num:0, syn_queue_max:5
+ accept_queue_num:6, accept_queue_max:5
+call stack:
+...
+（略，`call stack:`一共打印了13次）
+```
+
+分析：
+
+* 全连接队列依次增加到6，即最大数量5+1（内核中从0开始计数）。
+* 第7次时就开始阻塞了，而上面`call stack`打印了13次，所以这里进行了12次SYN重传，结合抓包看也是相符的（至于为什么是12次，这里客户端是mac笔记本，就先不去纠结了 ）
+* 上述结果里半连接队列的长度一直是0，是由于开始半连接->全连接是正常的，半连接队列记录一直被取走；而全连接队列超出限制后，不允许新的半连接建立
+* **所以这里我们通过bpftrace抓取到了全连接队列溢出的情况。**
+
+```sh
+# 服务端全连接队列
+[root@xdlinux ➜ workspace ]$ ss -antp|grep -E "8080|Local" 
+State  Recv-Q Send-Q Local Address:Port Peer Address:Port Process                                                 
+LISTEN 6      5            0.0.0.0:8080      0.0.0.0:*     users:(("server",pid=27846,fd=3)) 
+[root@xdlinux ➜ workspace ]$ netstat -anp|grep -E "8080|Local"
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
+tcp        6      0 0.0.0.0:8080            0.0.0.0:*               LISTEN      27846/./server 
+```
+
+抓包：
+
+![抓包结果](/images/2024-06-30-SYN-retrans.png)
+
+这里也记录一下服务端的系统参数（CentOS8.5系统，4.18.0内核）：
+
+```sh
+[root@xdlinux ➜ workspace ]$ sysctl -a|grep -E "syn_backlog|somaxconn|syn_retries|synack_retries|syncookies|abort_on_overflow|net.ipv4.tcp_fin_timeout|tw_buckets|tw_reuse|tw_recycle|tcp_orphan_retries"
+net.core.somaxconn = 128
+net.ipv4.tcp_abort_on_overflow = 0
+net.ipv4.tcp_fin_timeout = 60
+net.ipv4.tcp_max_syn_backlog = 1024
+net.ipv4.tcp_max_tw_buckets = 131072
+net.ipv4.tcp_orphan_retries = 0
+net.ipv4.tcp_syn_retries = 6
+net.ipv4.tcp_synack_retries = 5
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_tw_reuse = 2
+```
 
 ## 4. 小结
 
-用libbpf和bpftrace跟踪TCP全连接溢出
+用libbpf和bpftrace跟踪TCP全连接溢出，最后用bpftrace成功抓到了。
 
-## 5. 参考
+## 5. 附加系列总结
+
+到这里，TCP全连接、半连接学习实践先告一段落，做个小总结。
+
+## 6. 参考
 
 1、[BCC 到 libbpf 的转换指南【译】](https://www.ebpf.top/post/bcc-to-libbpf-guid/)
 
 2、[深入浅出eBPF｜你要了解的7个核心问题](https://juejin.cn/post/7110139083971624997)
 
-3、BCC项目
+3、[bpftrace](https://github.com/bpftrace/bpftrace)
+
+4、BCC项目
