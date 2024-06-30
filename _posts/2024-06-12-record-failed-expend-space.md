@@ -556,7 +556,7 @@ tmpfs                3.1G     0  3.1G   0% /run/user/0
 
 ![磁盘空间图](/images/windows_centos_disk_volume.jpeg)
 
-半小时左右装完。
+半小时左右装完（/boot这次直接设置4G）。
 
 1、设置免密登录 `ssh-copy-id -i ~/.ssh/id_rsa.pub root@192.168.1.150`
 
