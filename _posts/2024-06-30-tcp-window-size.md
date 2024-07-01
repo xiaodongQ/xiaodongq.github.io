@@ -76,7 +76,7 @@ TCP发送接收窗口相关学习实践和Wireshark跟踪
 现在的服务器上的网卡一般都是支持多队列的。每个队列对应发送（传输）和接收的Ring Buffer表示：  
 ![网卡多队列](/images/2024-06-30-multi-queue-ringbuffer.png)
 
-### TCP发送、接收窗口
+### 2.3. TCP发送、接收窗口
 
 > TCP 为了优化传输效率（注意这里的传输效率，并不是单纯某一个 TCP 连接的传输效率，而是整体网络的效率），会:
 >
@@ -97,12 +97,58 @@ TCP三次握手时会协商好发送、接收窗口。
 
 ## 3. WireShark抓包并分析
 
+### 3.1. 场景构造
+
+1、**服务端**：192.168.1.150，`python -m http.server`起http服务，并开启抓包`tcpdump -i any port 8000 -nn -w 8000_wget.cap -v`
+
+```sh
+# 且当前目录有个1.7MB的文件
+[root@xdlinux ➜ workspace ]$ ls -ltrh
+-rwxr-xr-x   1 root    root    1.7M Jun 17 22:42 minimal
+
+[root@xdlinux ➜ workspace ]$ python -m http.server
+Serving HTTP on 0.0.0.0 port 8000 (http://0.0.0.0:8000/) ...
+```
+
+2、**客户端**：192.168.1.2，下载文件`wget 192.168.1.150:8000/minimal`
+
+抓包文件在：[这里](/images/srcfiles/20240701-wnd-8000_wget.cap)
+
+### 3.2. 如何查看TCP Stream Graphs
+
+Wireshak提供的TCP Stream Graphs可视化功能，用于展示TCP连接中的数据传输情况。
+
+查看方式：  
+[TCP流图形tcptrace](/images/2024-07-01-wireshark-tcptrace.png)
+
+可看到有下面几种类型：（Q：wireshark 里TCP Stream Graphs中，xxx的作用）
+
+1. **Round Trip Time**
+    * 往返时间图，RTT图表直接展示了每个数据包或ACK从发送到接收到响应的时间，能直观地了解数据在两端之间往返的延迟情况。
+    * 如果RTT波动大，可能指示网络拥塞、丢包或路由不稳定；如果RTT持续较高，则可能意味着网络基础结构存在延迟问题。
+2. **Throughput**
+    * 吞吐量图，显示TCP连接在不同时间点的数据传输速率，有助于评估网络带宽的利用效率和识别瓶颈
+3. **Time/Sequence(Stevens)**
+    * 时间序列图，由网络专家 Bill Stevens 提倡并以其命名，关注于展示单位时间内TCP流在某个方向上传输的字节数
+    * 图表中的线条代表了随时间变化的数据流传输速率，这对于观察数据传输的速度和模式非常有用。
+    * Stevens 图更侧重于展示数据传输量与时间的关系，帮助用户理解数据传输的动态过程和速率变化。
+4. **Time/Sequence(tcptrace)**
+    * 另一种时间序列图，其时序图在 Wireshark 中被实现为同时显示两个关键指标：下方的线代表TCP在某方向上实际传输的数据字节数，而上方的线则代表TCP接收窗口的大小。
+    * 当上下两条线几乎重叠时，表明数据传输正好匹配接收方的接收能力，这有助于识别潜在的窗口受限情况或者评估拥塞窗口与接收窗口之间的交互
+    * tcptrace 图提供了关于数据传输速率及接收端能力的综合视图，对于分析网络拥塞控制机制、窗口调整策略特别有帮助
+5. **Windows Scaling**
+    * 窗口规模图，描绘TCP的接收窗口大小变化，这对于理解拥塞控制机制、数据流控制以及网络适应性非常重要
+
+tcptrace 的图表示的是单方向的数据发送，有时需要切换方向：  
+[切换方向](/images/2024-07-01-switch-dir.png)
+
+上图展示了服务端192.168.1.150发送数据时根据客户端的接收窗口进行调整的过程，下面具体分析
 
 
-## 小结
+## 4. 小结
 
 
-## 参考
+## 5. 参考
 
 1、[用 Wireshark 分析 TCP 吞吐瓶颈](https://www.kawabangga.com/posts/4794)
 
