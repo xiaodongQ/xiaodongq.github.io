@@ -252,7 +252,7 @@ tcptrace图表通过展示TCP数据包的发送和接收时间以及序列号，
 - 重传确认：寻找序列号重复或预期之外的序列号跳变，结合时间轴判断是否有重传发生，以及重传对整体性能的影响。
 - 性能瓶颈识别：窗口大小长时间保持不变或频繁调整，可能是网络瓶颈或接收方处理能力限制的信号。
 
-#### 另外两种线：SACK和丢包
+#### 3.6.1. 另外两种线：SACK和丢包
 
 参考文章里给的另外两种线：
 ![tcptrace-sack](https://www.kawabangga.com/wp-content/uploads/2022/08/tcptrace-sack.png)
@@ -290,11 +290,11 @@ tcptrace图表通过展示TCP数据包的发送和接收时间以及序列号，
 - **识别瓶颈**：如果窗口规模长时间维持在一个较低水平，可能意味着接收方处理能力或网络条件限制了数据传输。
 - **优化建议**：基于窗口调整行为，提出调整TCP参数或优化网络配置的建议，以提升传输效率。
 
-## 看图说话-几种常见的图形模式
+## 4. 看图说话-几种常见的图形模式
 
 基于上面的几种类型的graph说明，对照“[用 Wireshark 分析 TCP 吞吐瓶颈](https://www.kawabangga.com/posts/4794)”中的几种图形印证学习。
 
-### 丢包
+### 4.1. 丢包
 
 ![wireshark-packet-loss](https://www.kawabangga.com/wp-content/uploads/2022/08/wireshark-packet-loss.png)
 
@@ -302,10 +302,10 @@ tcptrace图表通过展示TCP数据包的发送和接收时间以及序列号，
 
 前面说过红色的线表示这一段 Sequence Number 已经收到了，黄色（或者说棕色）线表示 ACK 过的 Sequence Number，红色线和黄色线纵向的空白是没有ACK的包，即需要重传的包。
 
-## 4. 小结
+## 5. 小结
 
 
-## 5. 参考
+## 6. 参考
 
 1、[用 Wireshark 分析 TCP 吞吐瓶颈](https://www.kawabangga.com/posts/4794)
 
