@@ -83,7 +83,7 @@ TCP发送接收窗口相关学习实践和Wireshark跟踪
 > 1. 保护接收端，发送的数据不会超过接收端的 buffer 大小 (Flow control)。数据发送到接受端，也是和上面介绍的过程类似，kernel 先负责收好包放到 buffer 中，然后上层应用程序处理这个 buffer 中的内容，如果接收端的 buffer 过小，那么很容易出现瓶颈，即应用程序还没来得及处理就被填满了。那么如果数据继续发过来，buffer 存不下，接收端只能丢弃。
 > 2. 保护网络，发送的数据不会 overwhelming 网络 (Congestion Control, 拥塞控制), 如果中间的网络出现瓶颈，会导致长肥管道的吞吐不理想；
 
-TCP三次握手时会协商好发送、接收窗口。
+TCP三次握手时会协商好接收窗口，而发送窗口根据接收窗口和网络因素决定。
 
 > 对于接收端的保护，在两边连接建立的时候，会协商好接收端的 buffer 大小 (`receiver window size, rwnd`), 并且在后续的发送中，接收端也会在每一个 ack 回包中报告自己剩余和接受的 window 大小。这样，发送端在发送的时候会保证不会发送超过接收端 buffer 大小的数据。
 
@@ -95,9 +95,11 @@ TCP三次握手时会协商好发送、接收窗口。
 
 也推荐看下林沛满的《Wireshark网络分析就这么简单》、《Wireshark网络分析的艺术》。
 
-## 3. WireShark抓包并分析
+## 3. WireShark如何查看TCP Stream Graphs
 
-### 3.1. 场景构造
+### 3.1. 基本场景构造
+
+构造场景基于一个抓包文件查看
 
 1、**服务端**：192.168.1.150，`python -m http.server`起http服务，并开启抓包`tcpdump -i any port 8000 -nn -w 8000_wget.cap -v`
 
@@ -114,7 +116,7 @@ Serving HTTP on 0.0.0.0 port 8000 (http://0.0.0.0:8000/) ...
 
 抓包文件在：[这里](/images/srcfiles/20240701-wnd-8000_wget.cap)
 
-### 3.2. 如何查看TCP Stream Graphs
+### 3.2. 总体说明
 
 Wireshak提供的TCP Stream Graphs可视化功能，用于展示TCP连接中的数据传输情况。
 
@@ -123,7 +125,7 @@ Wireshak提供的TCP Stream Graphs可视化功能，用于展示TCP连接中的�
 
 可看到有这几种类型
 
-#### 3.2.1. Round Trip Time
+### 3.3. Round Trip Time
 
 往返时间图，RTT图表直接展示了每个数据包或ACK从发送到接收到响应的时间，能直观地了解数据在两端之间往返的延迟变化情况。
 
@@ -154,7 +156,7 @@ Wireshak提供的TCP Stream Graphs可视化功能，用于展示TCP连接中的�
 - 对比分析：对比不同时间段、不同连接或不同网络条件下的RTT，找出差异和规律。
 - 结合其他图：结合吞吐量图、窗口规模图等，全面分析TCP连接的性能。
 
-#### 3.2.2. Throughput
+### 3.4. Throughput
 
 吞吐量图，展示了TCP数据流在一段时间内的数据传输速率，通常以每秒比特数(bps)或每秒字节(byt/s)为单位。图表的横轴代表时间，纵轴代表吞吐量，通过图形化的方式直观地显示数据传输速度的变化情况。
 
@@ -186,7 +188,7 @@ Wireshak提供的TCP Stream Graphs可视化功能，用于展示TCP连接中的�
 - 长期趋势：分析长时间跨度内的吞吐量趋势，判断网络是否能够满足日益增长的数据需求。
 - 对比分析：比较不同时间段、不同连接或不同条件下的吞吐量，评估网络优化措施的效果。
 
-#### 3.2.3. Time/Sequence(Stevens)
+### 3.5. Time/Sequence(Stevens)
 
 时间序列图，由网络专家 Bill Stevens 提倡并以其命名，关注于展示单位时间内TCP流在某个方向上传输的字节数
 
@@ -218,7 +220,7 @@ Stevens 图更侧重于展示数据传输量与时间的关系，帮助用户理
 - 异常检测：寻找序列号不连续、大量重传或窗口突然减小等异常现象，这些可能是问题的信号。
 - 数据包筛选：在查看图表前，先通过Wireshark的过滤器功能筛选出特定的TCP流或事件，以聚焦分析目标。
 
-#### 3.2.4. Time/Sequence(tcptrace)
+### 3.6. Time/Sequence(tcptrace)
 
 另一种时间序列图，源自Unix的tcptrace工具，tcptrace图表提供了比Stevens格式更详尽的信息，特别侧重于TCP连接的性能和控制特性。
 
@@ -250,7 +252,14 @@ tcptrace图表通过展示TCP数据包的发送和接收时间以及序列号，
 - 重传确认：寻找序列号重复或预期之外的序列号跳变，结合时间轴判断是否有重传发生，以及重传对整体性能的影响。
 - 性能瓶颈识别：窗口大小长时间保持不变或频繁调整，可能是网络瓶颈或接收方处理能力限制的信号。
 
-#### 3.2.5. Windows Scaling
+#### 另外两种线：SACK和丢包
+
+参考文章里给的另外两种线：
+![tcptrace-sack](https://www.kawabangga.com/wp-content/uploads/2022/08/tcptrace-sack.png)
+
+> 需要始终记住的是 Y 轴是 Sequence Number，红色的线表示 SACK 的线表示这一段 Sequence Number 我已经收到了，然后配合黄色线表示 ACK 过的 Sequence Number，那么发送端就会知道，在中间这段空挡，包丢了，**红色线和黄色线纵向的空白**，是没有被 ACK 的包。所以，需要重新传输。而蓝色的线就是表示又重新传输了一遍。
+
+### 3.7. Windows Scaling
 
 窗口规模图，Windows Scaling图表主要关注TCP连接的窗口规模（Window Scaling）特性，这是TCP协议中用于提高数据传输效率的一个机制。展示了TCP连接中接收窗口规模随时间的变化情况。
 
@@ -281,7 +290,17 @@ tcptrace图表通过展示TCP数据包的发送和接收时间以及序列号，
 - **识别瓶颈**：如果窗口规模长时间维持在一个较低水平，可能意味着接收方处理能力或网络条件限制了数据传输。
 - **优化建议**：基于窗口调整行为，提出调整TCP参数或优化网络配置的建议，以提升传输效率。
 
+## 看图说话-几种常见的图形模式
 
+基于上面的几种类型的graph说明，对照“[用 Wireshark 分析 TCP 吞吐瓶颈](https://www.kawabangga.com/posts/4794)”中的几种图形印证学习。
+
+### 丢包
+
+![wireshark-packet-loss](https://www.kawabangga.com/wp-content/uploads/2022/08/wireshark-packet-loss.png)
+
+> 很多红色 SACK，说明接收端那边重复在说：中间有一个包我没有收到，中间有一个包我没有收到。
+
+前面说过红色的线表示这一段 Sequence Number 已经收到了，黄色（或者说棕色）线表示 ACK 过的 Sequence Number，红色线和黄色线纵向的空白是没有ACK的包，即需要重传的包。
 
 ## 4. 小结
 
