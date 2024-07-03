@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 深入TCP发送接收过程（一） -- Wrieshark跟踪TCP流
+title: 深入TCP发送接收过程（一） -- Wireshark跟踪TCP流
 categories: 网络
 tags: TCP Wireshark 接收窗口
 ---
