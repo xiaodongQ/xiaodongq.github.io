@@ -102,7 +102,17 @@ TCP三次握手时会协商好接收窗口，而发送窗口复杂一些，会�
 
 ## 3. WireShark如何查看TCP Stream Graphs
 
-### 3.1. 基本场景构造
+### 3.1. 总体说明
+
+Wireshak提供的TCP Stream Graphs可视化功能，用于展示TCP连接中的数据传输情况。
+
+查看方式：
+
+![TCP流图形tcptrace](/images/2024-07-01-wireshark-tcptrace.png)
+
+下面根据抓包进行分别说明。
+
+### 3.2. 基本场景构造
 
 构造场景基于一个抓包文件查看
 
@@ -121,17 +131,7 @@ Serving HTTP on 0.0.0.0 port 8000 (http://0.0.0.0:8000/) ...
 
 抓包文件在：[这里](/images/srcfiles/20240701-wnd-8000_wget.cap)
 
-### 3.2. 总体说明
-
-Wireshak提供的TCP Stream Graphs可视化功能，用于展示TCP连接中的数据传输情况。
-
-查看方式：
-
-![TCP流图形tcptrace](/images/2024-07-01-wireshark-tcptrace.png)
-
-可看到有这几种类型
-
-### 3.3. Round Trip Time
+### 3.3. 1）Round Trip Time
 
 往返时间图，RTT图表直接展示了每个数据包或ACK从发送到接收到响应的时间，能直观地了解数据在两端之间往返的延迟变化情况。
 
@@ -162,7 +162,7 @@ Wireshak提供的TCP Stream Graphs可视化功能，用于展示TCP连接中的�
 - 对比分析：对比不同时间段、不同连接或不同网络条件下的RTT，找出差异和规律。
 - 结合其他图：结合吞吐量图、窗口规模图等，全面分析TCP连接的性能。
 
-### 3.4. Throughput
+### 3.4. 2）Throughput
 
 吞吐量图，展示了TCP数据流在一段时间内的数据传输速率，通常以每秒比特数(bps)或每秒字节(byt/s)为单位。图表的横轴代表时间，纵轴代表吞吐量，通过图形化的方式直观地显示数据传输速度的变化情况。
 
@@ -194,7 +194,7 @@ Wireshak提供的TCP Stream Graphs可视化功能，用于展示TCP连接中的�
 - 长期趋势：分析长时间跨度内的吞吐量趋势，判断网络是否能够满足日益增长的数据需求。
 - 对比分析：比较不同时间段、不同连接或不同条件下的吞吐量，评估网络优化措施的效果。
 
-### 3.5. Time/Sequence(Stevens)
+### 3.5. 3）Time/Sequence(Stevens)
 
 时间序列图，由网络专家 Bill Stevens 提倡并以其命名，关注于展示单位时间内TCP流在某个方向上传输的字节数
 
@@ -226,11 +226,9 @@ Stevens 图更侧重于展示数据传输量与时间的关系，帮助用户理
 - 异常检测：寻找序列号不连续、大量重传或窗口突然减小等异常现象，这些可能是问题的信号。
 - 数据包筛选：在查看图表前，先通过Wireshark的过滤器功能筛选出特定的TCP流或事件，以聚焦分析目标。
 
-### 3.6. Time/Sequence(tcptrace)
+### 3.6. 4）Time/Sequence(tcptrace)
 
 另一种时间序列图，源自Unix的tcptrace工具，tcptrace图表提供了比Stevens格式更详尽的信息，特别侧重于TCP连接的性能和控制特性。
-
-当上下两条线几乎重叠时，表明数据传输正好匹配接收方的接收能力，这有助于识别潜在的窗口受限情况或者评估拥塞窗口与接收窗口之间的交互
 
 tcptrace 的图表示的是单方向的数据发送，有时需要切换方向：
 
@@ -251,7 +249,7 @@ tcptrace图表通过展示TCP数据包的发送和接收时间以及序列号，
 
 **图表解读：**
 
-- **上下两条线**：下方线代表TCP在某个方向上所传输数据字节数，上方线代表接收窗口的大小。如果上下两条线接近或重叠，可能意味着发送方受到了接收方窗口大小的限制。
+- **图形说明**：下方蓝点/线代表TCP在某个方向上所传输数据字节数，上方线（绿线）代表接收窗口的大小。如果上下两条线接近或重叠，可能意味着发送方受到了接收方窗口大小的限制。黄线表示已被ACK的数据。
 - **斜率和间距**：数据点的斜率反映了数据传输速度，点之间的间距则体现了数据包的发送间隔，进而可以分析网络延迟或拥塞情况。
 - **窗口变化**：接收窗口的扩大或缩小直接反映了接收方的缓冲区状态和流量控制策略。
 
@@ -261,6 +259,11 @@ tcptrace图表通过展示TCP数据包的发送和接收时间以及序列号，
 - 重传确认：寻找序列号重复或预期之外的序列号跳变，结合时间轴判断是否有重传发生，以及重传对整体性能的影响。
 - 性能瓶颈识别：窗口大小长时间保持不变或频繁调整，可能是网络瓶颈或接收方处理能力限制的信号。
 
+已发送的数据（蓝点）和ACK线之间，竖直方向的距离代表在途字节数（Bytes in flight）
+
+![tcptrace1](https://packetbomb.com/wp-content/uploads/2014/06/tcptrace1.png)  
+[出处](https://packetbomb.com/understanding-the-tcptrace-time-sequence-graph-in-wireshark/)
+
 #### 3.6.1. 另外两种线：SACK和丢包
 
 参考文章里给的另外两种线：
@@ -269,7 +272,7 @@ tcptrace图表通过展示TCP数据包的发送和接收时间以及序列号，
 
 > 需要始终记住的是 Y 轴是 Sequence Number，红色的线表示 SACK 的线表示这一段 Sequence Number 我已经收到了，然后配合黄色线表示 ACK 过的 Sequence Number，那么发送端就会知道，在中间这段空挡，包丢了，**红色线和黄色线纵向的空白**，是没有被 ACK 的包。所以，需要重新传输。而蓝色的线就是表示又重新传输了一遍。
 
-#### 3.6.2. Time/Sequence(tcptrace)图的一些细节
+#### 3.6.2. tcptrace图的一些细节
 
 参考：[在Wireshark的tcptrace图中看清TCP拥塞控制算法的细节(CUBIC/BBR算法为例)](https://blog.csdn.net/dog250/article/details/53227203)，博主对拥塞算法很有研究，后续涉及到在具体学习。
 
@@ -283,7 +286,7 @@ tcptrace图表通过展示TCP数据包的发送和接收时间以及序列号，
 * 产生队列拥塞
 * 拥塞缓解和消除
 
-### 3.7. Windows Scaling
+### 3.7. 5）Windows Scaling
 
 窗口规模图，Windows Scaling图表主要关注TCP连接的窗口规模（Window Scaling）特性，这是TCP协议中用于提高数据传输效率的一个机制。展示了TCP连接中**接收窗口**规模随时间的变化情况。（下面的图中还可以看到发送端发送出去的包）
 
@@ -455,3 +458,7 @@ TCP长肥管道（长肥网络）指在具有高带宽（Bandwidth）和高延�
 10、[TCP 长连接 CWND reset 的问题分析](https://www.kawabangga.com/posts/5217)
 
 11、[在Wireshark的tcptrace图中看清TCP拥塞控制算法的细节(CUBIC/BBR算法为例)](https://blog.csdn.net/dog250/article/details/53227203)
+
+12、[Understanding the tcptrace Time-Sequence Graph in Wireshark]((https://packetbomb.com/understanding-the-tcptrace-time-sequence-graph-in-wireshark/))
+
+13、GPT
