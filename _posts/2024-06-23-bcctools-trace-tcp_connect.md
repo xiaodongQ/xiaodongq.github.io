@@ -29,7 +29,7 @@ tags: 网络
 
 ## 2. 环境准备
 
-1、仍使用第一篇中的客户端、服务端程序，代码和编译脚步归档在 [github处](https://github.com/xiaodongQ/prog-playground/tree/main/network/)
+1、仍使用第一篇中的客户端、服务端程序，代码和编译脚本归档在 [github处](https://github.com/xiaodongQ/prog-playground/tree/main/network/)
 
 2、起2个阿里云抢占式ECS：Alibaba Cloud Linux 3.2104 LTS 64位（内核版本：5.10.134-16.1.al8.x86_64）
 

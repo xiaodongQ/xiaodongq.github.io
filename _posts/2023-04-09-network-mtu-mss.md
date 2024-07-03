@@ -134,6 +134,20 @@ SYN 包里面的 TCP option 字段中，会带有 `MSS`，如果不带的话，d
 
     和上一个场景相反，请求报文拆成5个ip分片。
 
+#### 2.3.1. Path MTU Discovery
+
+TCP协商MSS的时候应该经过 PMTUD（ This process is called "Path MTU discovery".） 来确认整个路由上的所有最小MTU。**PMTUD依赖于ICMP差错消息的正确传递**，如果网络中的防火墙或设备阻止了这些ICMP消息，PMTUD就无法正常工作。但是有些路由器会因为安全的原因过滤掉ICMP，导致PMTUD不可靠，所以这里的PMTUD形同虚设。
+
+比如在我们的三次握手中会协商一个MSS，这只是基于Client和Server两方的MTU来确定的，链路上如果还有比Client和Server的MTU更小的那么就会出现包超过MTU的大小，同时设置了DF标志而不再进行分片被丢掉。
+
+一般终端只有收到PATH MTU 调整报文才会去调整mss报文大小，PATH MTU是封装在`ICMP`报文里面。
+
+参考链接里，ICMP报文中能看到`MTU of next hop`，自己抓包没看到（设置ping -D也没抓到）
+
+对于MTU原因导致的超出长度的包无法发送的问题，设置由系统主动允许分片的参数 `sysctl -w net.ipv4.ip_no_pmtu_disc=1` 可以解决这种问题
+
+参考：[就是要你懂TCP--通过案例来学习MSS、MTU](https://articles.zsxq.com/id_3o85fob8mm20.html)
+
 ### 2.4. scp 测试
 
 环境说明：  
@@ -269,3 +283,4 @@ Nagle算法的原理是将多个较小的数据包合并成一个较大的数据
 1. [知识星球实验案例](https://t.zsxq.com/0cOVm843F)
 2. [有关 MTU 和 MSS 的一切](https://www.kawabangga.com/posts/4983)
 3. [什么是MTU（Maximum Transmission Unit）？](https://info.support.huawei.com/info-finder/encyclopedia/zh/MTU.html)
+4. [就是要你懂TCP--通过案例来学习MSS、MTU](https://articles.zsxq.com/id_3o85fob8mm20.html)

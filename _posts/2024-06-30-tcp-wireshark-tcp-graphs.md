@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 深入TCP发送接收过程（一） -- Wireshark跟踪TCP流
+title: 深入TCP发送接收过程（一） -- Wireshark跟踪TCP流统计图
 categories: 网络
 tags: TCP Wireshark 接收窗口
 ---
@@ -8,7 +8,7 @@ tags: TCP Wireshark 接收窗口
 * content
 {:toc}
 
-TCP发送接收过程相关学习实践和Wireshark跟踪，本节介绍使用TCP Stream Graphs
+TCP发送接收过程相关学习实践和Wireshark跟踪，本节先介绍基本过程及如何使用TCP Stream Graphs
 
 
 
