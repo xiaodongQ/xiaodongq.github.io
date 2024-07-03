@@ -43,6 +43,8 @@ eBPF追踪类型学习整理
 比如SEC("socket")对应的类型：  
 找libbpf.c的`section_defs`后，发现是`BPF_PROG_TYPE_SOCKET_FILTER`，然后到eBPF Docs：[Program type BPF_PROG_TYPE_SOCKET_FILTER](https://ebpf-docs.dylanreimerink.nl/linux/program-type/BPF_PROG_TYPE_SOCKET_FILTER/) 上展开分类并搜索这个type，上面会有个`3.19`的内核标签，并给出了其上下文（context）为`__sk_buff`
 
+*说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
+
 ## 2. eBPF程序类型
 
 eBPF 程序通常包含用户态和内核态两部分：用户态程序通过 BPF 系统调用，完成 eBPF 程序的加载、事件挂载以及映射创建和更新，而内核态中的 eBPF 程序则需要通过 BPF 辅助函数完成所需的任务。

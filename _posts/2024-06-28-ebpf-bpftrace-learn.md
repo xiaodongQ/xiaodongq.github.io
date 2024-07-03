@@ -21,6 +21,8 @@ bpftrace学习和使用
 小结下近期的eBPF学习历程：  
 ![eBPF学习历程](/images/2024-06-28-ebpf-learn-record.png)
 
+*说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
+
 ## 2. bpftrace说明
 
 bpftrace是一种针对较近期的Linux内核（4.x系列起）中eBPF的高级跟踪语言。bpftrace利用`LLVM`作为后端，将脚本编译为BPF字节码，并借助`BCC`与Linux BPF系统进行交互，同时也利用了Linux现有的跟踪功能，包括内核动态跟踪（`kprobes`）、用户级动态跟踪（`uprobes`）及`tracepoint`。
