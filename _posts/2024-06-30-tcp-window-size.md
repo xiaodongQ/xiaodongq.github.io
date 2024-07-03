@@ -77,7 +77,8 @@ TCP发送接收过程相关学习实践和Wireshark跟踪，本节介绍使用TC
 6. 网卡发起硬中断通知CPU发完
 7. CPU清理Ring Buffer
 
-现在的服务器上的网卡一般都是支持多队列的。每个队列对应发送（传输）和接收的Ring Buffer表示：  
+现在的服务器上的网卡一般都是支持多队列的。每个队列对应发送（传输）和接收的Ring Buffer表示：
+
 ![网卡多队列](/images/2024-06-30-multi-queue-ringbuffer.png)
 
 ### 2.3. TCP发送、接收窗口
@@ -124,7 +125,8 @@ Serving HTTP on 0.0.0.0 port 8000 (http://0.0.0.0:8000/) ...
 
 Wireshak提供的TCP Stream Graphs可视化功能，用于展示TCP连接中的数据传输情况。
 
-查看方式：  
+查看方式：
+
 ![TCP流图形tcptrace](/images/2024-07-01-wireshark-tcptrace.png)
 
 可看到有这几种类型
@@ -230,7 +232,8 @@ Stevens 图更侧重于展示数据传输量与时间的关系，帮助用户理
 
 当上下两条线几乎重叠时，表明数据传输正好匹配接收方的接收能力，这有助于识别潜在的窗口受限情况或者评估拥塞窗口与接收窗口之间的交互
 
-tcptrace 的图表示的是单方向的数据发送，有时需要切换方向：  
+tcptrace 的图表示的是单方向的数据发送，有时需要切换方向：
+
 ![切换方向](/images/2024-07-01-switch-dir.png)
 
 ![tcptrace图](/images/2024-07-02-tcp-graph-tcptrace.png)
@@ -261,6 +264,7 @@ tcptrace图表通过展示TCP数据包的发送和接收时间以及序列号，
 #### 3.6.1. 另外两种线：SACK和丢包
 
 参考文章里给的另外两种线：
+
 ![tcptrace-sack](https://www.kawabangga.com/wp-content/uploads/2022/08/tcptrace-sack.png)
 
 > 需要始终记住的是 Y 轴是 Sequence Number，红色的线表示 SACK 的线表示这一段 Sequence Number 我已经收到了，然后配合黄色线表示 ACK 过的 Sequence Number，那么发送端就会知道，在中间这段空挡，包丢了，**红色线和黄色线纵向的空白**，是没有被 ACK 的包。所以，需要重新传输。而蓝色的线就是表示又重新传输了一遍。
@@ -285,7 +289,8 @@ tcptrace图表通过展示TCP数据包的发送和接收时间以及序列号，
 
 ![窗口规模变化图](/images/2024-07-02-tcp-graph-wnd-scaling.png)
 
-实际接收窗口为通过`window * factor`计算得到的乘积：  
+实际接收窗口为通过`window * factor`计算得到的乘积：
+
 ![窗口factor](/images/2024-07-02-wnd-factor.png)
 
 （Q：详细介绍下 wireshark 里TCP Stream Graphs中 Windows Scaling图表）
@@ -349,6 +354,7 @@ tcptrace图表通过展示TCP数据包的发送和接收时间以及序列号，
 #### 4.3.1. 和拥塞控制区分开
 
 此时间序列波形对应的窗口变化图如下：
+
 ![窗口规模图](https://www.kawabangga.com/wp-content/uploads/2022/08/traffic-limited-by-sender.png)
 
 > 可以看一开始蓝色线的垂直距离很短，后面逐渐变长，说明 cwnd 在变大，然后变大到一定的程度不变了。说明 cwnd 没成为瓶颈。
@@ -356,6 +362,7 @@ tcptrace图表通过展示TCP数据包的发送和接收时间以及序列号，
 > 蓝色线每次发送数据时，短时间达到某一个最高点就不再上升了。但是上升的过程也没有下降过，“没有下降过”就可以说明，cwnd 没有下降过，即 cwnd 没有成为瓶颈。
 
 作为对比，查看我们上面构造的wget场景的窗口规模图：
+
 ![窗口规模变化图](/images/2024-07-02-tcp-graph-wnd-scaling.png)
 
 可看到并没有到接收端接收窗口的瓶颈，但后面发送端发送数据（蓝点/线）的垂直距离有长有短，且其水平线也有高有低。**说明什么呢？**（**TODO 待明确**，说明拥塞控制机制？说明受网络质量影响？局域网两台机器并没有丢包）
@@ -368,7 +375,8 @@ tcptrace图表通过展示TCP数据包的发送和接收时间以及序列号，
 
 > 从这张图中可以看出，接收端的 window size 远远不是瓶颈，还有很多空闲。但是发送端不会一直发直到填满接收端的 buffer。
 
-放大后的图：  
+放大后的图：
+
 ![放大后的图](https://www.kawabangga.com/wp-content/uploads/2022/08/wireshark-cwnd-low-zoom.png)
 
 > 放大可以看出，中间有很多丢包和重传，这会让发送端认为网络质量不好，会谨慎发送数据，想避免造成网络拥塞。发送端每次只发送一点点数据，发送的模式是发一点，停一点，然后再发一点，而不是一直发。这也说明很有可能是 cwnd 太小了，受到了拥塞控制算法的限制。
@@ -386,7 +394,8 @@ tcptrace图表通过展示TCP数据包的发送和接收时间以及序列号，
 >     * 蓝色线没有一直发送，而是发送，暂停，发送，暂停，是因为拥塞控制算法的窗口（cwnd）变小了，每次发送很快填满窗口，等接收端（0.23s之后）收到了，再继续发送；
 >     * 并且蓝色线的纵向距离每一波都在减少，说明这个窗口在每次发生丢包之后都在变小（减为一半）。
 
-放大后的图：  
+放大后的图：
+
 ![放大后的图](https://www.kawabangga.com/wp-content/uploads/2022/08/explain-for-congestion-control.png)
 
 ### 4.5. 完美的 TCP 连接
