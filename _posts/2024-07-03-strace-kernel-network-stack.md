@@ -189,6 +189,8 @@ comm:server, foreign:192.168.1.2:46067, call stack:
 
 脚本`faddr2line`，用来转换堆栈转储中的函数偏移，里面会组合使用`addr2line`、`readelf`、`nm`、`size`
 
+相对于`addr2line`，`faddr2line`支持查看
+
 这里的size有点陌生，man一下，可看到其用于查看object文件的各个section大小的
 
 ```sh
@@ -197,7 +199,7 @@ comm:server, foreign:192.168.1.2:46067, call stack:
    3012	    708	    280	   4000	    fa0	./server
 ```
 
-3、简单使用`addr2line`
+3、先简单使用`addr2line`
 
 `./server`启动程序，gcore生成个core文件，用`addr2line`分析地址对应的函数位置
 
@@ -234,15 +236,44 @@ Missing separate debuginfos, use: yum debuginfo-install glibc-2.28-164.el8.x86_6
 `addr2line`查看上面地址对应的函数位置：
 
 ```sh
+# 可以看到用户代码的具体位置
 [root@xdlinux ➜ workspace ]$ addr2line -e prog-playground/network/tcp_connect/server 0x0000000000400b64
 /home/workspace/prog-playground/network/tcp_connect/server.cpp:43
+
+# libc库里的符号找不到确切位置
+[root@xdlinux ➜ workspace ]$ addr2line -e prog-playground/network/tcp_connect/server 0x00007f04b521dc9e
+??:0
 ```
+
+关于上面gdb的报错："Missing separate debuginfos, use: yum debuginfo-install glibc-2.28-164.el8.x86_64 libgcc-8.5.0-3.el8.x86_64 libstdc++-8.5.0-3.el8.x86_64"
+
+```sh
+yum debuginfo-install glibc-2.28-164.el8.x86_64 libgcc-8.5.0-3.el8.x86_64 libstdc++-8.5.0-3.el8.x86_64
+Last metadata expiration check: 3:51:32 ago on Wed 03 Jul 2024 07:14:14 PM CST.
+Could not find debuginfo package for the following installed packages: glibc-2.28-164.el8.x86_64, libgcc-8.5.0-3.el8.x86_64, libstdc++-8.5.0-3.el8.x86_64
+Could not find debugsource package for the following installed packages: glibc-2.28-164.el8.x86_64, libgcc-8.5.0-3.el8.x86_64, libstdc++-8.5.0-3.el8.x86_64
+Dependencies resolved.
+Nothing to do.
+Complete!
+```
+
+查了下需要启用Debuginfo yum源，看之前陪的阿里云的源里没有Debuginfo，先手动下一下。
+
+到centos8官方（已停止维护更新）的debuginfo里下rpm：http://debuginfo.centos.org/8/x86_64/Packages/
+
+glibc-debuginfo-2.28-164.el8.x86_64.rpm、libgcc-debuginfo-8.5.0-3.el8.x86_64.rpm、libstdc++-debuginfo-8.5.0-3.el8.x86_64.rpm
+
+另外下载（安装上述包时会提示依赖）：gcc-debuginfo-8.5.0-3.el8.x86_64.rpm、glibc-debuginfo-common-2.28-164.el8.x86_64.rpm
+
+
 
 ### 3.2. iptables debug
 
 这里也参考上面学习下iptables调试日志，之前[网络实验-设置机器的MTU和MSS](https://xiaodongq.github.io/2023/04/09/network-mtu-mss/)里用`iptables`设置MSS时就想跟踪的，当时留了TODO项。
 
 ## 4. 使用perf打印网络堆栈
+
+
 
 ## 5. 使用gdb调试内核
 
