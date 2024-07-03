@@ -31,6 +31,8 @@ ollama搭建本地个人知识库
 
 最后：笔记本“本地”也安装ollama并下载模型
 
+*说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
+
 ## 2. 安装ollama
 
 1、从[ollama官网](https://ollama.com/download/linux)下载ollama：

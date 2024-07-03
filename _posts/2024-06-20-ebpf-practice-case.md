@@ -22,6 +22,8 @@ tags: eBPF libbpf BCC
 
 这篇主要记录自己为了写eBPF跟踪TCP队列溢出程序，而进行的检索和扩展学习过程。
 
+*说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
+
 ## 2. TCP相关tracepoint
 
 查看有哪些可用的TCP跟踪点，检索到Brendan Gregg大佬的这篇文章：[tcp-tracepoints](https://www.brendangregg.com/blog/2018-03-22/tcp-tracepoints.html)

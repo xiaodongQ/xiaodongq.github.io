@@ -16,6 +16,8 @@ tags: 网络
 
 继续上一篇 [TCP半连接全连接（三） -- eBPF跟踪全连接队列溢出（上）](https://xiaodongq.github.io/2024/06/23/bcctools-trace-tcp_connect/)
 
+*说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
+
 ## 2. libbpf跟踪
 
 基于libbpf-bootstrap框架，先参考bcc项目中的 `tcpdrop.py`和`tcplife.bpf.c`进行移植，跟踪tracepoint：`skb:kfree_skb`，后面再扩展

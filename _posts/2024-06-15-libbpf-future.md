@@ -22,6 +22,8 @@ tags: eBPF libbpf CO-RE
 
 [eBPF动手实践系列三：基于原生libbpf库的eBPF编程改进方案](https://mp.weixin.qq.com/s/R70hmc965cA8X3WUZRp2hQ)
 
+*说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
+
 ## 2. 基于libbpf开发hello world级BPF程序
 
 脱离开libbpf-bootstrap框架，构建一个独立的BPF项目。
