@@ -375,7 +375,7 @@ bpftrace项目的 [tools](https://github.com/bpftrace/bpftrace/tree/master/tools
 
 若是yum安装的bpftrace，tools默认安装在：`/usr/share/bpftrace/tools`
 
-过滤tcp相关的bpftrace脚步，可以用看到之前bcc tools里面的几个熟面孔
+过滤tcp相关的bpftrace脚本，可以用看到之前bcc tools里面的几个熟面孔
 
 ```sh
 ➜  /Users/xd/Documents/workspace/repo/bpftrace/tools git:(master) ls -ltr |grep tcp|grep .bt
