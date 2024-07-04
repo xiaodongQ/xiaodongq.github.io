@@ -14,7 +14,7 @@ tags: TCP 内核
 
 ## 1. 背景
 
-看[知识星球](https://wx.zsxq.com/dweb2/index/group/15552551584552)文章、以及查资料时，看到几篇文章里基于现象去跟踪定位内核代码、有的是推荐学习内核方法，看里面的方式很想自己去试一试，于是有了这篇小结和实验文章。
+看[知识星球](https://wx.zsxq.com/dweb2/index/group/15552551584552)文章、以及查资料时，看到几篇文章里有的基于现象去跟踪定位内核代码、有的是推荐学习内核方法，挺有收获。看里面的方式很想自己去学习掌握一下，于是有了这篇小结和实验文章。
 
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
@@ -66,11 +66,13 @@ tags: TCP 内核
 
 [实战使用 qemu + gdb 调试 Linux 内核以及网络配置](https://juejin.cn/book/6844733794801418253/section/7358469142175105059)
 
-不同时期的锚点相互叠加产生了足够推动动手的力。
+不同时期的锚点相互叠加产生了足够推动动手的力。（乔布斯斯坦福演讲里说的前后看似不搭边实则隐隐联系在一起，忍不住又又又要去看一遍）
+
+下面学习实践上述文章中涉及的工具和技巧。
 
 ## 3. 使用eBPF追踪
 
-上面的链接文章里用了systemtap追踪两个跟踪点`tcp_v4_send_reset`和`tcp_send_active_reset`，怎么用eBPF跟踪呢？
+上面的链接文章里用了systemtap追踪两个网络相关跟踪点`tcp_v4_send_reset`和`tcp_send_active_reset`，怎么用eBPF跟踪呢？
 
 这里还是用`bpftrace`，用法可参考之前的学习笔记：[eBPF学习实践系列（六） -- bpftrace学习和使用](https://xiaodongq.github.io/2024/06/28/ebpf-bpftrace-learn/)
 
@@ -174,7 +176,7 @@ comm:server, foreign:192.168.1.2:46067, call stack:
 
 对于复杂结构和逻辑，还是写个`.bt`脚本方便一些。
 
-### 3.1. faddr2line用法
+### 3.1. 扩展：faddr2line用法
 
 上面用到`faddr2line`将堆栈信息的地址转换对应到源码位置，这里学习下这个工具。
 
@@ -189,7 +191,7 @@ comm:server, foreign:192.168.1.2:46067, call stack:
 
 脚本`faddr2line`，用来转换堆栈转储中的函数偏移，里面会组合使用`addr2line`、`readelf`、`nm`、`size`
 
-相对于`addr2line`，`faddr2line`支持查看
+相对于`addr2line`，`faddr2line`支持转换查看`function+offset`形式
 
 这里的size有点陌生，man一下，可看到其用于查看object文件的各个section大小的
 
@@ -247,8 +249,10 @@ Missing separate debuginfos, use: yum debuginfo-install glibc-2.28-164.el8.x86_6
 
 关于上面gdb的报错："Missing separate debuginfos, use: yum debuginfo-install glibc-2.28-164.el8.x86_64 libgcc-8.5.0-3.el8.x86_64 libstdc++-8.5.0-3.el8.x86_64"
 
+yum安装找不到相关debuginfo包：
+
 ```sh
-yum debuginfo-install glibc-2.28-164.el8.x86_64 libgcc-8.5.0-3.el8.x86_64 libstdc++-8.5.0-3.el8.x86_64
+[root@xdlinux ➜ workspace ]$ yum debuginfo-install glibc-2.28-164.el8.x86_64 libgcc-8.5.0-3.el8.x86_64 libstdc++-8.5.0-3.el8.x86_64
 Last metadata expiration check: 3:51:32 ago on Wed 03 Jul 2024 07:14:14 PM CST.
 Could not find debuginfo package for the following installed packages: glibc-2.28-164.el8.x86_64, libgcc-8.5.0-3.el8.x86_64, libstdc++-8.5.0-3.el8.x86_64
 Could not find debugsource package for the following installed packages: glibc-2.28-164.el8.x86_64, libgcc-8.5.0-3.el8.x86_64, libstdc++-8.5.0-3.el8.x86_64
@@ -265,21 +269,140 @@ glibc-debuginfo-2.28-164.el8.x86_64.rpm、libgcc-debuginfo-8.5.0-3.el8.x86_64.rp
 
 另外下载（安装上述包时会提示依赖）：gcc-debuginfo-8.5.0-3.el8.x86_64.rpm、glibc-debuginfo-common-2.28-164.el8.x86_64.rpm
 
+`rpm -ivh *.rpm`安装上述包后，再加载core文件可以直接看到内核函数的具体位置了
 
+```sh
+(gdb) bt
+#0  0x00007f670e9f7d68 in __GI___nanosleep (
+    requested_time=requested_time@entry=0x7ffc536adea0, 
+    remaining=remaining@entry=0x7ffc536adea0) at ../sysdeps/unix/sysv/linux/nanosleep.c:28
+#1  0x00007f670e9f7c9e in __sleep (seconds=0) at ../sysdeps/posix/sleep.c:55
+#2  0x0000000000400b64 in main () at server.cpp:43
+(gdb) 
+```
 
-### 3.2. iptables debug
+### 3.2. 扩展：iptables debug
 
 这里也参考上面学习下iptables调试日志，之前[网络实验-设置机器的MTU和MSS](https://xiaodongq.github.io/2023/04/09/network-mtu-mss/)里用`iptables`设置MSS时就想跟踪的，当时留了TODO项。
 
 ## 4. 使用perf打印网络堆栈
 
+[之前](https://xiaodongq.github.io/2024/06/20/ebpf-practice-case/)也看过TCP相关的tracepoint，没有多少个：
 
+```sh
+[root@xdlinux ➜ ~ ]$ perf list 'tcp:*' 'sock:inet*' 'skb:*'
+
+List of pre-defined events (to be used in -e):
+
+  tcp:tcp_destroy_sock                               [Tracepoint event]
+  tcp:tcp_probe                                      [Tracepoint event]
+  tcp:tcp_rcv_space_adjust                           [Tracepoint event]
+  tcp:tcp_receive_reset                              [Tracepoint event]
+  tcp:tcp_retransmit_skb                             [Tracepoint event]
+  tcp:tcp_retransmit_synack                          [Tracepoint event]
+  tcp:tcp_send_reset                                 [Tracepoint event]
+
+  sock:inet_sock_set_state                           [Tracepoint event]
+
+  skb:consume_skb                                    [Tracepoint event]
+  skb:kfree_skb                                      [Tracepoint event]
+  skb:skb_copy_datagram_iovec                        [Tracepoint event]
+```
+
+跟踪sdk的消费和释放：
+
+```sh
+[root@xdlinux ➜ ~ ]$ perf record -e 'skb:consume_skb' -e 'skb:kfree_skb' -g -a 
+^C[ perf record: Woken up 1 times to write data ]
+[ perf record: Captured and wrote 0.266 MB perf.data (15 samples) ]
+
+```
+
+查看结果：采集到很多内容，这里截取部分，已经可以根据调用栈辅助代码跟踪了
+
+```sh
+[root@xdlinux ➜ ~ ]$ perf report --stdio
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 5  of event 'skb:consume_skb'
+# Event count (approx.): 5
+#
+# Children      Self  Command  Shared Object      Symbol                            
+# ........  ........  .......  .................  ..................................
+#
+   100.00%     0.00%  swapper  [kernel.kallsyms]  [k] secondary_startup_64_no_verify
+            |
+            ---secondary_startup_64_no_verify
+               start_secondary
+               cpu_startup_entry
+               do_idle
+               cpuidle_enter
+               cpuidle_enter_state
+               ret_from_intr
+               do_IRQ
+               irq_exit
+               __softirqentry_text_start
+               net_rx_action
+               __napi_poll
+               rtl8169_poll
+               |          
+               |--80.00%--napi_consume_skb
+               |          napi_consume_skb
+               |          
+                --20.00%--napi_gro_receive
+                          netif_receive_skb_internal
+                          __netif_receive_skb_core
+                          ip_rcv
+                          ip_local_deliver
+                          ip_local_deliver_finish
+                          ip_protocol_deliver_rcu
+                          tcp_v4_rcv
+                          tcp_v4_do_rcv
+                          tcp_rcv_state_process
+                          consume_skb
+                          consume_skb
+...
+# Samples: 1  of event 'skb:kfree_skb'
+# Event count (approx.): 1
+#
+# Children      Self  Command  Shared Object      Symbol                            
+# ........  ........  .......  .................  ..................................
+#
+   100.00%   100.00%  swapper  [kernel.kallsyms]  [k] kfree_skb
+            |
+            ---secondary_startup_64_no_verify
+               start_secondary
+               cpu_startup_entry
+               do_idle
+               cpuidle_enter
+               cpuidle_enter_state
+               ret_from_intr
+               do_IRQ
+               irq_exit
+               __softirqentry_text_start
+               net_rx_action
+               __napi_poll
+               rtl8169_poll
+               napi_gro_receive
+               netif_receive_skb_internal
+               __netif_receive_skb_core
+               kfree_skb
+               kfree_skb
+...
+```
+
+另外，brendangregg大佬的这篇：[perf Examples](https://www.brendangregg.com/perf.html)，有很多实用的perf命令，需要单独开一篇博客学习记录下。
 
 ## 5. 使用gdb调试内核
 
+需编译内核，然后基于QEMU+gdb调试，后续有需要再实践
+
 ## 6. 小结
 
-根据几个输入文章信息，梳理跟踪内核中网络栈的方式，并学习了解s文章中的工具。
+根据几个看过的文章信息，梳理跟踪内核中网络栈的方式，并学习了解了文章中的工具。
 
 ## 7. 参考
 
@@ -295,4 +418,6 @@ glibc-debuginfo-2.28-164.el8.x86_64.rpm、libgcc-debuginfo-8.5.0-3.el8.x86_64.rp
 
 6、[实战使用 qemu + gdb 调试 Linux 内核以及网络配置](https://juejin.cn/book/6844733794801418253/section/7358469142175105059)
 
-7、GPT
+7、[perf Examples](https://www.brendangregg.com/perf.html)
+
+8、GPT
