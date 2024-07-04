@@ -285,6 +285,64 @@ glibc-debuginfo-2.28-164.el8.x86_64.rpm、libgcc-debuginfo-8.5.0-3.el8.x86_64.rp
 
 这里也参考上面学习下iptables调试日志，之前[网络实验-设置机器的MTU和MSS](https://xiaodongq.github.io/2023/04/09/network-mtu-mss/)里用`iptables`设置MSS时就想跟踪的，当时留了TODO项。
 
+上面打印iptables DEBUG日志的命令：
+
+`iptables -A INPUT -m conntrack --ctstate INVALID -m limit --limit 1/sec   -j LOG --log-prefix "invalid: " --log-level 7`
+
+看一下加这个规则前后`iptables -L`结果的变化：
+
+```sh
+[root@xdlinux ➜ ~ ]$ iptables -nL > tmp
+[root@xdlinux ➜ ~ ]$ iptables -A INPUT -m conntrack --ctstate INVALID -m limit --limit 1/sec   -j LOG --log-prefix "invalid: " --log-level 7
+[root@xdlinux ➜ ~ ]$ iptables -nL > tmp2
+[root@xdlinux ➜ ~ ]$ iptables -D INPUT -m conntrack --ctstate INVALID -m limit --limit 1/sec   -j LOG --log-prefix "invalid: " --log-level 7
+[root@xdlinux ➜ ~ ]$ diff tmp tmp2
+11a12
+> LOG        all  --  0.0.0.0/0            0.0.0.0/0            ctstate INVALID limit: avg 1/sec burst 5 LOG flags 0 level 7 prefix "invalid: "
+```
+
+虽然`lsmod|grep nf_log_ipv4`看不到nf_log_ipv4这个模块，但是若移除这个模块`modprobe -r nf_log_ipv4`，会影响上面的命令，添加iptables规则时就会直接报错：
+
+```sh
+[root@xdlinux ➜ ~ ]$ iptables -A INPUT -m conntrack --ctstate INVALID -m limit --limit 1/sec   -j LOG --log-prefix "invalid: " --log-level 7
+iptables v1.8.4 (nf_tables):  RULE_APPEND failed (No such file or directory): rule in chain INPUT
+```
+
+模仿上面改成`ESTABLISHED`状态：还是没追踪到日志
+
+`iptables -A INPUT -m conntrack --ctstate ESTABLISHED -m limit --limit 1/sec -j LOG --log-prefix "conn_established_related: " --log-level 7`
+
+
+~~让GPT给个追踪RST的命令，没成功（`iptables -A INPUT -p tcp --tcp-flags ALL RST -j LOG --log-prefix "iptables:" --log-level debug`）~~
+
+~~下面的尝试也没成功：（加载模块和添加raw规则前后，lsmode和iptables -L对比没有变化）  ~~
+~~试下通过raw表跟踪，因为raw表在所有iptables规则中优先级是最高的，raw表有两条链，prerouting和output，分别作为输入和输出的第一必经点。  ~~
+~~CentOS7及以上，依赖的iptables日志模块是`nf_log_ipv4`（CentOS6则是ipt_LOG），因此需要手动加载该模块：modprobe nf_log_ipv4。然后加raw规则。  ~~
+~~参考：秘塔AI搜索（试了下效果还可以） + [CentOS通过raw表实现iptables日志输出和调试](http://www.chinasem.cn/article/958790)~~
+
+为了防止修改导致变化，先记录下修改前的日志相关参数
+
+```sh
+[root@xdlinux ➜ ~ ]$ sysctl -a|grep netfilter|grep log
+net.netfilter.nf_conntrack_log_invalid = 0
+net.netfilter.nf_log.0 = NONE
+net.netfilter.nf_log.1 = NONE
+net.netfilter.nf_log.10 = nf_log_ipv6
+net.netfilter.nf_log.11 = NONE
+net.netfilter.nf_log.12 = NONE
+net.netfilter.nf_log.2 = nf_log_ipv4
+net.netfilter.nf_log.3 = nf_log_arp
+net.netfilter.nf_log.4 = NONE
+net.netfilter.nf_log.5 = nf_log_netdev
+net.netfilter.nf_log.6 = NONE
+net.netfilter.nf_log.7 = nf_log_bridge
+net.netfilter.nf_log.8 = NONE
+net.netfilter.nf_log.9 = NONE
+net.netfilter.nf_log_all_netns = 0
+```
+
+(后续跟踪学习netfilter代码 TODO)
+
 ## 4. 使用perf打印网络堆栈
 
 [之前](https://xiaodongq.github.io/2024/06/20/ebpf-practice-case/)也看过TCP相关的tracepoint，没有多少个：
