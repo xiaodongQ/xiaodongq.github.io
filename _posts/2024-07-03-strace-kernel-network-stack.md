@@ -301,29 +301,43 @@ glibc-debuginfo-2.28-164.el8.x86_64.rpm、libgcc-debuginfo-8.5.0-3.el8.x86_64.rp
 > LOG        all  --  0.0.0.0/0            0.0.0.0/0            ctstate INVALID limit: avg 1/sec burst 5 LOG flags 0 level 7 prefix "invalid: "
 ```
 
-虽然`lsmod|grep nf_log_ipv4`看不到nf_log_ipv4这个模块，但是若移除这个模块`modprobe -r nf_log_ipv4`，会影响上面的命令，添加iptables规则时就会直接报错：
+虽然`lsmod|grep nf_log_ipv4`看不到nf_log_ipv4这个模块（此处CentOS8例看不到，发现CentOS7机器可看到），但是若移除这个模块`modprobe -r nf_log_ipv4`，会影响上面的命令，添加iptables规则时就会直接报错：
 
 ```sh
+# 移除nf_log_ipv4模块添加规则时报错
 [root@xdlinux ➜ ~ ]$ iptables -A INPUT -m conntrack --ctstate INVALID -m limit --limit 1/sec   -j LOG --log-prefix "invalid: " --log-level 7
 iptables v1.8.4 (nf_tables):  RULE_APPEND failed (No such file or directory): rule in chain INPUT
+
+# 过滤模块啥都没有
+[root@xdlinux ➜ ~ ]$ lsmod |grep -iE "nf_log_ipv4|ipt_LOG|ip6t_LOG|nfnetlink_log"
+[root@xdlinux ➜ ~ ]$ 
 ```
 
-模仿上面改成`ESTABLISHED`状态：还是没追踪到日志
-
-`iptables -A INPUT -m conntrack --ctstate ESTABLISHED -m limit --limit 1/sec -j LOG --log-prefix "conn_established_related: " --log-level 7`
-
-
-~~让GPT给个追踪RST的命令，没成功（`iptables -A INPUT -p tcp --tcp-flags ALL RST -j LOG --log-prefix "iptables:" --log-level debug`）~~
-
-~~下面的尝试也没成功：（加载模块和添加raw规则前后，lsmode和iptables -L对比没有变化）  ~~
-~~试下通过raw表跟踪，因为raw表在所有iptables规则中优先级是最高的，raw表有两条链，prerouting和output，分别作为输入和输出的第一必经点。  ~~
-~~CentOS7及以上，依赖的iptables日志模块是`nf_log_ipv4`（CentOS6则是ipt_LOG），因此需要手动加载该模块：modprobe nf_log_ipv4。然后加raw规则。  ~~
-~~参考：秘塔AI搜索（试了下效果还可以） + [CentOS通过raw表实现iptables日志输出和调试](http://www.chinasem.cn/article/958790)~~
-
-为了防止修改导致变化，先记录下修改前的日志相关参数
+`modprobe -r nf_log_ipv4`移除模块后，参数默认重置为：
 
 ```sh
-[root@xdlinux ➜ ~ ]$ sysctl -a|grep netfilter|grep log
+[root@xdlinux ➜ ~ ]$ sysctl -a|grep net.netfilter.|grep log    
+net.netfilter.nf_conntrack_log_invalid = 0
+net.netfilter.nf_log.0 = NONE
+net.netfilter.nf_log.1 = NONE
+net.netfilter.nf_log.10 = NONE
+net.netfilter.nf_log.11 = NONE
+net.netfilter.nf_log.12 = NONE
+net.netfilter.nf_log.2 = NONE
+net.netfilter.nf_log.3 = NONE
+net.netfilter.nf_log.4 = NONE
+net.netfilter.nf_log.5 = NONE
+net.netfilter.nf_log.6 = NONE
+net.netfilter.nf_log.7 = NONE
+net.netfilter.nf_log.8 = NONE
+net.netfilter.nf_log.9 = NONE
+net.netfilter.nf_log_all_netns = 0
+```
+
+`modprobe nf_log_ipv4`后，参数自动调整为了：
+
+```sh
+[root@xdlinux ➜ ~ ]$ sysctl -a|grep net.netfilter.|grep log
 net.netfilter.nf_conntrack_log_invalid = 0
 net.netfilter.nf_log.0 = NONE
 net.netfilter.nf_log.1 = NONE
@@ -340,6 +354,250 @@ net.netfilter.nf_log.8 = NONE
 net.netfilter.nf_log.9 = NONE
 net.netfilter.nf_log_all_netns = 0
 ```
+
+下面记录在CentOS8.5上的几次尝试，都没成功追踪到iptables的日志
+
+#### 3.2.1. CentOS 8.5上的尝试 及 其他系统对比
+
+CentOS8.5的内核：4.18.0-348.7.1.el8_5.x86_64
+
+1、尝试1：模仿上面改成`ESTABLISHED`状态，没追踪到日志
+
+`iptables -A INPUT -m conntrack --ctstate ESTABLISHED -m limit --limit 1/sec -j LOG --log-prefix "conn_established_related: " --log-level 7`
+
+**而找了个openEuler机器环境，追踪成功了！（之前加上这次，都是被CentOS8坑了，机制应该有变化）：**
+
+```sh
+# openEuler机器上
+[root@localhost ~]# iptables -A INPUT -m conntrack --ctstate ESTABLISHED -m limit --limit 1/sec -j LOG --log-prefix "conn_established_related: " --log-level 7
+
+# 查看dmesg里有iptables日志了
+[root@localhost ~]# dmesg -T|tail
+[Fri Jul  5 03:09:55 2024] conn_established_related: IN=br0 OUT= MAC=xxx SRC=xxx DST=xxx LEN=136 TOS=0x00 PREC=0x00 TTL=123 ID=47007 DF PROTO=TCP SPT=52005 DPT=22 WINDOW=8210 RES=0x00 ACK PSH URGP=0 
+[Fri Jul  5 03:09:56 2024] conn_established_related: IN=br0 OUT= MAC=xxx SRC=xxx DST=xxx LEN=136 TOS=0x00 PREC=0x00 TTL=123 ID=47017 DF PROTO=TCP SPT=52005 DPT=22 WINDOW=8208 RES=0x00 ACK PSH URGP=0 
+
+# 删除规则，还原
+iptables -D INPUT -m conntrack --ctstate ESTABLISHED -m limit --limit 1/sec -j LOG --log-prefix "conn_established_related: " --log-level 7
+```
+
+openEuler上加载的模块和参数如下，lsmod可看到nf_log_ipv4
+
+```sh
+# lsmod
+[root@localhost ～]# lsmod |grep -E "nf_log_ipv4|ipt_LOG|ip6t_LOG|nfnetlink_log"
+nf_log_ipv4            16384  0
+nf_log_common          16384  1 nf_log_ipv4
+
+# 系统参数
+[root@localhost ～]# sysctl -a|grep netfilter|grep log
+net.netfilter.nf_conntrack_log_invalid = 0
+net.netfilter.nf_log.0 = NONE
+net.netfilter.nf_log.1 = NONE
+net.netfilter.nf_log.10 = NONE
+net.netfilter.nf_log.11 = NONE
+net.netfilter.nf_log.12 = NONE
+net.netfilter.nf_log.2 = nf_log_ipv4
+net.netfilter.nf_log.3 = NONE
+net.netfilter.nf_log.4 = NONE
+net.netfilter.nf_log.5 = NONE
+net.netfilter.nf_log.6 = NONE
+net.netfilter.nf_log.7 = NONE
+net.netfilter.nf_log.8 = NONE
+net.netfilter.nf_log.9 = NONE
+net.netfilter.nf_log_all_netns = 0
+```
+
+2、尝试2：通过raw表跟踪，也没成功（CentOS8上）
+
+试下通过raw表跟踪，因为raw表在所有iptables规则中优先级是最高的，raw表有两条链，prerouting和output，分别作为输入和输出的第一必经点。  
+
+```sh
+iptables -t raw -A PREROUTING -p icmp -j TRACE
+iptables -t raw -A OUTPUT -p icmp -j TRACE
+```
+
+添加raw规则前后，`iptables -nL`对比没有任何变化
+
+CentOS7中，依赖的iptables日志模块是`nf_log_ipv4`（CentOS6则是ipt_LOG）  
+参考：[CentOS通过raw表实现iptables日志输出和调试](http://www.chinasem.cn/article/958790)
+
+3、尝试3：设置net.netfilter.nf_log_all_netns=1，也没成功
+
+注意到上面 net.netfilter.nf_log_all_netns=0，修改为1。结果dmesg还是没追踪到日志，而CentOS7上该值也为0但是有日志
+
+```sh
+sysctl -w net.netfilter.nf_log_all_netns=1
+```
+
+为了明确CentOS8的问题，起几个其他系统实锤对比。
+
+#### 3.2.2. 对比测试：Alibaba Cloud Linux 3.2104 LTS 64位
+
+起一个阿里云抢占式ECS：Alibaba Cloud Linux 3.2104 LTS 64位（内核版本：5.10.134-16.1.al8.x86_64）
+
+**注意设置规则前后，模块和系统参数的变化情况。**
+
+1）刚创建的ECS：
+
+```sh
+# 开始没有过滤到模块
+[root@iZ2zeb922hid1kv9lv9ufuZ ~]# lsmod |grep -E "nf_log_ipv4|ipt_LOG|ip6t_LOG|nfnetlink_log"
+[root@iZ2zeb922hid1kv9lv9ufuZ ~]# 
+
+# 系统参数如下，都是默认空的：
+[root@iZ2zeb922hid1kv9lv9ufuZ ~]# sysctl -a|grep netfilter|grep log
+net.netfilter.nf_log.0 = NONE
+net.netfilter.nf_log.1 = NONE
+net.netfilter.nf_log.10 = NONE
+net.netfilter.nf_log.11 = NONE
+net.netfilter.nf_log.12 = NONE
+net.netfilter.nf_log.2 = NONE
+net.netfilter.nf_log.3 = NONE
+net.netfilter.nf_log.4 = NONE
+net.netfilter.nf_log.5 = NONE
+net.netfilter.nf_log.6 = NONE
+net.netfilter.nf_log.7 = NONE
+net.netfilter.nf_log.8 = NONE
+net.netfilter.nf_log.9 = NONE
+net.netfilter.nf_log_all_netns = 0
+
+# iptables规则没有日志相关记录
+[root@iZ2zeb922hid1kv9lv9ufuZ ~]# iptables -nL|grep -i log
+[root@iZ2zeb922hid1kv9lv9ufuZ ~]# 
+```
+
+2）添加日志追踪规则：
+
+```sh
+[root@iZ2zeb922hid1kv9lv9ufuZ ~]# iptables -A INPUT -m conntrack --ctstate ESTABLISHED -m limit --limit 1/sec -j LOG --log-prefix "conn_established_related: " --log-level 7
+
+[root@iZ2zeb922hid1kv9lv9ufuZ ~]# iptables -nL|grep -i log
+LOG        all  --  0.0.0.0/0            0.0.0.0/0            ctstate ESTABLISHED limit: avg 1/sec burst 5 LOG flags 0 level 7 prefix "conn_established_related: "
+```
+
+可追踪到iptables日志：
+
+```sh
+[root@iZ2zeb922hid1kv9lv9ufuZ ~]# dmesg |tail
+[  111.529820] AliSecGuard : 0cf05ee8d063d9f37208e027efd361240bc0dc88
+[  412.424779] conn_established_related: IN=eth0 OUT= MAC=00:16:3e:3d:77:98:ee:ff:ff:ff:ff:ff:08:00 SRC=100.104.192.129 DST=172.23.133.147 LEN=40 TOS=0x00 PREC=0x20 TTL=57 ID=61323 DF PROTO=TCP SPT=43167 DPT=22 WINDOW=0 RES=0x00 RST URGP=0 
+[  412.426768] conn_established_related: IN=eth0 OUT= MAC=00:16:3e:3d:77:98:ee:ff:ff:ff:ff:ff:08:00 SRC=100.104.192.129 DST=172.23.133.147 LEN=52 TOS=0x00 PREC=0x00 TTL=57 ID=7112 DF PROTO=TCP SPT=39071 DPT=22 WINDOW=409 RES=0x00 ACK URGP=0 
+[  412.543725] conn_established_related: IN=eth0 OUT= MAC=00:16:3e:3d:77:98:ee:ff:ff:ff:ff:ff:08:00 SRC=100.100.30.26 DST=172.23.133.147 LEN=40 TOS=0x00 PREC=0x00 TTL=52 ID=3530 DF PROTO=TCP SPT=80 DPT=51562 WINDOW=1807 RES=0x00 ACK URGP=0 
+```
+
+模块和系统参数自动变化了：
+
+```sh
+# 自动加载了nf_log_ipv4
+[root@iZ2zeb922hid1kv9lv9ufuZ ~]# lsmod |grep -E "nf_log_ipv4|ipt_LOG|ip6t_LOG|nfnetlink_log"
+nf_log_ipv4            16384  0
+nf_log_common          16384  1 nf_log_ipv4
+```
+
+```sh
+# 自动设置了 net.netfilter.nf_log.2=nf_log_ipv4
+[root@iZ2zeb922hid1kv9lv9ufuZ ~]# sysctl -a|grep netfilter|grep log
+net.netfilter.nf_conntrack_log_invalid = 0
+net.netfilter.nf_log.0 = NONE
+net.netfilter.nf_log.1 = NONE
+net.netfilter.nf_log.10 = NONE
+net.netfilter.nf_log.11 = NONE
+net.netfilter.nf_log.12 = NONE
+net.netfilter.nf_log.2 = nf_log_ipv4
+net.netfilter.nf_log.3 = NONE
+net.netfilter.nf_log.4 = NONE
+net.netfilter.nf_log.5 = NONE
+net.netfilter.nf_log.6 = NONE
+net.netfilter.nf_log.7 = NONE
+net.netfilter.nf_log.8 = NONE
+net.netfilter.nf_log.9 = NONE
+net.netfilter.nf_log_all_netns = 0
+```
+
+3）删除规则，还原
+
+```sh
+[root@iZ2zeb922hid1kv9lv9ufuZ ~]# iptables -D INPUT -m conntrack --ctstate ESTABLISHED -m limit --limit 1/sec -j LOG --log-prefix "conn_established_related: " --log-level 7
+```
+
+加载模块和系统参数不变，不会自动清理
+
+```sh
+# 加载模块和上面一样
+[root@iZ2zeb922hid1kv9lv9ufuZ ~]# lsmod |grep -E "nf_log_ipv4|ipt_LOG|ip6t_LOG|nfnetlink_log"
+nf_log_ipv4            16384  0
+nf_log_common          16384  1 nf_log_ipv4
+
+# 系统参数和上面一样
+[root@iZ2zeb922hid1kv9lv9ufuZ ~]# sysctl -a|grep netfilter|grep log
+net.netfilter.nf_conntrack_log_invalid = 0
+net.netfilter.nf_log.0 = NONE
+net.netfilter.nf_log.1 = NONE
+net.netfilter.nf_log.10 = NONE
+net.netfilter.nf_log.11 = NONE
+net.netfilter.nf_log.12 = NONE
+net.netfilter.nf_log.2 = nf_log_ipv4
+net.netfilter.nf_log.3 = NONE
+net.netfilter.nf_log.4 = NONE
+net.netfilter.nf_log.5 = NONE
+net.netfilter.nf_log.6 = NONE
+net.netfilter.nf_log.7 = NONE
+net.netfilter.nf_log.8 = NONE
+net.netfilter.nf_log.9 = NONE
+net.netfilter.nf_log_all_netns = 0
+```
+
+4）手动移除模块 `modprobe -r nf_log_ipv4`
+
+可看到系统参数自动还原了
+
+```sh
+[root@iZ2zeb922hid1kv9lv9ufuZ ~]# lsmod |grep -E "nf_log_ipv4|ipt_LOG|ip6t_LOG|nfnetlink_log"
+[root@iZ2zeb922hid1kv9lv9ufuZ ~]# sysctl -a|grep netfilter|grep log
+net.netfilter.nf_conntrack_log_invalid = 0
+net.netfilter.nf_log.0 = NONE
+net.netfilter.nf_log.1 = NONE
+net.netfilter.nf_log.10 = NONE
+net.netfilter.nf_log.11 = NONE
+net.netfilter.nf_log.12 = NONE
+net.netfilter.nf_log.2 = NONE
+net.netfilter.nf_log.3 = NONE
+net.netfilter.nf_log.4 = NONE
+net.netfilter.nf_log.5 = NONE
+net.netfilter.nf_log.6 = NONE
+net.netfilter.nf_log.7 = NONE
+net.netfilter.nf_log.8 = NONE
+net.netfilter.nf_log.9 = NONE
+net.netfilter.nf_log_all_netns = 0
+```
+
+5）测试raw规则
+
+**结果：没成功。**
+
+按照上面的方式：[CentOS通过raw表实现iptables日志输出和调试](http://www.chinasem.cn/article/958790)
+
+```sh
+iptables -t raw -A PREROUTING -p icmp -j TRACE
+iptables -t raw -A OUTPUT -p icmp -j TRACE
+```
+
+通过ping -c 1 172.23.133.147验证
+
+`nf_log_ipv4`模块也有、nf_log_all_netns=1也试过，/var/log/messages 和 dmesg里都没有iptables日志！
+
+#### 3.2.3. CentOS7.9
+
+再起一个CentOS7.9 ECS
+
+```sh
+[root@iZbp1by1hq7wgbzm5nrdu2Z ~]# cat /etc/system-release
+CentOS Linux release 7.9.2009 (Core)
+[root@iZbp1by1hq7wgbzm5nrdu2Z ~]# uname -r
+3.10.0-1160.119.1.el7.x86_64
+```
+
+重复上述步骤，结果和结论和 Alibaba Cloud Linux 3.2104 LTS 64位 完全一样。
 
 (后续跟踪学习netfilter代码 TODO)
 
@@ -478,4 +736,6 @@ List of pre-defined events (to be used in -e):
 
 7、[perf Examples](https://www.brendangregg.com/perf.html)
 
-8、GPT
+8、[CentOS通过raw表实现iptables日志输出和调试](http://www.chinasem.cn/article/958790)
+
+9、GPT
