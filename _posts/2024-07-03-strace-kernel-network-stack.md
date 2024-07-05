@@ -14,7 +14,7 @@ tags: TCP 内核
 
 ## 1. 背景
 
-看[知识星球](https://wx.zsxq.com/dweb2/index/group/15552551584552)文章、以及查资料时，看到几篇文章里有的基于现象去跟踪定位内核代码、有的是推荐学习内核方法，挺有收获。看里面的方式很想自己去学习掌握一下，于是有了这篇小结和实验文章。
+看[知识星球](https://wx.zsxq.com/dweb2/index/group/15552551584552)文章、以及查资料时，看到几篇文章里有的基于现象去跟踪定位内核代码、有的推荐比较好的学习内核网络方法，挺有收获。看里面的方式很想自己去学习掌握一下，于是有了这篇小结和实验文章。
 
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
@@ -47,7 +47,7 @@ tags: TCP 内核
 
 2、“读源码不如读执行”
 
-早前因为这句话，有了后面深入学习eBPF的动力。
+早前因为这句话，有了深入学习eBPF/perf等追踪技术的动力和更好的源码学习思路。
 
 `ftrace`（或systemtap、ebpf）追踪函数运行序列。
 
@@ -70,7 +70,7 @@ tags: TCP 内核
 
 下面学习实践上述文章中涉及的工具和技巧。
 
-## 3. 使用eBPF追踪
+## 3. 使用eBPF追踪网络堆栈
 
 上面的链接文章里用了systemtap追踪两个网络相关跟踪点`tcp_v4_send_reset`和`tcp_send_active_reset`，怎么用eBPF跟踪呢？
 
@@ -178,7 +178,7 @@ comm:server, foreign:192.168.1.2:46067, call stack:
 
 ### 3.1. 扩展：faddr2line用法
 
-上面用到`faddr2line`将堆栈信息的地址转换对应到源码位置，这里学习下这个工具。
+上面用到`faddr2line`将堆栈信息的地址转换对应到源码位置，这里学习了解下这个工具。
 
 1、检索`faddr2line`，发现它是内核中脚本的一部分，find能找到该文件，不过该路径没加在PATH里（即直接执行`faddr2line`是找不到的）。
 
@@ -586,7 +586,7 @@ iptables -t raw -A OUTPUT -p icmp -j TRACE
 
 `nf_log_ipv4`模块也有、nf_log_all_netns=1也试过，/var/log/messages 和 dmesg里都没有iptables日志！
 
-#### 3.2.3. CentOS7.9
+#### 3.2.3. 对比测试：CentOS7.9
 
 再起一个CentOS7.9 ECS
 
@@ -601,7 +601,7 @@ CentOS Linux release 7.9.2009 (Core)
 
 (后续跟踪学习netfilter代码 TODO)
 
-## 4. 使用perf打印网络堆栈
+## 4. 使用perf跟踪网络堆栈
 
 [之前](https://xiaodongq.github.io/2024/06/20/ebpf-practice-case/)也看过TCP相关的tracepoint，没有多少个：
 
@@ -712,13 +712,15 @@ List of pre-defined events (to be used in -e):
 
 另外，brendangregg大佬的这篇：[perf Examples](https://www.brendangregg.com/perf.html)，有很多实用的perf命令，需要单独开一篇博客学习记录下。
 
-## 5. 使用gdb调试内核
+## 5. 使用gdb调试跟踪网络堆栈
 
-需编译内核，然后基于QEMU+gdb调试，后续有需要再实践
+需编译内核，然后基于QEMU+gdb调试，后续有需要再实践。
 
 ## 6. 小结
 
-根据几个看过的文章信息，梳理跟踪内核中网络栈的方式，并学习了解了文章中的工具。
+根据几个看过的文章信息及近期的学习实践，梳理跟踪内核中网络栈的几种方式，并学习了解了文章中的工具。
+
+对比了几个不同系统里面iptables设置跟踪日志的表现，CentOS8里实验失败的原因这里先遗留了，作为TODO项后续定位。
 
 ## 7. 参考
 
