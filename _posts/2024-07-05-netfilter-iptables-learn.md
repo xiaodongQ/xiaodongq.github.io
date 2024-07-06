@@ -8,7 +8,7 @@ tags: TCP netfilter iptables
 * content
 {:toc}
 
-深入学习netfilter和iptables
+深入学习netfilter和iptables，深入理解TCP发送接收过程
 
 
 
@@ -35,19 +35,21 @@ tags: TCP netfilter iptables
 
 ## 2. netfilter基本介绍
 
-Netfilter是Linux内核中一个非常关键的子系统，它负责在网络协议栈的不同层级处理数据包，提供了一系列强大的网络数据包处理功能，包括但不限于数据包过滤、网络地址转换（NAT）以及连接跟踪。
+官网：[netfilter](https://netfilter.org/)，上面可看到netfilter相关项目的动态，如iptables、nftables、conntrack-tools等。
 
-Netfilter框架由Linux内核防火墙和网络维护者 Rusty Russell 所提出和实现（备注：项目创世人之一和核心维护者）。这个作者还基于 netfilter 开发了大名鼎鼎的 iptables，用于在用户空间管理这些复杂的 netfilter 规则。（番外：这位大佬18年宣布退出并投入到比特币闪电网络的原型开发中了，大佬的[博客](https://rusty.ozlabs.org/)）
+netfilter是Linux内核中一个非常关键的子系统，它负责在网络协议栈的不同层级处理数据包，提供了一系列强大的网络数据包处理功能，包括但不限于数据包过滤、网络地址转换（NAT）以及连接跟踪。
 
-* Netfilter最初在Linux 2.4.x内核系列中引入，作为继`IPchains`之后的新一代Linux防火墙框架。它至今仍是Linux系统中实现网络数据包处理的核心机制。
-* Netfilter的设计遵循高度模块化的原则，这意味着它的功能可以通过加载或卸载内核模块来动态扩展，从而实现了极高的灵活性和可扩展性。
-* Netfilter的核心在于其hook机制。它在Linux网络堆栈的关键位置定义了多个挂载点（hook points），比如在数据包流入（PREROUTING）、流出（POSTROUTING）、进入本地进程（INPUT）和转发（FORWARD）时。当数据包经过这些点时，预先注册的hook函数会被调用，执行相应的处理逻辑，如过滤、修改或丢弃数据包。
-* Netfilter通常与用户空间工具`iptables`一起提及。Netfilter作为内核部分，负责实际的数据包处理；而`iptables`则是一个高级命令行工具，允许管理员定义复杂的规则集来控制Netfilter的行为，比如设置过滤规则、NAT规则等。
+netfilter框架由Linux内核防火墙和网络维护者 Rusty Russell 所提出和实现。这个作者还基于 netfilter 开发了大名鼎鼎的 iptables，用于在用户空间管理这些复杂的 netfilter 规则。（番外：这位大佬18年宣布退出并投入到比特币闪电网络的原型开发中了，大佬的[博客](https://rusty.ozlabs.org/)）
 
-**nftables**：（之前比较陌生）
+* netfilter最初在Linux 2.4.x内核系列中引入，作为继`IPchains`之后的新一代Linux防火墙框架。它至今仍是Linux系统中实现网络数据包处理的核心机制。
+* netfilter的设计遵循高度模块化的原则，这意味着它的功能可以通过加载或卸载内核模块来动态扩展，从而实现了极高的灵活性和可扩展性。
+* netfilter的核心在于其hook机制。它在Linux网络堆栈的关键位置定义了多个挂载点（hook points），比如在数据包流入（PREROUTING）、流出（POSTROUTING）、进入本地进程（INPUT）和转发（FORWARD）时。当数据包经过这些点时，预先注册的hook函数会被调用，执行相应的处理逻辑，如过滤、修改或丢弃数据包。
+* netfilter通常与用户空间工具`iptables`一起提及。netfilter作为内核部分，负责实际的数据包处理；而`iptables`则是一个高级命令行工具，允许管理员定义复杂的规则集来控制netfilter的行为，比如设置过滤规则、NAT规则等。
 
-* 也是一个Netfilter项目，旨在替换现有的 {ip,ip6,arp,eb}tables 框架，为 {ip,ip6}tables 提供一个新的包过滤框架、一个新的用户空间实用程序（nft）和一个兼容层。
-* 虽然`iptables`长期以来是与Netfilter交互的主要方式，但随着`nftables`的引入，它提供了一种更现代、更灵活的方式来配置Netfilter规则。`nftables`支持更丰富的表达能力和更高效的内部实现。
+**nftables**：（之前比较陌生，上面netfilter官网上也有nftables介绍）
+
+* 也是一个netfilter项目，旨在替换现有的 {ip,ip6,arp,eb}tables 框架，为 {ip,ip6}tables 提供一个新的包过滤框架、一个新的用户空间实用程序（nft）和一个兼容层。
+* 虽然`iptables`长期以来是与netfilter交互的主要方式，但随着`nftables`的引入，它提供了一种更现代、更灵活的方式来配置netfilter规则。`nftables`支持更丰富的表达能力和更高效的内部实现。
 * CentOS8里，就用 `nftables` 框架替代了 `iptables` 框架作为默认的网络包过滤工具。（**难道这就是之前日志跟踪实验没成功的原因？ TODO**）
 
 疑问：既然`nftables`旨在替换`iptables`，现在的使用情况怎么样？
@@ -72,9 +74,11 @@ Netfilter框架由Linux内核防火墙和网络维护者 Rusty Russell 所提出
 FirewallBackend=iptables
 ```
 
-## 3. Netfilter Hooks
+## 3. netfilter hooks
 
 netfilter提供了`5`个hook点，这些在内核协议栈中已经定义好了（之前学习eBPF时可了解到内核提供了各种类型hook钩子）
+
+*注意：下面列的hook类型是IPv4的宏，IPv6则为`NF_IP6_PRE_ROUTING`形式，枚举值是一样的。具体见下面**ip_rcv逻辑**小节的分析说明。*
 
 * `NF_IP_PRE_ROUTING`：接收到的包进入协议栈后立即触发此 hook，在进行任何路由判断（将包发往哪里）之前
 * `NF_IP_LOCAL_IN`：接收到的包经过路由判断，如果目的是本机，将触发此 hook
@@ -82,9 +86,9 @@ netfilter提供了`5`个hook点，这些在内核协议栈中已经定义好了�
 * `NF_IP_LOCAL_OUT`：本机产生的准备发送的包，在进入协议栈后立即触发此 hook
 * `NF_IP_POST_ROUTING`：本机产生的准备发送的包或者转发的包，在经过路由判断之后， 将触发此 hook
 
-内核协议栈各hook点位置和控制流如下图所示（来自[Wikipedia](https://upload.wikimedia.org/wikipedia/commons/3/37/Netfilter-packet-flow.svg)）：
+内核协议栈各hook点位置和控制流如下图所示（来自[Wikipedia](https://upload.wikimedia.org/wikipedia/commons/3/37/netfilter-packet-flow.svg)）：
 
-![Netfilter各hook点和控制流](/images/Netfilter-packet-flow.svg)
+![netfilter各hook点和控制流](/images/netfilter-packet-flow.svg)
 
 为了理解上面这张图，还需要了解 **`chain`** 和 **`table`**的概念。
 
@@ -113,7 +117,7 @@ iptables 提供的 table 类型如下：
 
 ## 4. 内核代码跟踪
 
-这里先找一个TCP相关追踪点先获取一个堆栈，再根据堆栈去找代码分析。
+这里先找一个TCP相关追踪点获取一个堆栈，再根据堆栈去找代码分析。
 
 说明：本篇环境基于CentOS8.5，内核：4.18.0-348.7.1.el8_5.x86_64
 
@@ -198,7 +202,7 @@ comm:swapper/9, stack:
 ...
 ```
 
-### 4.2. 接收数据处理
+### 4.2. 接收数据前置处理
 
 有上面的堆栈后，选取几个关键过程分析，直接参考[图解Linux网络包接收过程](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247484058&idx=1&sn=a2621bc27c74b313528eefbc81ee8c0f&chksm=a6e303a191948ab7d06e574661a905ddb1fae4a5d9eb1d2be9f1c44491c19a82d95957a0ffb6&scene=21#wechat_redirect)里的梳理，过程大体是对应的。
 
@@ -206,33 +210,33 @@ comm:swapper/9, stack:
 // linux-4.18/net/core/dev.c
 static int __netif_receive_skb_core(struct sk_buff *skb, bool pfmemalloc)
 {
-	struct packet_type *ptype, *pt_prev;
-	rx_handler_func_t *rx_handler;
-	struct net_device *orig_dev;
-	bool deliver_exact = false;
-	int ret = NET_RX_DROP;
-	__be16 type;
+    struct packet_type *ptype, *pt_prev;
+    rx_handler_func_t *rx_handler;
+    struct net_device *orig_dev;
+    bool deliver_exact = false;
+    int ret = NET_RX_DROP;
+    __be16 type;
 
-	net_timestamp_check(!netdev_tstamp_prequeue, skb);
+    net_timestamp_check(!netdev_tstamp_prequeue, skb);
 
-	// 定义 tracepoint:net:netif_receive_skb，可以通过eBPF追踪
-	trace_netif_receive_skb(skb);
+    // 定义 tracepoint:net:netif_receive_skb，可以通过eBPF追踪
+    trace_netif_receive_skb(skb);
     ...
 
-	// pcap逻辑，&ptype_all、&skb->dev->ptype_all 这里会将数据送入抓包点。tcpdump就是从这个入口获取包的
-	list_for_each_entry_rcu(ptype, &ptype_all, list) {
-		if (pt_prev)
-			// 从数据包中取出协议信息，然后遍历注册在这个协议上的回调函数列表
-			ret = deliver_skb(skb, pt_prev, orig_dev);
-		pt_prev = ptype;
-	}
+    // pcap逻辑，&ptype_all、&skb->dev->ptype_all 这里会将数据送入抓包点。tcpdump就是从这个入口获取包的
+    list_for_each_entry_rcu(ptype, &ptype_all, list) {
+        if (pt_prev)
+            // 从数据包中取出协议信息，然后遍历注册在这个协议上的回调函数列表
+            ret = deliver_skb(skb, pt_prev, orig_dev);
+        pt_prev = ptype;
+    }
 
-	list_for_each_entry_rcu(ptype, &skb->dev->ptype_all, list) {
-		if (pt_prev)
-			// 从数据包中取出协议信息，然后遍历注册在这个协议上的回调函数列表
-			ret = deliver_skb(skb, pt_prev, orig_dev);
-		pt_prev = ptype;
-	}
+    list_for_each_entry_rcu(ptype, &skb->dev->ptype_all, list) {
+        if (pt_prev)
+            // 从数据包中取出协议信息，然后遍历注册在这个协议上的回调函数列表
+            ret = deliver_skb(skb, pt_prev, orig_dev);
+        pt_prev = ptype;
+    }
     ...
 }
 ```
@@ -240,40 +244,144 @@ static int __netif_receive_skb_core(struct sk_buff *skb, bool pfmemalloc)
 ```c
 // linux-4.18/net/core/dev.c
 static inline int deliver_skb(struct sk_buff *skb,
-			      struct packet_type *pt_prev,
-			      struct net_device *orig_dev)
+                  struct packet_type *pt_prev,
+                  struct net_device *orig_dev)
 {
-	if (unlikely(skb_orphan_frags_rx(skb, GFP_ATOMIC)))
-		return -ENOMEM;
-	refcount_inc(&skb->users);
-	// 协议层注册的处理函数，对于ip包来讲，就会进入到ip_rcv（如果是arp包的话，会进入到arp_rcv）
-	return pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
+    if (unlikely(skb_orphan_frags_rx(skb, GFP_ATOMIC)))
+        return -ENOMEM;
+    refcount_inc(&skb->users);
+    // 协议层注册的处理函数，对于ip包来讲，就会进入到ip_rcv（如果是arp包的话，会进入到arp_rcv）
+    return pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
 }
+```
+
+贴一下pt_prev对应的`packet_type`结构：
+
+```c
+// linux-4.18/include/linux/netdevice.h
+struct packet_type {
+    __be16			type;	/* This is really htons(ether_type). */
+    struct net_device	*dev;	/* NULL is wildcarded here	     */
+    int			(*func) (struct sk_buff *,
+                     struct net_device *,
+                     struct packet_type *,
+                     struct net_device *);
+    bool			(*id_match)(struct packet_type *ptype,
+                        struct sock *sk);
+    void			*af_packet_priv;
+    struct list_head	list;
+};
 ```
 
 ### 4.3. IP网络层
 
+#### 4.3.1. ip_rcv注册时机
+
+上面`deliver_skb(xxx)`中调用的`pt_prev->func()`，其中的`func`就是网络子系统`inet_init()`初始化时，注册的IP网络层处理函数
+
 ```c
-// linux-5.10.10/net/ipv4/ip_input.c
-
-/*
- * IP receive entry point
- */
-int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt,
-	   struct net_device *orig_dev)
+// linux-4.18/net/ipv4/af_inet.c
+static int __init inet_init(void)
 {
-	struct net *net = dev_net(dev);
+    ...
+    rc = proto_register(&tcp_prot, 1);
+    if (rc)
+        goto out;
 
-	skb = ip_rcv_core(skb, net);
-	if (skb == NULL)
-		return NET_RX_DROP;
-
-	return NF_HOOK(NFPROTO_IPV4, NF_INET_PRE_ROUTING,
-		       net, NULL, skb, dev, NULL,
-		       ip_rcv_finish);
+    rc = proto_register(&udp_prot, 1);
+    if (rc)
+        goto out_unregister_tcp_proto;
+    ...
+    // 注册ip网络层的处理函数为 ip_rcv
+    dev_add_pack(&ip_packet_type);
+    ...
 }
+
+// ip_packet_type结构如下
+static struct packet_type ip_packet_type __read_mostly = {
+    .type = cpu_to_be16(ETH_P_IP),
+    .func = ip_rcv,
+};
 ```
 
+#### 4.3.2. ip_rcv逻辑
+
+继续看一下IP层的处理逻辑 `ip_rcv`，可看到`NF_INET_PRE_ROUTING`这个hook
+
+```c
+// linux-4.18/net/ipv4/ip_input.c
+int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, struct net_device *orig_dev)
+{
+    const struct iphdr *iph;
+    struct net *net;
+    u32 len;
+    ...
+
+    // 这里就是一个 netfilter 的hook了，类型为 NF_INET_PRE_ROUTING
+    return NF_HOOK(NFPROTO_IPV4, NF_INET_PRE_ROUTING,
+               net, NULL, skb, dev, NULL,
+               ip_rcv_finish);
+
+csum_error:
+    __IP_INC_STATS(net, IPSTATS_MIB_CSUMERRORS);
+inhdr_error:
+    __IP_INC_STATS(net, IPSTATS_MIB_INHDRERRORS);
+drop:
+    kfree_skb(skb);
+out:
+    return NET_RX_DROP;
+}
+
+hook类型看起来和上面netfilter介绍时的没完全对应起来。检索下可知是IPv4和IPv6各自定义了宏跟hook枚举值对应，实际是一样的。  
+而上面介绍时也只是放了IPv4的hook。
+
+```c
+// linux-4.18/include/uapi/linux/netfilter.h
+enum nf_inet_hooks {
+    NF_INET_PRE_ROUTING,
+    NF_INET_LOCAL_IN,
+    NF_INET_FORWARD,
+    NF_INET_LOCAL_OUT,
+    NF_INET_POST_ROUTING,
+    NF_INET_NUMHOOKS
+};
+```
+
+IPv4的netfilter hooks：
+
+```c
+// linux-4.18/include/uapi/linux/netfilter_ipv4.h
+/* IP Hooks */
+/* After promisc drops, checksum checks. */
+#define NF_IP_PRE_ROUTING	0
+/* If the packet is destined for this box. */
+#define NF_IP_LOCAL_IN		1
+/* If the packet is destined for another interface. */
+#define NF_IP_FORWARD		2
+/* Packets coming from a local process. */
+#define NF_IP_LOCAL_OUT		3
+/* Packets about to hit the wire. */
+#define NF_IP_POST_ROUTING	4
+#define NF_IP_NUMHOOKS		5
+```
+
+IPv6的netfilter hooks：
+
+```c
+// linux-4.18/include/uapi/linux/netfilter_ipv6.h
+/* IP6 Hooks */
+/* After promisc drops, checksum checks. */
+#define NF_IP6_PRE_ROUTING	0
+/* If the packet is destined for this box. */
+#define NF_IP6_LOCAL_IN		1
+/* If the packet is destined for another interface. */
+#define NF_IP6_FORWARD		2
+/* Packets coming from a local process. */
+#define NF_IP6_LOCAL_OUT		3
+/* Packets about to hit the wire. */
+#define NF_IP6_POST_ROUTING	4
+#define NF_IP6_NUMHOOKS		5
+```
 
 ## 5. 小结
 

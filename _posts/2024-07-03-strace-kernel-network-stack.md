@@ -178,7 +178,7 @@ comm:server, foreign:192.168.1.2:46067, call stack:
 
 对于复杂结构和逻辑，还是写个`.bt`脚本方便一些。
 
-其他网路相关跟踪点，按需使用
+其他网络相关跟踪点（部分，比如还有收到包时的tracepoint:net:netif_receive_skb），按需使用
 
 ```sh
 [root@xdlinux ➜ dbdoctor ]$ bpftrace -l |grep -E 'tcp:|sock:inet|skb:' 

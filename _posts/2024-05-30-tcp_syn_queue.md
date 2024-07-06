@@ -561,7 +561,7 @@ const struct inet_connection_sock_af_ops ipv4_specific = {
 ```cpp
 // linux-5.10.10/net/ipv4/tcp_ipv4.c
 // 初始化时注册的处理第一次SYN的函数
-// sk是socket， skb是请求？
+// sk是socket， skb是数据包
 int tcp_v4_conn_request(struct sock *sk, struct sk_buff *skb)
 {
     // 如果是广播或者组播的SYN请求包，直接drop
