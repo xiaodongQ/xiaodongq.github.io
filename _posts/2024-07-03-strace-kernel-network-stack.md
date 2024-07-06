@@ -64,7 +64,7 @@ tags: TCP 内核
 
 加上前段时间掘金小册看到：
 
-[实战使用 qemu + gdb 调试 Linux 内核以及网络配置](https://juejin.cn/book/6844733794801418253/section/7358469142175105059)
+* [实战使用 qemu + gdb 调试 Linux 内核以及网络配置](https://juejin.cn/book/6844733794801418253/section/7358469142175105059)
 
 4、耗子叔的[《左耳听风》](https://time.geekbang.org/column/article/14389)专栏，里面说的去获取第一手知识、高效学习、逆人性等颇有体会，不定期重读受益良多。
 
@@ -177,6 +177,28 @@ comm:server, foreign:192.168.1.2:46067, call stack:
 ```
 
 对于复杂结构和逻辑，还是写个`.bt`脚本方便一些。
+
+其他网路相关跟踪点，按需使用
+
+```sh
+[root@xdlinux ➜ dbdoctor ]$ bpftrace -l |grep -E 'tcp:|sock:inet|skb:' 
+# 这几个先不管
+# tracepoint:mptcp:ack_update_msk
+# tracepoint:mptcp:get_mapping_status
+# tracepoint:mptcp:mptcp_subflow_get_send
+# tracepoint:mptcp:subflow_check_data_avail
+tracepoint:skb:consume_skb
+tracepoint:skb:kfree_skb
+tracepoint:skb:skb_copy_datagram_iovec
+tracepoint:sock:inet_sock_set_state
+tracepoint:tcp:tcp_destroy_sock
+tracepoint:tcp:tcp_probe
+tracepoint:tcp:tcp_rcv_space_adjust
+tracepoint:tcp:tcp_receive_reset
+tracepoint:tcp:tcp_retransmit_skb
+tracepoint:tcp:tcp_retransmit_synack
+tracepoint:tcp:tcp_send_reset
+```
 
 ### 3.1. 扩展：faddr2line用法
 
@@ -627,7 +649,7 @@ List of pre-defined events (to be used in -e):
   skb:skb_copy_datagram_iovec                        [Tracepoint event]
 ```
 
-跟踪sdk的消费和释放：
+跟踪skb的消费和释放：
 
 ```sh
 [root@xdlinux ➜ ~ ]$ perf record -e 'skb:consume_skb' -e 'skb:kfree_skb' -g -a 
