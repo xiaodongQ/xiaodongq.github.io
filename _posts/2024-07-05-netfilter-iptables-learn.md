@@ -8,7 +8,7 @@ tags: TCP netfilter iptables
 * content
 {:toc}
 
-深入学习netfilter和iptables，深入理解TCP发送接收过程
+深入学习netfilter和iptables，梳理TCP发送接收过程
 
 
 
@@ -214,7 +214,7 @@ comm:swapper/9, stack:
 
 ### 4.2. 接收流程
 
-#### 4.2.1. 接收数据前置处理（设备层）
+#### 4.2.1. 设备层处理
 
 有上面的堆栈后，选取几个关键过程分析，直接参考[图解Linux网络包接收过程](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247484058&idx=1&sn=a2621bc27c74b313528eefbc81ee8c0f&chksm=a6e303a191948ab7d06e574661a905ddb1fae4a5d9eb1d2be9f1c44491c19a82d95957a0ffb6&scene=21#wechat_redirect)里的梳理，过程大体是对应的。
 
@@ -285,7 +285,7 @@ struct packet_type {
 };
 ```
 
-#### 4.2.2. IP协议层接收处理，ip_rcv注册时机
+#### 4.2.2. IP层ip_rcv注册时机
 
 上面`deliver_skb(xxx)`中调用的`pt_prev->func()`，其中的`func`就是网络子系统`inet_init()`初始化时，注册的IP网络层处理函数
 
@@ -531,7 +531,7 @@ comm:python, stack:
         entry_SYSCALL_64_after_hwframe+101
 ```
 
-这里的堆栈映证[25 张图，一万字，拆解 Linux 网络包发送过程](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247485146&idx=1&sn=e5bfc79ba915df1f6a8b32b87ef0ef78&chksm=a6e307e191948ef748dc73a4b9a862a22ce1db806a486afce57475d4331d905827d6ca161711&scene=178&cur_album_id=1532487451997454337#rd)里的流程分析图一起查看：
+这里的堆栈映证"[25 张图，一万字，拆解 Linux 网络包发送过程](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247485146&idx=1&sn=e5bfc79ba915df1f6a8b32b87ef0ef78&chksm=a6e307e191948ef748dc73a4b9a862a22ce1db806a486afce57475d4331d905827d6ca161711&scene=178&cur_album_id=1532487451997454337#rd)"里的流程分析图一起查看：
 
 ![网络包发送过程](/images/net-send-process.png)
 
@@ -622,7 +622,7 @@ int inet_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
 
 ##### 4.3.2.1. 再次分析网络协议初始化
 
-上面`sk_prot`对应的具体网络协议(`struct proto`结构)，之前梳理过流程，这里再说明一下再加强下印象。（这几个初始化对于梳理内核网络代码非常重要，对自己而言经常要去翻对应的具体接口）
+上面`sk_prot`对应的具体网络协议(`struct proto`结构)，之前梳理过流程，这里再说明一下加强印象。（初始化相关逻辑对于梳理内核网络代码非常重要，个人经常要去翻对应的具体接口）
 
 * af_inet.c中`inet_init`初始化网络时，遍历`inetsw_array`全局数组进行各类网络协议注册
 * 其中的`.prot`里是具体协议，如TCP、UDP。这里的"具体协议"都是`struct proto`结构的实例，不同协议各自定义了一个`struct proto`全局变量用于注册
