@@ -115,9 +115,9 @@ iptables 提供的 table 类型如下：
 * `raw`：conntrack 相关，其唯一目的就是提供一个让包绕过连接跟踪的框架
 * `security`：打 SELinux 标记
 
-## 4. 内核代码跟踪
+下面跟踪分析下内核流程。这里先找TCP相关追踪点获取一个堆栈，再根据堆栈去找代码分析。
 
-这里先找一个TCP相关追踪点获取一个堆栈，再根据堆栈去找代码分析。
+## 4. 接收流程内核代码跟踪
 
 说明：本篇环境基于CentOS8.5，内核：4.18.0-348.7.1.el8_5.x86_64
 
@@ -212,9 +212,7 @@ comm:swapper/9, stack:
 
 下面先分析下内核代码中网络包接收流程涉及的hook处理
 
-### 4.2. 接收流程
-
-#### 4.2.1. 设备层处理
+### 4.2. 设备层处理
 
 有上面的堆栈后，选取几个关键过程分析，直接参考"[图解Linux网络包接收过程](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247484058&idx=1&sn=a2621bc27c74b313528eefbc81ee8c0f&chksm=a6e303a191948ab7d06e574661a905ddb1fae4a5d9eb1d2be9f1c44491c19a82d95957a0ffb6&scene=21#wechat_redirect)"里的梳理，过程大体是对应的。
 
@@ -286,7 +284,7 @@ struct packet_type {
 };
 ```
 
-#### 4.2.2. 网络层ip_rcv注册时机
+### 4.3. 网络层ip_rcv注册时机
 
 上面`deliver_skb(xxx)`中调用的`pt_prev->func()`，其中的`func`就是网络子系统`inet_init()`初始化时，注册的IP网络层处理函数
 
@@ -315,7 +313,7 @@ static struct packet_type ip_packet_type __read_mostly = {
 };
 ```
 
-#### 4.2.3. ip_rcv逻辑
+### 4.4. ip_rcv逻辑
 
 继续看一下IP层的处理逻辑 `ip_rcv`，可看到`NF_INET_PRE_ROUTING`这个hook
 
@@ -397,7 +395,7 @@ IPv6的netfilter hooks：
 #define NF_IP6_NUMHOOKS		5
 ```
 
-#### 4.2.4. ip_rcv_finish
+### 4.5. ip_rcv_finish
 
 上面执行完`NF_INET_PRE_ROUTING` hook后，进入 `ip_rcv_finish` 函数处理
 
@@ -458,7 +456,7 @@ int ip_local_deliver(struct sk_buff *skb)
 }
 ```
 
-#### 4.2.5. 接收流程小结
+### 4.6. 接收流程小结
 
 小结上述网络包接收时的netfilter hook，先经过`PREROUTING`，而后经过`INPUT` hook。
 
@@ -467,11 +465,11 @@ int ip_local_deliver(struct sk_buff *skb)
 ![接收过程netfilter hook](/images/receive-netfilter-hook.png)  
 [出处](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247487465&idx=1&sn=aace79dcb4edb011cf69e7cd9f7331f9&chksm=a6e30ed2919487c402f20fdda822bc63f057a334e81e8d26e48194f5b679882c627311205bbe&scene=178&cur_album_id=1532487451997454337#rd)
 
-### 4.3. 发送流程
+## 5. 发送流程内核代码跟踪
 
 发送流程也如上跟踪一下。
 
-#### 4.3.1. 获取发送堆栈
+### 5.1. 获取发送堆栈
 
 上面`bpftrace -l |grep -E ':tcp:|sock:inet|skb:'`过滤的几个追踪点，看起来貌似没特别合适跟踪发送数据的。
 
@@ -540,7 +538,7 @@ comm:python, stack:
 
 下面跟踪堆栈到内核代码里看一下。
 
-#### 4.3.2. __sys_sendto
+### 5.2. __sys_sendto
 
 这里的系统调用是`sendto`，man一下`send`或者`sendto`，可看到`sendto`默认后两个参数为零值时即跟`send`是等价的。
 
@@ -622,7 +620,7 @@ int inet_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
 }
 ```
 
-##### 4.3.2.1. 再次分析网络协议初始化
+#### 5.2.1. 再次分析网络协议初始化
 
 上面`sk_prot`对应的具体网络协议(`struct proto`结构)，之前梳理过流程，这里再说明一下加强印象。（初始化相关逻辑对于理清内核网络代码非常重要）
 
@@ -691,7 +689,7 @@ struct proto udp_prot = {
 EXPORT_SYMBOL(udp_prot);
 ```
 
-#### 4.3.3. tcp_sendmsg
+### 5.3. tcp_sendmsg
 
 ```c
 // linux-4.18/net/ipv4/tcp.c
@@ -736,7 +734,7 @@ int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
 
 上述`__tcp_push_pending_frames` 和 `tcp_push_one` 中，都会调用到 `tcp_write_xmit`发送数据。
 
-#### 4.3.4. tcp_write_xmit
+### 5.4. tcp_write_xmit
 
 ```c
 // linux-4.18/net/ipv4/tcp_output.c
@@ -799,7 +797,7 @@ static int __tcp_transmit_skb(struct sock *sk, struct sk_buff *skb,
 }
 ```
 
-##### 4.3.4.1. queue_xmit对应的注册函数
+#### 5.4.1. queue_xmit对应的注册函数
 
 上面`queue_xmit`中注册的函数是`ip_queue_xmit`
 
@@ -845,7 +843,7 @@ const struct inet_connection_sock_af_ops ipv4_specific = {
 };
 ```
 
-#### 4.3.5. 网络层处理：ip_queue_xmit
+### 5.5. 网络层处理：ip_queue_xmit
 
 在网络层里主要处理路由项查找、IP 头设置、netfilter 过滤、skb 切分（大于 MTU 的话）等几项工作，处理完这些工作后会交给更下层的邻居子系统来处理。
 
@@ -873,7 +871,7 @@ int ip_queue_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl)
 }
 ```
 
-#### 4.3.6. ip_local_out：NF_INET_LOCAL_OUT hook
+### 5.6. ip_local_out：NF_INET_LOCAL_OUT hook
 
 ```c
 // linux-4.18/net/ipv4/ip_output.c
@@ -932,7 +930,7 @@ static inline int dst_output(struct net *net, struct sock *sk, struct sk_buff *s
 
 全局搜了下是在linux-4.18/net/ipv4/route.c的`rt_dst_alloc`中进行的赋值，暂不细究注册的流程
 
-#### 4.3.7. ip_output：NF_INET_POST_ROUTING hook
+### 5.7. ip_output：NF_INET_POST_ROUTING hook
 
 ```c
 // linux-4.18/net/ipv4/ip_output.c
@@ -973,14 +971,14 @@ static int ip_finish_output(struct net *net, struct sock *sk, struct sk_buff *sk
 }
 ```
 
-#### 4.3.8. 发送流程小结
+### 5.8. 发送流程小结
 
 基于上述流程可知，Linux在网络包发送的过程中，首先是发送的路由选择，然后碰到的第一个netfilter hook就是`OUTPUT`，然后接着进入`POSTROUTING`链。
 
 ![发送过程的netfilter hook](/images/send-netfilter-hook.png)  
 [出处](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247487465&idx=1&sn=aace79dcb4edb011cf69e7cd9f7331f9&chksm=a6e30ed2919487c402f20fdda822bc63f057a334e81e8d26e48194f5b679882c627311205bbe&scene=178&cur_album_id=1532487451997454337#rd)
 
-## 5. 小结
+## 6. 小结
 
 学习了解了netfilter模块功能、和iptables的关系，并跟踪了内核中TCP网络包接收和发送过程中涉及到的netfileter hook。
 
@@ -988,7 +986,7 @@ static int ip_finish_output(struct net *net, struct sock *sk, struct sk_buff *sk
 
 当前只是简单跟踪流程，并未深入探究详细逻辑，后续基于参考链接再进一步学习，近期先放一放。
 
-## 6. 参考
+## 7. 参考
 
 1、[[译] 深入理解 iptables 和 netfilter 架构](https://arthurchiao.art/blog/deep-dive-into-iptables-and-netfilter-arch-zh)
 
