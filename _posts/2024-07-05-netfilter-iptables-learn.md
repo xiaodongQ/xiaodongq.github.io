@@ -214,7 +214,7 @@ comm:swapper/9, stack:
 
 ### 4.2. 设备层处理
 
-有上面的堆栈后，选取几个关键过程分析，直接参考"[图解Linux网络包接收过程](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247484058&idx=1&sn=a2621bc27c74b313528eefbc81ee8c0f&chksm=a6e303a191948ab7d06e574661a905ddb1fae4a5d9eb1d2be9f1c44491c19a82d95957a0ffb6&scene=21#wechat_redirect)"里的梳理，过程大体是对应的。
+有上面的堆栈后，选取几个关键过程分析，直接参考下"[图解Linux网络包接收过程](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247484058&idx=1&sn=a2621bc27c74b313528eefbc81ee8c0f&chksm=a6e303a191948ab7d06e574661a905ddb1fae4a5d9eb1d2be9f1c44491c19a82d95957a0ffb6&scene=21#wechat_redirect)"里的梳理说明，过程大体是对应的。
 
 ```c
 // linux-4.18/net/core/dev.c
@@ -456,6 +456,22 @@ int ip_local_deliver(struct sk_buff *skb)
 }
 ```
 
+传输层的处理，比如跟踪堆栈中`tcp_v4_rcv`及后续的调用，这里暂不展开分析了，简单过一下。
+
+```c
+static int ip_local_deliver_finish(struct net *net, struct sock *sk, struct sk_buff *skb)
+{
+    ...
+    const struct net_protocol *ipprot;
+    ...
+    ipprot = rcu_dereference(inet_protos[protocol]);
+    ...
+    // 对于TCP这里是tcp_v4_rcv，对应struct net_protocol tcp_protocol等协议初始化注册的接口
+    ret = ipprot->handler(skb);
+    ...
+}
+```
+
 ### 4.6. 接收流程小结
 
 小结上述网络包接收时的netfilter hook，先经过`PREROUTING`，而后经过`INPUT` hook。
@@ -473,7 +489,7 @@ int ip_local_deliver(struct sk_buff *skb)
 
 上面`bpftrace -l |grep -E ':tcp:|sock:inet|skb:'`过滤的几个追踪点，看起来貌似没特别合适跟踪发送数据的。
 
-接收流程我们看到有`tracepoint:net:netif_receive_skb`，到tracefs支持的符号里找下类似的发送追踪点。
+接收流程里我们看到有`tracepoint:net:netif_receive_skb`，到tracefs支持的符号里找下类似的发送追踪点。
 
 * `/sys/kernel/tracing/available_events`里是支持的各类tracepoint
 * `/sys/kernel/tracing/available_filter_functions`里一般是支持的各类kprobe
