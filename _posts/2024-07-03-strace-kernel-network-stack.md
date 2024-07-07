@@ -381,7 +381,7 @@ net.netfilter.nf_log_all_netns = 0
 
 下面记录在CentOS8.5上的几次尝试，都没成功追踪到iptables的日志
 
-#### 3.2.1. CentOS 8.5上的尝试 及 其他系统对比
+#### 3.2.1. CentOS 8.5上的尝试及其他系统对比
 
 CentOS8.5的内核：4.18.0-348.7.1.el8_5.x86_64
 
