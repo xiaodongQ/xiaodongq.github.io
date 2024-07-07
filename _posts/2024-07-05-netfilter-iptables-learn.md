@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 深入学习netfilter和iptables
+title: 深入学习netfilter和iptables（一） -- 跟踪内核流程
 categories: 网络
 tags: TCP netfilter iptables
 ---
@@ -202,7 +202,7 @@ comm:swapper/9, stack:
 ...
 ```
 
-上面堆栈也映证了[图解Linux网络包接收过程](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247484058&idx=1&sn=a2621bc27c74b313528eefbc81ee8c0f&chksm=a6e303a191948ab7d06e574661a905ddb1fae4a5d9eb1d2be9f1c44491c19a82d95957a0ffb6&scene=21#wechat_redirect)里的分析流程图：
+上面堆栈也映证了"[图解Linux网络包接收过程](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247484058&idx=1&sn=a2621bc27c74b313528eefbc81ee8c0f&chksm=a6e303a191948ab7d06e574661a905ddb1fae4a5d9eb1d2be9f1c44491c19a82d95957a0ffb6&scene=21#wechat_redirect)"里的分析流程图：
 
 软中断处理：  
 ![ksoftirqd线程处理](/images/ksoftirqd_net_process.png)
@@ -216,7 +216,7 @@ comm:swapper/9, stack:
 
 #### 4.2.1. 设备层处理
 
-有上面的堆栈后，选取几个关键过程分析，直接参考[图解Linux网络包接收过程](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247484058&idx=1&sn=a2621bc27c74b313528eefbc81ee8c0f&chksm=a6e303a191948ab7d06e574661a905ddb1fae4a5d9eb1d2be9f1c44491c19a82d95957a0ffb6&scene=21#wechat_redirect)里的梳理，过程大体是对应的。
+有上面的堆栈后，选取几个关键过程分析，直接参考"[图解Linux网络包接收过程](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247484058&idx=1&sn=a2621bc27c74b313528eefbc81ee8c0f&chksm=a6e303a191948ab7d06e574661a905ddb1fae4a5d9eb1d2be9f1c44491c19a82d95957a0ffb6&scene=21#wechat_redirect)"里的梳理，过程大体是对应的。
 
 ```c
 // linux-4.18/net/core/dev.c
@@ -235,7 +235,8 @@ static int __netif_receive_skb_core(struct sk_buff *skb, bool pfmemalloc)
     trace_netif_receive_skb(skb);
     ...
 
-    // pcap逻辑，&ptype_all、&skb->dev->ptype_all 这里会将数据送入抓包点。tcpdump就是从这个入口获取包的
+    // &ptype_all、&skb->dev->ptype_all 这里会将数据送入抓包点。
+    // tcpdump就是从这个入口获取包的
     list_for_each_entry_rcu(ptype, &ptype_all, list) {
         if (pt_prev)
             // 从数据包中取出协议信息，然后遍历注册在这个协议上的回调函数列表
@@ -275,9 +276,9 @@ struct packet_type {
     __be16          type;   /* This is really htons(ether_type). */
     struct net_device *dev; /* NULL is wildcarded here	     */
     int             (*func) (struct sk_buff *,
-                     struct net_device *,
-                     struct packet_type *,
-                     struct net_device *);
+                        struct net_device *,
+                        struct packet_type *,
+                        struct net_device *);
     bool            (*id_match)(struct packet_type *ptype,
                         struct sock *sk);
     void            *af_packet_priv;
@@ -285,7 +286,7 @@ struct packet_type {
 };
 ```
 
-#### 4.2.2. IP层ip_rcv注册时机
+#### 4.2.2. 网络层ip_rcv注册时机
 
 上面`deliver_skb(xxx)`中调用的`pt_prev->func()`，其中的`func`就是网络子系统`inet_init()`初始化时，注册的IP网络层处理函数
 
@@ -398,7 +399,7 @@ IPv6的netfilter hooks：
 
 #### 4.2.4. ip_rcv_finish
 
-上面执行完`NF_INET_PRE_ROUTING` hook后，进入 ip_rcv_finish 函数处理
+上面执行完`NF_INET_PRE_ROUTING` hook后，进入 `ip_rcv_finish` 函数处理
 
 ```c
 // linux-4.18/net/ipv4/ip_input.c
@@ -459,7 +460,7 @@ int ip_local_deliver(struct sk_buff *skb)
 
 #### 4.2.5. 接收流程小结
 
-小节下上述网络包接收时的netfilter hook，先经过`PREROUTING`，而后经过`INPUT` hook。
+小结上述网络包接收时的netfilter hook，先经过`PREROUTING`，而后经过`INPUT` hook。
 
 简单总结接收数据的处理流程是：PREROUTING链 -> 路由判断（是本机）-> INPUT链 -> ...
 
@@ -616,13 +617,14 @@ int inet_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
     struct sock *sk = sock->sk;
     ...
     // sk_prot 的定义：#define sk_prot	__sk_common.skc_prot（对应的结构是：struct proto *skc_prot; 这里会进行协议接口区分）
+    // 对于TCP协议的，此处注册为 tcp_sendmsg 接口，具体可见下面小节的梳理
     return sk->sk_prot->sendmsg(sk, msg, size);
 }
 ```
 
 ##### 4.3.2.1. 再次分析网络协议初始化
 
-上面`sk_prot`对应的具体网络协议(`struct proto`结构)，之前梳理过流程，这里再说明一下加强印象。（初始化相关逻辑对于梳理内核网络代码非常重要，个人经常要去翻对应的具体接口）
+上面`sk_prot`对应的具体网络协议(`struct proto`结构)，之前梳理过流程，这里再说明一下加强印象。（初始化相关逻辑对于理清内核网络代码非常重要）
 
 * af_inet.c中`inet_init`初始化网络时，遍历`inetsw_array`全局数组进行各类网络协议注册
 * 其中的`.prot`里是具体协议，如TCP、UDP。这里的"具体协议"都是`struct proto`结构的实例，不同协议各自定义了一个`struct proto`全局变量用于注册
@@ -689,18 +691,302 @@ struct proto udp_prot = {
 EXPORT_SYMBOL(udp_prot);
 ```
 
-#### 4.3.3. sock_sendmsg
+#### 4.3.3. tcp_sendmsg
 
+```c
+// linux-4.18/net/ipv4/tcp.c
+int tcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
+{
+    int ret;
 
+    lock_sock(sk);
+    ret = tcp_sendmsg_locked(sk, msg, size);
+    release_sock(sk);
 
+    return ret;
+}
 
+// linux-4.18/net/ipv4/tcp.c
+int tcp_sendmsg_locked(struct sock *sk, struct msghdr *msg, size_t size)
+{
+    struct tcp_sock *tp = tcp_sk(sk);
+    struct ubuf_info *uarg = NULL;
+    struct sk_buff *skb;
+    ...
+    while (msg_data_left(msg)) {
+        int copy = 0;
 
-和上述接收流程类似分析
+        // 获取发送队列
+        skb = tcp_write_queue_tail(sk);
+        if (skb)
+            copy = size_goal - skb->len;
+        ...
+        // 只有满足下面2个条件之一，内核才会真正启动发送数据包
+        // 这里判断的是未发送的数据数据是否已经超过最大窗口的一半
+        if (forced_push(tp)) {
+            tcp_mark_push(tp, skb);
+            __tcp_push_pending_frames(sk, mss_now, TCP_NAGLE_PUSH);
+        } else if (skb == tcp_send_head(sk))
+            tcp_push_one(sk, mss_now);
+        ...
+    }
+    ...
+}
+```
 
-![发送时的netfilter hook](/images/send-netfilter-hook.png)
+上述`__tcp_push_pending_frames` 和 `tcp_push_one` 中，都会调用到 `tcp_write_xmit`发送数据。
+
+#### 4.3.4. tcp_write_xmit
+
+```c
+// linux-4.18/net/ipv4/tcp_output.c
+static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
+               int push_one, gfp_t gfp)
+{
+    struct tcp_sock *tp = tcp_sk(sk);
+    struct sk_buff *skb;
+    ...
+    while ((skb = tcp_send_head(sk))) {
+        // 真正开启发送
+        if (unlikely(tcp_transmit_skb(sk, skb, 1, gfp)))
+            break;
+        ...
+    }
+}
+
+// linux-4.18/net/ipv4/tcp_output.c
+static int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb, int clone_it,
+                gfp_t gfp_mask)
+{
+    return __tcp_transmit_skb(sk, skb, clone_it, gfp_mask,
+                  tcp_sk(sk)->rcv_nxt);
+}
+```
+
+`__tcp_transmit_skb`即上述调用栈中的打印的接口，逻辑如下：
+
+```c
+// linux-4.18/net/ipv4/tcp_output.c
+static int __tcp_transmit_skb(struct sock *sk, struct sk_buff *skb,
+                  int clone_it, gfp_t gfp_mask, u32 rcv_nxt)
+{
+    const struct inet_connection_sock *icsk = inet_csk(sk);
+    struct inet_sock *inet;
+    struct tcp_sock *tp;
+    struct tcp_skb_cb *tcb;
+    ...
+    tp = tcp_sk(sk);
+
+    // 1.克隆新 skb 出来
+    if (clone_it) {
+        TCP_SKB_CB(skb)->tx.in_flight = TCP_SKB_CB(skb)->end_seq
+            - tp->snd_una;
+        oskb = skb;
+        ...
+        skb = skb_clone(oskb, gfp_mask);
+    }
+    ...
+    // 2.封装 TCP 头
+    /* Build TCP header and checksum it. */
+    th = (struct tcphdr *)skb->data;
+    th->source		= inet->inet_sport;
+    th->dest		= inet->inet_dport;
+    th->seq			= htonl(tcb->seq);
+    ...
+    // 3.调用网络层发送接口
+    err = icsk->icsk_af_ops->queue_xmit(sk, skb, &inet->cork.fl);
+    ...
+}
+```
+
+##### 4.3.4.1. queue_xmit对应的注册函数
+
+上面`queue_xmit`中注册的函数是`ip_queue_xmit`
+
+我们在"[TCP半连接全连接（二） -- 半连接队列代码逻辑](https://xiaodongq.github.io/2024/05/30/tcp_syn_queue/)"中梳理过，面向连接的sock相关的初始化。这里再贴一下：
+
+`inet_init`初始化网络协议->注册TCP协议(`struct proto tcp_prot`)
+
+注册的init接口为： `.init = tcp_v4_init_sock,`，其中会指定tcp协议socket连接的处理接口`ipv4_specific`
+
+```c
+// linux-5.10.10/net/ipv4/tcp_ipv4.c
+static int tcp_v4_init_sock(struct sock *sk)
+{
+    struct inet_connection_sock *icsk = inet_csk(sk);
+
+    tcp_init_sock(sk);
+
+    icsk->icsk_af_ops = &ipv4_specific;
+
+#ifdef CONFIG_TCP_MD5SIG
+    tcp_sk(sk)->af_specific = &tcp_sock_ipv4_specific;
+#endif
+
+    return 0;
+}
+```
+
+```cpp
+// linux-5.10.10/net/ipv4/tcp_ipv4.c（之前看的是5.10内核，此处4.18结构是一样的）
+const struct inet_connection_sock_af_ops ipv4_specific = {
+    // 发送数据的函数。用于将数据从传输层（TCP）发送到网络层（IP）
+    .queue_xmit	   = ip_queue_xmit,
+    // 用于计算校验和的函数
+    .send_check	   = tcp_v4_send_check,
+    .rebuild_header	   = inet_sk_rebuild_header,
+    .sk_rx_dst_set	   = inet_sk_rx_dst_set,
+    // 处理SYN段的函数。在TCP三次握手的开始阶段被调用，用于处理来自客户端的SYN包
+    .conn_request	   = tcp_v4_conn_request,
+    // 创建和初始化新socket的函数。在TCP三次握手完成后被调用，用于为新的连接创建一个传输控制块（TCB）并初始化它
+    .syn_recv_sock	   = tcp_v4_syn_recv_sock,
+    .net_header_len	   = sizeof(struct iphdr),
+    ...
+};
+```
+
+#### 4.3.5. 网络层处理：ip_queue_xmit
+
+在网络层里主要处理路由项查找、IP 头设置、netfilter 过滤、skb 切分（大于 MTU 的话）等几项工作，处理完这些工作后会交给更下层的邻居子系统来处理。
+
+这里暂不细看，详情可跟着参考链接的流程分析。
+
+```c
+// linux-4.18/net/ipv4/ip_output.c
+int ip_queue_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl)
+{
+    struct inet_sock *inet = inet_sk(sk);
+    struct net *net = sock_net(sk);
+    ...
+    // 检查 socket 中是否有缓存的路由表；没有时会查找路由项并缓存到socket中
+    rt = (struct rtable *)__sk_dst_check(sk, 0);
+    ...
+    // 为 skb 设置路由表
+    skb_dst_set_noref(skb, &rt->dst);
+    ...
+    // 设置 IP 头
+    iph = ip_hdr(skb);
+    ...
+    // 发送
+    res = ip_local_out(net, sk, skb);
+    ...
+}
+```
+
+#### 4.3.6. ip_local_out：NF_INET_LOCAL_OUT hook
+
+```c
+// linux-4.18/net/ipv4/ip_output.c
+int ip_local_out(struct net *net, struct sock *sk, struct sk_buff *skb)
+{
+    int err;
+
+    err = __ip_local_out(net, sk, skb);
+    if (likely(err == 1))
+        err = dst_output(net, sk, skb);
+
+    return err;
+}
+// 可通过kprobe跟踪到
+EXPORT_SYMBOL_GPL(ip_local_out);
+```
+
+到这里，终于找到netfilter hook了，此处为`NF_INET_LOCAL_OUT`
+
+```c
+// linux-4.18/net/ipv4/ip_output.c
+int __ip_local_out(struct net *net, struct sock *sk, struct sk_buff *skb)
+{
+    struct iphdr *iph = ip_hdr(skb);
+
+    iph->tot_len = htons(skb->len);
+    ip_send_check(iph);
+
+    /* if egress device is enslaved to an L3 master device pass the
+     * skb to its handler for processing
+     */
+    skb = l3mdev_ip_out(sk, skb);
+    if (unlikely(!skb))
+        return 0;
+
+    skb->protocol = htons(ETH_P_IP);
+
+    // 这里是netfilter hook：NF_INET_LOCAL_OUT
+    return nf_hook(NFPROTO_IPV4, NF_INET_LOCAL_OUT,
+               net, sk, skb, NULL, skb_dst(skb)->dev,
+               dst_output);
+}
+```
+
+这里再看下钩子结束后调用的`dst_output`
+
+```c
+/* Output packet to network from transport.  */
+static inline int dst_output(struct net *net, struct sock *sk, struct sk_buff *skb)
+{
+    return skb_dst(skb)->output(net, sk, skb);
+}
+```
+
+根据eBPF追踪打印的调用栈，`output`对应的应该是`ip_output`
+
+全局搜了下是在linux-4.18/net/ipv4/route.c的`rt_dst_alloc`中进行的赋值，暂不细究注册的流程
+
+#### 4.3.7. ip_output：NF_INET_POST_ROUTING hook
+
+```c
+// linux-4.18/net/ipv4/ip_output.c
+int ip_output(struct net *net, struct sock *sk, struct sk_buff *skb)
+{
+    struct net_device *dev = skb_dst(skb)->dev;
+
+    IP_UPD_PO_STATS(net, IPSTATS_MIB_OUT, skb->len);
+
+    skb->dev = dev;
+    skb->protocol = htons(ETH_P_IP);
+
+    return NF_HOOK_COND(NFPROTO_IPV4, NF_INET_POST_ROUTING,
+                net, sk, skb, NULL, dev,
+                ip_finish_output,
+                !(IPCB(skb)->flags & IPSKB_REROUTED));
+}
+```
+
+简单看下`ip_finish_output`，可看到如果数据大于 MTU 的话，是会执行分片的
+
+```c
+// linux-4.18/net/ipv4/ip_output.c
+static int ip_finish_output(struct net *net, struct sock *sk, struct sk_buff *skb)
+{
+    unsigned int mtu;
+    int ret;
+    ...
+    mtu = ip_skb_dst_mtu(sk, skb);
+    if (skb_is_gso(skb))
+        return ip_finish_output_gso(net, sk, skb, mtu);
+
+    if (skb->len > mtu || (IPCB(skb)->flags & IPSKB_FRAG_PMTU))
+        // ip分片
+        return ip_fragment(net, sk, skb, mtu, ip_finish_output2);
+
+    return ip_finish_output2(net, sk, skb);
+}
+```
+
+#### 4.3.8. 发送流程小结
+
+基于上述流程可知，Linux在网络包发送的过程中，首先是发送的路由选择，然后碰到的第一个netfilter hook就是`OUTPUT`，然后接着进入`POSTROUTING`链。
+
+![发送过程的netfilter hook](/images/send-netfilter-hook.png)  
+[出处](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247487465&idx=1&sn=aace79dcb4edb011cf69e7cd9f7331f9&chksm=a6e30ed2919487c402f20fdda822bc63f057a334e81e8d26e48194f5b679882c627311205bbe&scene=178&cur_album_id=1532487451997454337#rd)
 
 ## 5. 小结
 
+学习了解了netfilter模块功能、和iptables的关系，并跟踪了内核中TCP网络包接收和发送过程中涉及到的netfileter hook。
+
+本篇贴了较多源码导致篇幅过大（但有价值，便于以后快速定位），tcpdump和iptables的学习梳理单独作为一篇。
+
+当前只是简单跟踪流程，并未深入探究详细逻辑，后续基于参考链接再进一步学习，近期先放一放。
 
 ## 6. 参考
 
