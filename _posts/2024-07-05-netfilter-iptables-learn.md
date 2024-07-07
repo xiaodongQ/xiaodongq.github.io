@@ -172,15 +172,15 @@ comm:swapper/9, stack:
         # linux-4.18/net/ipv4/ip_input.c
         ip_rcv+635
         # 网络协议栈收到skb，依次向上面的各协议调用栈传递
-        # linux-4.18/net/core/dev.c
+        # linux-4.18/net/core/dev.c，声明为static int __netif_receive_skb_core(struct sk_buff *skb, bool pfmemalloc)
         __netif_receive_skb_core+2963
         # 数据包将被送到协议栈中
         # linux-4.18/net/core/dev.c
         netif_receive_skb_internal+61
         # 网卡GRO特性，理解成把相关的小包合并成一个大包，目的是减少传送给网络栈的包数
-        # linux-4.18/net/core/dev.c
+        # linux-4.18/net/core/dev.c，声明为napi_gro_receive(struct napi_struct *napi, struct sk_buff *skb)，传入已经是skb了
         napi_gro_receive+186
-        # 网卡驱动注册的poll
+        # 网卡驱动注册的poll，这里面抽取数据成 struct sk_buff *skb
         # linux-4.18/drivers/net/ethernet/realtek/r8169.c
         rtl8169_poll+667
         __napi_poll+45
@@ -260,16 +260,16 @@ static inline int deliver_skb(struct sk_buff *skb,
 ```c
 // linux-4.18/include/linux/netdevice.h
 struct packet_type {
-    __be16			type;	/* This is really htons(ether_type). */
-    struct net_device	*dev;	/* NULL is wildcarded here	     */
-    int			(*func) (struct sk_buff *,
+    __be16          type;   /* This is really htons(ether_type). */
+    struct net_device *dev; /* NULL is wildcarded here	     */
+    int             (*func) (struct sk_buff *,
                      struct net_device *,
                      struct packet_type *,
                      struct net_device *);
-    bool			(*id_match)(struct packet_type *ptype,
+    bool            (*id_match)(struct packet_type *ptype,
                         struct sock *sk);
-    void			*af_packet_priv;
-    struct list_head	list;
+    void            *af_packet_priv;
+    struct list_head    list;
 };
 ```
 
@@ -331,8 +331,11 @@ drop:
 out:
     return NET_RX_DROP;
 }
+```
 
-hook类型看起来和上面netfilter介绍时的没完全对应起来。检索下可知是IPv4和IPv6各自定义了宏跟hook枚举值对应，实际是一样的。  
+这里`NF_HOOK`是一个钩子函数，当执行完注册的钩子后就会执行到最后一个参数指向的函数`ip_rcv_finish`。
+
+hook类型看起来和上面netfilter介绍时的没完全对应起来。检索下代码可知是IPv4和IPv6各自定义了宏跟hook枚举值对应，实际的值是一样的。  
 而上面介绍时也只是放了IPv4的hook。
 
 ```c
@@ -381,6 +384,66 @@ IPv6的netfilter hooks：
 /* Packets about to hit the wire. */
 #define NF_IP6_POST_ROUTING	4
 #define NF_IP6_NUMHOOKS		5
+```
+
+#### 4.3.3. ip_rcv_finish
+
+上面执行完`NF_INET_PRE_ROUTING` hook后的 ip_rcv_finish 处理
+
+```c
+// linux-4.18/net/ipv4/ip_input.c
+static int ip_rcv_finish(struct net *net, struct sock *sk, struct sk_buff *skb)
+{
+    const struct iphdr *iph = ip_hdr(skb);
+    int (*edemux)(struct sk_buff *skb);
+    struct net_device *dev = skb->dev;
+    struct rtable *rt;
+    int err;
+    ...
+    // 处理input，rt_dst_alloc 时(route.c)，input函数注册为了 ip_local_deliver
+    return dst_input(skb);
+
+    ...
+drop:
+    kfree_skb(skb);
+    return NET_RX_DROP;
+
+drop_error:
+    if (err == -EXDEV)
+        __NET_INC_STATS(net, LINUX_MIB_IPRPFILTER);
+    goto drop;
+}
+```
+
+```c
+// linux-4.18/include/net/dst.h
+/* Input packet from network to transport.  */
+static inline int dst_input(struct sk_buff *skb)
+{
+    return skb_dst(skb)->input(skb);
+}
+```
+
+上面的input处理函数，实际调用到 `ip_local_deliver`，可看到这里又有个hook：`NF_INET_LOCAL_IN`
+
+```c
+// linux-4.18/net/ipv4/ip_input.c
+int ip_local_deliver(struct sk_buff *skb)
+{
+    /*
+     *	Reassemble IP fragments.
+     */
+    struct net *net = dev_net(skb->dev);
+
+    if (ip_is_fragment(ip_hdr(skb))) {
+        if (ip_defrag(net, skb, IP_DEFRAG_LOCAL_DELIVER))
+            return 0;
+    }
+
+    return NF_HOOK(NFPROTO_IPV4, NF_INET_LOCAL_IN,
+               net, NULL, skb, skb->dev, NULL,
+               ip_local_deliver_finish);
+}
 ```
 
 ## 5. 小结
