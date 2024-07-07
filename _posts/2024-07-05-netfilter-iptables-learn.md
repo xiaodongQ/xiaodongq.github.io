@@ -86,7 +86,7 @@ netfilter提供了`5`个hook点，这些在内核协议栈中已经定义好了�
 * `NF_IP_LOCAL_OUT`：本机产生的准备发送的包，在进入协议栈后立即触发此 hook
 * `NF_IP_POST_ROUTING`：本机产生的准备发送的包或者转发的包，在经过路由判断之后， 将触发此 hook
 
-内核协议栈各hook点位置和控制流如下图所示（来自[Wikipedia](https://upload.wikimedia.org/wikipedia/commons/3/37/netfilter-packet-flow.svg)）：
+内核协议栈各hook点位置和控制流如下图所示（来自[Wikipedia](https://upload.wikimedia.org/wikipedia/commons/3/37/Netfilter-packet-flow.svg)）：
 
 ![netfilter各hook点和控制流](/images/netfilter-packet-flow.svg)
 
@@ -145,7 +145,7 @@ tracepoint:tcp:tcp_send_reset
 
 方法：用bpftrace启动eBPF跟踪，服务端`python -m http.server`起一个服务，并通过客户端`curl 192.168.1.150:8000`。
 
-截取一个网络接收的堆栈如下：
+截取一个网络接收的堆栈如下（从下到上）：
 
 ```sh
 [root@xdlinux ➜ ~ ]$ bpftrace -e 'tracepoint:sock:inet_sock_set_state { printf("comm:%s, stack:%s\n", comm, kstack); }'
@@ -202,7 +202,19 @@ comm:swapper/9, stack:
 ...
 ```
 
-### 4.2. 接收数据前置处理
+上面堆栈也映证了[图解Linux网络包接收过程](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247484058&idx=1&sn=a2621bc27c74b313528eefbc81ee8c0f&chksm=a6e303a191948ab7d06e574661a905ddb1fae4a5d9eb1d2be9f1c44491c19a82d95957a0ffb6&scene=21#wechat_redirect)里的分析流程图：
+
+软中断处理：  
+![ksoftirqd线程处理](/images/ksoftirqd_net_process.png)
+
+网络协议栈处理：  
+![网络协议栈处理](/images/net-protocol-rcv-process.png)
+
+下面先分析下内核代码中网络包接收流程涉及的hook处理
+
+### 4.2. 接收流程
+
+#### 4.2.1. 接收数据前置处理（设备层）
 
 有上面的堆栈后，选取几个关键过程分析，直接参考[图解Linux网络包接收过程](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247484058&idx=1&sn=a2621bc27c74b313528eefbc81ee8c0f&chksm=a6e303a191948ab7d06e574661a905ddb1fae4a5d9eb1d2be9f1c44491c19a82d95957a0ffb6&scene=21#wechat_redirect)里的梳理，过程大体是对应的。
 
@@ -273,9 +285,7 @@ struct packet_type {
 };
 ```
 
-### 4.3. IP网络层
-
-#### 4.3.1. ip_rcv注册时机
+#### 4.2.2. IP协议层接收处理，ip_rcv注册时机
 
 上面`deliver_skb(xxx)`中调用的`pt_prev->func()`，其中的`func`就是网络子系统`inet_init()`初始化时，注册的IP网络层处理函数
 
@@ -304,7 +314,7 @@ static struct packet_type ip_packet_type __read_mostly = {
 };
 ```
 
-#### 4.3.2. ip_rcv逻辑
+#### 4.2.3. ip_rcv逻辑
 
 继续看一下IP层的处理逻辑 `ip_rcv`，可看到`NF_INET_PRE_ROUTING`这个hook
 
@@ -386,9 +396,9 @@ IPv6的netfilter hooks：
 #define NF_IP6_NUMHOOKS		5
 ```
 
-#### 4.3.3. ip_rcv_finish
+#### 4.2.4. ip_rcv_finish
 
-上面执行完`NF_INET_PRE_ROUTING` hook后的 ip_rcv_finish 处理
+上面执行完`NF_INET_PRE_ROUTING` hook后，进入 ip_rcv_finish 函数处理
 
 ```c
 // linux-4.18/net/ipv4/ip_input.c
@@ -424,7 +434,7 @@ static inline int dst_input(struct sk_buff *skb)
 }
 ```
 
-上面的input处理函数，实际调用到 `ip_local_deliver`，可看到这里又有个hook：`NF_INET_LOCAL_IN`
+上面的`input`处理函数，实际调用到 `ip_local_deliver`，可看到这里又有个hook：`NF_INET_LOCAL_IN`
 
 ```c
 // linux-4.18/net/ipv4/ip_input.c
@@ -440,11 +450,254 @@ int ip_local_deliver(struct sk_buff *skb)
             return 0;
     }
 
+    // netfilter hook: NF_INET_LOCAL_IN
     return NF_HOOK(NFPROTO_IPV4, NF_INET_LOCAL_IN,
                net, NULL, skb, skb->dev, NULL,
                ip_local_deliver_finish);
 }
 ```
+
+#### 4.2.5. 接收流程小结
+
+小节下上述网络包接收时的netfilter hook，先经过`PREROUTING`，而后经过`INPUT` hook。
+
+简单总结接收数据的处理流程是：PREROUTING链 -> 路由判断（是本机）-> INPUT链 -> ...
+
+![接收过程netfilter hook](/images/receive-netfilter-hook.png)  
+[出处](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247487465&idx=1&sn=aace79dcb4edb011cf69e7cd9f7331f9&chksm=a6e30ed2919487c402f20fdda822bc63f057a334e81e8d26e48194f5b679882c627311205bbe&scene=178&cur_album_id=1532487451997454337#rd)
+
+### 4.3. 发送流程
+
+发送流程也如上跟踪一下。
+
+#### 4.3.1. 获取发送堆栈
+
+上面`bpftrace -l |grep -E ':tcp:|sock:inet|skb:'`过滤的几个追踪点，看起来貌似没特别合适跟踪发送数据的。
+
+接收流程我们看到有`tracepoint:net:netif_receive_skb`，到tracefs支持的符号里找下类似的发送追踪点。
+
+* `/sys/kernel/tracing/available_events`里是支持的各类tracepoint
+* `/sys/kernel/tracing/available_filter_functions`里一般是支持的各类kprobe
+
+优先选择tracepoint，看`netif_receive_skb`附近的`net_dev_xmit`是设备层发送数据的，先跟踪看下
+
+```sh
+# available_events 文件内容截取
+...
+net:netif_rx
+net:netif_receive_skb
+net:net_dev_queue
+net:net_dev_xmit_timeout
+net:net_dev_xmit
+net:net_dev_start_xmit
+skb:skb_copy_datagram_iovec
+skb:consume_skb
+skb:kfree_skb
+...
+```
+
+仍旧是上面的方法：用bpftrace启动eBPF跟踪，服务端`python -m http.server`起一个服务，并通过客户端`curl 192.168.1.150:8000`。
+
+这里加个python进程的pid过滤条件，追踪堆栈信息截取如下（从下到上）：
+
+```sh
+[root@xdlinux ➜ tracing ]$ bpftrace -e 'tracepoint:net:net_dev_xmit /pid==1569531/ { printf("comm:%s, stack:%s\n", comm, kstack); }'
+Attaching 1 probe...
+comm:python, stack:
+        dev_hard_start_xmit+394
+        # 调用驱动程序来发送数据
+        dev_hard_start_xmit+394
+        sch_direct_xmit+159
+        # 通过网络设备子系统发送数据
+        __dev_queue_xmit+2140
+        ip_finish_output2+738
+        ip_output+112
+        # 网络层发送数据
+        __ip_queue_xmit+349
+        __tcp_transmit_skb+1362
+        # 传输层发送数据
+        tcp_write_xmit+1077
+        __tcp_push_pending_frames+50
+        tcp_sendmsg_locked+3128
+        # TCP协议注册的sendmsg函数为tcp_sendmsg，具体见下面网络协议初始化小节的分析
+        tcp_sendmsg+39
+        # 系统调用里会调到 sock_sendmsg，里面会调用到具体协议的 sendmsg
+        sock_sendmsg+62
+        # 实际调用到__sys_sendto
+        __sys_sendto+238
+        __x64_sys_sendto+36
+        # 用户态进行系统调用
+        do_syscall_64+91
+        entry_SYSCALL_64_after_hwframe+101
+```
+
+这里的堆栈映证[25 张图，一万字，拆解 Linux 网络包发送过程](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247485146&idx=1&sn=e5bfc79ba915df1f6a8b32b87ef0ef78&chksm=a6e307e191948ef748dc73a4b9a862a22ce1db806a486afce57475d4331d905827d6ca161711&scene=178&cur_album_id=1532487451997454337#rd)里的流程分析图一起查看：
+
+![网络包发送过程](/images/net-send-process.png)
+
+虽然堆栈和上述流程图没有全部一一对应，但总体流程差别不大，具体可查看原文及源码跟踪。
+
+下面跟踪堆栈到内核代码里看一下。
+
+#### 4.3.2. __sys_sendto
+
+这里的系统调用是`sendto`，man一下`send`或者`sendto`，可看到`sendto`默认后两个参数为零值时即跟`send`是等价的。
+
+```sh
+DESCRIPTION
+    The  system  calls  send(), sendto(), and sendmsg() are used to transmit a message to
+    another socket.
+
+    The send() call may be used only when the socket is in a connected state (so that the
+    intended recipient is known).  The only difference between send() and write(2) is the
+    presence of flags.  With a zero flags argument, send()  is  equivalent  to  write(2).
+    Also, the following call
+        send(sockfd, buf, len, flags);
+
+    is equivalent to
+        sendto(sockfd, buf, len, flags, NULL, 0);
+```
+
+```c
+// linux-4.18/net/socket.c
+int __sys_sendto(int fd, void __user *buff, size_t len, unsigned int flags,
+         struct sockaddr __user *addr,  int addr_len)
+{
+    struct socket *sock;
+    struct sockaddr_storage address;
+    ...
+    // 根据fd找到socket
+    sock = sockfd_lookup_light(fd, &err, &fput_needed);
+    if (!sock)
+        goto out;
+
+    ...
+    // 调用到 sock_sendmsg
+    err = sock_sendmsg(sock, &msg);
+    ...
+}
+```
+
+```c
+// linux-4.18/net/socket.c
+int sock_sendmsg(struct socket *sock, struct msghdr *msg)
+{
+    // 安全相关校验，暂不关注
+    int err = security_socket_sendmsg(sock, msg,
+                      msg_data_left(msg));
+
+    return err ?: sock_sendmsg_nosec(sock, msg);
+}
+
+static inline int sock_sendmsg_nosec(struct socket *sock, struct msghdr *msg)
+{
+    // socket注册的相应 sendmsg 函数
+    int ret = sock->ops->sendmsg(sock, msg, msg_data_left(msg));
+    BUG_ON(ret == -EIOCBQUEUED);
+    return ret;
+}
+```
+
+查看af_inet.c的协议初始化，对于TCP(stream)、UDP(dgram)、RAW类型的协议，虽然`sendmsg`操作都初始化为`inet_sendmsg`，但`inet_sendmsg`里还有一层，里面会按具体网络协议区分处理函数。
+
+```c
+// linux-4.18/net/ipv4/af_inet.c
+const struct proto_ops inet_stream_ops = {
+    .family		   = PF_INET,
+    ...
+    .sendmsg	   = inet_sendmsg,
+    ...
+}
+```
+
+```c
+int inet_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
+{
+    struct sock *sk = sock->sk;
+    ...
+    // sk_prot 的定义：#define sk_prot	__sk_common.skc_prot（对应的结构是：struct proto *skc_prot; 这里会进行协议接口区分）
+    return sk->sk_prot->sendmsg(sk, msg, size);
+}
+```
+
+##### 4.3.2.1. 再次分析网络协议初始化
+
+上面`sk_prot`对应的具体网络协议(`struct proto`结构)，之前梳理过流程，这里再说明一下再加强下印象。（这几个初始化对于梳理内核网络代码非常重要，对自己而言经常要去翻对应的具体接口）
+
+* af_inet.c中`inet_init`初始化网络时，遍历`inetsw_array`全局数组进行各类网络协议注册
+* 其中的`.prot`里是具体协议，如TCP、UDP。这里的"具体协议"都是`struct proto`结构的实例，不同协议各自定义了一个`struct proto`全局变量用于注册
+    * `struct proto`里定义了一堆函数指针（linux-4.18/include/net/sock.h中）
+    * 比如下面TCP协议，对应协议实例为：`struct proto tcp_prot`
+
+```c
+// linux-4.18/net/ipv4/af_inet.c
+static struct inet_protosw inetsw_array[] =
+{
+    {
+        .type =       SOCK_STREAM,
+        .protocol =   IPPROTO_TCP,
+        .prot =       &tcp_prot,
+        .ops =        &inet_stream_ops,
+        .flags =      INET_PROTOSW_PERMANENT |
+                  INET_PROTOSW_ICSK,
+    },
+    {
+        .type =       SOCK_DGRAM,
+        .protocol =   IPPROTO_UDP,
+        .prot =       &udp_prot,
+        .ops =        &inet_dgram_ops,
+        .flags =      INET_PROTOSW_PERMANENT,
+    },
+    ...
+};
+```
+
+```c
+// linux-4.18/net/ipv4/tcp_ipv4.c
+// 这里是定义一个`struct proto`实例，并初始化各种操作接口，用于指代TCP协议，网络初始化时会进行注册
+struct proto tcp_prot = {
+    .name           = "TCP",
+    .owner          = THIS_MODULE,
+    .close          = tcp_close,
+    .pre_connect    = tcp_v4_pre_connect,
+    .connect        = tcp_v4_connect,
+    ...
+    .recvmsg        = tcp_recvmsg,
+    .sendmsg        = tcp_sendmsg,
+    ...
+}
+EXPORT_SYMBOL(tcp_prot);
+```
+
+**于是，就知道上面TCP协议后面会调用到`tcp_sendmsg`，跟堆栈一致。**
+
+作为对比，把UDP协议实例也贴一下
+
+```c
+struct proto udp_prot = {
+    .name           = "UDP",
+    .owner          = THIS_MODULE,
+    .close          = udp_lib_close,
+    .pre_connect    = udp_pre_connect,
+    .connect        = ip4_datagram_connect,
+    .disconnect     = udp_disconnect,
+    ...
+    .sendmsg        = udp_sendmsg,
+    .recvmsg        = udp_recvmsg,
+    ...
+}
+EXPORT_SYMBOL(udp_prot);
+```
+
+#### 4.3.3. sock_sendmsg
+
+
+
+
+
+和上述接收流程类似分析
+
+![发送时的netfilter hook](/images/send-netfilter-hook.png)
 
 ## 5. 小结
 
@@ -463,4 +716,6 @@ int ip_local_deliver(struct sk_buff *skb)
 
 6、[图解Linux网络包接收过程](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247484058&idx=1&sn=a2621bc27c74b313528eefbc81ee8c0f&chksm=a6e303a191948ab7d06e574661a905ddb1fae4a5d9eb1d2be9f1c44491c19a82d95957a0ffb6&scene=21#wechat_redirect)
 
-7、GPT
+7、[25 张图，一万字，拆解 Linux 网络包发送过程](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247485146&idx=1&sn=e5bfc79ba915df1f6a8b32b87ef0ef78&chksm=a6e307e191948ef748dc73a4b9a862a22ce1db806a486afce57475d4331d905827d6ca161711&scene=178&cur_album_id=1532487451997454337#rd)
+
+8、GPT
