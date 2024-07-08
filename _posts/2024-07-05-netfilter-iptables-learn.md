@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 深入学习netfilter和iptables（一） -- 跟踪内核流程
+title: TCP发送接收过程（三） -- 深入学习netfilter和iptables
 categories: 网络
 tags: TCP netfilter iptables
 ---
@@ -8,7 +8,7 @@ tags: TCP netfilter iptables
 * content
 {:toc}
 
-深入学习netfilter和iptables，梳理TCP发送接收过程
+netfilter作为网络协议栈非常关键的一部分，本篇深入学习netfilter和iptables，有助于理解TCP发送接收过程
 
 
 
@@ -22,7 +22,7 @@ tags: TCP netfilter iptables
 
 这些问题都或多或少，或直接或间接跟**内核中的netfilter框架**有关系。
 
-基于上述几个原因，深入学习一下`netfilter`框架和基于其实现的`iptables`，以及tcpdump抓包跟`netfilter`的关系。
+基于上述几个原因，深入学习一下`netfilter`框架，以及它的“客户端”：`iptables`。同时说明下`tcpdump`抓包跟`netfilter`的关系。
 
 主要参考学习以下文章：
 
@@ -90,7 +90,11 @@ netfilter提供了`5`个hook点，这些在内核协议栈中已经定义好了�
 
 ![netfilter各hook点和控制流](/images/netfilter-packet-flow.svg)
 
+### 3.1. iptables的“四表五链”
+
 为了理解上面这张图，还需要了解 **`chain`** 和 **`table`**的概念。
+
+上面我们说`iptables`是基于`netfilter`实现的，用于控制`netfilter`的行为。很多时候两者混在一起说，所以直接基于`iptables`来说明上图中的`chain`和`table`。
 
 * iptables 使用 `table` 来组织规则，根据用来做什么类型的判断标准，将规则分为不同 `table`。
 * 在每个 `table` 内部，规则被进一步组织成 `chain`，内置的 `chain` 是由内置的 `hook` 触发 的。
@@ -105,6 +109,12 @@ chain基本上能决定规则是何时被匹配的。内置的 chain 名字和 n
 * `OUTPUT`：由 `NF_IP_LOCAL_OUT` hook 触发
 * `POSTROUTING`：由 `NF_IP_POST_ROUTING` hook 触发
 
+为什么叫链，看下下面以`PREROUTING`为例的示意图就明白了：
+
+![prerouting链示意图](/images/iptables_prerouting_chain.png)
+
+规则列表以**链**的方式组织，且归属不同的表(`table`)，不同表之间还有优先级关系。
+
 **table：**
 
 iptables 提供的 table 类型如下：
@@ -113,7 +123,11 @@ iptables 提供的 table 类型如下：
 * `nat`：网络地址转换，通常用于将包路由到无法直接访问的网络
 * `mangle`：修改 IP 头
 * `raw`：conntrack 相关，其唯一目的就是提供一个让包绕过连接跟踪的框架
-* `security`：打 SELinux 标记
+
+四表五链的关系和优先级：
+
+![四表五链的关系和优先级](/images/iptables_4chain_5table.png)  
+[出处](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247487465&idx=1&sn=aace79dcb4edb011cf69e7cd9f7331f9&chksm=a6e30ed2919487c402f20fdda822bc63f057a334e81e8d26e48194f5b679882c627311205bbe&scene=178&cur_album_id=1532487451997454337#rd)
 
 下面跟踪分析下内核流程。这里先找TCP相关追踪点获取一个堆栈，再根据堆栈去找代码分析。
 
@@ -476,7 +490,7 @@ static int ip_local_deliver_finish(struct net *net, struct sock *sk, struct sk_b
 
 小结上述网络包接收时的netfilter hook，先经过`PREROUTING`，而后经过`INPUT` hook。
 
-简单总结接收数据的处理流程是：PREROUTING链 -> 路由判断（是本机）-> INPUT链 -> ...
+简单总结接收数据的处理流程是：PREROUTING链 -> 路由判断（是本机）-> INPUT链 -> ...，如下图所示。
 
 ![接收过程netfilter hook](/images/receive-netfilter-hook.png)  
 [出处](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247487465&idx=1&sn=aace79dcb4edb011cf69e7cd9f7331f9&chksm=a6e30ed2919487c402f20fdda822bc63f057a334e81e8d26e48194f5b679882c627311205bbe&scene=178&cur_album_id=1532487451997454337#rd)
@@ -813,9 +827,9 @@ static int __tcp_transmit_skb(struct sock *sk, struct sk_buff *skb,
 }
 ```
 
-#### 5.4.1. queue_xmit对应的注册函数
+#### 5.4.1. 分析 queue_xmit 对应的注册函数
 
-上面`queue_xmit`中注册的函数是`ip_queue_xmit`
+先说结果：上面`queue_xmit`中注册的函数是`ip_queue_xmit`，下面进行分析说明。
 
 我们在"[TCP半连接全连接（二） -- 半连接队列代码逻辑](https://xiaodongq.github.io/2024/05/30/tcp_syn_queue/)"中梳理过，面向连接的sock相关的初始化。这里再贴一下：
 
@@ -991,10 +1005,24 @@ static int ip_finish_output(struct net *net, struct sock *sk, struct sk_buff *sk
 
 基于上述流程可知，Linux在网络包发送的过程中，首先是发送的路由选择，然后碰到的第一个netfilter hook就是`OUTPUT`，然后接着进入`POSTROUTING`链。
 
+基本流程如下图所示：
+
 ![发送过程的netfilter hook](/images/send-netfilter-hook.png)  
 [出处](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247487465&idx=1&sn=aace79dcb4edb011cf69e7cd9f7331f9&chksm=a6e30ed2919487c402f20fdda822bc63f057a334e81e8d26e48194f5b679882c627311205bbe&scene=178&cur_album_id=1532487451997454337#rd)
 
-## 6. 小结
+## 6. 发送接收总体流程
+
+转发流程我们本篇就先不看了，具体可参考"[来，今天飞哥带你理解 iptables 原理！](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247487465&idx=1&sn=aace79dcb4edb011cf69e7cd9f7331f9&chksm=a6e30ed2919487c402f20fdda822bc63f057a334e81e8d26e48194f5b679882c627311205bbe&scene=178&cur_album_id=1532487451997454337#rd)"。直接放一下其中对上述过程汇总后的总体流程。
+
+![发送接收总体流程](/images/netfilter_iptables_total_process.png)
+
+到这里，再回头看开头那张`netfilter`/`iptables`的hook点和流程（里面还包含优先级）经典配图，就清晰不少了。
+
+## 7. tcpdump对应上述hook点的说明
+
+
+
+## 8. 小结
 
 学习了解了netfilter模块功能、和iptables的关系，并跟踪了内核中TCP网络包接收和发送过程中涉及到的netfileter hook。
 
@@ -1002,7 +1030,7 @@ static int ip_finish_output(struct net *net, struct sock *sk, struct sk_buff *sk
 
 当前只是简单跟踪流程，并未深入探究详细逻辑，后续基于参考链接再进一步学习，近期先放一放。
 
-## 7. 参考
+## 9. 参考
 
 1、[[译] 深入理解 iptables 和 netfilter 架构](https://arthurchiao.art/blog/deep-dive-into-iptables-and-netfilter-arch-zh)
 
