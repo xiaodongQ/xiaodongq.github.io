@@ -1018,17 +1018,35 @@ static int ip_finish_output(struct net *net, struct sock *sk, struct sk_buff *sk
 
 到这里，再回头看开头那张`netfilter`/`iptables`的hook点和流程（里面还包含优先级）经典配图，就清晰不少了。
 
-## 7. tcpdump对应上述hook点的说明
+## 7. tcpdump和netfilter说明
 
+tcpdump是基于libpcap抓取内核态的包的，这里引出一个问题：**netfilter 过滤的包 tcpdump 是否可以抓的到？**
 
+需要分发送和接收过程分别说明，这里贴一下结论，详情请参考原链接。
+
+参考：[用户态 tcpdump 如何实现抓到内核网络包的?](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247486315&idx=1&sn=ce3a85a531447873e02ccef17198e8fe&chksm=a6e30a509194834693bb7ee50cdd3868ab1f686a3a0807e2d1a514253ba1579d1246b99bf35d&scene=178&cur_album_id=1532487451997454337#rd)
+
+### 7.1. 接收过程
+
+* tcpdump在`ptype_all`上挂了虚拟协议，上述的`__netif_receive_skb_core`中会遍历`ptype_all`上的每个协议
+
+![接收过程tcpdump和netfilter](/images/tcpdump_netfilter_receive.png)
+
+**可以捕获到命中 netfilter 过滤规则的包。**
+
+### 7.2. 发送过程
+
+* `dev_queue_xmit_nit`中也会遍历 ptype_all 中的协议，会执行到 tcpdump 挂在上面的虚拟协议
+
+![发送过程tcpdump和netfilter](/images/tcpdump_netfilter_send.png)
+
+**不可以捕获到 netfilter 过滤掉的包。**
 
 ## 8. 小结
 
-学习了解了netfilter模块功能、和iptables的关系，并跟踪了内核中TCP网络包接收和发送过程中涉及到的netfileter hook。
+学习了解了netfilter模块功能、和iptables、tcpdump的关系，并跟踪了内核中TCP网络包接收和发送过程中涉及到的netfileter hook。
 
-本篇贴了较多源码导致篇幅过大（但有价值，便于以后快速定位），tcpdump和iptables的学习梳理单独作为一篇。
-
-当前只是简单跟踪流程，并未深入探究详细逻辑，后续基于参考链接再进一步学习，近期先放一放。
+当前只是简单跟踪流程，并未深入探究详细逻辑，后续涉及细节再基于参考链接进一步学习。
 
 ## 9. 参考
 
