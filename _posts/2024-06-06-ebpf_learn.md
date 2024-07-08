@@ -20,6 +20,39 @@ eBPF名声在外，之前没用过时简单翻完了《Linux内核观测技术BP
 
 在基本学习eBPF之后尝试用libbpf-bootstrap写跟踪程序，发现还差些火候。先把学习过程整理一下单独作为一篇博客，初步技术储备。索性后续eBPF学习过程作为一个系列，此为第一篇。
 
+### 1.1. 初学说明建议
+
+eBPF学习实践记录包含下面几篇（另外各篇里的参考链接文章很值得一看），其中也包含捣腾的"弯路"。回顾并结合自己学习实践过程，给一些初学的建议。
+
+* eBPF学习实践系列（一） -- 初识eBPF
+* [eBPF学习实践系列（二） -- bcc tools网络工具集](https://xiaodongq.github.io/2024/06/10/bcc-tools-network/)
+* [eBPF学习实践系列（三） -- 基于libbpf开发实践](https://xiaodongq.github.io/2024/06/15/libbpf-future/)
+* [eBPF学习实践系列（四） -- eBPF的各种追踪类型](https://xiaodongq.github.io/2024/06/19/ebpf-trace-type/)
+* [eBPF学习实践系列（五） -- 分析tcplife.bpf.c程序](https://xiaodongq.github.io/2024/06/20/ebpf-practice-case/)
+* [eBPF学习实践系列（六） -- bpftrace学习和使用](https://xiaodongq.github.io/2024/06/28/ebpf-bpftrace-learn/)
+
+* [TCP半连接全连接（三） -- eBPF跟踪全连接队列溢出（上）](https://xiaodongq.github.io/2024/06/23/bcctools-trace-tcp_connect/)
+* [TCP半连接全连接（四） -- eBPF跟踪全连接队列溢出（下）](https://xiaodongq.github.io/2024/06/26/libbpf-trace-tcp_connect/)
+
+* [TCP发送接收过程（三） -- 深入学习netfilter和iptables](https://xiaodongq.github.io/2024/07/05/netfilter-iptables-learn/)
+
+eBPF初学建议顺序：
+
+* 可从`eBPF学习实践系列（一）`，先大致了解eBPF概念，理解大概功能
+    * bcc/bpftrace/libbpf-bootstrap/cilium等都可以用来开发eBPF程序，一般也提供了现成可用的工具或者脚本。以前看这个也是eBPF那个也是eBPF有点迷惑，其实都是eBPF的上层开发框架，类比日志和日志库：底层记日志文件，但有各种类型的日志库封装。
+    * 本篇`libbpf-bootstrap`开发框架了解即可，不需要上手就去跟着hello world实操demo。只要理解不管上面哪种框架，都是分内核态和用户态两部分文件。
+    * `eBPF学习实践系列（三） -- 基于libbpf开发实践`和`eBPF学习实践系列（五） -- 分析tcplife.bpf.c程序`可以先跳过，最后需要理解内部流程再回头看。libbpf及其CO-RE机制是开发可移植eBPF程序的利器。
+* 对于大多数人来说，感觉`bcc tools`和`bpftrace`已经能满足大部分的需要了。
+    * 从 `eBPF学习实践系列（二） -- bcc tools网络工具集` 里了解bcc tools提供的现成工具能干什么，体会eBPF的强大
+    * 利用`bpftrace`只要一行命令就可以实现自定义追踪，从 `eBPF学习实践系列（六） -- bpftrace学习和使用` 里可了解用法（或参考链接里的官网教程）
+* 用`bpftrace`要自定义追踪时，自然会疑惑要用什么追踪点、怎么查看追踪点对应的数据结构、系统支持哪些eBPF类型和追踪点(tracepoint/kprobe等)
+    * 那就可以从 `eBPF学习实践系列（四） -- eBPF的各种追踪类型` 里了解怎么查看系统支持的eBPF程序类型、追踪点及对应结构
+    * `tracepoint`、`kprobe`是比较常用的，`uprobe`和`USDT`自己还没用过
+* 后面几篇是问题实验场景里的eBPF相关使用情况
+    * `TCP半连接全连接（三） -- eBPF跟踪全连接队列溢出（上）` bcc tools跟踪实验过程中的TCP状态变化
+    * `[TCP半连接全连接（四） -- eBPF跟踪全连接队列溢出（下）]` bpftrace跟踪全连接队列溢出（还有个libbpf程序开发失败的示例）
+    * `TCP发送接收过程（三） -- 深入学习netfilter和iptables` bpftrace跟踪内核中网络的调用栈
+
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
 ## 2. eBPF基本介绍
@@ -156,6 +189,7 @@ libbpf-bootstrap将其依赖的libbpf、bpftool以git submodule的形式配置�
 // SEC名 会定义libbpf将会创建的BPF程序类型 和 在内核挂载的方式。tracepoint有时简写成tp
 // sys_enter_xxx，表示调用到xxx系统调用时会触发此函数。此处即每次调用`execve`时都会调用`bpf_prog`
 SEC("tracepoint/syscalls/sys_enter_execve")
+// 这里的函数名无所谓，主要是上下文入参的类型，不同eBPF程序类型有对应的上下文结构。
 int bpf_prog(void *ctx) {
   char msg[] = "Hello, World!";
   // bpf中的printf，会打印到 /sys/kernel/debug/tracing/trace_pipe
