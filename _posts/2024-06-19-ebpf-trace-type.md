@@ -129,7 +129,7 @@ eBPF program_type lsm is NOT available
 eBPF program_type sk_lookup is available
 ```
 
-这些类型主要分为下述3大使用场景。参考：[事件触发：各类eBPF程序的触发机制及其应用场景](https://time.geekbang.org/column/article/483364)
+这些类型主要分为下述3大使用场景。主要参考：[事件触发：各类eBPF程序的触发机制及其应用场景](https://time.geekbang.org/column/article/483364)
 
 ### 2.1. 跟踪类eBPF程序
 
@@ -183,7 +183,7 @@ lsm用于安全，其他还有flow_dissector、lwt_in等
 
 ## 3. SEC(name)对应的eBPF类型
 
-bcc/libbpf-tools/中有很多不同的`SEC(xxx)`类型，这个上面介绍的30来种`enum bpf_prog_type`枚举值是怎么对应起来的？
+bcc/libbpf-tools/中有很多不同的`SEC(xxx)`类型，这和上面介绍的30来种`enum bpf_prog_type`枚举值是怎么对应起来的？
 
 比如下面几个：
 
@@ -272,7 +272,7 @@ static const struct bpf_sec_def section_defs[] = {
 
 * 使用调试信息获取内核函数、内核跟踪点
 
-查看：/sys/kernel/debug/tracing/events
+查看：/sys/kernel/debug/tracing/events （或/sys/kernel/tracing/events）
 
 ```sh
 [root@xdlinux ➜ /root ]$ ls /sys/kernel/debug/tracing/events
@@ -308,6 +308,10 @@ mptcp:ack_update_msk
 mptcp:get_mapping_status
 mptcp:mptcp_subflow_get_send
 ```
+
+对于kprobe，**只有显式导出的内核函数才可以被eBPF进行动态跟踪**：
+
+可以通过 `/sys/kernel/tracing/available_filter_functions` 或 `/proc/kallsyms` 查看各内核函数。
 
 * 使用 `bpftrace` 获取内核函数、内核跟踪点
 
@@ -376,7 +380,7 @@ List of pre-defined events (to be used in -e):
 
 对于内核函数和内核跟踪点，在需要跟踪它们的传入参数和返回值的时候，该如何查询这些数据结构的定义格式呢？
 
-* 使用调试信息获取
+* 1）使用调试信息获取
 
 以系统调用的`sys_enter_openat`为例，查看调试信息下的`format`文件
 
@@ -404,7 +408,9 @@ format:
 print fmt: "dfd: 0x%08lx, filename: 0x%08lx, flags: 0x%08lx, mode: 0x%08lx", ((unsigned long)(REC->dfd)), ((unsigned long)(REC->filename)), ((unsigned long)(REC->flags)), ((unsigned long)(REC->mode))
 ```
 
-* 使用bpftrace获取
+对于kprobe，是无法通过上面方式获取参数的，可从内核代码找对应的内核函数。
+
+* 2）使用bpftrace获取
 
 ```sh
 # -l 搜索，-v 附加信息
@@ -419,6 +425,8 @@ tracepoint:syscalls:sys_enter_openat
 ```
 
 ### 4.2. 寻找应用的插桩点
+
+说明：`tracepoint`和`kprobe`已经能满足很多eBPF刚需场景了，`uprobe`、`USDT`追踪此处作了解，有需要再深入。
 
 #### 4.2.1. 如何查询用户进程的跟踪点？
 
@@ -688,6 +696,7 @@ struct trace_event_raw_sys_enter {
 
 ```c
 SEC("tracepoint/syscalls/sys_enter_fchmodat")
+// 函数名可以自定义，入参跟eBPF追踪类型结构一致
 int tracepoint__syscalls__sys_enter_fchmodat(struct trace_event_raw_sys_enter *ctx)
 {
     // ...
