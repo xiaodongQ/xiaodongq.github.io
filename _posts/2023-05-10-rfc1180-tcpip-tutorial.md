@@ -1,7 +1,7 @@
 ---
 layout: post
 title: RFC1180学习笔记
-categories: 笔记
+categories: 网络
 tags: 网络
 ---
 
