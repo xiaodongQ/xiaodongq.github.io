@@ -736,17 +736,53 @@ List of pre-defined events (to be used in -e):
 
 另外，brendangregg大佬的这篇：[perf Examples](https://www.brendangregg.com/perf.html)，有很多实用的perf命令，需要单独开一篇博客学习记录下。
 
-## 5. 使用gdb调试跟踪网络堆栈
+## 5. perf-tools跟踪网络堆栈
+
+利用brendangregg大佬开发的 [perf-tools](https://github.com/brendangregg/perf-tools) 中的`funcgraph`跟踪堆栈。
+
+用法：
+
+```sh
+[root@xdlinux ➜ bin git:(master) ]$ ./funcgraph -h
+USAGE: funcgraph [-aCDhHPtT] [-m maxdepth] [-p PID] [-L TID] [-d secs] funcstring
+                 -a              # all info (same as -HPt)
+                 -C              # measure on-CPU time only
+                 -d seconds      # trace duration, and use buffers
+                 -D              # do not show function duration
+                 -h              # this usage message
+                 -H              # include column headers
+                 -m maxdepth     # max stack depth to show
+                 -p PID          # trace when this pid is on-CPU
+                 -L TID          # trace when this thread is on-CPU
+                 -P              # show process names & PIDs
+                 -t              # show timestamps
+                 -T              # comment function tails
+  eg,
+       funcgraph do_nanosleep    # trace do_nanosleep() and children
+       funcgraph -m 3 do_sys_open # trace do_sys_open() to 3 levels only
+       funcgraph -a do_sys_open    # include timestamps and process name
+       funcgraph -p 198 do_sys_open # trace vfs_read() for PID 198 only
+       funcgraph -d 1 do_sys_open >out # trace 1 sec, then write to file
+
+See the man page and example file for more info.
+```
+
+这里还有两个用到`funcgraph`的实际案例，定位过程也很值得学习：
+
+* [【BPF网络篇系列-2】容器网络延时之 ipvs 定时器篇](https://www.ebpf.top/post/ebpf_network_kpath_ipvs/)
+* [eBPF/Ftrace 双剑合璧：no space left on device 无处遁形](https://mp.weixin.qq.com/s/VuD20JgMQlbf-RIeCGniaA)
+
+## 6. 使用gdb调试跟踪网络堆栈
 
 需编译内核，然后基于QEMU+gdb调试，后续有需要再实践。
 
-## 6. 小结
+## 7. 小结
 
 根据几个看过的文章信息及近期的学习实践，梳理跟踪内核中网络栈的几种方式，并学习了解了文章中的工具。
 
 对比了几个不同系统里面iptables设置跟踪日志的表现，CentOS8里实验失败的原因这里先遗留了，作为TODO项后续定位。
 
-## 7. 参考
+## 8. 参考
 
 1、 [关于解决问题的能力](https://wx.zsxq.com/dweb2/index/columns/15552551584552)
 
