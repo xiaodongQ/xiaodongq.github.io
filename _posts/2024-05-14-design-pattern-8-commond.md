@@ -135,4 +135,4 @@ g++ command.cpp -std=c++11 -o command
 
 ## 5. 参考
 
-1、大模型
+1、GPT
