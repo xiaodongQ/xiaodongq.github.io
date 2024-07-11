@@ -179,4 +179,4 @@ g++ strategy.cpp -std=c++11 -o strategy
 
 ## 5. 参考
 
-1、大模型
+1、GPT

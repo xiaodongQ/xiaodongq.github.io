@@ -486,4 +486,4 @@ if (found_native && streq(verb, "is-enabled"))
 
 ## 5. 参考
 
-1、文心一言，省了梯子，体验效果还不错
+1、GPT

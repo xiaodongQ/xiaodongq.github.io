@@ -315,4 +315,4 @@ int main() {
 
 1、[极客时间：设计模式之美](https://time.geekbang.org/column/article/198614)
 
-2、大模型
+2、GPT

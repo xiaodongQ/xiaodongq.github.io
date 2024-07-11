@@ -113,4 +113,4 @@ g++ observer.cpp -std=c++11 -o observer
 
 ## 5. 参考
 
-1、大模型
+1、GPT

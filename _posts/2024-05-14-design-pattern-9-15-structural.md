@@ -596,4 +596,4 @@ g++ proxy.cpp -o proxy -std=c++14
 
 ## 11. 参考
 
-1、大模型
+1、GPT

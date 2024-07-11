@@ -1,6 +1,6 @@
 ---
 layout: post
-title: TCP发送接收过程（三） -- 深入学习netfilter和iptables
+title: TCP发送接收过程（三） -- 学习netfilter和iptables
 categories: 网络
 tags: TCP netfilter iptables
 ---
@@ -8,7 +8,7 @@ tags: TCP netfilter iptables
 * content
 {:toc}
 
-netfilter作为网络协议栈非常关键的一部分，本篇深入学习netfilter和iptables，有助于理解TCP发送接收过程
+netfilter作为网络协议栈非常关键的一部分，本篇学习下netfilter和iptables，有助于理解TCP发送接收过程
 
 
 
@@ -22,7 +22,7 @@ netfilter作为网络协议栈非常关键的一部分，本篇深入学习netfi
 
 这些问题都或多或少，或直接或间接跟**内核中的netfilter框架**有关系。
 
-基于上述几个原因，深入学习一下`netfilter`框架，以及它的“客户端”：`iptables`。同时说明下`tcpdump`抓包跟`netfilter`的关系。
+基于上述几个原因，学习一下`netfilter`框架，以及它的“客户端”：`iptables`。同时说明下`tcpdump`抓包跟`netfilter`的关系。
 
 主要参考学习以下文章：
 

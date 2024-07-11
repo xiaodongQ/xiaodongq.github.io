@@ -34,7 +34,7 @@ eBPF学习实践记录包含下面几篇（另外各篇里的参考链接文章�
 * [TCP半连接全连接（三） -- eBPF跟踪全连接队列溢出（上）](https://xiaodongq.github.io/2024/06/23/bcctools-trace-tcp_connect/)
 * [TCP半连接全连接（四） -- eBPF跟踪全连接队列溢出（下）](https://xiaodongq.github.io/2024/06/26/libbpf-trace-tcp_connect/)
 
-* [TCP发送接收过程（三） -- 深入学习netfilter和iptables](https://xiaodongq.github.io/2024/07/05/netfilter-iptables-learn/)
+* [TCP发送接收过程（三） -- 学习netfilter和iptables](https://xiaodongq.github.io/2024/07/05/netfilter-iptables-learn/)
 
 eBPF初学建议顺序：
 
@@ -51,7 +51,7 @@ eBPF初学建议顺序：
 * 后面几篇是问题实验场景里的eBPF相关使用情况
     * `TCP半连接全连接（三） -- eBPF跟踪全连接队列溢出（上）` bcc tools跟踪实验过程中的TCP状态变化
     * `[TCP半连接全连接（四） -- eBPF跟踪全连接队列溢出（下）]` bpftrace跟踪全连接队列溢出（还有个libbpf程序开发失败的示例）
-    * `TCP发送接收过程（三） -- 深入学习netfilter和iptables` bpftrace跟踪内核中网络的调用栈
+    * `TCP发送接收过程（三） -- 学习netfilter和iptables` bpftrace跟踪内核中网络的调用栈
 
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
