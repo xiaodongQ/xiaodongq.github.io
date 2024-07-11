@@ -1,6 +1,6 @@
 ---
 layout: post
-title: LinuxIO存储栈
+title: 学习Linux存储IO栈
 categories: 存储
 tags: 存储 IO
 ---
@@ -8,7 +8,7 @@ tags: 存储 IO
 * content
 {:toc}
 
-学习Linux IO存储栈
+学习Linux存储IO栈
 
 
 
@@ -39,7 +39,7 @@ Linux内核的存储IO栈的全貌图：
 
 下面摘抄参考文章里提出的几个问题，详情请参考原链接。
 
-### 2.1. `Buffered IO`、`mmap(2)`、`Direct IO`等机制怎么和IO栈联系起来的
+### 2.1. `Buffered IO`、`mmap(2)`、`Direct IO`
 
 Linux系统编程里用到的`Buffered IO`、`mmap(2)`、`Direct IO`，这些机制怎么和Linux IO栈联系起来呢？
 
