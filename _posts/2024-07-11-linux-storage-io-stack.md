@@ -166,7 +166,7 @@ CPU、磁盘、网络的耗时体感：
 
 ### 4.3. IOPS和读写速度参考
 
-机械硬盘 (HDD) 和固态硬盘 (SSD) 的I/O和读写速度存在明显的差异，以下是两者的大致性能指标（供参考）。
+机械硬盘 (HDD) 和固态硬盘 (SSD) 的I/O和读写速度存在明显的差异，以下是两者的大致性能指标（GPT提供，供参考）。
 
 **机械硬盘 (HDD)：**
 
@@ -175,7 +175,6 @@ CPU、磁盘、网络的耗时体感：
 1. **顺序速度**：
    - **顺序读取速度：** 80到160 MB/s
    - **顺序写入速度：** 80到160 MB/s
-   - 来源：如Seagate和Western Digital等硬盘厂商的官方技术规格和测试。
 
 2. **随机速度**：
    - **随机读取速度：** 0.5到2 MB/s
@@ -193,22 +192,21 @@ CPU、磁盘、网络的耗时体感：
 
 1. **顺序速度**:
    - **SATA接口SSD：**
-     - **顺序读取速度：** 500到550 MB/s
-     - **顺序写入速度：** 450到500 MB/s
+     - **顺序读取速度：** 大约500到550 MB/s
+     - **顺序写入速度：** 大约450到500 MB/s
      - SATA接口由于受到接口带宽限制，性能有限。
    - **NVMe接口SSD：**
      - **顺序读取速度：** 2000到3500+ MB/s
      - **顺序写入速度：** 1500到3000+ MB/s
      - NVMe通过PCIe高速通道，显著提高性能。高端型号甚至超过3500 MB/s的读取速度。
-   - 来源：如Samsung, Western Digital等厂商的官方数据和评测。
 
 2. **随机速度**：
    - **SATA接口SSD：**
-     - **随机读取速度：** 75,000到100,000 IOPS
-     - **随机写入速度：** 70,000到90,000 IOPS
+     - **随机读取速度：** 25到50 MB/s
+     - **随机写入速度：** 10到40 MB/s
    - **NVMe接口SSD：**
-     - **随机读取速度：** 250,000到500,000 IOPS
-     - **随机写入速度：** 200,000到450,000 IOPS
+     - **随机读取速度：** 50到100 MB/s
+     - **随机写入速度：** 50到100 MB/s
      - 高IOPS性能使其在处理小文件和大量随机操作时表现优异。
 
 3. **IOPS (Input/Output Operations Per Second)**：
@@ -220,7 +218,16 @@ CPU、磁盘、网络的耗时体感：
      - **随机写入IOPS：** 200,000到450,000 IOPS
    - NVMe接口SSD在高需求应用中以其卓越的IOPS性能脱颖而出。
 
-这些数据来源于硬件厂商的官方技术规格，包括Seagate、Western Digital、Samsung等公司，及独立硬件评测网站如Tom's Hardware、AnandTech和TechRadar的测评结果。对于具体型号的精确数据，建议查阅厂商的官方产品页面及最新独立评测报告。
+一些数据出处可参考：
+
+1. **硬盘厂商**：Seagate、Western Digital等硬盘厂商的官方技术规格。
+2. **SSD厂商**：Samsung、Western Digital、Crucial等SSD制造商的官方数据。
+3. **评测网站**：Tom's Hardware, AnandTech, TechRadar等提供的性能评测数据。
+
+比如搜索"Seagate BarraCuda 计算硬盘数据表"，可找到下面两份datasheets：
+
+* [希捷Seagate HDD datasheets](https://www.seagate.com/content/dam/seagate/migrated-assets/www-content/datasheets/pdfs/3-5-barracudaDS1900-14-2007CN-zh_CN.pdf)
+* [希捷Seagate SATA SSD datasheets](https://www.seagate.com/content/dam/seagate/zh_cn/content-fragments/products/datasheets/barracuda-sata-ssd/barracuda-sata-ssd-DS2128-2-2308US-zh_CN.pdf)
 
 ## 5. 小结
 
