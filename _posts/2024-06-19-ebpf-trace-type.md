@@ -39,6 +39,7 @@ eBPF追踪类型学习整理
 * 怎么确认 **eBPF类型 -> 上下文结构**
     - 通过eBPF Docs查看：[program types (Linux)](https://ebpf-docs.dylanreimerink.nl/linux/program-type/)
     - 上面有该类型是哪个内核版本开始新增的，还有该类型对应的具体上下文结构，以及支持的helper函数、内核侧函数等
+    - 系统libbpf的include下的bpf.h里可以看到各helper函数功能介绍（linux-5.10.10\include\uapi\linux\bpf.h）
 
 比如SEC("socket")对应的类型：  
 找libbpf.c的`section_defs`后，发现是`BPF_PROG_TYPE_SOCKET_FILTER`，然后到eBPF Docs：[Program type BPF_PROG_TYPE_SOCKET_FILTER](https://ebpf-docs.dylanreimerink.nl/linux/program-type/BPF_PROG_TYPE_SOCKET_FILTER/) 上展开分类并搜索这个type，上面会有个`3.19`的内核标签，并给出了其上下文（context）为`__sk_buff`
@@ -764,13 +765,238 @@ int tracepoint__syscalls__sys_enter_fchmodat(struct sys_enter_fchmodat_args *ctx
 
 上面重点展示了tracepoint对应的`的BPF_PROG_TYPE_TRACEPOINT`类型的实践方式，其他类型的eBPF程序，如篇头所述可以查询eBPF Docs：[program types (Linux)](https://ebpf-docs.dylanreimerink.nl/linux/program-type/)
 
-## 6. 小结
+## 6. `SEC(name)`对应的处理函数定义说明
+
+很多人（包括我自己）一开始很容易迷惑，到底该以什么规则定义处理函数？输入参数又是怎么样的？下面进行说明。
+
+从bcc/libbpf-bootstrap等项目里可以看到好几种不同的处理函数定义。比如下面列举的几种：
+
+```c
+// bcc/libbpf-tools/opensnoop.bpf.c
+SEC("tracepoint/syscalls/sys_enter_open")
+int tracepoint__syscalls__sys_enter_open(struct trace_event_raw_sys_enter* ctx){xxx}
+
+// bcc/libbpf-tools/runqslower.bpf.c
+SEC("tp_btf/sched_wakeup")
+int handle__sched_wakeup(u64 *ctx){xxx}
+
+// bcc/libbpf-tools/syscount.bpf.c
+SEC("tracepoint/raw_syscalls/sys_enter")
+int sys_enter(struct trace_event_raw_sys_enter *args)
+
+// bcc/libbpf-tools/numamove.bpf.c
+SEC("fexit/migrate_misplaced_page")
+int BPF_PROG(migrate_misplaced_page_exit){xxx}
+
+// bcc/libbpf-tools/tcpconnect.bpf.c
+SEC("kprobe/tcp_v4_connect")
+int BPF_KPROBE(tcp_v4_connect, struct sock *sk){xxx}
+SEC("kretprobe/tcp_v4_connect")
+int BPF_KRETPROBE(tcp_v4_connect_ret, int ret)
+
+// libbpf-bootstrap/examples/c/uprobe.bpf.c
+SEC("uretprobe")
+int BPF_KRETPROBE(uretprobe_add, int ret){xxx}
+
+// libbpf-bootstrap/examples/c/sockfilter.bpf.c 
+SEC("socket")   
+int socket_handler(struct __sk_buff *skb){xxx}
+```
+
+**函数名可以自定义**，比如上面的`tracepoint__syscalls__sys_enter_open`、`handle__sched_wakeup`、`sys_enter`，不需要跟`SEC(xxx)`里面的xxx有严格的绑定关系，保持一定的可读性即可。
+
+也可借助`eBPF宏`来简化和标准化不同类型eBPF程序的定义。这里的宏只是再包装了一下上面的自定义函数。
+
+上面有3个宏：`BPF_PROG`、`BPF_KPROBE`、`BPF_KRETPROBE`，都是比较常用的，下面单独说明。
+
+### 6.1. BPF_PROG 宏
+
+`BPF_PROG` 宏用于定义一个通用的 eBPF 程序，该宏是最基础的宏，可以适用于不同类型的 eBPF 程序，根据定义的上下文和用途的不同，其作用也不同。其签名通常会根据具体的 eBPF 程序类型来适配。
+
+此宏的作用是定义一个 eBPF 程序，参数是一个 eBPF 上下文对象（例如 `struct __sk_buff` 代表网络数据包的上下文）。
+
+示例：
+
+```c
+// 宏定义（部分内容）
+#define BPF_PROG(name, ... ) \
+    int name(struct __sk_buff *ctx, ##__VA_ARGS__)
+
+// 用法，比如上面的 BPF_PROG(migrate_misplaced_page_exit){xxx}
+BPF_PROG(my_prog_name)
+{
+    // Your eBPF program logic here
+    return 0;
+}
+```
+
+我们看下`BPF_PROG`在内核中的定义
+
+```c
+// linux-5.10.10/tools/lib/bpf/bpf_tracing.h
+/*
+ * BPF_PROG is a convenience wrapper for generic tp_btf/fentry/fexit and
+ * similar kinds of BPF programs, that accept input arguments as a single
+ * pointer to untyped u64 array, where each u64 can actually be a typed
+ * pointer or integer of different size. Instead of requring user to write
+ * manual casts and work with array elements by index, BPF_PROG macro
+ * allows user to declare a list of named and typed input arguments in the
+ * same syntax as for normal C function. All the casting is hidden and
+ * performed transparently, while user code can just assume working with
+ * function arguments of specified type and name.
+ *
+ * Original raw context argument is preserved as well as 'ctx' argument.
+ * This is useful when using BPF helpers that expect original context
+ * as one of the parameters (e.g., for bpf_perf_event_output()).
+ */
+#define BPF_PROG(name, args...)						    \
+name(unsigned long long *ctx);						    \
+static __attribute__((always_inline)) typeof(name(0))			    \
+____##name(unsigned long long *ctx, ##args);				    \
+typeof(name(0)) name(unsigned long long *ctx)				    \
+{									    \
+    _Pragma("GCC diagnostic push")					    \
+    _Pragma("GCC diagnostic ignored \"-Wint-conversion\"")		    \
+    return ____##name(___bpf_ctx_cast(args));			    \
+    _Pragma("GCC diagnostic pop")					    \
+}									    \
+...
+```
+
+手动改下本地代码看下宏展开的样子。
+
+修改：/home/workspace/bcc/libbpf-tools/tcpconnect.bpf.c
+
+```c
+SEC("kprobe/tcp_v4_connect")
+//int BPF_KPROBE(tcp_v4_connect, struct sock *sk) 
+//{
+//  return enter_tcp_connect(ctx, sk);
+//}
+// 函数改成 tcp_v4_connect_test，便于检索，此处也可说明处理函数是可以自定义的
+int BPF_KPROBE(tcp_v4_connect_test, struct sock *sk)
+{
+    return enter_tcp_connect(ctx, sk);
+}
+```
+
+在Makefile里临时加一个`-E`预编译规则
+
+```sh
+# /home/workspace/bcc/libbpf-tools/Makefile
+$(OUTPUT)/%.bpf.o: %.bpf.c $(LIBBPF_OBJ) $(wildcard %.h) $(ARCH)/vmlinux.h | $(OUTPUT)
+    $(call msg,BPF,$@)
+    $(Q)$(CLANG) -g -O2 -target bpf -D__TARGET_ARCH_$(ARCH)           \
+             -I$(ARCH)/ $(INCLUDES) -c $(filter %.c,$^) -o $@ &&      \
+    $(LLVM_STRIP) -g $@
+    # 临时新增begin 生成预编译文件
+    $(call msg,xxxxxxxxxxxxxx, 000tcpconnect.bpf.i)                                            
+    $(Q)$(CLANG) -g -O2 -target bpf -D__TARGET_ARCH_$(ARCH)           \
+             -I$(ARCH)/ $(INCLUDES) -E $(filter %.c,$^) -o tcpconnect.bpf.i &&      \
+    $(LLVM_STRIP) -g $@
+    # 临时新增end 生成预编译文件
+```
+
+进行编译
+
+```sh
+[root@xdlinux ➜ libbpf-tools git:(v0.19.0) ✗ ]$ make clean; make tcpconnect
+  CLEAN    
+  MKDIR    .output
+  MKDIR    libbpf
+  LIB      libbpf.a
+  MKDIR    staticobjs
+  CC       bpf.o
+  ...
+  INSTALL  libbpf.a
+  BPF      tcpconnect.bpf.o
+# 生成预编译文件
+  xxxxxxxxxxxxxx 000tcpconnect.bpf.i
+  GEN-SKEL tcpconnect.skel.h
+  CC       tcpconnect.o
+  ...
+  BINARY   tcpconnect
+```
+
+预编译文件tcpconnect.bpf.i，上面改的`tcp_v4_connect_test`，`BPF_KPROBE`宏展开后如下。
+
+```c
+// /home/workspace/bcc/libbpf-tools/tcpconnect.bpf.i
+int tcp_v4_connect_test(struct pt_regs *ctx); static __attribute__((always_inline)) typeof(tcp_v4_connect_test(0)) ____tcp_v4_connect_test(struct pt_regs *ctx, struct sock *sk); typeof(tcp_v4_connect_test(0)) tcp_v4_connect_test(struct pt_regs *ctx) {                                  
+# 213 "tcpconnect.bpf.c"                                                                   
+#pragma GCC diagnostic push                                                                
+# 213 "tcpconnect.bpf.c"                                                                   
+#pragma GCC diagnostic ignored "-Wint-conversion"                                          
+# 213 "tcpconnect.bpf.c"                                                                   
+ return ____tcp_v4_connect_test(ctx, (void *)((ctx)->di));                                 
+# 213 "tcpconnect.bpf.c"                                                                   
+#pragma GCC diagnostic pop                                                                 
+# 213 "tcpconnect.bpf.c"                                                                   
+ } static __attribute__((always_inline)) typeof(tcp_v4_connect_test(0)) ____tcp_v4_connect_test(struct pt_regs *ctx, struct sock *sk)                                                    
+{                                                                                          
+ return enter_tcp_connect(ctx, sk);                                                        
+}
+```
+
+### 6.2. BPF_KPROBE 宏
+
+`BPF_KPROBE` 宏用于定义基于 kprobe（内核探针）的 eBPF 程序，它用于探测内核函数的入口点。在 kprobe 上设置的 eBPF 程序能够在内核函数被调用时执行。
+
+其通常的定义方式是：
+
+```c
+#define BPF_KPROBE(func, ...) \
+    int func(struct pt_regs *ctx, ##__VA_ARGS__)
+```
+
+示例：
+
+```c
+SEC("kprobe/tcp_v6_connect")
+int BPF_KPROBE(tcp_v6_connect, struct sock *sk)
+{
+    // Your kprobe logic here
+    return 0;
+}
+```
+
+此宏的作用是定义一个 kprobe 钩子函数，并传入内核函数的参数，`ctx` 是上下文信息，其他参数是内核函数的实际参数。
+
+### 6.3. BPF_KRETPROBE 宏
+
+`BPF_KRETPROBE` 宏用于定义基于 kretprobe（返回探针）的 eBPF 程序，它用于探测内核函数的返回点。在 kretprobe 上设置的 eBPF 程序能够在内核函数执行完成并返回时执行。
+
+其通常的定义方式是：
+
+```c
+#define BPF_KRETPROBE(func) \
+    int func(struct pt_regs *ctx)
+```
+
+示例：
+
+```c
+SEC("kretprobe/tcp_v6_connect")
+int BPF_KRETPROBE(tcp_v6_connect)
+{
+    // Your kretprobe logic here
+    return 0;
+}
+```
+
+此宏的作用是定义一个 kretprobe 钩子函数，只有一个参数 ctx，它代表了捕获的寄存器上下文，因为在函数返回点时，我们没有其他函数参数可以获取。
+
+### 6.4. 参数说明
+
+上面小节我们知道`SEC(xxx)`对应的eBPF类型后，可以到eBPF Docs上去查找对应的上下文结构。
+
+## 7. 小结
 
 学习梳理了eBPF各程序类型，查找追踪点的方法，进行追踪的实践套路。
 
 下一步应该可以按需开始上手了。
 
-## 7. 参考
+## 8. 参考
 
 1、[深入浅出 eBPF｜你要了解的 7 个核心问题](https://developer.aliyun.com/article/985159)
 
