@@ -156,6 +156,8 @@ Got 14
 
 Server 和 Client 都关闭 `net.ipv4.tcp_timestamps`，并构造下次请求的seq比上次的小（需要时间足够长等seq达到最大后重新计数）
 
+这里暂时仅作分析，先不进行实验。
+
 服务端timewait时回rst场景，过程解释：
 
 ![服务端timewait时回rst场景](/images/2024-07-13-timewait-rst-case.png)
