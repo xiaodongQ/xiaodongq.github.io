@@ -32,7 +32,9 @@ TIME_WAIT状态的连接收到SYN是什么表现
 
 ### 3.1. 构造方式
 
-1、服务端：192.168.1.150，开不同终端进行监听、开启抓包、tcpstates观测
+1、服务端：192.168.1.150，开不同终端分别进行监听、开启抓包、tcpstates观测
+
+代码：accept连接后就close，[github](https://github.com/xiaodongQ/prog-playground/blob/main/network/tcp_timewait_rcv_syn/server.cpp)
 
 ```sh
 # 终端1
