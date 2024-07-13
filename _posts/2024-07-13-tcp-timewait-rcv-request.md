@@ -28,7 +28,40 @@ TIME_WAIT状态的连接收到SYN是什么表现
 
 ![示意图](/images/2024-07-13-time-wait-rcv-syn.png)
 
-## 3. 构造复现场景
+## 3. 构造复现场景（场景1）
+
+这里使用CentOS8.5系统，构造常规场景，保持默认TCP参数。内核为4.18.0-348.7.1.el8_5.x86_64.
+
+```sh
+[root@xdlinux ➜ ~ ]$ sysctl -a|grep -E 'ip_local_port_range|tcp_max_tw_buckets|tcp_tw_reuse|tcp_rfc1337|tcp_timestamps|tcp_tw_timeout'
+net.ipv4.ip_local_port_range = 32768	60999
+net.ipv4.tcp_max_tw_buckets = 131072
+net.ipv4.tcp_rfc1337 = 0
+net.ipv4.tcp_timestamps = 1
+net.ipv4.tcp_tw_reuse = 2
+```
+
+**注意：这里`tcp_tw_reuse`是2**，而不是布尔的0或1。包括之前起的ECS也默认2：Alibaba Cloud Linux 3.2104 LTS 64位（内核版本：5.10.134-16.1.al8.x86_64）  
+
+> 在高版本内核中，`net.ipv4.tcp_tw_reuse` 默认值为 2，表示仅为回环地址开启复用，基本可以粗略的认为没开启复用。 [参考](https://imroc.cc/kubernetes/best-practices/performance-optimization/network)
+
+对于网络相关内核参数的说明和取值，可以参考 [kernel.org](https://www.kernel.org/doc/html/latest/networking/ip-sysctl.html) 或者 内核代码里的`Documentation/networking/ip-sysctl.rst`（如下）。
+
+```sh
+# linux-5.10.10/Documentation/networking/ip-sysctl.rst
+tcp_tw_reuse - INTEGER
+	Enable reuse of TIME-WAIT sockets for new connections when it is
+	safe from protocol viewpoint.
+
+	- 0 - disable
+	- 1 - global enable
+	- 2 - enable for loopback traffic only
+
+	It should not be changed without advice/request of technical
+	experts.
+
+	Default: 2
+```
 
 ### 3.1. 构造方式
 
@@ -136,31 +169,56 @@ Got 14
 
 ![服务端-客户端抓包](/images/2024-07-13-server-fin.png)
 
-2、结论：篇头场景描述的，服务端socket处于TIME_WAIT时，客户端重用12345端口是可以连接的
+2、（局部）结论
 
-## 4. 另一种情况
+此处实验结果：服务端socket处于`TIME_WAIT`时，客户端重用原端口组成相同的四元组是可以连接的；
 
-为什么有的文章或书籍里会说上述场景客户端是无法连接的，参考文章里给了说明：
+但不能简单得出所有情况下服务端`TIME_WAIT`都能接收相同四元组的连接，具体见下小节说明。
+
+## 4. 完整结论说明
+
+为什么有的文章或书籍里会说上述场景客户端是无法连接的，参考文章里给了说明，这里先直接贴下结论，下述的说明和流程图均来自[4.11 在 TIME_WAIT 状态的 TCP 连接，收到 SYN 后会发生什么？](https://www.xiaolincoding.com/network/3_tcp/time_wait_recv_syn.html)。
 
 针对这个问题，**关键是要看 SYN 的`序列号和时间戳`是否合法**，因为处于 `TIME_WAIT` 状态的连接收到 SYN 后，会判断 SYN 的`序列号和时间戳`是否合法，然后根据判断结果的不同做不同的处理。
 
-* 合法 SYN：客户端的 SYN 的「序列号」比服务端「期望下一个收到的序列号」要大，并且 SYN 的「时间戳」比服务端「最后收到的报文的时间戳」要大。
+### 4.1. `TIME_WAIT`时收到同四元组的SYN是否合法
+
+1、TCP时间戳机制开启情况下（即`net.ipv4.tcp_timestamps=1`，一般默认开启）：
+
+* 合法 SYN：客户端的 SYN 的「序列号」比服务端「期望下一个收到的序列号」要大，**并且** SYN 的「时间戳」比服务端「最后收到的报文的时间戳」要大。
 * 非法 SYN：客户端的 SYN 的「序列号」比服务端「期望下一个收到的序列号」要小，或者 SYN 的「时间戳」比服务端「最后收到的报文的时间戳」要小。
 
-上面 SYN 合法判断是基于双方都开启了 TCP 时间戳机制（`net.ipv4.tcp_timestamps`）的场景，如果双方都没有开启 TCP 时间戳机制，则 SYN 合法判断如下：
+2、如果双方都没有开启 TCP 时间戳机制（`net.ipv4.tcp_timestamps=0`），则 SYN 合法判断如下：
 
 * 合法 SYN：客户端的 SYN 的「序列号」比服务端「期望下一个收到的序列号」要大。
 * 非法 SYN：客户端的 SYN 的「序列号」比服务端「期望下一个收到的序列号」要小。
 
-### 4.1. 构造思路
+上述说的开启`tcp_timestamps`，是需要客户端和服务端都开启。那么对于一端开启一端关闭的情况，表现如何？（**待定 TODO**）
 
-Server 和 Client 都关闭 `net.ipv4.tcp_timestamps`，并构造下次请求的seq比上次的小（需要时间足够长等seq达到最大后重新计数）
+### 4.2. 流程图示
+
+1、如果处于 `TIME_WAIT` 状态的连接收到「**合法的 SYN**」后，就会重用此四元组连接，**跳过 2MSL 而转变为 `SYN_RECV` 状态**，接着就能进行建立连接过程。
+
+收到合法的SYN处理过程（双方都启用了 TCP 时间戳机制，`TSval`是发送报文时的时间戳）：
+
+![收到合法的 SYN](/images/2024-07-13-timewait-valid-syn.png)
+
+2、如果处于 `TIME_WAIT` 状态的连接收到「**非法的 SYN**」后，就会再回复一个第四次挥手的 ACK 报文，客户端收到后，发现并不是自己期望收到确认号（ack num），就回 RST 报文给服务端。
+
+收到合法的SYN处理过程（双方都启用了 TCP 时间戳机制，TSval 是发送报文时的时间戳）：
+
+![收到非法的 SYN](/images/2024-07-13-timewait-invalid-syn.png)
+
+**这里特别注意下：服务端收到非法SYN后回复的是`ACK`（而不是`RST`），`RST`是客户端判断收到的`ACK`号不符合其预期才发起的。**
+
+根据上述说明，构造实验场景的思路：
+
+1. 情形1：两端都设置`net.ipv4.tcp_timestamps=1`，构造下次请求的seq比上次的小（需要时间足够长等seq达到最大后重新计数，该情况称为`**回绕**`）、或者构造发送时间戳比前面的小
+2. 情形2：两端都设置`net.ipv4.tcp_timestamps=0`，构造下次请求的seq比上次的小
+
+而构造方式需要再考虑。星球给了一个方式：Server 端调大 `net.ipv4.tcp_tw_timeout` 到600秒，时间长 seq 才有机会回绕（**注意 该参数ALinux特有**，可以起`Alibaba Cloud Linux`的ECS实验）
 
 这里暂时仅作分析，先不进行实验。
-
-服务端timewait时回rst场景，过程解释：
-
-![服务端timewait时回rst场景](/images/2024-07-13-timewait-rst-case.png)
 
 ## 5. `TIME_WAIT`影响说明
 
@@ -178,4 +236,6 @@ Server 和 Client 都关闭 `net.ipv4.tcp_timestamps`，并构造下次请求的
 
 2、[4.11 在 TIME_WAIT 状态的 TCP 连接，收到 SYN 后会发生什么？](https://www.xiaolincoding.com/network/3_tcp/time_wait_recv_syn.html)
 
-3、GPT
+3、[K8S最佳实践-网络性能调优](https://imroc.cc/kubernetes/best-practices/performance-optimization/network)
+
+4、GPT
