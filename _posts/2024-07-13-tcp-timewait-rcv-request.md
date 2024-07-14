@@ -8,7 +8,7 @@ tags: TCP 网络
 * content
 {:toc}
 
-TIME_WAIT状态的连接收到SYN是什么表现
+TIME_WAIT状态的连接收到同四元组的SYN是什么表现
 
 
 
@@ -20,19 +20,20 @@ TIME_WAIT状态的连接收到SYN是什么表现
 
 ## 2. 问题描述
 
-一个连接如果 Server 主动断开，那么这个连接在Server 上会进入 `TIME_WAIT`
+一个连接如果 Server 主动断开，那么这个连接在Server 上会进入 `TIME_WAIT`，
 
-这个时候如果客户端再次用原来的四元组发起连接请求。首先这个连接和已经断开但处于`TIME_WAIT`的连接是重复的，这个时候Server该怎么处理这个握手包呢？
+这个时候如果客户端再次用**原来的四元组**发起连接请求。首先这个连接 和 已经断开但处于`TIME_WAIT`的连接是重复的，这个时候Server该怎么处理这个握手包呢？
 
 假设服务端监听端口为`8888`，客户端请求端口为`12345`，示意图如下：
 
 ![示意图](/images/2024-07-13-time-wait-rcv-syn.png)
 
-## 3. 构造复现场景（场景1）
+## 3. 构造场景（场景1）
 
 这里使用CentOS8.5系统，构造常规场景，保持默认TCP参数。内核为4.18.0-348.7.1.el8_5.x86_64.
 
 ```sh
+# tcp_tw_timeout 在标准内核上没有，ALinux（`Alibaba Cloud Linux`）单独新增
 [root@xdlinux ➜ ~ ]$ sysctl -a|grep -E 'ip_local_port_range|tcp_max_tw_buckets|tcp_tw_reuse|tcp_rfc1337|tcp_timestamps|tcp_tw_timeout'
 net.ipv4.ip_local_port_range = 32768	60999
 net.ipv4.tcp_max_tw_buckets = 131072
@@ -220,7 +221,7 @@ Got 14
 
 而构造方式需要再考虑。星球给了一个方式：Server 端调大 `net.ipv4.tcp_tw_timeout` 到600秒，时间长 seq 才有机会回绕（**注意 该参数ALinux特有**，可以起`Alibaba Cloud Linux`的ECS实验）
 
-这里暂时仅作分析，先不进行实验。
+~~这里暂时仅作分析，先不进行实验。~~
 
 ## 5. `TIME_WAIT`影响说明
 
@@ -232,7 +233,117 @@ Got 14
 
 客户端 syn需要两次（对应上面SYN非法回RST的场景）、syn 被reset等，主要是导致连接握手异常
 
-## 6. 参考
+## 6. 构造场景（场景2）
+
+### 6.1. 环境说明
+
+环境：起两个阿里云抢占式实例，Alibaba Cloud Linux 3.2104 LTS 64位（内核版本：5.10.134-16.1.al8.x86_64）
+
+相关内核网络参数如下：
+
+```sh
+[root@iZ2zeegk1auuwxkov67qfmZ ~]# sysctl -a|grep -E 'ip_local_port_range|tcp_max_tw_buckets|tcp_tw_reuse|tcp_rfc1337|tcp_timestamps|tcp_tw_timeout|tcp_tw_timeout'
+net.ipv4.ip_local_port_range = 32768    60999
+net.ipv4.tcp_max_tw_buckets = 5000
+# 为1时丢掉RST，避免因为 TIME_WAIT 状态收到 RST 报文而跳过 2MSL 的时间；为0则收到RST时提前结束 TIME_WAIT 状态，释放连接
+net.ipv4.tcp_rfc1337 = 0
+net.ipv4.tcp_timestamps = 1
+# 仅回环地址开启TIME_WAIT复用，基本可以粗略的认为没开启复用
+net.ipv4.tcp_tw_reuse = 2
+# Alinux特有，控制TIME_WAIT的持续时间
+net.ipv4.tcp_tw_timeout = 60
+net.ipv4.tcp_tw_timeout_inherit = 0
+```
+
+### 6.2. 构造方式
+
+1、服务端：172.23.133.149，`sysctl -w net.ipv4.tcp_tw_timeout=600`开不同终端分别进行监听、开启抓包、tcpstates观测
+
+代码：accept连接后就close，[github](https://github.com/xiaodongQ/prog-playground/blob/main/network/tcp_timewait_rcv_syn/server.cpp)
+
+```sh
+# 终端1
+[root@iZ2zeegk1auuwxkov67qfmZ ~]# tcpdump -i any port 8888 -nn -w server149_8888.cap -v
+
+# 终端2
+[root@iZ2zeegk1auuwxkov67qfmZ ~]# /usr/share/bcc/tools/tcpstates -L 8888
+```
+
+2、客户端：172.23.133.150，开启抓包，并指定端口请求 `nc 172.23.133.149 8888 -p 12345`
+
+```sh
+[root@iZ2zeegk1auuwxkov67qflZ ~]# tcpdump -i any port 8888 -nn -w client150_12345.cap -v
+```
+
+### 6.3. 现象和分析
+
+客户端一共发起4次请求。前两次默认tcp_timestamps是开启的，后两次两端都关闭：`sysctl -w net.ipv4.tcp_timestamps=0`
+
+**服务端：**
+
+1、只观察到`FIN-WAIT-2`状态，**没有TIME_WAIT** （为什么？TODO）
+
+```sh
+[root@iZ2zeegk1auuwxkov67qfmZ ~]# ss -antp|grep 8888
+LISTEN     0      5             0.0.0.0:8888          0.0.0.0:*     users:(("server",pid=5107,fd=3))                        
+FIN-WAIT-2 0      0      172.23.133.149:8888   172.23.133.150:12345
+```
+
+```sh
+[root@iZ2zeegk1auuwxkov67qfmZ ~]# /usr/share/bcc/tools/tcpstates -L 8888
+SKADDR           C-PID C-COMM     LADDR           LPORT RADDR           RPORT OLDSTATE    -> NEWSTATE    MS
+ffff9a7306de47c0 4630  server     0.0.0.0         8888  0.0.0.0         0     CLOSE       -> LISTEN      0.000
+ffff9a7306de47c0 4630  server     0.0.0.0         8888  0.0.0.0         0     LISTEN      -> CLOSE       82994.442
+ffff9a7306de5200 5107  server     0.0.0.0         8888  0.0.0.0         0     CLOSE       -> LISTEN      0.000
+# 1
+ffff9a7306de3d80 0     swapper/0  0.0.0.0         8888  0.0.0.0         0     LISTEN      -> SYN_RECV    0.000
+ffff9a7306de3d80 0     swapper/0  172.23.133.149  8888  172.23.133.150  12345 SYN_RECV    -> ESTABLISHED 0.042
+ffff9a7306de3d80 5107  server     172.23.133.149  8888  172.23.133.150  12345 ESTABLISHED -> FIN_WAIT1   0.090
+ffff9a7306de3d80 0     swapper/0  172.23.133.149  8888  172.23.133.150  12345 FIN_WAIT1   -> FIN_WAIT2   0.704
+ffff9a7306de3d80 0     swapper/0  172.23.133.149  8888  172.23.133.150  12345 FIN_WAIT2   -> CLOSE       0.002
+# 2
+ffff9a7306de3d80 0     swapper/0  0.0.0.0         8888  0.0.0.0         0     LISTEN      -> SYN_RECV    0.000
+ffff9a7306de3d80 0     swapper/0  172.23.133.149  8888  172.23.133.150  12345 SYN_RECV    -> ESTABLISHED 0.010
+ffff9a7306de3d80 5107  server     172.23.133.149  8888  172.23.133.150  12345 ESTABLISHED -> FIN_WAIT1   0.050
+ffff9a7306de3d80 0     swapper/0  172.23.133.149  8888  172.23.133.150  12345 FIN_WAIT1   -> FIN_WAIT2   0.322
+ffff9a7306de3d80 0     swapper/0  172.23.133.149  8888  172.23.133.150  12345 FIN_WAIT2   -> CLOSE       0.005
+# 3
+ffff9a7306de0a40 0     swapper/0  0.0.0.0         8888  0.0.0.0         0     LISTEN      -> SYN_RECV    0.000
+ffff9a7306de0a40 0     swapper/0  172.23.133.149  8888  172.23.133.150  12345 SYN_RECV    -> ESTABLISHED 0.011
+ffff9a7306de0a40 5107  server     172.23.133.149  8888  172.23.133.150  12345 ESTABLISHED -> FIN_WAIT1   0.077
+ffff9a7306de0a40 0     swapper/0  172.23.133.149  8888  172.23.133.150  12345 FIN_WAIT1   -> FIN_WAIT2   0.597
+ffff9a7306de0a40 0     swapper/0  172.23.133.149  8888  172.23.133.150  12345 FIN_WAIT2   -> CLOSE       0.003
+# 4
+ffff9a7306de2900 0     swapper/0  0.0.0.0         8888  0.0.0.0         0     LISTEN      -> SYN_RECV    0.000
+ffff9a7306de2900 0     swapper/0  172.23.133.149  8888  172.23.133.150  12345 SYN_RECV    -> ESTABLISHED 0.008
+ffff9a7306de2900 5107  server     172.23.133.149  8888  172.23.133.150  12345 ESTABLISHED -> FIN_WAIT1   0.041
+ffff9a7306de2900 0     swapper/0  172.23.133.149  8888  172.23.133.150  12345 FIN_WAIT1   -> FIN_WAIT2   1.109
+ffff9a7306de2900 0     swapper/0  172.23.133.149  8888  172.23.133.150  12345 FIN_WAIT2   -> CLOSE       0.003
+```
+
+2、抓包结果，4次都是服务端发送RST，4次请求间隔最长差不多有6分钟
+
+![ECS上抓包情况](/images/2024-07-14-ecs-timewait-syn.png)
+
+可以观察到客户端第2次和第3次时发`SYN`时有Seq回绕，但并不是服务端socket为`TIME_WAIT`时收到的SYN，还是要分析上面为什么没有`TIME_WAIT`。
+
+**客户端：**
+
+1、现象都是请求后阻塞一段时间，最后回车报错。抓包和服务端是一样的，见上面的图。
+
+```sh
+[root@iZ2zeegk1auuwxkov67qflZ ~]# nc 172.23.133.149 8888 -p 12345
+Ncat: Broken pipe.
+```
+
+## 7. 小结
+
+对`TIME_WAIT`状态的连接收到同四元组的SYN的表现做了实验分析。还有几个问题待定：
+
+* `tcp_timestamps`，是需要客户端和服务端都开启，那么对于一端开启一端关闭的情况，表现如何？
+* 在ECS上，FIN主动发起方最后没观察到`TIME_WAIT`状态，待分析原因？
+
+## 8. 参考
 
 1、[连接处于 TIME_WAIT 状态，这时收到了 syn 握手包](https://articles.zsxq.com/id_37l6pw1mtb0g.html)
 
