@@ -68,7 +68,7 @@ tcp_tw_reuse - INTEGER
 
 1、服务端：192.168.1.150，**CentOS8.5**，开不同终端分别进行监听、开启抓包、tcpstates观测
 
-代码：accept连接后就close，[github](https://github.com/xiaodongQ/prog-playground/blob/main/network/tcp_timewait_rcv_syn/server.cpp)
+代码：accept连接后就close，[github noread](https://github.com/xiaodongQ/prog-playground/tree/main/network/tcp_timewait_rcv_syn/mac_nc_case_noread/server.cpp)
 
 ```sh
 # 终端1
@@ -80,7 +80,7 @@ tcp_tw_reuse - INTEGER
 
 2、客户端：192.168.1.2，**MacOS**，开启抓包，并指定端口请求 `nc 192.168.1.150 8888 -p 12345`，在60s内请求2次
 
-*说明：此处客户端机器为MacOS，在Linux上用上述`nc`命令会阻塞，可以考虑换成`curl`并用`--local-port`指定端口*
+*说明：此处客户端机器为MacOS，**自己在Linux上用上述`nc`命令实验会阻塞**，若出现可以考虑换成`curl`并用`--local-port`指定端口*
 
 ```sh
 ➜  /Users/xd/Downloads tcpdump -i en0 port 8888 -nn -w client2_12345.cap -v
@@ -225,7 +225,7 @@ Got 14
 
 ~~这里暂时仅作分析，先不进行实验。~~
 
-## 5. `TIME_WAIT`影响说明
+## 5. TIME_WAIT 影响说明
 
 1、TIME_WAIT 过多对客户端的影响(大多场景)：
 
@@ -250,7 +250,7 @@ Got 14
 
 先了解下：
 
-* **序列号**，是 TCP 一个头部字段（Seq），标识了 TCP 发送端到 TCP 接收端的数据流的一个字节，因为 TCP 是面向字节流的可靠协议，为了保证消息的顺序性和可靠性，TCP 为每个传输方向上的每个字节都赋予了一个编号，以便于传输成功后确认、丢失后重传以及在接收端保证不会乱序。序列号是一个 32 位的无符号数，因此在到达 4G 之后再循环回到 0（该情况称为`**回绕**`）。**这意味着无法根据序列号来判断新老数据**。
+* **序列号**，是 TCP 一个头部字段（Seq），标识了 TCP 发送端到 TCP 接收端的数据流的一个字节，因为 TCP 是面向字节流的可靠协议，为了保证消息的顺序性和可靠性，TCP 为每个传输方向上的每个字节都赋予了一个编号，以便于传输成功后确认、丢失后重传以及在接收端保证不会乱序。序列号是一个 32 位的无符号数，因此在到达 4G 之后再循环回到 0（该情况称为 **`回绕`**）。**这意味着无法根据序列号来判断新老数据**。
 * **初始序列号**，在 TCP 建立连接的时候，客户端和服务端都会`各自`生成一个初始序列号，它是基于时钟生成的一个随机数，来保证每个连接都拥有不同的初始序列号。初始化序列号可被视为一个 32 位的计数器，该计数器的数值每 4 微秒加 1，循环一次需要 4.55 小时。
 
 `MSL（Maximum Segment Lifetime）`是指 TCP 协议中任何报文在网络上最大的生存时间，任何超过这个时间的数据都将被丢弃。虽然 `RFC 793` 规定 MSL 为 2 分钟，但是在实际实现的时候会有所不同，比如 Linux 默认为 30 秒，那么 2MSL 就是 60 秒。
@@ -275,7 +275,7 @@ Got 14
 * `net.ipv4.tcp_tw_recycle`：如果开启该选项的话，允许处于 TIME_WAIT 状态的连接被快速回收，该参数在 NAT 的网络下是不安全的！
 	* NAT网络存在的问题详情可参考：[SYN 报文什么时候情况下会被丢弃？](https://xiaolincoding.com/network/3_tcp/syn_drop.html)
 	* **在 Linux 4.12 版本后，直接取消了tcp_tw_recycle这一参数。**
-* `net.ipv4.tcp_timestamps`：tcp_timestamps 选项开启之后， `PAWS（Protect Against Wrapped Sequences）` 机制会自动开启，它的作用是防止 TCP 包中的序列号发生`回绕`。
+* `net.ipv4.tcp_timestamps`：tcp_timestamps 选项开启之后， `PAWS（Protect Against Wrapped Sequences）` 机制会自动开启，它的作用是防止 TCP 包中的序列号发生`回绕`。（感觉保护回绕更准确，Seq 4G回绕后借助timestamp判断）
 	* 在开启 tcp_timestamps 选项情况下，一台机器发的所有 TCP 包都会带上发送时的时间戳，PAWS 要求连接双方维护最近一次收到的数据包的时间戳（Recent TSval），每收到一个新数据包都会读取数据包中的时间戳值跟 Recent TSval 值做比较，如果发现收到的数据包中时间戳不是递增的，则表示该数据包是过期的，就会直接丢弃这个数据包。
 
 ## 6. 构造场景（场景2）
@@ -312,7 +312,7 @@ net.ipv4.tcp_tw_timeout_inherit = 0
 
 开不同终端分别进行监听、开启抓包、tcpstates观测
 
-代码：accept连接后就close，[github](https://github.com/xiaodongQ/prog-playground/blob/main/network/tcp_timewait_rcv_syn/server.cpp)，`g++ server.cpp -o server`。
+代码：accept连接后就close，[github noread](https://github.com/xiaodongQ/prog-playground/tree/main/network/tcp_timewait_rcv_syn/mac_nc_case_noread/server.cpp)，`g++ server.cpp -o server`。
 
 ```sh
 # 终端1
@@ -395,7 +395,9 @@ Ncat: Broken pipe.
 
 再看下上述的抓包，服务端发起FIN后收到对端的ACK，变成`FIN_WAIT2`状态，本来正常的挥手应该由对端再发送`FIN`（看上面的流程图示更直观），而后主动发起方才变成`TIME_WAIT`状态。
 
-但是`nc 172.23.133.149 8888 -p 12345`执行时阻塞在那，看抓包也时没发送`FIN`的。所以要查下：为什么`nc`在ECS上没发`FIN`呢？
+但是`nc 172.23.133.149 8888 -p 12345`执行时**阻塞**在那，需要多次回车才结束，看过程抓包也是没发送`FIN`的。所以要查下：为什么`nc`在ECS上没发`FIN`呢？
+
+尝试看下：
 
 ```sh
 [root@iZ2zeegk1auuwxkov67qflZ ~]# strace -yy nc 172.23.133.149 8888 -p 12345
@@ -408,19 +410,22 @@ bind(3<TCP:[60349]>, {sa_family=AF_INET, sin_port=htons(12345), sin_addr=inet_ad
 connect(3<TCP:[60349]>, {sa_family=AF_INET, sin_port=htons(8888), sin_addr=inet_addr("172.23.133.149")}, 16) = -1 EINPROGRESS (Operation now in progress)
 select(4, [3<TCP:[172.23.133.150:12345->172.23.133.149:8888]>], [3<TCP:[172.23.133.150:12345->172.23.133.149:8888]>], [3<TCP:[172.23.133.150:12345->172.23.133.149:8888]>], {tv_sec=9, tv_usec=999000}) = 1 (out [3], left {tv_sec=9, tv_usec=998876})
 getsockopt(3<TCP:[172.23.133.150:12345->172.23.133.149:8888]>, SOL_SOCKET, SO_ERROR, [0], [4]) = 0
+# 贴一下声明：int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
+# 此处还有8888对应fd read事件的监控
 select(4, [0</dev/pts/0<char 136:0>> 3<TCP:[172.23.133.150:12345->172.23.133.149:8888]>], [], [0</dev/pts/0<char 136:0>> 3<TCP:[172.23.133.150:12345->172.23.133.149:8888]>], NULL) = 1 (in [3])
 recvfrom(3<TCP:[172.23.133.150:12345->172.23.133.149:8888]>, "", 8192, 0, 0x7ffc073e1710, [128 => 0]) = 0
 close(1</dev/pts/0<char 136:0>>)        = 0
-# 阻塞
+# 阻塞 （此处没有8888对应fd read事件监控了）
 select(4, [0</dev/pts/0<char 136:0>>], [], [0</dev/pts/0<char 136:0>> 3<TCP:[172.23.133.150:12345->172.23.133.149:8888]>], NULL
 
 # 第1次回车，已经发出了抓包对应的空数据，抓包里可以看出对端发了RST，本端也收到了
 ) = 1 (in [0])
 recvfrom(0</dev/pts/0<char 136:0>>, 0x7ffc073e1790, 8192, 0, 0x7ffc073e1710, [128]) = -1 ENOTSOCK (Socket operation on non-socket)
 read(0</dev/pts/0<char 136:0>>, "\n", 8192) = 1
+# 8888对应fd write事件的监控
 select(4, [], [3<TCP:[172.23.133.150:12345->172.23.133.149:8888]>], [0</dev/pts/0<char 136:0>> 3<TCP:[172.23.133.150:12345->172.23.133.149:8888]>], NULL) = 1 (out [3])
 sendto(3<TCP:[172.23.133.150:12345->172.23.133.149:8888]>, "\n", 1, 0, NULL, 0) = 1
-# 阻塞，但上面已经RST了（为什么还阻塞着？）
+# 阻塞，但上面已经RST了（为什么还阻塞着？read、write事件监控都没了）
 select(4, [0</dev/pts/0<char 136:0>>], [], [0</dev/pts/0<char 136:0>> 3<TCP:[172.23.133.150:12345->172.23.133.149:8888]>], NULL
 
 # 第2次回车，无法向对端发任何东西
@@ -466,7 +471,7 @@ libnsock nsock_trace_handler_callback(): Callback: WRITE ERROR [Broken pipe (32)
 Ncat: Broken pipe.
 ```
 
-没看出啥问题，试了下服务端先发送部分数据，表现也一样。想回头`strace`和`-v`跟踪下CentOS8.5上的过程用作对比，客户端和服务端都在上面，**发现表现跟这里一样，也不发送`FIN`！！！**（之前场景1的客户端机器是MacOS）
+没直接看出啥问题，试了下服务端先发送部分数据，表现也一样。想回头`strace`和`-v`跟踪下CentOS8.5上的过程用作对比，客户端和服务端都在这台采集，**发现表现跟这里一样，也不发送`FIN`！！！**（之前场景1的客户端机器是MacOS）
 
 场景1的实验里，是由于`nc`在MacOS上执行的，收到服务端`FIN`主动关闭后，后面发送了`FIN`完成挥手，依赖客户端的实现。
 
@@ -475,6 +480,8 @@ Ncat: Broken pipe.
 ### 6.5. （成功）客户端切换为`curl`重新验证
 
 `curl`的`--local-port`选项，可指定本地端口（`--local-port 12345`）或端口范围（`--local-port 4000-4200`）
+
+代码：accept连接后read再close，read下curl请求要不curl会请求失败，[github withread](https://github.com/xiaodongQ/prog-playground/tree/main/network/tcp_timewait_rcv_syn/server.cpp)
 
 *下述IP说明：重新拉了2个ECS，服务端172.23.133.151、客户端172.23.133.152。*
 
@@ -486,10 +493,10 @@ Ncat: Broken pipe.
 * Server 和 Client 都关闭 net.ipv4.tcp_timestamps（之前设置过）
 * 客户端两次连接间隔150秒左右（**这次不请求那么频繁了，sleep后再请求**）
 
-请求3次，每次间隔150s，如下
+客户端请求3次，每次间隔150s，如下
 
 ```sh
-# 脚步内容
+# 脚本内容
 [root@iZ2ze39uwj39zyd1pdvq3xZ ~]# cat test.sh 
 curl 172.23.133.151:8888 --local-port 12345
 sleep 150
@@ -504,12 +511,24 @@ curl: (52) Empty reply from server
 curl: (52) Empty reply from server
 ```
 
+服务端收到请求打印形式如下：
+
+```sh
+Client: GET / HTTP/1.1
+Host: 172.23.133.151:8888
+User-Agent: curl/7.61.1
+Accept: */*
+
+
+close, client_ip:172.23.133.152, port:12345
+```
+
 看下抓包：服务端和客户端抓到的包是一样的。
 
 ![服务端客户端抓包情况](/images/2024-07-14-timewait-syn-client-rst.png)
 
 [服务端抓包文件](/images/srcfiles/8888_server_172.23.133.151.cap)  
-[客户端端抓包文件](/images/srcfiles/8888_client_172.23.133.152.cap)
+[客户端抓包文件](/images/srcfiles/8888_client_172.23.133.152.cap)
 
 ### 6.6. （成功）结果分析
 
