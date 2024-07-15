@@ -251,7 +251,7 @@ Got 14
 先了解下：
 
 * **序列号**，是 TCP 一个头部字段（Seq），标识了 TCP 发送端到 TCP 接收端的数据流的一个字节，因为 TCP 是面向字节流的可靠协议，为了保证消息的顺序性和可靠性，TCP 为每个传输方向上的每个字节都赋予了一个编号，以便于传输成功后确认、丢失后重传以及在接收端保证不会乱序。序列号是一个 32 位的无符号数，因此在到达 4G 之后再循环回到 0（该情况称为 **`回绕`**）。**这意味着无法根据序列号来判断新老数据**。
-* **初始序列号**，在 TCP 建立连接的时候，客户端和服务端都会`各自`生成一个初始序列号，它是基于时钟生成的一个随机数，来保证每个连接都拥有不同的初始序列号。初始化序列号可被视为一个 32 位的计数器，该计数器的数值每 4 微秒加 1，循环一次需要 4.55 小时。
+* **初始序列号（Initial Sequence Number，ISN）**，在 TCP 建立连接的时候，客户端和服务端都会`各自`生成一个初始序列号，它是基于时钟生成的一个随机数，来保证每个连接都拥有不同的初始序列号。初始化序列号可被视为一个 32 位的计数器，该计数器的数值每 4 微秒加 1，循环一次需要 4.55 小时。
 
 `MSL（Maximum Segment Lifetime）`是指 TCP 协议中任何报文在网络上最大的生存时间，任何超过这个时间的数据都将被丢弃。虽然 `RFC 793` 规定 MSL 为 2 分钟，但是在实际实现的时候会有所不同，比如 Linux 默认为 30 秒，那么 2MSL 就是 60 秒。
 
@@ -541,13 +541,29 @@ close, client_ip:172.23.133.152, port:12345
 
 ![stream1 Flow Graph](/images/2024-07-14-stream1-flowgraph.png)
 
-#### 6.6.1. **疑问（TODO）：**
+分析上述过程，**存在如下疑问。TODO**
+
+#### 6.6.1. 客户端`TCP Port numbers reused`问题
 
 * 1、客户端第2、第3个stream发起的`SYN`握手，为什么也是 **`TCP Port numbers reused`**（上图`mark0`）？ 客户端请求完后`netstat`/`ss`看是已经没有任何`8888`或`12345`的连接的，之前端口用完释放了才对？
+
+这里的`TCP Port numbers reused`提示，是Wireshark的TCP解析器提供的分析功能，可以在Wireshark设置->协议->TCP中，勾选/取消“`Analyze TCP sequence numbers`”来启用或禁用此功能。（还有些其他场景可参考：[TCP Analysis Flags 之 TCP Port numbers reused](https://mp.weixin.qq.com/s/rP65saOCuFFEZQBtJA5H-w)）
+
+针对 SYN 数据包(实际SYN+ACK包也是)，如果已经有一个使用相同 IP+Port 的会话，并且这个 SYN 的序列号与已有会话的 `ISN` 不同时就会设置`TCP Port numbers reused`标记。
+
+所以这个只是Wireshark侧的辅助信息，可展开抓包看下：
+
+![wireshark分析port reused](/images/2024-07-15-wireshark-port-reused.png)
+
+**注意**：这里展示的`port reused`和内核的端口重用（`REUSEPORT`）特性不是一回事，端口重用允许同一机器上的多个进程同时创建不同的socket来`bind`和`listen`在相同的端口上，然后在内核层面实现多个用户进程的负载均衡。可通过`setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, ...)`方式开启该特性，进一步了解可见：[深入理解Linux端口重用这一特性](https://mp.weixin.qq.com/s/SYCUMvzktgeGbyAfRdqhmg)。
+
+#### 6.6.2. Seq回绕时应答的ACK 和 `Challenge ACK` 问题
 
 * 2、对于`mark0`处对应的发起SYN后收到的ACK（`mark1`，被标记为 **`TCP ACKed unseen segment`**），和处于`Established`状态收到SYN而收到的 **`Challenge ACK`**是一回事吗？
 
 `Challenge ACK`相关机制，参考：[4.9 已建立连接的TCP，收到SYN会发生什么？](https://www.xiaolincoding.com/network/3_tcp/challenge_ack.html)
+
+#### 6.6.3. 服务端`TIME_WAIT`收到`RST`的表现问题
 
 * 3、对于客户端发送的`RST`（上图`mark2`），服务端收到后的表现具体如何？
 
@@ -555,13 +571,19 @@ close, client_ip:172.23.133.152, port:12345
 
 但是看后面`mark4`好像有复用关系？此环境tcp_rfc1337为0，没结束`TIME_WAIT`释放连接吗？
 
+#### 6.6.4. 重新发起`SYN`为什么也是`TCP Port numbers reused`
+
 * 4、`mark3`从Seq看是`mark0`的重传，重新发起`SYN`三次握手，这里疑问还是和第1个一样，为什么是`TCP Port numbers reused`？
+
+#### 6.6.5. 服务端端口重用问题 及 为什么被标记重传
 
 * 5、`mark4`是服务端复用`TIME_WAIT`四元组端口？和前面第3个问题一起待定。另外，这里标记的重传，是谁的重传？
 
 分析：客户端重新发SYN握手时，服务端应答SYN+ACK，其中Seq是重新生成的，对应上面说的`初始序列号`（`mark1`里Seq对应的是老连接）
 
 看起来是正常的三次握手，为什么标记成重传了
+
+#### 6.6.6. 服务端`FIN`+`ACK`包为什么被标记重传
 
 * 6、`mark5`的重传又是什么鬼？发FIN的同时重传ACK? 印象里ACK不存在重传啊？
 
@@ -581,4 +603,8 @@ close, client_ip:172.23.133.152, port:12345
 
 5、[4.9 已建立连接的TCP，收到SYN会发生什么？](https://www.xiaolincoding.com/network/3_tcp/challenge_ack.html)
 
-6、GPT
+6、[深入理解Linux端口重用这一特性](https://mp.weixin.qq.com/s/SYCUMvzktgeGbyAfRdqhmg)
+
+7、[TCP Analysis Flags 之 TCP Port numbers reused](https://mp.weixin.qq.com/s/rP65saOCuFFEZQBtJA5H-w)
+
+8、GPT
