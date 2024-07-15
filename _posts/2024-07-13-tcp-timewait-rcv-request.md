@@ -555,13 +555,13 @@ close, client_ip:172.23.133.152, port:12345
 
 ![wireshark分析port reused](/images/2024-07-15-wireshark-port-reused.png)
 
-**注意**：这里展示的`port reused`和内核的端口重用（`REUSEPORT`）特性不是一回事，端口重用允许同一机器上的多个进程同时创建不同的socket来`bind`和`listen`在相同的端口上，然后在内核层面实现多个用户进程的负载均衡。可通过`setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, ...)`方式开启该特性，进一步了解可见：[深入理解Linux端口重用这一特性](https://mp.weixin.qq.com/s/SYCUMvzktgeGbyAfRdqhmg)。
+**注意**：这里展示的`port reused`和**内核的端口重用（`REUSEPORT`）特性**不是一回事，端口重用允许同一机器上的多个进程同时创建不同的socket来`bind`和`listen`在相同的端口上，然后在内核层面实现多个用户进程的负载均衡。可通过`setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, ...)`方式开启该特性，进一步了解可见：[深入理解Linux端口重用这一特性](https://mp.weixin.qq.com/s/SYCUMvzktgeGbyAfRdqhmg)。
 
 #### 6.6.2. Seq回绕时应答的ACK 和 `Challenge ACK` 问题
 
 * 2、对于`mark0`处对应的发起SYN后收到的ACK（`mark1`，被标记为 **`TCP ACKed unseen segment`**），和处于`Established`状态收到SYN而收到的 **`Challenge ACK`**是一回事吗？
 
-`Challenge ACK`相关机制，参考：[4.9 已建立连接的TCP，收到SYN会发生什么？](https://www.xiaolincoding.com/network/3_tcp/challenge_ack.html)
+`Challenge ACK`，相关机制具体参考：[4.9 已建立连接的TCP，收到SYN会发生什么？](https://www.xiaolincoding.com/network/3_tcp/challenge_ack.html)
 
 #### 6.6.3. 服务端`TIME_WAIT`收到`RST`的表现问题
 
@@ -586,6 +586,14 @@ close, client_ip:172.23.133.152, port:12345
 #### 6.6.6. 服务端`FIN`+`ACK`包为什么被标记重传
 
 * 6、`mark5`的重传又是什么鬼？发FIN的同时重传ACK? 印象里ACK不存在重传啊？
+
+#### 6.6.7. 一端开启一端关闭`tcp_timestamps`表现如何
+
+上面描述"`SYN`是否合法"的小节留的TODO：时间回绕判断一般需要客户端和服务端都开启`tcp_timestamps`，那么对于一端开启一端关闭的情况，表现如何？
+
+先分析当前涉及场景：
+
+服务端（本场景的主动关闭方）开启，客户端关闭`timestamp`
 
 ## 7. 小结
 
