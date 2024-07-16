@@ -51,17 +51,17 @@ net.ipv4.tcp_tw_reuse = 2
 ```sh
 # linux-5.10.10/Documentation/networking/ip-sysctl.rst
 tcp_tw_reuse - INTEGER
-	Enable reuse of TIME-WAIT sockets for new connections when it is
-	safe from protocol viewpoint.
+    Enable reuse of TIME-WAIT sockets for new connections when it is
+    safe from protocol viewpoint.
 
-	- 0 - disable
-	- 1 - global enable
-	- 2 - enable for loopback traffic only
+    - 0 - disable
+    - 1 - global enable
+    - 2 - enable for loopback traffic only
 
-	It should not be changed without advice/request of technical
-	experts.
+    It should not be changed without advice/request of technical
+    experts.
 
-	Default: 2
+    Default: 2
 ```
 
 ### 3.1. 构造方式
@@ -270,13 +270,13 @@ Got 14
 再说下几个和`TIME_WAIT`相关的参数：
 
 * `net.ipv4.tcp_tw_reuse`：其作用是让客户端快速复用处于 TIME_WAIT 状态的端口，相当于跳过了 TIME_WAIT 状态。
-	* 如果开启该选项的话，客户端（连接发起方） 在调用 connect() 函数时，如果内核选择到的端口，已经被相同四元组的连接占用的时候，就会判断该连接是否处于 TIME_WAIT 状态，如果该连接处于 TIME_WAIT 状态并且 TIME_WAIT 状态持续的时间超过了 `1` 秒，那么就会重用这个连接，然后就可以正常使用该端口了。所以该选项只适用于连接发起方。
-	* 新内核中默认值为2，表示仅为回环地址开启复用，基本可以粗略的认为没开启复用
+    * 如果开启该选项的话，客户端（连接发起方） 在调用 connect() 函数时，如果内核选择到的端口，已经被相同四元组的连接占用的时候，就会判断该连接是否处于 TIME_WAIT 状态，如果该连接处于 TIME_WAIT 状态并且 TIME_WAIT 状态持续的时间超过了 `1` 秒，那么就会重用这个连接，然后就可以正常使用该端口了。所以该选项只适用于连接发起方。
+    * 新内核中默认值为2，表示仅为回环地址开启复用，基本可以粗略的认为没开启复用
 * `net.ipv4.tcp_tw_recycle`：如果开启该选项的话，允许处于 TIME_WAIT 状态的连接被快速回收，该参数在 NAT 的网络下是不安全的！
-	* NAT网络存在的问题详情可参考：[SYN 报文什么时候情况下会被丢弃？](https://xiaolincoding.com/network/3_tcp/syn_drop.html)
-	* **在 Linux 4.12 版本后，直接取消了tcp_tw_recycle这一参数。**
+    * NAT网络存在的问题详情可参考：[SYN 报文什么时候情况下会被丢弃？](https://xiaolincoding.com/network/3_tcp/syn_drop.html)
+    * **在 Linux 4.12 版本后，直接取消了tcp_tw_recycle这一参数。**
 * `net.ipv4.tcp_timestamps`：tcp_timestamps 选项开启之后， `PAWS（Protect Against Wrapped Sequences）` 机制会自动开启，它的作用是防止 TCP 包中的序列号发生`回绕`。（感觉保护回绕更准确，Seq 4G回绕后借助timestamp判断）
-	* 在开启 tcp_timestamps 选项情况下，一台机器发的所有 TCP 包都会带上发送时的时间戳，PAWS 要求连接双方维护最近一次收到的数据包的时间戳（Recent TSval），每收到一个新数据包都会读取数据包中的时间戳值跟 Recent TSval 值做比较，如果发现收到的数据包中时间戳不是递增的，则表示该数据包是过期的，就会直接丢弃这个数据包。
+    * 在开启 tcp_timestamps 选项情况下，一台机器发的所有 TCP 包都会带上发送时的时间戳，PAWS 要求连接双方维护最近一次收到的数据包的时间戳（Recent TSval），每收到一个新数据包都会读取数据包中的时间戳值跟 Recent TSval 值做比较，如果发现收到的数据包中时间戳不是递增的，则表示该数据包是过期的，就会直接丢弃这个数据包。
 
 ## 6. 构造场景（场景2）
 
@@ -595,11 +595,200 @@ close, client_ip:172.23.133.152, port:12345
 
 服务端（本场景的主动关闭方）开启，客户端关闭`timestamp`
 
-## 7. 小结
+## 7. TCP接收处理源码简要说明
+
+af_inet.c里初始化：`inet_init`->`inet_add_protocol(&tcp_protocol, IPPROTO_TCP)`，里面会注册`tcp_v4_rcv`为TCP层的处理入口函数。下面简要分析`TIME_WAIT`时的处理。
+
+### 7.1. tcp_v4_rcv
+
+```c
+// linux-5.10.10/net/ipv4/tcp_ipv4.c
+int tcp_v4_rcv(struct sk_buff *skb)
+{
+    struct net *net = dev_net(skb->dev);
+    struct sk_buff *skb_to_free;
+    int sdif = inet_sdif(skb);
+    int dif = inet_iif(skb);
+    const struct iphdr *iph;
+    const struct tcphdr *th;
+    bool refcounted;
+    struct sock *sk;
+    ...
+    // TCP协议头
+    th = (const struct tcphdr *)skb->data;
+    // IP协议头
+    iph = ip_hdr(skb);
+lookup:
+    // 根据四元组查找对应的sock
+    sk = __inet_lookup_skb(&tcp_hashinfo, skb, __tcp_hdrlen(th), th->source,
+                   th->dest, sdif, &refcounted);
+process:
+    // 如果连接的状态为TIME_WAIT，会跳转到 do_time_wait
+    if (sk->sk_state == TCP_TIME_WAIT)
+        // 本地为TIME_WAIT状态时，跳到do_time_wait处理
+        goto do_time_wait;
+    ...
+do_time_wait:
+    ...
+    // 由 tcp_timewait_state_process 函数处理在 TIME_WAIT 状态收到的报文
+    switch (tcp_timewait_state_process(inet_twsk(sk), skb, th)) {
+    // 如果是TCP_TW_SYN，允许TIM_WAIT状态跃迁到SYN_RECV
+    case TCP_TW_SYN: {
+        struct sock *sk2 = inet_lookup_listener(dev_net(skb->dev),
+                            &tcp_hashinfo, skb,
+                            __tcp_hdrlen(th),
+                            iph->saddr, th->source,
+                            iph->daddr, th->dest,
+                            inet_iif(skb),
+                            sdif);
+        if (sk2) {
+            inet_twsk_deschedule_put(inet_twsk(sk));
+            sk = sk2;
+            tcp_v4_restore_cb(skb);
+            refcounted = false;
+            goto process;
+        }
+    }
+        /* to ACK */
+        fallthrough;
+    // 如果是TCP_TW_ACK，返回记忆中的ACK（上一次发送的ACK）
+    case TCP_TW_ACK:
+        tcp_v4_timewait_ack(sk, skb);
+        break;
+    // 如果是TCP_TW_RST，直接发送RST包
+    case TCP_TW_RST:
+        tcp_v4_send_reset(sk, skb);
+        inet_twsk_deschedule_put(inet_twsk(sk));
+        goto discard_it;
+    // 如果是TCP_TW_SUCCESS，则直接丢弃此包，不做任何响应
+    case TCP_TW_SUCCESS:;
+    }
+    ...
+}
+```
+
+### 7.2. tcp_timewait_state_process
+
+```c
+// linux-5.10.10/net/ipv4/tcp_minisocks.c
+enum tcp_tw_status
+tcp_timewait_state_process(struct inet_timewait_sock *tw, struct sk_buff *skb,
+               const struct tcphdr *th)
+{
+    struct tcp_options_received tmp_opt;
+    struct tcp_timewait_sock *tcptw = tcp_twsk((struct sock *)tw);
+    //paws_reject 为 false，表示没有发生时间戳回绕
+    //paws_reject 为 true，表示发生了时间戳回绕
+    bool paws_reject = false;
+    tmp_opt.saw_tstamp = 0;
+    // TCP头中有选项且旧连接开启了时间戳选项，tw_ts_recent_stamp为原sock对应的timestamp开关
+    if (th->doff > (sizeof(*th) >> 2) && tcptw->tw_ts_recent_stamp) {
+        tcp_parse_options(twsk_net(tw), skb, &tmp_opt, 0, NULL); // 解析TCP选项放入tmp_opt
+        // 上面tcp_parse_options中，若收到的对端报文中发现有TIMESTAMP，会对时间戳进行记录，并置saw_tstamp=1
+        if (tmp_opt.saw_tstamp) {
+            if (tmp_opt.rcv_tsecr)
+                tmp_opt.rcv_tsecr -= tcptw->tw_ts_offset;
+            // 本地sock记录的，上次接收包的时间戳
+            tmp_opt.ts_recent	= tcptw->tw_ts_recent;
+            // 上次记录的时间戳
+            tmp_opt.ts_recent_stamp	= tcptw->tw_ts_recent_stamp;
+            // 检查收到的报文的时间戳是否发生了时间戳回绕
+            paws_reject = tcp_paws_reject(&tmp_opt, th->rst);
+        }
+    }
+    ...
+    //是SYN包、没有RST、没有ACK、时间戳没有回绕，并且序列号也没有回绕
+    if (th->syn && !th->rst && !th->ack && !paws_reject &&
+        (after(TCP_SKB_CB(skb)->seq, tcptw->tw_rcv_nxt) ||
+         (tmp_opt.saw_tstamp && //新连接开启了时间戳
+          (s32)(tcptw->tw_ts_recent - tmp_opt.rcv_tsval) < 0))) { //时间戳没有回绕
+        // 初始化序列号
+        u32 isn = tcptw->tw_snd_nxt + 65535 + 2;
+        if (isn == 0)
+            isn++;
+        TCP_SKB_CB(skb)->tcp_tw_isn = isn;
+        return TCP_TW_SYN; //允许重用TIME_WAIT四元组重新建立连接
+    }
+
+    if (paws_reject)
+        __NET_INC_STATS(twsk_net(tw), LINUX_MIB_PAWSESTABREJECTED);
+
+    if (!th->rst) {
+        // 如果时间戳回绕，或者报文里包含ack，则将 TIMEWAIT 状态的持续时间重新延长
+        if (paws_reject || th->ack)
+            inet_twsk_reschedule(tw, TCP_TIMEWAIT_LEN);
+
+        return tcp_timewait_check_oow_rate_limit(
+            tw, skb, LINUX_MIB_TCPACKSKIPPEDTIMEWAIT);
+    }
+    inet_twsk_put(tw);
+    return TCP_TW_SUCCESS;
+}
+```
+
+### 7.3. `struct tcp_options_received`
+
+`tcp_options_received` 是 Linux 内核中用于处理接收到的 TCP 选项的重要结构。此结构在 TCP 协议的实现中起着至关重要的作用。TCP 选项是 TCP 首部的一部分，用于提供附加的通信控制功能，例如窗口扩展、时间戳等。
+
+TCP**三次握手的过程**中会协商各类选项，包括时间戳选项。如果双方都支持时间戳选项，就会使用时间戳进行后续通信。
+
+下面说明下字段含义，有助于后续梳理代码逻辑。
+
+```c
+// linux-5.10.10/include/linux/tcp.h
+// 提供了一个集中化的地方来保持所有已接收 TCP 选项的状态。处理函数会根据这些选项来调整 TCP 连接的行为。
+// 通过解析 TCP 包中的选项字段，然后填充这个结构，TCP 协议可以动态调整其操作。
+struct tcp_options_received {
+/*	PAWS/RTTM data	*/
+    // `ts_recent_stamp` 是一个时间戳，
+    // 记录的是最近一次更新 `ts_recent` 的内核时间。这是一个内核时间的标记，通常以系统时间或者定时器滴答值（jiffies）表示，用于衡量时间流逝的。
+    // 主要用于计算 TCP 连接中的 RTT（Round-Trip Time），以及进行 PAWS（Protect Against Wrapped Sequence numbers）保护机制中的时间验证。
+    // 每当 `ts_recent` 更新时，相应地，`ts_recent_stamp` 也会更新为内核当前的时间值。这样能够帮助内核知道 `ts_recent` 是什么时候最后更新的，从而进行时间相关的验证和计算。
+    int	ts_recent_stamp;/* Time we stored ts_recent (for aging) */
+    // 存储的是接收到的最新时间戳值。这值是对方在其发送的 TCP 包的时间戳选项（TSval字段）中提供的值。
+    // PAWS 通过检查接收的时间戳值是否小于 `ts_recent` 来防止因 TCP 序列号回绕（序列号重新开始）引起的包混乱
+    // 当一个新的 TCP 包被接收并且其中的时间戳值大于当前的 `ts_recent` 时，这个字段就会被更新，并且 `ts_recent_stamp` 也会相应更新
+    u32	ts_recent;	/* Time stamp to echo next		*/
+    // 时间戳值（Timestamp Value, TSval）：发送方获取本地时钟的当前值填入TSval
+    u32	rcv_tsval;	/* Time stamp value             	*/
+    // 回送时间戳回显值（Timestamp Echo Reply field, TSecr）：接收方将其上次接收到的数据包中的TSval值填入TSecr并返回给发送方
+    u32	rcv_tsecr;	/* Time stamp echo reply        	*/
+    // `saw_tstamp` 是一个标志位，表示该连接是否启用了 TCP 时间戳选项。
+    // 当一个 TCP 包被接收并且其中包含时间戳选项时，这个标志位就会被设置为1。根据这个标志位，内核可以决定是否需要解析和使用其他时间戳相关的字段。
+    // 如果 `saw_tstamp` 是1，表示时间戳功能已经确认，可以信赖这些时间戳数据来进行 RTT 计算和 PAWS 保护
+    u16 	saw_tstamp : 1,	/* Saw TIMESTAMP on last packet		*/
+    // 一个标志，表示时间戳选项是否已协商通过
+        tstamp_ok : 1,	/* TIMESTAMP seen on SYN packet		*/
+        dsack : 1,	/* D-SACK is scheduled			*/
+        // 一个标志，表示窗口扩大选项是否已协商通过
+        wscale_ok : 1,	/* Wscale seen on SYN packet		*/
+        // 一个标志，表示选择性确认（Selective ACK）的支持情况。它值为3是为了确保多次协商的结果一致。
+        sack_ok : 3,	/* SACK seen on SYN packet		*/
+        smc_ok : 1,	/* SMC seen on SYN packet		*/
+        // 存储发送方向的窗口扩大因子（scale factor）
+        snd_wscale : 4,	/* Window scaling received from sender	*/
+        // 存储接收方向的窗口扩大因子（scale factor）
+        rcv_wscale : 4;	/* Window scaling to send to receiver	*/
+    u8	saw_unknown:1,	/* Received unknown option		*/
+        unused:7;
+    // 用于统计选项 SACK（Selective Acknowledgment）的数量
+    u8	num_sacks;	/* Number of SACK blocks		*/
+    // 用户设置的最大报文段大小（MSS, Maximum Segment Size）
+    u16	user_mss;	/* mss requested by user in ioctl	*/
+    // 代表协商过后使用的最大报文段大小（MSS, Maximum Segment Size）
+    u16	mss_clamp;	/* Maximal mss, negotiated at connection setup */
+};
+```
+
+三次握手时协商TCP选项，开启关闭`net.ipv4.tcp_timestamps`对比：
+
+![tcp头选项-timestamp对比](/images/2024-07-16-tcp-option-timestamp.png)
+
+## 8. 小结
 
 对`TIME_WAIT`状态的连接收到同四元组的SYN的表现做了实验分析。踩了一些坑，还有好几个问题待定分析。
 
-## 8. 参考
+## 9. 参考
 
 1、[连接处于 TIME_WAIT 状态，这时收到了 syn 握手包](https://articles.zsxq.com/id_37l6pw1mtb0g.html)
 
@@ -611,8 +800,10 @@ close, client_ip:172.23.133.152, port:12345
 
 5、[4.9 已建立连接的TCP，收到SYN会发生什么？](https://www.xiaolincoding.com/network/3_tcp/challenge_ack.html)
 
-6、[深入理解Linux端口重用这一特性](https://mp.weixin.qq.com/s/SYCUMvzktgeGbyAfRdqhmg)
+6、[SYN 报文什么时候情况下会被丢弃？](https://xiaolincoding.com/network/3_tcp/syn_drop.html)
 
-7、[TCP Analysis Flags 之 TCP Port numbers reused](https://mp.weixin.qq.com/s/rP65saOCuFFEZQBtJA5H-w)
+7、[深入理解Linux端口重用这一特性](https://mp.weixin.qq.com/s/SYCUMvzktgeGbyAfRdqhmg)
 
-8、GPT
+8、[TCP Analysis Flags 之 TCP Port numbers reused](https://mp.weixin.qq.com/s/rP65saOCuFFEZQBtJA5H-w)
+
+9、GPT
