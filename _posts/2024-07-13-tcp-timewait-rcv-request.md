@@ -547,6 +547,8 @@ close, client_ip:172.23.133.152, port:12345
 
 * 1、客户端第2、第3个stream发起的`SYN`握手，为什么也是 **`TCP Port numbers reused`**（上图`mark0`）？ 客户端请求完后`netstat`/`ss`看是已经没有任何`8888`或`12345`的连接的，之前端口用完释放了才对？
 
+分析解答：
+
 这里的`TCP Port numbers reused`提示，是Wireshark的TCP解析器提供的分析功能，可以在Wireshark设置->协议->TCP中，勾选/取消“`Analyze TCP sequence numbers`”来启用或禁用此功能。（还有些其他场景可参考：[TCP Analysis Flags 之 TCP Port numbers reused](https://mp.weixin.qq.com/s/rP65saOCuFFEZQBtJA5H-w)）
 
 针对 SYN 数据包(实际SYN+ACK包也是)，如果已经有一个使用相同 IP+Port 的会话，并且这个 SYN 的序列号与已有会话的 `ISN` 不同时就会设置`TCP Port numbers reused`标记。
@@ -571,9 +573,19 @@ close, client_ip:172.23.133.152, port:12345
 
 但是看后面`mark4`好像有复用关系？此环境tcp_rfc1337为0，没结束`TIME_WAIT`释放连接吗？
 
+解答：
+
+这个复用同问题1，只是Wireshark发现前面用了相同IP+Port的辅助信息，不用关注了。
+
+至于`tcp_rfc1337`为0，此处应该是释放了之前的`TIME_WAIT`。
+
 #### 6.6.4. 重新发起`SYN`为什么也是`TCP Port numbers reused`
 
 * 4、`mark3`从Seq看是`mark0`的重传，重新发起`SYN`三次握手，这里疑问还是和第1个一样，为什么是`TCP Port numbers reused`？
+
+解答：
+
+这个复用也是同问题1，只是Wireshark发现前面用了相同IP+Port的辅助信息，不用关注了。
 
 #### 6.6.5. 服务端端口重用问题 及 为什么被标记重传
 
@@ -583,17 +595,30 @@ close, client_ip:172.23.133.152, port:12345
 
 看起来是正常的三次握手，为什么标记成重传了
 
+```sh
+13	20:17:27.322431	172.23.133.151	172.23.133.152	8888	12345	68	TCP	64	0.000029000	[TCP Retransmission] [TCP Port numbers reused] 8888 → 12345 [SYN, ACK] Seq=301265408 Ack=226707748 Win=64240 Len=0 MSS=1460 SACK_PERM WS=128
+```
+
+没找到其他Seq=301265408的包，待定
+
 #### 6.6.6. 服务端`FIN`+`ACK`包为什么被标记重传
 
 * 6、`mark5`的重传又是什么鬼？发FIN的同时重传ACK? 印象里ACK不存在重传啊？
+
+~~分析：类似上面端口复用的提示？应该要看下Wireshark的判断规则，本篇暂不深入分析了~~
+
+没注意看，确实是重传了上一个包（Seq都是301265409），这次只是多加了FIN（ACK也有重传？）
+
+```sh
+16	20:17:27.322773	172.23.133.151	172.23.133.152	8888	12345	56	TCP	64	0.000011000	8888 → 12345 [ACK] Seq=301265409 Ack=226707831 Win=64256 Len=0
+17	20:17:27.322815	172.23.133.151	172.23.133.152	8888	12345	56	TCP	64	0.000042000	[TCP Retransmission] 8888 → 12345 [FIN, ACK] Seq=301265409 Ack=226707831 Win=64256 Len=0
+```
 
 #### 6.6.7. 一端开启一端关闭`tcp_timestamps`表现如何
 
 上面描述"`SYN`是否合法"的小节留的TODO：时间回绕判断一般需要客户端和服务端都开启`tcp_timestamps`，那么对于一端开启一端关闭的情况，表现如何？
 
-先分析当前涉及场景：
-
-服务端（本场景的主动关闭方）开启，客户端关闭`timestamp`
+一般两端都开启（下面代码中有对应判断），本篇暂不深入分析了。
 
 ## 7. TCP接收处理源码简要说明
 
@@ -681,22 +706,52 @@ tcp_timewait_state_process(struct inet_timewait_sock *tw, struct sk_buff *skb,
     //paws_reject 为 true，表示发生了时间戳回绕
     bool paws_reject = false;
     tmp_opt.saw_tstamp = 0;
-    // TCP头中有选项且旧连接开启了时间戳选项，tw_ts_recent_stamp为原sock对应的timestamp开关
+    // TCP头中有选项且旧连接开启了时间戳选项
+    // th->doff表示数据偏移量，即 TCP 报头的长度。以 32 位字的形式表示，用于确定数据开始的位置。它的值乘以 4 得到报头长度的字节数。
+    // tw_ts_recent_stamp 记录最近一次更新 `tw_ts_recent` 的实际时间（通常是系统时间或 jiffies）
     if (th->doff > (sizeof(*th) >> 2) && tcptw->tw_ts_recent_stamp) {
-        tcp_parse_options(twsk_net(tw), skb, &tmp_opt, 0, NULL); // 解析TCP选项放入tmp_opt
-        // 上面tcp_parse_options中，若收到的对端报文中发现有TIMESTAMP，会对时间戳进行记录，并置saw_tstamp=1
+        tcp_parse_options(twsk_net(tw), skb, &tmp_opt, 0, NULL); // 解析TCP选项放入tmp_opt。其中若协商过时间戳选项或者本地开启了tcp_timestamps，则对时间戳进行记录
+        // 启用了 TCP 时间戳选项
         if (tmp_opt.saw_tstamp) {
+            // rcv_tsecr：接收方将其上次接收到的数据包中的TSval值填入TSecr并返回给发送方
             if (tmp_opt.rcv_tsecr)
+                // tw_ts_offset 是时间戳偏移量，用于防止 TIME-WAIT 重用问题，即在新的连接中避免时间戳冲突
                 tmp_opt.rcv_tsecr -= tcptw->tw_ts_offset;
-            // 本地sock记录的，上次接收包的时间戳
+            // ts_recent：存储的是接收到的最新时间戳值。这值是对方在其发送的 TCP 包的时间戳选项（TSval字段）中提供的值。
+                // 当一个新的 TCP 包被接收并且其中的时间戳值大于当前的 `ts_recent` 时，这个字段就会被更新，并且 `ts_recent_stamp` 也会相应更新
+            // tw_ts_recent：存储最近一次接收到的 TCP 时间戳值。该值用于 PAWS 机制，确保 TIME-WAIT 期间的时间戳一致
             tmp_opt.ts_recent	= tcptw->tw_ts_recent;
             // 上次记录的时间戳
+            // 每当 `ts_recent` 更新时，相应地，`ts_recent_stamp` 也会更新为内核当前的时间值。
             tmp_opt.ts_recent_stamp	= tcptw->tw_ts_recent_stamp;
             // 检查收到的报文的时间戳是否发生了时间戳回绕
             paws_reject = tcp_paws_reject(&tmp_opt, th->rst);
         }
     }
     ...
+    // RST报文的时间戳没有发生回绕
+    if (!paws_reject &&
+        (TCP_SKB_CB(skb)->seq == tcptw->tw_rcv_nxt &&
+         (TCP_SKB_CB(skb)->seq == TCP_SKB_CB(skb)->end_seq || th->rst))) {
+        // 处理rst报文
+        if (th->rst) {
+            // 不开启 sysctl_tcp_rfc1337 选项，当收到 RST 时会立即回收tw
+            if (twsk_net(tw)->ipv4.sysctl_tcp_rfc1337 == 0) {
+kill:
+                // 删除tw定时器，并释放tw
+                inet_twsk_deschedule_put(tw);
+                // 如果是TCP_TW_SUCCESS，则直接丢弃此包，不做任何响应
+                return TCP_TW_SUCCESS;
+            }
+        } else {
+            // 将 TIMEWAIT 状态的持续时间重新延长
+            inet_twsk_reschedule(tw, TCP_TIMEWAIT_LEN);
+        }
+        ...
+        // 如果是TCP_TW_SUCCESS，则直接丢弃此包，不做任何响应
+        return TCP_TW_SUCCESS;
+    }
+
     //是SYN包、没有RST、没有ACK、时间戳没有回绕，并且序列号也没有回绕
     if (th->syn && !th->rst && !th->ack && !paws_reject &&
         (after(TCP_SKB_CB(skb)->seq, tcptw->tw_rcv_nxt) ||
@@ -728,7 +783,10 @@ tcp_timewait_state_process(struct inet_timewait_sock *tw, struct sk_buff *skb,
 
 ### 7.3. `struct tcp_options_received`
 
-`tcp_options_received` 是 Linux 内核中用于处理接收到的 TCP 选项的重要结构。此结构在 TCP 协议的实现中起着至关重要的作用。TCP 选项是 TCP 首部的一部分，用于提供附加的通信控制功能，例如窗口扩展、时间戳等。
+上面`tmp_opt.ts_recent`/`tmp_opt.ts_recent_stamp`等赋值涉及`tcp_options_received`和`tcp_timewait_sock`结构，这里说明下。
+
+* `tcp_options_received` 是 Linux 内核中用于处理接收到的 TCP 选项的重要结构。此结构在 TCP 协议的实现中起着至关重要的作用。TCP 选项是 TCP 首部的一部分，用于提供附加的通信控制功能，例如窗口扩展、时间戳等。
+* `tcp_timewait_sock` 是 Linux 内核中用于管理 TIME-WAIT 状态的结构。
 
 TCP**三次握手的过程**中会协商各类选项，包括时间戳选项。如果双方都支持时间戳选项，就会使用时间戳进行后续通信。
 
@@ -778,9 +836,35 @@ struct tcp_options_received {
     // 代表协商过后使用的最大报文段大小（MSS, Maximum Segment Size）
     u16	mss_clamp;	/* Maximal mss, negotiated at connection setup */
 };
+
+// linux-5.10.10/include/linux/tcp.h
+struct tcp_timewait_sock {
+    // 基类，包含通用的 TIME-WAIT 状态信息，如源、目标地址等。
+    struct inet_timewait_sock tw_sk;
+    // 下一个期待接收的序列号。辅助确保重传数据包可以被正确识别和处理。
+#define tw_rcv_nxt tw_sk.__tw_common.skc_tw_rcv_nxt
+    // 下一个要发送的序列号。在 TIME-WAIT 状态期间，这个字段通常不会改变，但仍然需要保留它以应对潜在的重传和处理。
+#define tw_snd_nxt tw_sk.__tw_common.skc_tw_snd_nxt
+    // 接收窗口大小
+    u32			  tw_rcv_wnd;
+    // 时间戳偏移量，用于防止 TIME-WAIT 重用问题，即在新的连接中避免时间戳冲突。
+    u32			  tw_ts_offset;
+    // 存储最近一次接收到的 TCP 时间戳值。该值用于 PAWS 机制，确保 TIME-WAIT 期间的时间戳一致。
+    u32			  tw_ts_recent;
+
+    /* The time we sent the last out-of-window ACK: */
+    u32			  tw_last_oow_ack_time;
+
+    // 记录最近一次更新 `tw_ts_recent` 的实际时间（通常是系统时间或 jiffies）。这对于时间相关的验证非常重要。
+    int			  tw_ts_recent_stamp;
+    u32			  tw_tx_delay;
+#ifdef CONFIG_TCP_MD5SIG
+    struct tcp_md5sig_key	  *tw_md5_key;
+#endif
+};
 ```
 
-三次握手时协商TCP选项，开启关闭`net.ipv4.tcp_timestamps`对比：
+三次握手时会协商TCP选项，下面是开启和关闭`net.ipv4.tcp_timestamps`时握手的抓包对比：
 
 ![tcp头选项-timestamp对比](/images/2024-07-16-tcp-option-timestamp.png)
 
