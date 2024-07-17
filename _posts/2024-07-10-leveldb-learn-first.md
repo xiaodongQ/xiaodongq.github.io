@@ -22,7 +22,7 @@ leveldb学习笔记，整体架构和主要数据结构
 
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
-## 2. leveldb说明和总体架构
+## 2. leveldb说明和整体架构
 
 ### 2.1. 项目说明
 
@@ -86,12 +86,11 @@ leveldb中有个**版本（version）**的概念，一个版本中主要记录�
 
 LevelDB基于`LSM树（Log-Structured-Merge-Tree）`，翻译过来就是结构日志合并树。但是`LSM树`并不是一种严格意义上的树型数据结构，而是一种数据存储机制。
 
-流程：
+LSM流程：
 
 ![leveldb LSM树和读写流程](/images/leveldb-lsm-tree.png)
 
-当一个数据写入时，首先记录预写日志，然后将数据插入到内存中一个名为 MemTable 的数据结构中。当 MemTable 的大小到达阈值后，就会转换为 Immutable MemTable。
-
+当一个数据写入时，首先记录`预写日志（WAL，Write-Ahead Logging）`，然后将数据插入到内存中一个名为 MemTable 的数据结构中。当 MemTable 的大小到达阈值后，就会转换为 Immutable MemTable。
 
 ## 3. 编译运行
 
@@ -144,26 +143,139 @@ LevelDB基于`LSM树（Log-Structured-Merge-Tree）`，翻译过来就是结构�
 [100%] Built target benchmark_main
 ```
 
-编译结果：
+编译的主要成果物如下：
 
 ```sh
-# 主要成果物如下
+
 [root@xdlinux ➜ build git:(main) ]$ ls -ltrh
 # libleveldb静态库
 -rw-r--r--  1 root root 663K Jul 17 14:55 libleveldb.a
+# 用于从指定文件dump内容
 -rwxr-xr-x  1 root root 169K Jul 17 14:55 leveldbutil
+# 包含几个测试环境中posix读写接口的gtest用例
 -rwxr-xr-x  1 root root 610K Jul 17 14:55 env_posix_test
+# 包含一些leveldb特性的gtest用例，比如db操作、自动compact、log、恢复、跳表、布隆过滤器等等
 -rwxr-xr-x  1 root root 1.9M Jul 17 14:55 leveldb_tests
+# 使用libleveldb库的几个基本测试
 -rwxr-xr-x  1 root root 341K Jul 17 14:55 c_test
+# 用来测试leveldb性能，直接./db_bench执行即可
 -rwxr-xr-x  1 root root 345K Jul 17 14:56 db_bench
 ...
 ```
 
-3、运行
+可以看到，成果物里面是没有一个服务端程序的。**LevelDB 没有设计成`C/S`模式，而是将数据库以库文件的形式提供给用户，运行时数据库需要和服务一起部署在同一台服务器上。**
 
-### 3.2. 基本IO操作
+这里先`make install`一下，把必要的头文件和库安装到系统路径，便于后面使用。
 
+```sh
+[root@xdlinux ➜ build git:(main) ]$ make install
+Consolidate compiler generated dependencies of target leveldb
+[ 37%] Built target leveldb
+Consolidate compiler generated dependencies of target leveldbutil
+[ 39%] Built target leveldbutil
+...
+Consolidate compiler generated dependencies of target benchmark_main
+[100%] Built target benchmark_main
+Install the project...
+-- Install configuration: "Release"
+-- Installing: /usr/local/lib64/libleveldb.a
+-- Installing: /usr/local/include/leveldb/c.h
+...
+# 可看到下面还会生成对应的文档，不过貌似都是benchmark性能测试相关的
+-- Installing: /usr/local/share/doc/leveldb/releasing.md
+-- Installing: /usr/local/share/doc/leveldb/tools.md
+-- Installing: /usr/local/share/doc/leveldb/user_guide.md
+```
 
+下面结合各gtest用例和测试工具，来了解下leveldb功能和实现。
+
+### 3.2. db_bench
+
+先用上述编译结果中的`db_bench`，简单看下本地跑的性能情况（NVME SSD）。
+
+```sh
+[root@xdlinux ➜ build git:(main) ]$ ./db_bench
+LevelDB:    version 1.23
+Date:       Wed Jul 17 22:30:31 2024
+CPU:        16 * AMD Ryzen 7 5700G with Radeon Graphics
+CPUCache:   512 KB
+Keys:       16 bytes each
+Values:     100 bytes each (50 bytes after compression)
+Entries:    1000000
+RawSize:    110.6 MB (estimated)
+FileSize:   62.9 MB (estimated)
+# 没有开启Snappy压缩
+WARNING: Snappy compression is not enabled
+------------------------------------------------
+fillseq      :       0.813 micros/op;  136.0 MB/s     
+fillsync     :    1590.175 micros/op;    0.1 MB/s (1000 ops)
+fillrandom   :       1.555 micros/op;   71.1 MB/s     
+overwrite    :       2.035 micros/op;   54.4 MB/s     
+readrandom   :       2.024 micros/op; (864322 of 1000000 found)
+readrandom   :       1.681 micros/op; (864083 of 1000000 found)
+readseq      :       0.070 micros/op; 1586.2 MB/s    
+readreverse  :       0.161 micros/op;  686.8 MB/s    
+compact      :  350350.000 micros/op;
+readrandom   :       1.161 micros/op; (864105 of 1000000 found)
+readseq      :       0.055 micros/op; 2027.3 MB/s    
+readreverse  :       0.130 micros/op;  854.0 MB/s    
+fill100K     :     416.247 micros/op;  229.1 MB/s (1000 ops)
+crc32c       :       0.703 micros/op; 5558.3 MB/s (4K per op)
+snappycomp   :    1744.000 micros/op; (snappy failure)
+snappyuncomp :    1696.000 micros/op; (snappy failure)
+zstdcomp     :    1441.000 micros/op; (zstd failure)
+zstduncomp   :    1448.000 micros/op; (zstd failure)
+```
+
+贴下github官网提供的数据，作为简单对比参考
+
+```sh
+LevelDB:    version 1.1
+Date:       Sun May  1 12:11:26 2011
+CPU:        4 x Intel(R) Core(TM)2 Quad CPU    Q6600  @ 2.40GHz
+CPUCache:   4096 KB
+Keys:       16 bytes each
+Values:     100 bytes each (50 bytes after compression)
+Entries:    1000000
+Raw Size:   110.6 MB (estimated)
+File Size:  62.9 MB (estimated)
+# 写性能
+fillseq      :       1.765 micros/op;   62.7 MB/s
+fillsync     :     268.409 micros/op;    0.4 MB/s (10000 ops)
+fillrandom   :       2.460 micros/op;   45.0 MB/s
+overwrite    :       2.380 micros/op;   46.5 MB/s
+# 读性能
+readrandom  : 16.677 micros/op;  (approximately 60,000 reads per second)
+readseq     :  0.476 micros/op;  232.3 MB/s
+readreverse :  0.724 micros/op;  152.9 MB/s
+# compactions之后的读性能
+readrandom  : 11.602 micros/op;  (approximately 85,000 reads per second)
+readseq     :  0.423 micros/op;  261.8 MB/s
+readreverse :  0.663 micros/op;  166.9 MB/s
+```
+
+另外关于性能情况，`leveldb/doc/benchmark.html`里面还做了一下`LevelDB`、`Kyoto TreeDB`、`SQLite3`的对比说明。
+
+### 3.3. 基本IO操作
+
+跟着 `leveldb/doc/index.md`（也可见[doc/index.md](https://github.com/google/leveldb/blob/main/doc/index.md)） 的说明，写个简单demo进行基本功能的试用。
+
+#### 3.3.1. demo
+
+```cpp
+#include <cassert>
+#include "leveldb/db.h"
+#include <iostream>
+
+using namespace std;
+
+leveldb::DB* db;
+leveldb::Options options;
+options.create_if_missing = true;
+leveldb::Status status = leveldb::DB::Open(options, "/tmp/testdb", &db);
+assert(status.ok());
+
+```
 
 ## 4. 小结
 
