@@ -46,7 +46,13 @@ LevelDB是一个由Google开源的、快速的键值存储库，提供了`string
 
 ![leveldb 整体架构](/images/leveldb_arch.jpeg)
 
-leveldb中主要由以下几个重要的部件构成：
+LevelDB基于`LSM树（Log-Structured-Merge-Tree）`，翻译过来就是结构日志合并树。但是`LSM树`并不是一种严格意义上的树型数据结构，而是一种数据存储机制。
+
+下图跟上面类似，这里看LSM流程更直观一点：
+
+![leveldb LSM树和读写流程](/images/leveldb-lsm-tree.png)
+
+下面介绍leveldb几个重要的构成部件：
 
 #### 2.2.1. memtable
 
@@ -58,7 +64,7 @@ memtable的容量到达阈值时，便会转换成一个不可修改的memtable�
 
 #### 2.2.3. log(journal)
 
-leveldb在写内存之前会首先将所有的写操作写到日志文件中，也就是log文件。当以下异常情况发生时，均可以通过日志文件进行恢复。
+leveldb在写内存之前会首先将所有的写操作写到日志文件中，也就是log文件，`预写日志（WAL，Write-Ahead Logging）`。当以下异常情况发生时，均可以通过日志文件进行恢复。
 
 #### 2.2.4. sstable
 
@@ -81,16 +87,6 @@ leveldb中有个**版本（version）**的概念，一个版本中主要记录�
 #### 2.2.6. current
 
 这个文件的内容只有一个信息，就是记载当前的`manifest`文件名。
-
-### 2.3. 读写流程（LSM树）
-
-LevelDB基于`LSM树（Log-Structured-Merge-Tree）`，翻译过来就是结构日志合并树。但是`LSM树`并不是一种严格意义上的树型数据结构，而是一种数据存储机制。
-
-LSM流程：
-
-![leveldb LSM树和读写流程](/images/leveldb-lsm-tree.png)
-
-当一个数据写入时，首先记录`预写日志（WAL，Write-Ahead Logging）`，然后将数据插入到内存中一个名为 MemTable 的数据结构中。当 MemTable 的大小到达阈值后，就会转换为 Immutable MemTable。
 
 ## 3. 编译运行
 
@@ -165,28 +161,6 @@ LSM流程：
 
 可以看到，成果物里面是没有一个服务端程序的。**LevelDB 没有设计成`C/S`模式，而是将数据库以库文件的形式提供给用户，运行时数据库需要和服务一起部署在同一台服务器上。**
 
-这里先`make install`一下，把必要的头文件和库安装到系统路径，便于后面使用。
-
-```sh
-[root@xdlinux ➜ build git:(main) ]$ make install
-Consolidate compiler generated dependencies of target leveldb
-[ 37%] Built target leveldb
-Consolidate compiler generated dependencies of target leveldbutil
-[ 39%] Built target leveldbutil
-...
-Consolidate compiler generated dependencies of target benchmark_main
-[100%] Built target benchmark_main
-Install the project...
--- Install configuration: "Release"
--- Installing: /usr/local/lib64/libleveldb.a
--- Installing: /usr/local/include/leveldb/c.h
-...
-# 可看到下面还会生成对应的文档，不过貌似都是benchmark性能测试相关的
--- Installing: /usr/local/share/doc/leveldb/releasing.md
--- Installing: /usr/local/share/doc/leveldb/tools.md
--- Installing: /usr/local/share/doc/leveldb/user_guide.md
-```
-
 下面结合各gtest用例和测试工具，来了解下leveldb功能和实现。
 
 ### 3.2. db_bench
@@ -256,25 +230,71 @@ readreverse :  0.663 micros/op;  166.9 MB/s
 
 另外关于性能情况，`leveldb/doc/benchmark.html`里面还做了一下`LevelDB`、`Kyoto TreeDB`、`SQLite3`的对比说明。
 
-### 3.3. 基本IO操作
+### 3.3. 基本操作测试
 
 跟着 `leveldb/doc/index.md`（也可见[doc/index.md](https://github.com/google/leveldb/blob/main/doc/index.md)） 的说明，写个简单demo进行基本功能的试用。
 
-#### 3.3.1. demo
+这里先`make install`一下，把必要的头文件和库安装到系统路径，便于后面使用。
+
+```sh
+[root@xdlinux ➜ build git:(main) ]$ make install
+Consolidate compiler generated dependencies of target leveldb
+[ 37%] Built target leveldb
+Consolidate compiler generated dependencies of target leveldbutil
+[ 39%] Built target leveldbutil
+...
+Consolidate compiler generated dependencies of target benchmark_main
+[100%] Built target benchmark_main
+Install the project...
+-- Install configuration: "Release"
+-- Installing: /usr/local/lib64/libleveldb.a
+-- Installing: /usr/local/include/leveldb/c.h
+...
+# 可看到下面还会生成对应的文档，不过貌似都是benchmark性能测试相关的
+-- Installing: /usr/local/share/doc/leveldb/releasing.md
+-- Installing: /usr/local/share/doc/leveldb/tools.md
+-- Installing: /usr/local/share/doc/leveldb/user_guide.md
+```
+
+#### 3.3.1. 创建并打开一个数据库
 
 ```cpp
 #include <cassert>
-#include "leveldb/db.h"
 #include <iostream>
+#include "leveldb/db.h"
 
 using namespace std;
+ 
+void test_leveldb()
+{
+    leveldb::DB* db;
+    leveldb::Options options;
+    options.create_if_missing = true;
+    leveldb::Status status = leveldb::DB::Open(options, "/tmp/testdb", &db);
+    assert(status.ok());
+}
 
-leveldb::DB* db;
-leveldb::Options options;
-options.create_if_missing = true;
-leveldb::Status status = leveldb::DB::Open(options, "/tmp/testdb", &db);
-assert(status.ok());
+int main(int argc, char *argv[])
+{
+    test_leveldb();
+    return 0;
+}
+```
 
+```sh
+# 编译
+[root@xdlinux ➜ leveldb git:(main) ✗ ]$ g++ test_leveldb.cpp -lleveldb -lpthread -o test_leveldb
+# 运行
+[root@xdlinux ➜ leveldb git:(main) ✗ ]$ ./test_leveldb
+# 查看上面指定的 /tmp/testdb 目录
+[root@xdlinux ➜ leveldb git:(main) ✗ ]$ ll /tmp/testdb -ltrh
+total 16K
+-rw-r--r-- 1 root root   0 Jul 18 14:55 LOCK
+-rw-r--r-- 1 root root 149 Jul 18 14:55 LOG.old
+-rw-r--r-- 1 root root  50 Jul 18 14:55 MANIFEST-000004
+-rw-r--r-- 1 root root   0 Jul 18 14:55 000005.log
+-rw-r--r-- 1 root root  16 Jul 18 14:55 CURRENT
+-rw-r--r-- 1 root root 181 Jul 18 14:55 LOG
 ```
 
 ## 4. 小结
