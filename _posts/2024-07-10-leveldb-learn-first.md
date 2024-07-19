@@ -234,6 +234,8 @@ readreverse :  0.663 micros/op;  166.9 MB/s
 
 跟着 `leveldb/doc/index.md`（也可见[doc/index.md](https://github.com/google/leveldb/blob/main/doc/index.md)） 的说明，写个简单demo进行基本功能的试用。
 
+公共接口为`include/leveldb/*.h`，一般不需要再依赖其他涉及内部实现的头文件了。
+
 这里先`make install`一下，把必要的头文件和库安装到系统路径，便于后面使用。
 
 ```sh
@@ -296,6 +298,24 @@ total 16K
 -rw-r--r-- 1 root root  16 Jul 18 14:55 CURRENT
 -rw-r--r-- 1 root root 181 Jul 18 14:55 LOG
 ```
+
+选项说明（定义为`struct Options`，include/leveldb/options.h）：
+
+|            选项             |       默认值       |               说明                |
+| :-------------------------: | :----------------: | :-------------------------------: |
+|   bool create_if_missing    |       false        |           不存在则创建            |
+|    bool error_if_exists     |       false        |       若数据库已存在则报错        |
+|    bool paranoid_checks     |       false        |         检查到出错就退出          |
+|      Logger* info_log       |      nullptr       | 为nullptr则在当前目录生成日志文件 |
+|  size_t write_buffer_size   |  4 * 1024 * 1024   |            写缓存大小             |
+|     int max_open_files      |        1000        |        DB可以打开的文件数         |
+|      size_t block_size      |       4*1024       |             block大小             |
+|    size_t max_file_size     |  2 * 1024 * 1024;  |           最大文件大小            |
+| CompressionType compression | kSnappyCompression |             压缩算法              |
+
+
+
+
 
 ## 4. 小结
 
