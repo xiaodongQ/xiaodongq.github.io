@@ -96,7 +96,7 @@ leveldb中有个**版本（version）**的概念，一个版本中主要记录�
 
 2、编译
 
-截取编译过程如下，可看到包含了相当完备的测试内容：gtest、gmock、benchmark、db_bench等。
+截取编译过程如下，可看到里面包含了相当完备的测试内容：gtest、gmock、benchmark、db_bench等。
 
 ```sh
 [root@xdlinux ➜ leveldb git:(main) ]$ mkdir -p build && cd build
@@ -299,6 +299,26 @@ total 16K
 -rw-r--r-- 1 root root 181 Jul 18 14:55 LOG
 ```
 
+可以看下上面几个非空文件的内容：
+
+```sh
+# 当前日志
+[root@xdlinux ➜ leveldb git:(main) ✗ ]$ cat /tmp/testdb/LOG
+2024/07/18-14:55:58.384853 140470980511552 Recovering log #3
+2024/07/18-14:55:58.455339 140470980511552 Delete type=0 #3
+2024/07/18-14:55:58.455378 140470980511552 Delete type=3 #2
+# 历史日志
+[root@xdlinux ➜ leveldb git:(main) ✗ ]$ cat /tmp/testdb/LOG.old
+2024/07/18-14:55:44.266962 140622247708480 Creating DB /tmp/testdb since it was missing.
+2024/07/18-14:55:44.277569 140622247708480 Delete type=3 #1
+# 当前使用的MANIFEST
+[root@xdlinux ➜ leveldb git:(main) ✗ ]$ cat /tmp/testdb/CURRENT        
+MANIFEST-000004
+# MANIFEST文件中的内容
+[root@xdlinux ➜ leveldb git:(main) ✗ ]$ cat /tmp/testdb/MANIFEST-000004 
+V???leveldb.BytewiseComparator??#       #   
+```
+
 选项说明（定义为`struct Options`，include/leveldb/options.h）：
 
 |            选项             |       默认值       |               说明                |
@@ -313,9 +333,66 @@ total 16K
 |    size_t max_file_size     |  2 * 1024 * 1024;  |           最大文件大小            |
 | CompressionType compression | kSnappyCompression |             压缩算法              |
 
+#### 3.3.2. 基本读写
 
+leveldb提供3个基本操作来查询/修改：`Put`、`Delete`、`Get`
 
+```c
+void test_leveldb_rw()
+{
+	leveldb::DB* db;
 
+	// 初始化
+	leveldb::Options options;
+	options.create_if_missing = true;
+	// 若已存在则DB::Open会报错退出
+	// options.error_if_exists = true;
+	leveldb::Status status = leveldb::DB::Open(options, "/tmp/testdb", &db);
+	assert(status.ok());
+
+	// 读写操作
+	std::string value="hello-leveldb";
+	string key1="xdkey1";
+	string key2="xdkey2";
+
+	// 设置key1
+	leveldb::Status s = db->Put(leveldb::WriteOptions(), key1, value);
+	assert(s.ok());
+	// 获取key1
+	value="";
+	s = db->Get(leveldb::ReadOptions(), key1, &value);
+	cout << "key:" << key1 << ", value:" << value << endl;
+
+	// 设置key2的value为key1对应的value
+	// leveldb::WriteOptions()默认构造一个sync为false的选项结构体
+	// 声明为：Status Put(const WriteOptions& options, const Slice& key, const Slice& value);
+	// class Slice是一个简单的包含指针和数据大小的类结构，可以通过char*/string来构造初始化
+	if (s.ok()) s = db->Put(leveldb::WriteOptions(), key2, value);
+
+	// 删除key1
+	if (s.ok()) s = db->Delete(leveldb::WriteOptions(), key1);
+
+	// 尝试获取key1
+	s = db->Get(leveldb::ReadOptions(), key1, &value);
+	if (!s.ok()) {
+		cout << "get key:" << key1 << " error!" << endl;
+	}
+
+	// 获取key2
+	s = db->Get(leveldb::ReadOptions(), key1, &value);
+	cout << "key2:" << key1 << ", value:" << value << endl;
+
+	// 清理数据库
+	delete db;
+}
+```
+
+```sh
+[root@xdlinux ➜ leveldb git:(main) ✗ ]$ ./test_leveldb
+key:xdkey1, value:hello-leveldb
+get key:xdkey1 error!
+key2:xdkey1, value:hello-leveldb
+```
 
 ## 4. 小结
 
