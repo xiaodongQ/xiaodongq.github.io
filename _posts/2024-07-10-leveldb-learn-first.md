@@ -546,9 +546,7 @@ xdkey3: itv3
 
 快照，提供只读的全局键值记录视图。
 
-通过`GetSnapshot`获取处理句柄，并基于句柄创建的迭代器会观察到固定快照的DB状态。
-
-查看内部实现，必定new一个成员，不会返回NULL。
+通过`GetSnapshot`获取处理句柄，基于该句柄创建的迭代器会观察到固定快照的DB记录状态。
 
 ```cpp
 // 文件位置：include/leveldb/db.h
@@ -559,6 +557,8 @@ xdkey3: itv3
   virtual const Snapshot* GetSnapshot() = 0;
 ```
 
+查看内部实现，该接口必定会new一个成员，不会返回NULL。
+
 示例：
 
 ```cpp
@@ -567,7 +567,8 @@ void test_snapshot()
     leveldb::DB* db;
     leveldb::Options options;
     options.create_if_missing = true;
-    leveldb::Status s = leveldb::DB::Open(options, "/tmp/testdb", &db);
+    // 为防止之前记录影响观察，用个单独的数据库
+    leveldb::Status s = leveldb::DB::Open(options, "/tmp/testdb_for_snapshot", &db);
     assert(s.ok());
 
     // 初始化数据
@@ -622,7 +623,9 @@ void test_snapshot()
 }
 ```
 
-结果：
+结果如下：
+
+可知**快照后新增记录是都可以看到的，只是快照时已有的记录不做变更（包括被删除的）**
 
 ```sh
 [root@xdlinux ➜ leveldb git:(main) ✗ ]$ ./test_leveldb     
@@ -645,6 +648,7 @@ xdkey5:itv5
 
 ## 5. 小结
 
+学习了leveldb的整体架构和重要构成部件，对其功能做了基本的验证测试。后续进一步看其功能实现，以及重要的数据结构。
 
 ## 6. 参考
 
