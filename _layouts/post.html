@@ -210,7 +210,10 @@ layout: default
 
         var sortDom = function ($domlist) {
             var $item = $domlist.find('.categories-list-item');
-            var $newList = Array.prototype.sort.call($item, function (a, b) {
+            // var $newList = Array.prototype.sort.call($item, function (a, b) {
+            //     return get_score($(b).find('.name').html()) - get_score($(a).find('.name').html());
+            // });
+            var $newList = Array.from($item).sort(function (a, b) {
                 return get_score($(b).find('.name').html()) - get_score($(a).find('.name').html());
             });
             return $newList;
