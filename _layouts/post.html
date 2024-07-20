@@ -186,19 +186,19 @@ layout: default
 <script>
     (function () {
         var cat_map = {
-            '网络':9900,
-            'eBPF':9850,
-            '存储':9800,
-            '大模型': 9750,
-            '设计模式':9700,
-            '案例实验': 9650,
+            网络:9900,
+            eBPF:9850,
+            存储:9800,
+            大模型: 9750,
+            设计模式:9700,
+            案例实验: 9650,
             'C/C++': 9600,
-            'Linux': 9550,
-            'Shell':9549,
-            '区块链':9500,
-            '翻译学习':9300,
-            '工具':9200,
-            '其他': -2
+            Linux: 9550,
+            Shell:9549,
+            区块链:9500,
+            翻译学习:9300,
+            工具:9200,
+            其他: 0
         };
 
 
@@ -210,10 +210,7 @@ layout: default
 
         var sortDom = function ($domlist) {
             var $item = $domlist.find('.categories-list-item');
-            // var $newList = Array.prototype.sort.call($item, function (a, b) {
-            //     return get_score($(b).find('.name').html()) - get_score($(a).find('.name').html());
-            // });
-            var $newList = Array.from($item).sort(function (a, b) {
+            var $newList = Array.prototype.sort.call($item, function (a, b) {
                 return get_score($(b).find('.name').html()) - get_score($(a).find('.name').html());
             });
             return $newList;
