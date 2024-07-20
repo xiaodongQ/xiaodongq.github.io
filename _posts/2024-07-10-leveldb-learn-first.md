@@ -1,6 +1,6 @@
 ---
 layout: post
-title: leveldb学习笔记（一） -- 整体架构和数据结构
+title: leveldb学习笔记（一） -- 整体架构和基本操作
 categories: 存储
 tags: 存储 leveldb
 ---
@@ -8,7 +8,7 @@ tags: 存储 leveldb
 * content
 {:toc}
 
-leveldb学习笔记，整体架构和主要数据结构
+leveldb学习笔记，本篇说明整体架构和基本操作，并进行代码验证。
 
 
 
@@ -88,7 +88,7 @@ leveldb中有个**版本（version）**的概念，一个版本中主要记录�
 
 这个文件的内容只有一个信息，就是记载当前的`manifest`文件名。
 
-## 3. 编译运行
+## 3. 编译
 
 ### 3.1. 下载并编译
 
@@ -161,9 +161,9 @@ leveldb中有个**版本（version）**的概念，一个版本中主要记录�
 
 可以看到，成果物里面是没有一个服务端程序的。**LevelDB 没有设计成`C/S`模式，而是将数据库以库文件的形式提供给用户，运行时数据库需要和服务一起部署在同一台服务器上。**
 
-下面结合各gtest用例和测试工具，来了解下leveldb功能和实现。
+下面结合各gtest用例和测试工具，来了解下leveldb功能。
 
-### 3.2. db_bench
+### 3.2. db_bench测试工具
 
 先用上述编译结果中的`db_bench`，简单看下本地跑的性能情况（NVME SSD）。
 
@@ -230,7 +230,7 @@ readreverse :  0.663 micros/op;  166.9 MB/s
 
 另外关于性能情况，`leveldb/doc/benchmark.html`里面还做了一下`LevelDB`、`Kyoto TreeDB`、`SQLite3`的对比说明。
 
-### 3.3. 基本操作测试
+## 4. 基本操作测试
 
 跟着 `leveldb/doc/index.md`（也可见[doc/index.md](https://github.com/google/leveldb/blob/main/doc/index.md)） 的说明，写个简单demo进行基本功能的试用。
 
@@ -258,7 +258,7 @@ Install the project...
 -- Installing: /usr/local/share/doc/leveldb/user_guide.md
 ```
 
-#### 3.3.1. 创建并打开一个数据库
+### 4.1. 创建并打开一个数据库
 
 ```cpp
 #include <cassert>
@@ -333,71 +333,320 @@ V???leveldb.BytewiseComparator??#       #
 |    size_t max_file_size     |  2 * 1024 * 1024;  |           最大文件大小            |
 | CompressionType compression | kSnappyCompression |             压缩算法              |
 
-#### 3.3.2. 基本读写
+### 4.2. 基本读写
 
 leveldb提供3个基本操作来查询/修改：`Put`、`Delete`、`Get`
 
-```c
+```cpp
 void test_leveldb_rw()
 {
-	leveldb::DB* db;
+    leveldb::DB* db;
 
-	// 初始化
-	leveldb::Options options;
-	options.create_if_missing = true;
-	// 若已存在则DB::Open会报错退出
-	// options.error_if_exists = true;
-	leveldb::Status status = leveldb::DB::Open(options, "/tmp/testdb", &db);
-	assert(status.ok());
+    // 初始化
+    leveldb::Options options;
+    options.create_if_missing = true;
+    // 若已存在则DB::Open会报错退出
+    // options.error_if_exists = true;
+    leveldb::Status status = leveldb::DB::Open(options, "/tmp/testdb", &db);
+    assert(status.ok());
 
-	// 读写操作
-	std::string value="hello-leveldb";
-	string key1="xdkey1";
-	string key2="xdkey2";
+    // 读写操作
+    std::string value = "hello-leveldb";
+    string key1 = "xdkey1";
+    string key2 = "xdkey2";
 
-	// 设置key1
-	leveldb::Status s = db->Put(leveldb::WriteOptions(), key1, value);
-	assert(s.ok());
-	// 获取key1
-	value="";
-	s = db->Get(leveldb::ReadOptions(), key1, &value);
-	cout << "key:" << key1 << ", value:" << value << endl;
+    // 设置key1
+    // leveldb::WriteOptions()默认构造一个sync为false的选项结构体
+    // 声明为：Status Put(const WriteOptions& options, const Slice& key, const Slice& value);
+    // class Slice是一个简单的包含指针和数据大小的类结构，可以通过char*/string来构造初始化
+    leveldb::Status s = db->Put(leveldb::WriteOptions(), key1, value);
+    assert(s.ok());
+    cout << "set key:" << key1 << ", value:" << value << " ok" << endl;
+    // 获取key1
+    value="";
+    // 声明为：Status Get(const ReadOptions& options, const Slice& key, std::string* value)
+    s = db->Get(leveldb::ReadOptions(), key1, &value);
+    assert(s.ok());
+    cout << "get key:" << key1 << ", value:" << value << endl;
 
-	// 设置key2的value为key1对应的value
-	// leveldb::WriteOptions()默认构造一个sync为false的选项结构体
-	// 声明为：Status Put(const WriteOptions& options, const Slice& key, const Slice& value);
-	// class Slice是一个简单的包含指针和数据大小的类结构，可以通过char*/string来构造初始化
-	if (s.ok()) s = db->Put(leveldb::WriteOptions(), key2, value);
+    // 设置key2的value为key1对应的value
+    s = db->Put(leveldb::WriteOptions(), key2, value);
+    assert(s.ok());
+    cout << "set key:" << key2 << ", value:" << value << " ok" << endl;
 
-	// 删除key1
-	if (s.ok()) s = db->Delete(leveldb::WriteOptions(), key1);
+    // 删除key1
+    // 声明为：Status Delete(const WriteOptions& options, const Slice& key) 
+    s = db->Delete(leveldb::WriteOptions(), key1);
+    assert(s.ok());
+    cout << "del key:" << key1 << " ok"<< endl;
 
-	// 尝试获取key1
-	s = db->Get(leveldb::ReadOptions(), key1, &value);
-	if (!s.ok()) {
-		cout << "get key:" << key1 << " error!" << endl;
-	}
+    // 尝试获取key1
+    s = db->Get(leveldb::ReadOptions(), key1, &value);
+    if (!s.ok()) {
+        cout << "get key:" << key1 << " error! errmsg: " << s.ToString() << endl;
+    }
 
-	// 获取key2
-	s = db->Get(leveldb::ReadOptions(), key1, &value);
-	cout << "key2:" << key1 << ", value:" << value << endl;
+    // 获取key2
+    value = "";
+    s = db->Get(leveldb::ReadOptions(), key2, &value);
+    if (!s.ok()){
+        cout << "get key:" << key2 << " error! errmsg: " << s.ToString() << endl;
+    }else{
+        cout << "get key:" << key2 << ", value:" << value << endl;
+    }
 
-	// 清理数据库
-	delete db;
+    // 清理数据库
+    delete db;
+}
+```
+
+```sh
+# 执行
+[root@xdlinux ➜ leveldb git:(main) ✗ ]$ ./test_leveldb
+set key:xdkey1, value:hello-leveldb ok
+get key:xdkey1, value:hello-leveldb
+set key:xdkey2, value:hello-leveldb ok
+del key:xdkey1 ok
+get key:xdkey1 error! errmsg: NotFound: 
+get key:xdkey2, value:hello-leveldb
+```
+
+### 4.3. WriteBatch
+
+场景：key1移动到key2
+
+过程为：获取key1的value -> 设置key2的value -> 删除key1。若删除key1之前db异常，则两个key有原来相同的value
+
+利用 `WriteBatch` 可达到原子更新的效果
+
+```cpp
+void test_leveldb_write_batch()
+{
+    leveldb::DB* db;
+    leveldb::Options options;
+    options.create_if_missing = true;
+    leveldb::Status status = leveldb::DB::Open(options, "/tmp/testdb", &db);
+    assert(status.ok());
+
+    // 准备数据
+    string key1 = "xdkey1";
+    std::string value = "test-atomic-update";
+    leveldb::Status s = db->Put(leveldb::WriteOptions(), key1, value);
+    assert(s.ok());
+    cout << "set key:" << key1 << ", value:" << value << endl;
+
+    string key2 = "xdkey2";
+    value = "";
+    s = db->Get(leveldb::ReadOptions(), key1, &value);
+    assert(s.ok());
+
+    // 使用 WriteBatch
+    leveldb::WriteBatch batch;
+    batch.Delete(key1);
+    batch.Put(key2, value);
+    s = db->Write(leveldb::WriteOptions(), &batch);
+    assert(s.ok());
+    cout << "move key:" << key1 << " to key:" << key2 << endl;
+
+    s = db->Get(leveldb::ReadOptions(), key1, &value);
+    cout << "get key: " << key1 << " result:" << s.ToString() << endl;
+    s = db->Get(leveldb::ReadOptions(), key2, &value);
+    cout << "get key: " << key2 << " result:" << s.ToString() << ", value:" << value << endl;
+
+    // 清理数据库
+    delete db;
 }
 ```
 
 ```sh
 [root@xdlinux ➜ leveldb git:(main) ✗ ]$ ./test_leveldb
-key:xdkey1, value:hello-leveldb
-get key:xdkey1 error!
-key2:xdkey1, value:hello-leveldb
+set key:xdkey1, value:test-atomic-update
+move key:xdkey1 to key:xdkey2
+get key: xdkey1 result:NotFound: 
+get key: xdkey2 result:OK, value:test-atomic-update
 ```
 
-## 4. 小结
+### 4.4. Iteration
+
+leveldb的迭代器，用于遍历key。
+
+```cpp
+void test_leveldb_iterator()
+{
+    leveldb::DB* db;
+    leveldb::Options options;
+    options.create_if_missing = true;
+    leveldb::Status s = leveldb::DB::Open(options, "/tmp/testdb", &db);
+    assert(s.ok());
+
+    s = db->Put(leveldb::WriteOptions(), "xdkey1", "itv1");
+    assert(s.ok());
+    s = db->Put(leveldb::WriteOptions(), "xdkey2", "itv2");
+    assert(s.ok());
+    s = db->Put(leveldb::WriteOptions(), "xdkey3", "itv3");
+    assert(s.ok());
+    s = db->Put(leveldb::WriteOptions(), "xdkey4", "itv4");
+    assert(s.ok());
+
+    // 创建 Iterator
+    // 创建后是未初始化的，必须先调用某种Seek再使用它
+    leveldb::Iterator* it = db->NewIterator(leveldb::ReadOptions());
+    // 从头开始遍历所有记录，`SeekToFirst`
+    cout << "scan first to last..." << endl;
+    for (it->SeekToFirst(); it->Valid(); it->Next()) {
+        // 注意Slice类需要调用下ToString()才转成std::string
+        cout << it->key().ToString() << ": "  << it->value().ToString() << endl;
+        assert(it->status().ok());  // Check for any errors found during the scan
+    }
+
+    // 也可以从尾部开始向前遍历所有记录，`SeekToLast`
+    cout << "scan last to first..." << endl;
+    for (it->SeekToLast(); it->Valid(); it->Prev()) {
+        cout << it->key().ToString() << ": "  << it->value().ToString() << endl;
+        assert(it->status().ok());  // Check for any errors found during the scan
+    }
+
+    // 也可以指定key的范围遍历，`Seek`并给定结束条件
+    string start = "xdkey2";
+    string end = "xdkey3";
+    cout << "scan rang [" << start << ", " << end << "]..." << endl;
+    // 自行控制结束条件
+    for (it->Seek(start); it->Valid() && it->key().ToString() <= end; it->Next()) {
+        cout << it->key().ToString() << ": "  << it->value().ToString() << endl;
+        assert(it->status().ok());  // Check for any errors found during the scan
+    }
+
+    delete it;
+
+    // 清理数据库
+    delete db;
+}
+```
+
+结果：
+
+```sh
+[root@xdlinux ➜ leveldb git:(main) ✗ ]$ ./test_leveldb     
+scan first to last...
+xdkey1: itv1
+xdkey2: itv2
+xdkey3: itv3
+xdkey4: itv4
+scan last to first...
+xdkey4: itv4
+xdkey3: itv3
+xdkey2: itv2
+xdkey1: itv1
+scan rang [xdkey2, xdkey3]...
+xdkey2: itv2
+xdkey3: itv3
+```
+
+### 4.5. Snapshots
+
+快照，提供只读的全局键值记录视图。
+
+通过`GetSnapshot`获取处理句柄，并基于句柄创建的迭代器会观察到固定快照的DB状态。
+
+查看内部实现，必定new一个成员，不会返回NULL。
+
+```cpp
+// 文件位置：include/leveldb/db.h
+  // Return a handle to the current DB state.  Iterators created with
+  // this handle will all observe a stable snapshot of the current DB
+  // state.  The caller must call ReleaseSnapshot(result) when the
+  // snapshot is no longer needed.
+  virtual const Snapshot* GetSnapshot() = 0;
+```
+
+示例：
+
+```cpp
+void test_snapshot()
+{
+    leveldb::DB* db;
+    leveldb::Options options;
+    options.create_if_missing = true;
+    leveldb::Status s = leveldb::DB::Open(options, "/tmp/testdb", &db);
+    assert(s.ok());
+
+    // 初始化数据
+    s = db->Put(leveldb::WriteOptions(), "xdkey1", "itv1");
+    assert(s.ok());
+    s = db->Put(leveldb::WriteOptions(), "xdkey2", "itv2");
+    assert(s.ok());
+    s = db->Put(leveldb::WriteOptions(), "xdkey3", "itv3");
+    assert(s.ok());
+    s = db->Put(leveldb::WriteOptions(), "xdkey4", "itv4");
+    assert(s.ok());
+
+    // options.snapshot
+    leveldb::ReadOptions options_sp;
+    // GetSnapshot生成快照
+    // 声明为：const Snapshot* GetSnapshot()，返回一个当前db状态的处理句柄
+    // 当不再使用时，必须通过 ReleaseSnapshot(result) 释放
+    options_sp.snapshot = db->GetSnapshot();
+    cout << "get snapshot" << endl;
+
+    // 快照后做些增删改之类的操作，用作对比
+    db->Put(leveldb::WriteOptions(), "xdkey5", "itv5");
+    cout << "[add xdkey5:itv5]" << endl;
+    assert(s.ok());
+    db->Put(leveldb::WriteOptions(), "xdkey1", "itv1_modify");
+    cout << "[modify xdkey1:itv1_modify]" << endl;
+    assert(s.ok());
+    db->Delete(leveldb::WriteOptions(), "xdkey2");
+    cout << "[delete xdkey2]" << endl;
+    assert(s.ok());
+    
+    // 此处使用的ReadOptions是设置了快照的，所以只有当时snapshot的记录状态
+    cout << "scan snapshot..." << endl;
+    leveldb::Iterator* it = db->NewIterator(options_sp);
+    for (it->SeekToFirst(); it->Valid(); it->Next()) {
+        cout << it->key().ToString() << ":" << it->value().ToString() << endl;
+    }
+
+    // 使用普通ReadOptions
+    cout << "scan ordinarily..." << endl;
+    leveldb::Iterator* it_od = db->NewIterator(leveldb::ReadOptions());
+    for (it_od->SeekToFirst(); it_od->Valid(); it_od->Next()) {
+        cout << it_od->key().ToString() << ":" << it_od->value().ToString() << endl;
+    }
+    delete it;
+
+    // 释放快照
+    db->ReleaseSnapshot(options_sp.snapshot);
+
+    // 清理数据库
+    delete db;
+}
+```
+
+结果：
+
+```sh
+[root@xdlinux ➜ leveldb git:(main) ✗ ]$ ./test_leveldb     
+get snapshot
+[add xdkey5:itv5]
+[modify xdkey1:itv1_modify]
+[delete xdkey2]
+scan snapshot...
+xdkey1:itv1
+xdkey2:itv2
+xdkey3:itv3
+xdkey4:itv4
+xdkey5:itv5
+scan ordinarily...
+xdkey1:itv1_modify
+xdkey3:itv3
+xdkey4:itv4
+xdkey5:itv5
+```
+
+## 5. 小结
 
 
-## 5. 参考
+## 6. 参考
 
 1、[leveldb](https://github.com/google/leveldb)
 
