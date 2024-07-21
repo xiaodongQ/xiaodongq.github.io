@@ -94,6 +94,8 @@ leveldb中有个**版本（version）**的概念，一个版本中主要记录�
 
 1、下载代码：`git clone --recurse-submodules https://github.com/google/leveldb.git`
 
+(换成自己fork的仓库：`git clone --recurse-submodules https://github.com/xiaodongQ/leveldb.git`)
+
 2、编译
 
 截取编译过程如下，可看到里面包含了相当完备的测试内容：gtest、gmock、benchmark、db_bench等。
