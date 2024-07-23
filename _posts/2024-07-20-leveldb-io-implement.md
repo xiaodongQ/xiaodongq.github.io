@@ -118,7 +118,7 @@ void WriteBatch::Delete(const Slice& key) {
 
 append追加对应的操作后，此处开始写入数据库。
 
-里面很多内容值得好好学习一下：比如`std::deque`、leveldb自己封装的`MutexLock`和`port::CondVar`、单例类模板、各种线程安全保护手段等等，学习记录直接在 [fork](https://github.com/xiaodongQ/leveldb) 的代码里添加注释。
+里面很多内容值得好好学习一下：比如`std::deque`、leveldb自己封装的`MutexLock`和`port::CondVar`、单例类模板、生产者/消费者模型、各种线程安全保护手段等等，也是个学习实践现代C++的机会，学习记录直接在 [fork](https://github.com/xiaodongQ/leveldb) 的代码里添加注释。
 
 先看下`DBImpl::Writer`这个类（`DBImpl::Write`函数里会用到）
 
