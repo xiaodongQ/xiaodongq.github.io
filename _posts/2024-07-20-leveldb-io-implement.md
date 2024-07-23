@@ -118,7 +118,7 @@ void WriteBatch::Delete(const Slice& key) {
 
 append追加对应的操作后，此处开始写入数据库。
 
-里面很多内容值得好好学习一下：比如`std::deque`、leveldb自己封装的`MutexLock`和`port::CondVar`，学习记录直接在 [fork](https://github.com/xiaodongQ/leveldb) 的代码里添加注释。
+里面很多内容值得好好学习一下：比如`std::deque`、leveldb自己封装的`MutexLock`和`port::CondVar`、单例类模板，学习记录直接在 [fork](https://github.com/xiaodongQ/leveldb) 的代码里添加注释。
 
 先看下`DBImpl::Writer`这个类（`DBImpl::Write`函数里会用到）
 
@@ -166,6 +166,48 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
   Status status = MakeRoomForWrite(updates == nullptr);
   ...
 }
+```
+
+#### CondVar
+
+
+```cpp
+// port/port_stdcxx.h
+
+// Thinly wraps std::condition_variable.
+// 封装了 std::condition_variable，确保了线程安全的等待与通知机制。
+/*
+  `std::condition_variable`是C++11标准库中提供的一种线程同步机制，用于多线程环境下的条件变量。它允许一个线程等待某个条件的变化，并在条件满足时进行通知。
+  `std::condition_variable`与互斥锁（`std::mutex`）配合使用，以确保线程间安全地修改可共享的状态。
+*/
+class CondVar {
+ public:
+  explicit CondVar(Mutex* mu) : mu_(mu) { assert(mu != nullptr); }
+  ~CondVar() = default;
+
+  CondVar(const CondVar&) = delete;
+  CondVar& operator=(const CondVar&) = delete;
+
+  void Wait() {
+    // std::adopt_lock 定义时即加锁
+    std::unique_lock<std::mutex> lock(mu_->mu_, std::adopt_lock);
+    // 等待条件变量，直到其他线程通过Signal或SignalAll唤醒它
+    // 在等待过程中，lock会被临时释放，允许其他线程访问被保护的资源
+    cv_.wait(lock);
+    // 调用lock.release()是在wait返回后释放锁的一种不常见方式。
+    // 实际上，在此上下文中，由于std::unique_lock会在其作用域结束时自动释放锁，这里的release调用是冗余的
+    // 一般让 std::unique_lock自动管理锁的生命周期即可，无需手动调用release
+    lock.release();
+  }
+  // 唤醒一个正在等待该条件变量的线程，哪个线程被唤醒是不确定的，由实现决定。
+  void Signal() { cv_.notify_one(); }
+  // 唤醒所有等待该条件变量的线程
+  void SignalAll() { cv_.notify_all(); }
+
+ private:
+  std::condition_variable cv_;
+  Mutex* const mu_;
+};
 ```
 
 ## 4. 小结
