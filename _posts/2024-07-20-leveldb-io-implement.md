@@ -146,10 +146,13 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
   w.sync = options.sync;
   w.done = false;
 
+  // 整体加锁，在同一个时刻，只允许一个写入操作将内容写入到日志文件以及内存数据库中
   // RAII特性，构造时lock，析构时unlock
   MutexLock l(&mutex_);
+  // 要写入的数据，由Writer封装后先放到队列尾部
   // 这里的writers_是 std::deque 双端队列
   writers_.push_back(&w);
+  // 有其他的写入操作，则等待
   while (!w.done && &w != writers_.front()) {
     // 线程安全地等待条件变量，直到被唤醒
     w.cv.Wait();
@@ -161,18 +164,99 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
   }
 
   // May temporarily unlock and wait.
-  // 声明为：Status DBImpl::MakeRoomForWrite(bool force)，若传入 WriteBatch* 为NULL则强制写，即不允许延迟写
+  // 声明为：Status DBImpl::MakeRoomForWrite(bool force)，updates为nullptr时压缩处理
   // 调用 MakeRoomForWrite 前必定已持锁，里面会断言判断
   Status status = MakeRoomForWrite(updates == nullptr);
-  ...
+  // VersionSet的最新序列号
+  uint64_t last_sequence = versions_->LastSequence();
+  // 待写入数据（封装在Writer中）
+  Writer* last_writer = &w;
+  // 有合并空间且有内容要写入时
+  if (status.ok() && updates != nullptr) {  // nullptr batch is for compactions
+    // 合并写操作，要合并的对象是 writers_ 对应的 Writer 双端队列
+    // 都会合并到 tmp_batch_ 成员变量去，返回的指针实际也是 tmp_batch_（定义为WriteBatch* tmp_batch_）
+    WriteBatch* write_batch = BuildBatchGroup(&last_writer);
+    WriteBatchInternal::SetSequence(write_batch, last_sequence + 1);
+    last_sequence += WriteBatchInternal::Count(write_batch);
+
+    // Add to log and apply to memtable.  We can release the lock
+    // during this phase since &w is currently responsible for logging
+    // and protects against concurrent loggers and concurrent writes
+    // into mem_.
+    // 这里解锁是因为 log_->AddRecord 和 WriteBatchInternal::InsertInto 操作里会加锁保护
+    {
+      mutex_.Unlock();
+      // 合并后的记录，写WAL预写日志
+      // Contents获取WriteBatch里面的内容，多条记录按batch格式组织
+      status = log_->AddRecord(WriteBatchInternal::Contents(write_batch));
+      bool sync_error = false;
+      if (status.ok() && options.sync) {
+        status = logfile_->Sync();
+        if (!status.ok()) {
+          sync_error = true;
+        }
+      }
+      if (status.ok()) {
+        // 写memtable，write_batch写到传入的 mem_ 里
+        status = WriteBatchInternal::InsertInto(write_batch, mem_);
+      }
+      mutex_.Lock();
+      if (sync_error) {
+        // The state of the log file is indeterminate: the log record we
+        // just added may or may not show up when the DB is re-opened.
+        // So we force the DB into a mode where all future writes fail.
+        RecordBackgroundError(status);
+      }
+    }
+    if (write_batch == tmp_batch_) tmp_batch_->Clear();
+
+    versions_->SetLastSequence(last_sequence);
+  }
+
+  while (true) {
+    // deque头
+    Writer* ready = writers_.front();
+    // 从deque弹出
+    writers_.pop_front();
+    // 如果队列头有其他待写入，依次通知写入（本次写入合并到了其后面）
+    if (ready != &w) {
+      ready->status = status;
+      ready->done = true;
+      // 通知唤醒一个线程
+      ready->cv.Signal();
+    }
+    if (ready == last_writer) break;
+  }
+
+  // 最后是通知本次的写入。和上面逻辑差别是 status和done 的赋值
+  // Notify new head of write queue
+  if (!writers_.empty()) {
+    writers_.front()->cv.Signal();
+  }
+
+  return status;
 }
 ```
 
-## 4. 小结
+### 3.3. 流程图和代码对应
+
+这里直接看下handbook里的写入流程，写入时会进行合并：
+
+![写入合并流程](https://leveldb-handbook.readthedocs.io/zh/latest/_images/write_merge.jpeg)
+
+对应代码位置：
+
+![对应代码位置](/images/2024-07-25-level-write-process.png)
+
+## 4. 读操作流程
+
+
+
+## 5. 小结
 
 读写过程代码学习。
 
-## 5. 参考
+## 6. 参考
 
 1、[leveldb](https://github.com/google/leveldb)
 
