@@ -240,11 +240,7 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
 
 ### 3.3. 流程图和代码对应
 
-这里直接看下handbook里的写入流程，写入时会进行合并：
-
-![写入合并流程](https://leveldb-handbook.readthedocs.io/zh/latest/_images/write_merge.jpeg)
-
-对应代码位置：
+这里直接看下leveldb-handbook里的写入流程图，写入时会进行合并，自己加了点代码注释：
 
 ![对应代码位置](/images/2024-07-25-level-write-process.png)
 
