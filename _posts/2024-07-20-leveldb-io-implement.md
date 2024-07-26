@@ -246,7 +246,7 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
 
 ## 4. 读操作流程
 
-
+涉及到VersionSet和Version类，见前面对应的类图。
 
 ## 5. 小结
 
