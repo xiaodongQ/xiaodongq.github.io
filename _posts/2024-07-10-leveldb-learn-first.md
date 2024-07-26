@@ -16,9 +16,9 @@ leveldb学习笔记，本篇说明整体架构和基本操作，并进行代码�
 
 之前学习了一些网络的内容，本打算把网络相关TODO先了结完再去啃存储、CPU、内存等基础和相关领域内容，但扩展开的话点有点多，就先留部分坑了，穿插学习。换一点新的东西，先学习梳理下[leveldb](https://github.com/google/leveldb)这个优秀的存储引擎。
 
-这里先参考 [官网](https://github.com/google/leveldb) 和 [leveldb-handbook](https://leveldb-handbook.readthedocs.io/zh/latest/index.html)，并结合一些博客文章学习，自己再动手做些实验，以此为出发点正好把内核存储栈、涉及的数据结构和算法带着场景再过一遍。
+这里先参考 [官网](https://github.com/google/leveldb) 和 [leveldb-handbook](https://leveldb-handbook.readthedocs.io/zh/latest/index.html)，并结合一些博客文章学习，自己再动手做些实验，以此为出发点正好把Linux内核存储栈、涉及的数据结构和算法带着场景再过一遍。
 
-从官网仓库 fork [一份](https://github.com/xiaodongQ/leveldb)，便于代码学习注释、修改调试。（另外会用到benchmark、googletest，`git submodule update --init --recursive`）
+从官网仓库 [fork](https://github.com/xiaodongQ/leveldb) 一份，便于代码学习注释、修改调试。（另外会用到benchmark、googletest，`git submodule update --init --recursive`）
 
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
@@ -234,9 +234,9 @@ readreverse :  0.663 micros/op;  166.9 MB/s
 
 ## 4. 基本操作测试
 
-跟着 `leveldb/doc/index.md`（也可见[doc/index.md](https://github.com/google/leveldb/blob/main/doc/index.md)） 的说明，写个简单demo进行基本功能的试用。
+跟着 `leveldb/doc/index.md`（也可见[doc/index.md](https://github.com/google/leveldb/blob/main/doc/index.md)） 的说明，写个简单[demo](https://github.com/xiaodongQ/prog-playground/blob/main/leveldb/test_leveldb.cpp)进行基本功能的试用。
 
-公共接口为`include/leveldb/*.h`，一般不需要再依赖其他涉及内部实现的头文件了。
+leveldb公共接口为`include/leveldb/*.h`，一般不需要再依赖其他涉及内部实现的头文件了。
 
 这里先`make install`一下，把必要的头文件和库安装到系统路径，便于后面使用。
 
