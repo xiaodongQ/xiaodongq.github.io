@@ -248,6 +248,10 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
 
 涉及到VersionSet和Version类，见前面对应的类图。
 
+`DB::Get` -> `DBImpl::Get`，
+
+
+
 ## 5. 小结
 
 读写过程代码学习。
