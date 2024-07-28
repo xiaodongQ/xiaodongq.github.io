@@ -248,9 +248,97 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
 
 涉及到VersionSet和Version类，见前面对应的类图。
 
-`DB::Get` -> `DBImpl::Get`，
+调用链：`DB::Get` -> `DBImpl::Get`，对应的读流程如下：
 
+![读流程](/images/2024-07-28-leveldb-read-process.png)
 
+代码不长，下面贴一下。`memtable`、`immutable memtable`、`current Version`三者（实际前2个都是`MemTable`类型）的具体`Get`流程暂不展开。
+
+```cpp
+// db/db_impl.cc
+Status DBImpl::Get(const ReadOptions& options, const Slice& key,
+                   std::string* value) {
+  Status s;
+  // RAII 加锁
+  MutexLock l(&mutex_);
+  SequenceNumber snapshot;
+  if (options.snapshot != nullptr) {
+    // 若option里传入了快照，获取快照对应的 seqnumber
+    snapshot =
+        static_cast<const SnapshotImpl*>(options.snapshot)->sequence_number();
+  } else {
+    // 非快照Get，则获取当前 VersionSet 对应的seqnumber
+    snapshot = versions_->LastSequence();
+  }
+
+  // 当前数据库的 memtable
+  MemTable* mem = mem_;
+  // immutable memtable
+  MemTable* imm = imm_;
+  // VersionSet里当前使用的Version
+  /*
+    immutalbe memtable压缩持久化后得到 level0的sstable；
+    levelN层的sstable压缩后得到levelN+1层的sstable
+    每次压缩完成，就得到一个Version。Version创建规则：versionNew = versionOld + VersionEdit（VersionEdit记录相对上一个Version变化的内容）
+  */
+  Version* current = versions_->current();
+  // memtable、immutable memtable、current Version里的引用计数都+1（下面结束时会都-1）
+  mem->Ref();
+  if (imm != nullptr) imm->Ref();
+  current->Ref();
+
+  bool have_stat_update = false;
+  Version::GetStats stats;
+
+  // Unlock while reading from files and memtables
+  {
+    // 从文件和memtable中读取时先解锁
+    mutex_.Unlock();
+    // First look in the memtable, then in the immutable memtable (if any).
+    //构造一个查询key，会根据key+seqnumber+key类型 进行编码得到
+    LookupKey lkey(key, snapshot);
+    // 到memtable找key，传入key对应的seqnumber
+    if (mem->Get(lkey, value, &s)) {
+      // Done
+    } else if (imm != nullptr && imm->Get(lkey, value, &s)) {  // 找不到则在immutalbe table里找
+      // Done
+    } else {
+      // 上面都找不到则在current Version里找
+      s = current->Get(options, lkey, value, &stats);
+      // 状态直接更新为true？
+      have_stat_update = true;
+    }
+    mutex_.Lock();
+  }
+
+  // 若上面查到current Version，且计数满足压缩条件，则检查调度进行压缩
+  if (have_stat_update && current->UpdateStats(stats)) {
+    MaybeScheduleCompaction();
+  }
+  // memtable、immutable memtable、Version里的引用计数都-1
+  mem->Unref();
+  if (imm != nullptr) imm->Unref();
+  current->Unref();
+  return s;
+}
+```
+
+### 4.1. Version说明
+
+再看下Version和manifest的关系。
+
+compaction压缩操作包含：
+
+* immutable memtable压缩为level0的sstable
+* levelN的sstable压缩为levelN+1的）
+
+每次压缩完成，就得到一个Version。Version创建规则：`versionNew = versionOld + VersionEdit`，其中`VersionEdit`记录相对上一个Version变化的内容，比如新增/删除哪些sstable文件、日志编号、操作seq number等。manifest文件用于记录`VersionEdit`数据。
+
+通过这些信息，leveldb便可以在启动时，基于一个空的version，不断apply这些记录，最终得到一个上次运行结束时的版本信息。
+
+manifest文件结构示意图：
+
+![manifest文件结构](https://leveldb-handbook.readthedocs.io/zh/latest/_images/manifest.jpeg)
 
 ## 5. 小结
 
