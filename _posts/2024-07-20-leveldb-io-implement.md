@@ -330,7 +330,7 @@ Status DBImpl::Get(const ReadOptions& options, const Slice& key,
 compaction压缩操作包含：
 
 * immutable memtable压缩为level0的sstable
-* levelN的sstable压缩为levelN+1的）
+* levelN的sstable压缩为levelN+1的sstable
 
 每次压缩完成，就得到一个Version。Version创建规则：`versionNew = versionOld + VersionEdit`，其中`VersionEdit`记录相对上一个Version变化的内容，比如新增/删除哪些sstable文件、日志编号、操作seq number等。manifest文件用于记录`VersionEdit`数据。
 
@@ -342,7 +342,7 @@ manifest文件结构示意图：
 
 ## 5. 小结
 
-读写过程代码学习。
+读写过程代码流程梳理学习，通过画类图和流程图加深了理解。
 
 ## 6. 参考
 
