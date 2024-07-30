@@ -1,6 +1,6 @@
 ---
 layout: post
-title: leveldb学习笔记（三） -- 日志和memtable
+title: leveldb学习笔记（三） -- 日志和memtable实现
 categories: 存储
 tags: 存储 leveldb
 ---
