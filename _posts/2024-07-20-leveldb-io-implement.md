@@ -183,7 +183,7 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
     // during this phase since &w is currently responsible for logging
     // and protects against concurrent loggers and concurrent writes
     // into mem_.
-    // 这里解锁是因为 log_->AddRecord 和 WriteBatchInternal::InsertInto 操作里会加锁保护
+    // 这里解锁是因为 w（类型为Writer） 中会进行并发控制。且下面操作可能涉及::write文件io，比较耗时
     {
       mutex_.Unlock();
       // 合并后的记录，写WAL预写日志
