@@ -28,7 +28,7 @@ leveldb学习笔记，本篇学习日志结构和memtable的实现，学习其�
 
 在leveldb中，有两个memory db，以及对应的两份日志文件。两个memory db即下面定义中的`mem_`和`imm_`；日志文件为`log_`
 
-### 日志文件初始化
+### 2.1. 日志文件初始化
 
 ```cpp
 // db/db_impl.h
@@ -78,7 +78,7 @@ Status DB::Open(const Options& options, const std::string& dbname, DB** dbptr) {
 }
 ```
 
-### 写流程中的日志操作
+### 2.2. 写流程中的日志操作
 
 主要写流程操作如下：
 
@@ -141,66 +141,83 @@ Status Writer::AddRecord(const Slice& slice) {
 }
 ```
 
-涉及日志转换和memtable/immutable memtable转换操作，逻辑在上面的`MakeRoomForWrite`中，放到memtable小节说明。
+涉及日志转换和memtable/immutable memtable转换操作，逻辑在`MakeRoomForWrite`函数中，放到memtable小节说明。
 
-### 日志结构
+### 2.3. 日志结构
 
 为便于理解，我们把上面的`AddRecord`全部展开。
 
 ```cpp
-Status Writer::AddRecord(const Slice& slice) {
-  const char* ptr = slice.data();
-  size_t left = slice.size();
+    Status Writer::AddRecord(const Slice& slice) {
+    const char* ptr = slice.data();
+    size_t left = slice.size();
 
-  // Fragment the record if necessary and emit it.  Note that if slice
-  // is empty, we still want to iterate once to emit a single
-  // zero-length record
-  Status s;
-  bool begin = true;
-  // 循环写 dest_（定义为`WritableFile* dest_;`），并::write写物理盘
-  do {
-    // kBlockSize默认为32KB
-    const int leftover = kBlockSize - block_offset_;
-    assert(leftover >= 0);
-    if (leftover < kHeaderSize) {
-      // Switch to a new block
-      if (leftover > 0) {
-        // Fill the trailer (literal below relies on kHeaderSize being 7)
-        static_assert(kHeaderSize == 7, "");
-        // 小数据写buffer，大数据直接::write写盘
-        dest_->Append(Slice("\x00\x00\x00\x00\x00\x00", leftover));
-      }
-      block_offset_ = 0;
+    // Fragment the record if necessary and emit it.  Note that if slice
+    // is empty, we still want to iterate once to emit a single
+    // zero-length record
+    Status s;
+    bool begin = true;
+    // 循环写 dest_（定义为`WritableFile* dest_;`），并::write写物理盘
+    do {
+        // kBlockSize默认为32KB
+        const int leftover = kBlockSize - block_offset_;
+        assert(leftover >= 0);
+        if (leftover < kHeaderSize) {
+        // Switch to a new block
+        if (leftover > 0) {
+            // Fill the trailer (literal below relies on kHeaderSize being 7)
+            static_assert(kHeaderSize == 7, "");
+            // 小数据写buffer，大数据直接::write写盘
+            dest_->Append(Slice("\x00\x00\x00\x00\x00\x00", leftover));
+        }
+        block_offset_ = 0;
+        }
+
+        // Invariant: we never leave < kHeaderSize bytes in a block.
+        assert(kBlockSize - block_offset_ - kHeaderSize >= 0);
+
+        const size_t avail = kBlockSize - block_offset_ - kHeaderSize;
+        const size_t fragment_length = (left < avail) ? left : avail;
+
+        RecordType type;
+        const bool end = (left == fragment_length);
+        if (begin && end) {
+        type = kFullType;
+        } else if (begin) {
+        type = kFirstType;
+        } else if (end) {
+        type = kLastType;
+        } else {
+        type = kMiddleType;
+        }
+
+        // buffer写物理盘，这里只是调::write，具体操作系统的page cache等不关注
+        s = EmitPhysicalRecord(type, ptr, fragment_length);
+        ptr += fragment_length;
+        left -= fragment_length;
+        begin = false;
+    } while (s.ok() && left > 0);
+    return s;
     }
-
-    // Invariant: we never leave < kHeaderSize bytes in a block.
-    assert(kBlockSize - block_offset_ - kHeaderSize >= 0);
-
-    const size_t avail = kBlockSize - block_offset_ - kHeaderSize;
-    const size_t fragment_length = (left < avail) ? left : avail;
-
-    RecordType type;
-    const bool end = (left == fragment_length);
-    if (begin && end) {
-      type = kFullType;
-    } else if (begin) {
-      type = kFirstType;
-    } else if (end) {
-      type = kLastType;
-    } else {
-      type = kMiddleType;
-    }
-
-    // buffer写物理盘，这里只是调::write，具体操作系统的page cache等不关注
-    s = EmitPhysicalRecord(type, ptr, fragment_length);
-    ptr += fragment_length;
-    left -= fragment_length;
-    begin = false;
-  } while (s.ok() && left > 0);
-  return s;
-}
 ```
 
+`dest_`对应的类结构为`PosixWritableFile`，成员变量如下：
+
+```cpp
+// util/env_posix.cc
+class PosixWritableFile final : public WritableFile {
+    ...
+    // buf_[0, pos_ - 1] contains data to be written to fd_.
+    // kWritableFileBufferSize定义为 65536 的const变量，即此处buffer为64KB
+    char buf_[kWritableFileBufferSize];
+    size_t pos_;
+    int fd_;
+
+    const bool is_manifest_;  // True if the file's name starts with MANIFEST.
+    const std::string filename_;
+    const std::string dirname_;  // The directory of filename_.
+}
+```
 
 
 ## 3. memtable
@@ -223,7 +240,7 @@ class MemTable {
 };
 ```
 
-### 写流程中的memtable转换
+### 3.1. 写流程中的memtable转换
 
 上述梳理日志流程的小节中，提到了`MakeRoomForWrite`，此处进行分析。
 
