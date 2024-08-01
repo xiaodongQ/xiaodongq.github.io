@@ -1,6 +1,6 @@
 ---
 layout: post
-title: leveldb学习笔记（三） -- 日志和memtable实现
+title: leveldb学习笔记（三） -- 日志结构实现
 categories: 存储
 tags: 存储 leveldb
 ---
@@ -8,17 +8,17 @@ tags: 存储 leveldb
 * content
 {:toc}
 
-leveldb学习笔记，本篇学习日志结构和memtable的实现，学习其中的跳表用法。
+leveldb学习笔记，本篇学习日志结构对应的实现。
 
 
 
 ## 1. 背景
 
-前面跟踪学习了读写实现的基本流程，此篇开始学习梳理其中具体的流程实现。本篇先看日志和memtable（内存数据库）对应的实现细节，尤其是其中的跳表结构。
+前面跟踪学习了读写实现的基本流程，此篇开始学习梳理其中具体的流程实现。本篇先看日志结构对应的实现细节。
 
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
-## 2. 日志
+## 2. 再看下总体流程
 
 [前面](https://xiaodongq.github.io/2024/07/20/leveldb-io-implement/)看过了写流程，这里再放一下：
 
@@ -26,9 +26,9 @@ leveldb学习笔记，本篇学习日志结构和memtable的实现，学习其�
 
 如上，为了避免断电、程序崩溃等异常导致丢数据，写memtable之前会先写日志。
 
-在leveldb中，有两个memory db，以及对应的两份日志文件。两个memory db即下面定义中的`mem_`和`imm_`；日志文件为`log_`
+在leveldb中，有两个memory db，以及对应的两份日志文件。两个memory db即下面定义中的`mem_`和`imm_`；日志文件为`log_`，也会对应immutable memtable有个不可修改的log实例。
 
-### 2.1. 日志文件初始化
+## 3. 日志文件初始化
 
 ```cpp
 // db/db_impl.h
@@ -78,7 +78,7 @@ Status DB::Open(const Options& options, const std::string& dbname, DB** dbptr) {
 }
 ```
 
-### 2.2. 写流程中的日志操作
+## 4. 写流程中的日志操作
 
 主要写流程操作如下：
 
@@ -121,7 +121,7 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
 }
 ```
 
-其中涉及写日志的逻辑：
+其中涉及写日志的逻辑，`leveldb::log::Writer`实现写`journal`(日子)的writer：
 
 ```cpp
 // db/log_writer.cc
@@ -139,9 +139,9 @@ Status Writer::AddRecord(const Slice& slice) {
 }
 ```
 
-涉及日志转换和memtable/immutable memtable转换操作，逻辑在`MakeRoomForWrite`函数中，放到memtable小节说明。
+涉及日志转换和memtable/immutable memtable转换操作，逻辑在`MakeRoomForWrite`函数中，放到memtable里去说明。
 
-### 2.3. 代码中的日志结构
+## 5. 写日志逻辑
 
 为便于理解，我们把上面的`AddRecord`全部展开，并添加注释。
 
@@ -173,6 +173,7 @@ Status Writer::AddRecord(const Slice& slice) {
         // 小数据写buffer，大数据直接::write写盘
         dest_->Append(Slice("\x00\x00\x00\x00\x00\x00", leftover));
       }
+      // 32KB后重置偏移，重新写一个block
       block_offset_ = 0;
     }
 
@@ -209,9 +210,24 @@ Status Writer::AddRecord(const Slice& slice) {
 }
 ```
 
-#### 2.3.1. EmitPhysicalRecord
+### 5.1. 写日志流程图
+
+上述逻辑对应逻辑图，即：
+
+![日志写流程图](https://leveldb-handbook.readthedocs.io/zh/latest/_images/journal_write.jpeg)
+
+在写入的过程中，不断判断writer中buffer的大小，若超过32KiB，将chunk开始到现在做为一个完整的chunk，为其计算header之后将整个chunk写入文件。与此同时reset buffer，开始新的chunk的写入。
+
+若一条journal记录较大，则可能会分成几个chunk存储在若干个block中。
+
+## 6. 日志结构
+
+### 6.1. EmitPhysicalRecord：日志结构组装
+
+写日志时的`EmitPhysicalRecord`中，涉及组装日志结构，具体组装方式见代码：
 
 ```cpp
+// db/log_writer.cc
 Status Writer::EmitPhysicalRecord(RecordType t, const char* ptr,
                                   size_t length) {
   assert(length <= 0xffff);  // Must fit in two bytes
@@ -247,7 +263,7 @@ Status Writer::EmitPhysicalRecord(RecordType t, const char* ptr,
 }
 ```
 
-#### 2.3.2. dest_->Append
+### 6.2. 落盘时机：dest_->Append
 
 `dest_`对应的类结构为`PosixWritableFile`，成员变量如下：
 
@@ -311,11 +327,11 @@ class PosixWritableFile final : public WritableFile {
     return WriteUn
 ```
 
-### 2.4. 结构示意图
+### 6.3. 日志结构示意图
 
 ![日志结构示意图](https://leveldb-handbook.readthedocs.io/zh/latest/_images/journal.jpeg)
 
-上面代码注释也是映证示意图梳理的，通过代码去反看设计的方式比较费劲且需要抽象，还是先理解设计然后映证代码实现比较轻松。
+上面代码注释也是映证示意图梳理的，通过代码去反看设计的方式比较费劲且需要抽象，还是先理解设计然后映证代码实现更轻松一些。
 
 贴一下参考链接的结构说明，对照代码就比较清晰了：
 
@@ -325,41 +341,24 @@ chunk共有四种类型：full，first，middle，last。一条日志记录若�
 
 由于一个block的大小为32KiB，因此当一条日志文件过大时，会将第一部分数据写在第一个block中，且类型为first，若剩余的数据仍然超过一个block的大小，则第二部分数据写在第二个block中，类型为middle，最后剩余的数据写在最后一个block中，类型为last。
 
-## 3. memtable
+## 7. 日志内容(Data)
 
-看下内存数据库memtable的定义，可看到MemTable中的实现为：`SkipList<const char*, KeyComparator>`
+上述要写的日志，即示意图中的Data（不包含7字节的header），在`WriteBatchInternal::Contents(write_batch)`里构造。
 
-```cpp
-class MemTable {
-    ...
-    // 跳表
-    typedef SkipList<const char*, KeyComparator> Table;
+[上篇](https://xiaodongq.github.io/2024/07/20/leveldb-io-implement/)中可知write_batch(类型为`WriteBatch*`)对应的编码格式（以`Put`为例，`Delete`则没有value）为：
 
-    ~MemTable();  // Private since only Unref() should be used to delete it
-
-    KeyComparator comparator_;
-    int refs_;
-    Arena arena_;
-    // Table是跳表结构
-    Table table_;
-};
-```
-
-### 3.1. 写流程中的memtable转换
-
-上述梳理日志流程的小节中，提到了`MakeRoomForWrite`，此处进行分析。
+![batch](https://leveldb-handbook.readthedocs.io/zh/latest/_images/batch.jpeg)
 
 
-## 4. 小结
 
-学习日志结构和memtable的实现细节。
+## 8. 小结
 
-## 5. 参考
+学习日志结构的实现细节。
+
+## 9. 参考
 
 1、[leveldb](https://github.com/google/leveldb)
 
 2、[leveldb-handbook](https://leveldb-handbook.readthedocs.io/zh/latest/index.html)
 
-3、[漫谈 LevelDB 数据结构（一）：跳表（Skip List）](https://www.qtmuniao.com/2020/07/03/leveldb-data-structures-skip-list/)
-
-4、GPT
+3、GPT
