@@ -129,12 +129,10 @@ Status Writer::AddRecord(const Slice& slice) {
     const char* ptr = slice.data();
     size_t left = slice.size();
     ...
-    // 循环写 dest_（定义为`WritableFile* dest_;`），并::write写物理盘
+    // 循环写 dest_（定义为`WritableFile* dest_;`）
     do {
-        // 小数据写buffer，大数据直接::write写盘
         dest_->Append(Slice("\x00\x00\x00\x00\x00\x00", leftover));
         ...
-        // buffer写物理盘，这里只是调::write，具体操作系统的page cache等不关注
         s = EmitPhysicalRecord(type, ptr, fragment_length);
         ...
     } while(s.ok() && left > 0);
@@ -143,63 +141,113 @@ Status Writer::AddRecord(const Slice& slice) {
 
 涉及日志转换和memtable/immutable memtable转换操作，逻辑在`MakeRoomForWrite`函数中，放到memtable小节说明。
 
-### 2.3. 日志结构
+### 2.3. 代码中的日志结构
 
-为便于理解，我们把上面的`AddRecord`全部展开。
+为便于理解，我们把上面的`AddRecord`全部展开，并添加注释。
 
 ```cpp
-    Status Writer::AddRecord(const Slice& slice) {
-    const char* ptr = slice.data();
-    size_t left = slice.size();
+// db/log_writer.cc
+Status Writer::AddRecord(const Slice& slice) {
+  const char* ptr = slice.data();
+  size_t left = slice.size();
 
-    // Fragment the record if necessary and emit it.  Note that if slice
-    // is empty, we still want to iterate once to emit a single
-    // zero-length record
-    Status s;
-    bool begin = true;
-    // 循环写 dest_（定义为`WritableFile* dest_;`），并::write写物理盘
-    do {
-        // kBlockSize默认为32KB
-        const int leftover = kBlockSize - block_offset_;
-        assert(leftover >= 0);
-        if (leftover < kHeaderSize) {
-        // Switch to a new block
-        if (leftover > 0) {
-            // Fill the trailer (literal below relies on kHeaderSize being 7)
-            static_assert(kHeaderSize == 7, "");
-            // 小数据写buffer，大数据直接::write写盘
-            dest_->Append(Slice("\x00\x00\x00\x00\x00\x00", leftover));
-        }
-        block_offset_ = 0;
-        }
-
-        // Invariant: we never leave < kHeaderSize bytes in a block.
-        assert(kBlockSize - block_offset_ - kHeaderSize >= 0);
-
-        const size_t avail = kBlockSize - block_offset_ - kHeaderSize;
-        const size_t fragment_length = (left < avail) ? left : avail;
-
-        RecordType type;
-        const bool end = (left == fragment_length);
-        if (begin && end) {
-        type = kFullType;
-        } else if (begin) {
-        type = kFirstType;
-        } else if (end) {
-        type = kLastType;
-        } else {
-        type = kMiddleType;
-        }
-
-        // buffer写物理盘，这里只是调::write，具体操作系统的page cache等不关注
-        s = EmitPhysicalRecord(type, ptr, fragment_length);
-        ptr += fragment_length;
-        left -= fragment_length;
-        begin = false;
-    } while (s.ok() && left > 0);
-    return s;
+  // Fragment the record if necessary and emit it.  Note that if slice
+  // is empty, we still want to iterate once to emit a single
+  // zero-length record
+  Status s;
+  bool begin = true;
+  // 循环写 dest_（定义为`WritableFile* dest_;`）
+  // 一条日志记录可能包含多个block，一个block包含一个或多个完整的chunk。
+  // 可查看日志结构[示意图](https://leveldb-handbook.readthedocs.io/zh/latest/_images/journal.jpeg)
+  do {
+    // 日志文件中按照block进行划分，每个block的大小为32KiB，32KB对齐这是为了提升读取时的效率
+    // kBlockSize默认为32KB，block_offset_在下面的 EmitPhysicalRecord 里会赋值 fragment_length+头长度，表示数据偏移
+    const int leftover = kBlockSize - block_offset_;
+    assert(leftover >= 0);
+    if (leftover < kHeaderSize) {
+      // 一个block里剩余不足写7字节头，则填充空字符
+      // Switch to a new block
+      if (leftover > 0) {
+        // Fill the trailer (literal below relies on kHeaderSize being 7)
+        static_assert(kHeaderSize == 7, "");
+        // 小数据写buffer，大数据直接::write写盘
+        dest_->Append(Slice("\x00\x00\x00\x00\x00\x00", leftover));
+      }
+      block_offset_ = 0;
     }
+
+    // 断言：block里剩余的空间肯定 >= 7字节，留空间给下面的写入 (block剩余空间即kBlockSize - block_offset_)
+    // Invariant: we never leave < kHeaderSize bytes in a block.
+    assert(kBlockSize - block_offset_ - kHeaderSize >= 0);
+
+    // 剩余可以给数据用的空间（头占有的7字节预留好了）
+    const size_t avail = kBlockSize - block_offset_ - kHeaderSize;
+    // 若要写的数据 < block剩余空间，写要写的数据长度
+    // 若要写的数据 >= block剩余空间，写block剩余空间（可能只写个头，数据为0长度）
+    const size_t fragment_length = (left < avail) ? left : avail;
+
+    RecordType type;
+    // 根据 写的数据 和 block剩余空间的关系，判断chunk所处位置是 开始/结束/中间/满
+    const bool end = (left == fragment_length);
+    if (begin && end) {
+      type = kFullType;
+    } else if (begin) {
+      type = kFirstType;
+    } else if (end) {
+      type = kLastType;
+    } else {
+      type = kMiddleType;
+    }
+
+    // 里面涉及组装日志结构：7字节大小的header + 数据(数据可能为0字节)
+    s = EmitPhysicalRecord(type, ptr, fragment_length);
+    ptr += fragment_length;
+    left -= fragment_length;
+    begin = false;
+  } while (s.ok() && left > 0);
+  return s;
+}
 ```
+
+#### 2.3.1. EmitPhysicalRecord
+
+```cpp
+Status Writer::EmitPhysicalRecord(RecordType t, const char* ptr,
+                                  size_t length) {
+  assert(length <= 0xffff);  // Must fit in two bytes
+  assert(block_offset_ + kHeaderSize + length <= kBlockSize);
+
+  // 每个chunk包含了一个7字节大小的header，前4字节是该chunk的校验码，紧接的2字节是该chunk数据的长度，以及最后一个字节是该chunk的类型。
+  // 可查看日志结构[示意图](https://leveldb-handbook.readthedocs.io/zh/latest/_images/journal.jpeg)
+  // Format the header
+  char buf[kHeaderSize];
+  buf[4] = static_cast<char>(length & 0xff);
+  buf[5] = static_cast<char>(length >> 8);
+  buf[6] = static_cast<char>(t);
+
+  // Compute the crc of the record type and the payload.
+  // 计算 数据+类型 对应的 CRC
+  uint32_t crc = crc32c::Extend(type_crc_[t], ptr, length);
+  crc = crc32c::Mask(crc);  // Adjust for storage
+  EncodeFixed32(buf, crc);
+
+  // Write the header and the payload
+  // 写7字节大小的header 到 dest_，buffer够则只写buffer
+  Status s = dest_->Append(Slice(buf, kHeaderSize));
+  if (s.ok()) {
+    // 写 数据 到 dest_，buffer够则只写buffer
+    s = dest_->Append(Slice(ptr, length));
+    if (s.ok()) {
+      // 系统::write接口写磁盘（里面并不会调::flush）
+      s = dest_->Flush();
+    }
+  }
+  block_offset_ += kHeaderSize + length;
+  return s;
+}
+```
+
+#### 2.3.2. dest_->Append
 
 `dest_`对应的类结构为`PosixWritableFile`，成员变量如下：
 
@@ -219,6 +267,63 @@ class PosixWritableFile final : public WritableFile {
 }
 ```
 
+上面写记录时，`EmitPhysicalRecord`会调用`dest_->Append`，其逻辑如下：
+
+* buffer总大小为64KB，先往buffer剩余空间写，若buffer剩余空间足够写入当前日志数据，则写buffer后退出
+* 若buffer剩余空间不足以写满，则将buffer数据::write落盘后，剩余数据再判断写入：
+    * 若剩余<64KB，则写buffer并退出；
+    * 若剩余>=64KB，则直接::write落盘
+
+下面是具体代码：
+
+```cpp
+  // util/env_posix.cc，PosixWritableFile 类的成员函数
+  Status Append(const Slice& data) override {
+    size_t write_size = data.size();
+    const char* write_data = data.data();
+
+    // Fit as much as possible into buffer.
+    // 若要写的数据 > buffer还剩下的空间，先写满剩下的空间
+    size_t copy_size = std::min(write_size, kWritableFileBufferSize - pos_);
+    std::memcpy(buf_ + pos_, write_data, copy_size);
+    write_data += copy_size;
+    write_size -= copy_size;
+    pos_ += copy_size;
+    // 此处说明buffer剩余空间足够写入本次数据，写入buffer后直接退出
+    if (write_size == 0) {
+      return Status::OK();
+    }
+
+    // 到这里说明只写了一部分数据，buffer已经满了，调一次 ::write 写盘
+    // Can't fit in buffer, so need to do at least one write.
+    Status status = FlushBuffer();
+    if (!status.ok()) {
+      return status;
+    }
+
+    // 剩余要写入的数据，不足64KB则写buffer后退出，否则直接::write写盘（操作系统的page cache等不关注）
+    // Small writes go to buffer, large writes are written directly.
+    if (write_size < kWritableFileBufferSize) {
+      std::memcpy(buf_, write_data, write_size);
+      pos_ = write_size;
+      return Status::OK();
+    }
+    return WriteUn
+```
+
+### 2.4. 结构示意图
+
+![日志结构示意图](https://leveldb-handbook.readthedocs.io/zh/latest/_images/journal.jpeg)
+
+上面代码注释也是映证示意图梳理的，通过代码去反看设计的方式比较费劲且需要抽象，还是先理解设计然后映证代码实现比较轻松。
+
+贴一下参考链接的结构说明，对照代码就比较清晰了：
+
+一条日志记录包含一个或多个chunk。每个chunk包含了一个7字节大小的header，前4字节是该chunk的校验码，紧接的2字节是该chunk数据的长度，以及最后一个字节是该chunk的类型。其中checksum校验的范围包括chunk的类型以及随后的data数据。
+
+chunk共有四种类型：full，first，middle，last。一条日志记录若只包含一个chunk，则该chunk的类型为full。若一条日志记录包含多个chunk，则这些chunk的第一个类型为first, 最后一个类型为last，中间包含大于等于0个middle类型的chunk。
+
+由于一个block的大小为32KiB，因此当一条日志文件过大时，会将第一部分数据写在第一个block中，且类型为first，若剩余的数据仍然超过一个block的大小，则第二部分数据写在第二个block中，类型为middle，最后剩余的数据写在最后一个block中，类型为last。
 
 ## 3. memtable
 
