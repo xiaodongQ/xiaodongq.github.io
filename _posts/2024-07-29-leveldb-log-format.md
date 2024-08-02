@@ -343,13 +343,21 @@ chunk共有四种类型：full，first，middle，last。一条日志记录若�
 
 ## 7. 日志内容(Data)
 
+日志的内容为写入的batch编码后的信息。
+
 上述要写的日志，即示意图中的Data（不包含7字节的header），在`WriteBatchInternal::Contents(write_batch)`里构造。
 
-[上篇](https://xiaodongq.github.io/2024/07/20/leveldb-io-implement/)中可知write_batch(类型为`WriteBatch*`)对应的编码格式（以`Put`为例，`Delete`则没有value）为：
+[上篇](https://xiaodongq.github.io/2024/07/20/leveldb-io-implement/)中可知write_batch(类型为`WriteBatch*`)对应的编码格式如下（以`Put`为例，`Delete`则没有value对应信息）：
 
 ![batch](https://leveldb-handbook.readthedocs.io/zh/latest/_images/batch.jpeg)
 
+日志内容格式如下：
 
+![journal_content](https://leveldb-handbook.readthedocs.io/zh/latest/_images/journal_content.jpeg)
+
+WriteBatch中`rep_`的第一个字节即编码得到的sequence number
+
+entry number在哪里体现的？（TODO）
 
 ## 8. 小结
 
@@ -359,6 +367,6 @@ chunk共有四种类型：full，first，middle，last。一条日志记录若�
 
 1、[leveldb](https://github.com/google/leveldb)
 
-2、[leveldb-handbook](https://leveldb-handbook.readthedocs.io/zh/latest/index.html)
+2、[leveldb-handbook: journal](https://leveldb-handbook.readthedocs.io/zh/latest/journal.html)
 
 3、GPT
