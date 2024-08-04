@@ -52,7 +52,7 @@ class MemTable {
 
 * `a`为初始的有序链表，查找复杂度`O(n)`
 
-## 4. leveldb里的跳表实现
+## 4. leveldb里的跳表实现s
 
 看下leveldb里面的跳表定义和大致实现。
 
