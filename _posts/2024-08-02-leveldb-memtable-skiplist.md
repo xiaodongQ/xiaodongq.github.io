@@ -87,11 +87,9 @@ leveldb学习笔记，本篇学习memtable结构实现，学习其基于的跳�
 
 实际上，在软件开发中，我们不必太在意索引占用的额外空间。在讲数据结构和算法时，我们习惯性地把要处理的数据看成整数，但是在实际的软件开发中，原始链表中存储的有可能是很大的对象，而索引节点只需要存储关键值和几个**指针**，并不需要存储对象，所以当对象比索引节点大很多时，那索引占用的额外空间就可以忽略了。
 
-## 3. leveldb中的跳表实现
+## 3. MemTable类定义
 
-### 3.1. memtable类定义
-
-leveldb中的`memtable`，key-value是有序的，底层基于`跳表(skiplist)`实现。绝大多数操作（读／写）的时间复杂度均为`O(log n)`，有着与`平衡树`相媲美的操作效率，但是从实现的角度来说简单许多。
+leveldb中的`MemTable`是有序的，底层基于`跳表(skiplist)`实现。绝大多数操作（读／写）的时间复杂度均为`O(log n)`，有着与`平衡树`相媲美的操作效率，但是从实现的角度来说简单许多。
 
 看下内存数据库memtable的定义，可看到MemTable中的实现为：`SkipList<const char*, KeyComparator>`
 
@@ -112,9 +110,11 @@ class MemTable {
 };
 ```
 
-### 3.2. `SkipList`实现
+## 4. SkipList实现
 
 看下leveldb里面的跳表定义和大致实现。
+
+### 4.1. SkipList定义
 
 ```cpp
 // db/skiplist.h
@@ -133,6 +133,7 @@ class SkipList {
 
   bool Contains(const Key& key) const;
 
+  // 定义迭代器内部类
   class Iterator {
    public:
     ...
@@ -141,9 +142,6 @@ class SkipList {
     void Prev();
     void Seek(const Key& target);
     ...
-   private:
-    const SkipList* list_;
-    Node* node_;
   };
 
  private:
@@ -177,11 +175,145 @@ class SkipList {
 };
 ```
 
-## 4. 小结
+### 4.2. Node定义
 
-学习memtable的实现细节和跳表。
+这里的`std::atomic<Node*> next_[1];`，虽然只有一个数组成员，但其利用后面的连续空间存储其他层的节点，所以实际表示了一个节点指针数组。
 
-## 5. 参考
+`next_[0]`则表示最底层链表中的节点，其他层用`next_[1]`、`next_[level-1]`等表示。
+
+```cpp
+// db/skiplist.h
+template <typename Key, class Comparator>
+struct SkipList<Key, Comparator>::Node {
+  explicit Node(const Key& k) : key(k) {}
+
+  Key const key;
+
+  // Accessors/mutators for links.  Wrapped in methods so we can
+  // add the appropriate barriers as necessary.
+  // 传入的n是层数，对于高层有的索引节点，下面几层肯定也有这个节点
+  Node* Next(int n) {
+    assert(n >= 0);
+    // Use an 'acquire load' so that we observe a fully initialized
+    // version of the returned Node.
+    // 示意图如下：next_在这n层(0~n-1)都是同一个指针
+    // *           *            *
+    // *     *     *      *     *
+    // *  *  *  *  *   *  *  *  *
+    return next_[n].load(std::memory_order_acquire);
+  }
+  void SetNext(int n, Node* x) {
+    assert(n >= 0);
+    // Use a 'release store' so that anybody who reads through this
+    // pointer observes a fully initialized version of the inserted node.
+    next_[n].store(x, std::memory_order_release);
+  }
+
+  // No-barrier variants that can be safely used in a few locations.
+  Node* NoBarrier_Next(int n) {
+    assert(n >= 0);
+    return next_[n].load(std::memory_order_relaxed);
+  }
+  void NoBarrier_SetNext(int n, Node* x) {
+    assert(n >= 0);
+    next_[n].store(x, std::memory_order_relaxed);
+  }
+
+ private:
+  // Array of length equal to the node height.  next_[0] is lowest level link.
+  std::atomic<Node*> next_[1];
+};
+```
+
+### 4.3. SkipList::Insert
+
+上面的`Node`类定义的巧妙之处，通过跳表的插入操作逻辑来看一下。
+
+标题中的`SkipList::Insert`简化了一下相关模板的参数，完整声明和定义如下：
+
+```cpp
+// db/skiplist.h
+template <typename Key, class Comparator>
+void SkipList<Key, Comparator>::Insert(const Key& key) {
+  // TODO(opt): We can use a barrier-free variant of FindGreaterOrEqual()
+  // here since Insert() is externally synchronized.
+  Node* prev[kMaxHeight];
+  Node* x = FindGreaterOrEqual(key, prev);
+
+  // Our data structure does not allow duplicate insertion
+  assert(x == nullptr || !Equal(key, x->key));
+
+  int height = RandomHeight();
+  if (height > GetMaxHeight()) {
+    for (int i = GetMaxHeight(); i < height; i++) {
+      prev[i] = head_;
+    }
+    
+    max_height_.store(height, std::memory_order_relaxed);
+  }
+
+  x = NewNode(key, height);
+  for (int i = 0; i < height; i++) {
+    // NoBarrier_SetNext() suffices since we will add a barrier when
+    // we publish a pointer to "x" in prev[i].
+    x->NoBarrier_SetNext(i, prev[i]->NoBarrier_Next(i));
+    prev[i]->SetNext(i, x);
+  }
+}
+```
+
+#### 4.3.1. FindGreaterOrEqual：索引节点用处
+
+```cpp
+// db/skiplist.h
+template <typename Key, class Comparator>
+typename SkipList<Key, Comparator>::Node*
+SkipList<Key, Comparator>::FindGreaterOrEqual(const Key& key,
+                                              Node** prev) const {
+  Node* x = head_;
+  // 当前高度
+  int level = GetMaxHeight() - 1;
+  while (true) {
+    // 依次从最高层索引往下查找，直到 key <= 某节点
+    // Node* 的Next可以获取本层的下一个节点，也可以获取下一层的下一个节点
+    Node* next = x->Next(level);
+    // 只要key在节点后面(>)就继续next
+    if (KeyIsAfterNode(key, next)) {
+      // Keep searching in this list
+      x = next;
+    } else {
+      // *    [*    *
+      // * [*  *  * *
+      // prev里依次记录索引指针
+      if (prev != nullptr) prev[level] = x;
+      if (level == 0) {
+        // 查找到最底层链表了
+        return next;
+      } else {
+        // Switch to next list
+        // 继续下一层查找
+        level--;
+      }
+    }
+  }
+}
+```
+
+```cpp
+// db/skiplist.h
+template <typename Key, class Comparator>
+bool SkipList<Key, Comparator>::KeyIsAfterNode(const Key& key, Node* n) const {
+  // null n is considered infinite
+  // key > 某节点（即key在节点后面）则返回true
+  return (n != nullptr) && (compare_(n->key, key) < 0);
+}
+```
+
+## 5. 小结
+
+学习MemTable和跳表的实现细节。
+
+## 6. 参考
 
 1、[leveldb](https://github.com/google/leveldb)
 
