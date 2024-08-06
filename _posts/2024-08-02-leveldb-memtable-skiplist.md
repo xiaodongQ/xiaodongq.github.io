@@ -227,7 +227,23 @@ struct SkipList<Key, Comparator>::Node {
 };
 ```
 
-### 4.3. SkipList::Insert
+#### 4.2.1. 内存序说明
+
+**指令重排：**
+
+编译器或处理器为了优化性能，可能会对执行指令重新排序。这在单线程程序中通常是安全的，但在多线程环境中可能会导致问题，因为不同线程之间的指令重排可能导致不一致的状态。
+
+例如，在一个简单的多线程场景中，线程A可能先写入一个变量，然后设置一个标志表示它完成了；线程B等待这个标志被设置，然后读取该变量。如果没有适当的内存序约束，编译器或处理器可能会重排这些指令，导致线程B在变量被正确设置之前就读取它，从而导致错误的结果。
+
+上述`Node`类中的原子类操作，`Next`、`SetNext`保证了比较安全的内存顺序（memory order）；`NoBarrier_Next`、`NoBarrier_SetNext`则比较宽松。
+
+1. `std::memory_order_relaxed`：不对重排做限制，只保证相关共享内存访问的原子性。
+2. `std::memory_order_acquire`: 用在 load 时，保证同线程中该 load 之后的对相关内存读写语句不会被重排到 load 之前，并且其他线程中对同样内存用了 store release（`next_[n].store(x, std::memory_order_release)`） 都对其可见。
+3. `std::memory_order_release`：用在 store 时，保证同线程中该 store 之后的对相关内存的读写语句不会被重排到 store 之前，并且该线程的所有修改对用了 load acquire（`next_[n].load(std::memory_order_acquire)`） 的其他线程都可见。
+
+`load acquire`和`store release`常配套使用，之前在学习：[创建型设计模式-单例模式](https://xiaodongq.github.io/2024/05/11/design-pattern-1-singleton/)时，其中的双重检测单例里，也有个相关示例。
+
+### 4.3. 插入：SkipList::Insert
 
 上面的`Node`类定义的巧妙之处，通过跳表的插入操作逻辑来看一下。
 
@@ -239,14 +255,22 @@ template <typename Key, class Comparator>
 void SkipList<Key, Comparator>::Insert(const Key& key) {
   // TODO(opt): We can use a barrier-free variant of FindGreaterOrEqual()
   // here since Insert() is externally synchronized.
+  // 层数直接取最大值（kMaxHeight = 12）
   Node* prev[kMaxHeight];
+  // 找到 >= key 的第一个节点
+  // * * * key[*  *
   Node* x = FindGreaterOrEqual(key, prev);
 
   // Our data structure does not allow duplicate insertion
+  // 不允许插入重复数据（外部保证）
   assert(x == nullptr || !Equal(key, x->key));
 
+  // 随机获取一个 level 值。每次以 1/4 的概率增加层数，最后返回的层数 <= 12
   int height = RandomHeight();
   if (height > GetMaxHeight()) {
+    // 若生成层数 > 当前实际层数，高层索引指针置为跳表头，从高层查找时会继续往下层找
+    // *
+    // *   *   key[*    * = GetMaxHeight(); i < height; i++) {
     for (int i = GetMaxHeight(); i < height; i++) {
       prev[i] = head_;
     }
@@ -254,17 +278,19 @@ void SkipList<Key, Comparator>::Insert(const Key& key) {
     max_height_.store(height, std::memory_order_relaxed);
   }
 
+  // 构造要插入的节点
   x = NewNode(key, height);
   for (int i = 0; i < height; i++) {
     // NoBarrier_SetNext() suffices since we will add a barrier when
     // we publish a pointer to "x" in prev[i].
+    // 每层都进行插入操作，设置其对应层级的next指针
     x->NoBarrier_SetNext(i, prev[i]->NoBarrier_Next(i));
     prev[i]->SetNext(i, x);
   }
 }
 ```
 
-#### 4.3.1. FindGreaterOrEqual：索引节点用处
+#### 4.3.1. FindGreaterOrEqual
 
 ```cpp
 // db/skiplist.h
@@ -308,6 +334,225 @@ bool SkipList<Key, Comparator>::KeyIsAfterNode(const Key& key, Node* n) const {
   // null n is considered infinite
   // key > 某节点（即key在节点后面）则返回true
   return (n != nullptr) && (compare_(n->key, key) < 0);
+}
+```
+
+#### 4.3.2. 查找及插入示意图
+
+查找插入示意图（关注高层到低层的索引指针的变化路径）：
+
+![查找示意图](/images/skiplist-search.png)（出处：论文）
+
+#### 4.3.3. SkipList::NewNode
+
+这里讲一下上面`SkipList::Insert`插入中的创建`NewNode`新节点逻辑。
+
+leveldb中自行管理内存分配，并利用`Placement New`语法在指定内存上构造实例。
+
+```cpp
+// db/skiplist.h
+template <typename Key, class Comparator>
+typename SkipList<Key, Comparator>::Node* SkipList<Key, Comparator>::NewNode(
+    const Key& key, int height) {
+  // 申请节点空间，预留了空间给对应的各层指针（最多不会超过height-1层索引）
+  // 这里申请的空间是内存对齐的，便于atomic原子操作
+  char* const node_memory = arena_->AllocateAligned(
+      sizeof(Node) + sizeof(std::atomic<Node*>) * (height - 1));
+  /*
+    Placement New语法，用法：`new (pointer_to_location) Type(args...);`
+    不会另外申请内存
+    不会自动调用析构函数
+    禁止拷贝和move（对于此处的跳表，并不提供删除节点，只要跳表不被销毁空间就一直在）
+  */
+  // 用于在指定的内存处（node_memory），构造一个Node实例
+  return new (node_memory) Node(key);
+}
+```
+
+```cpp
+// util/arena.cc
+char* Arena::AllocateAligned(size_t bytes) {
+  // 按指针长度对齐（64位一般8字节）
+  const int align = (sizeof(void*) > 8) ? sizeof(void*) : 8;
+  // 申请的内存空间，必须按 2^n 大小对齐
+  static_assert((align & (align - 1)) == 0,
+                "Pointer size should be a power of 2");
+  size_t current_mod = reinterpret_cast<uintptr_t>(alloc_ptr_) & (align - 1);
+  size_t slop = (current_mod == 0 ? 0 : align - current_mod);
+  size_t needed = bytes + slop;
+  char* result;
+  // 剩余空间够用则不用新增
+  if (needed <= alloc_bytes_remaining_) {
+    result = alloc_ptr_ + slop;
+    alloc_ptr_ += needed;
+    alloc_bytes_remaining_ -= needed;
+  } else {
+    // 需要的空间比剩余空间大，则按实际大小申请空间
+    // AllocateFallback always returned aligned memory
+    result = AllocateFallback(bytes);
+  }
+  assert((reinterpret_cast<uintptr_t>(result) & (align - 1)) == 0);
+  return result;
+}
+```
+
+### 4.4. 查找：SkipList::Contains
+
+上面插入操作中是先根据key查找合适的节点位置，再进行插入。此处的查找也是基于上面的`FindGreaterOrEqual`函数。
+
+```cpp
+// db/skiplist.h
+template <typename Key, class Comparator>
+bool SkipList<Key, Comparator>::Contains(const Key& key) const {
+  Node* x = FindGreaterOrEqual(key, nullptr);
+  // 只有key完全相同，才算查找到
+  if (x != nullptr && Equal(key, x->key)) {
+    return true;
+  } else {
+    return false;
+  }
+}
+```
+
+### 4.5. 遍历：迭代器
+
+利用内部类`Iterator`（`leveldb::SkipList::Iterator`）实现leveldb节点的遍历操作。
+
+另外提供给用户的创建迭代器接口：`include/leveldb/db.h`中的`Iterator* NewIterator(const ReadOptions& options)`，也主要由此处的内部类实现。
+
+类图关系如下：
+
+* `include/leveldb/iterator.h`中定义抽象类`Iterator`
+* `MemTable`类提供`Iterator* NewIterator();`，其返回的具体类为：`MemTableIterator`
+* `MemTableIterator`实现了上述iterator.h中的`Iterator`抽象类
+* `MemTableIterator`中的逻辑就是基于内部类`SkipList::Iterator`
+* 另外有其他迭代器也实现了上述iterator.h中的`Iterator`抽象类，此处暂不关注
+    * 如 `DBIter`类也实现上述`Iterator`抽象类（代码位于`db/db_iter.cc`）
+    * 还有`EmptyIterator`、`MergingIterator`、`TwoLevelIterator`、`Version::LevelFileNumIterator`等
+
+MemTableIterator类定义如下：
+
+```cpp
+// db/memtable.cc
+class MemTableIterator : public Iterator {
+ public:
+  // 初始化列表中，MemTable::Table::Iterator 初始化为 MemTable::Table* table ？
+  // SkipList的内部类`SkipList::Iterator`对应的构造函数就是传一个SkipList*： explicit Iterator(const SkipList* list);
+    // MemTable::Table 实际是SkipList模板类的具体类： typedef SkipList<const char*, KeyComparator> Table;
+  explicit MemTableIterator(MemTable::Table* table) : iter_(table) {}
+  ...
+  void Seek(const Slice& k) override { iter_.Seek(EncodeKey(&tmp_, k)); }
+  void SeekToFirst() override { iter_.SeekToFirst(); }
+  void SeekToLast() override { iter_.SeekToLast(); }
+  void Next() override { iter_.Next(); }
+  void Prev() override { iter_.Prev(); }
+  ...
+ private:
+  MemTable::Table::Iterator iter_;
+  std::string tmp_;  // For passing to EncodeKey
+};
+```
+
+内部类`SkipList::Iterator`定义：
+
+构造时就传入一个指定跳表。
+
+```cpp
+// db/skiplist.h
+class SkipList{
+  ...
+  class Iterator {
+   public:
+    // Initialize an iterator over the specified list.
+    explicit Iterator(const SkipList* list);
+    bool Valid() const;
+    const Key& key() const;
+    void Next();
+    void Prev();
+    void Seek(const Key& target);
+    void SeekToFirst();
+    void SeekToLast();
+
+   private:
+    const SkipList* list_;
+    Node* node_;
+    // Intentionally copyable
+  };
+  ...
+};
+```
+
+内部类对应的部分接口实现如下：
+
+```cpp
+// db/skiplist.h
+template <typename Key, class Comparator>
+inline SkipList<Key, Comparator>::Iterator::Iterator(const SkipList* list) {
+  list_ = list;
+  node_ = nullptr;
+}
+
+template <typename Key, class Comparator>
+inline void SkipList<Key, Comparator>::Iterator::Next() {
+  assert(Valid());
+  node_ = node_->Next(0);
+}
+
+template <typename Key, class Comparator>
+inline void SkipList<Key, Comparator>::Iterator::Prev() {
+  // Instead of using explicit "prev" links, we just search for the
+  // last node that falls before key.
+  assert(Valid());
+  node_ = list_->FindLessThan(node_->key);
+  if (node_ == list_->head_) {
+    node_ = nullptr;
+  }
+}
+
+template <typename Key, class Comparator>
+inline void SkipList<Key, Comparator>::Iterator::Seek(const Key& target) {
+  node_ = list_->FindGreaterOrEqual(target, nullptr);
+}
+
+template <typename Key, class Comparator>
+inline void SkipList<Key, Comparator>::Iterator::SeekToFirst() {
+  node_ = list_->head_->Next(0);
+}
+
+template <typename Key, class Comparator>
+inline void SkipList<Key, Comparator>::Iterator::SeekToLast() {
+  node_ = list_->FindLast();
+  if (node_ == list_->head_) {
+    node_ = nullptr;
+  }
+}
+```
+
+注意，此处`Iterator::Prev()`的实现，相比在节点中额外增加一个 prev 指针，leveldb使用从头开始的查找定位其 prev 节点。
+
+> 该迭代器没有为每个节点增加一个额外的 prev 指针以进行反向迭代，而是用了选择从 head 开始查找。这也是一种用时间换空间的取舍。当然，其假设是前向遍历情况相对较少。
+
+```cpp
+// db/skiplist.h
+template <typename Key, class Comparator>
+typename SkipList<Key, Comparator>::Node*
+SkipList<Key, Comparator>::FindLessThan(const Key& key) const {
+  Node* x = head_;
+  int level = GetMaxHeight() - 1;
+  while (true) {
+    assert(x == head_ || compare_(x->key, key) < 0);
+    Node* next = x->Next(level);
+    if (next == nullptr || compare_(next->key, key) >= 0) {
+      if (level == 0) {
+        return x;
+      } else {
+        // Switch to next list
+        level--;
+      }
+    } else {
+      x = next;
+    }
+  }
 }
 ```
 
