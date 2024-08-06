@@ -280,11 +280,14 @@ void SkipList<Key, Comparator>::Insert(const Key& key) {
 
   // 构造要插入的节点
   x = NewNode(key, height);
+  // 链表的插入操作，只是各层前驱节点也需设置
   for (int i = 0; i < height; i++) {
     // NoBarrier_SetNext() suffices since we will add a barrier when
     // we publish a pointer to "x" in prev[i].
-    // 每层都进行插入操作，设置其对应层级的next指针
+    // 要插入的节点，其前驱节点列表设置为和上述查找到的节点一样，即通过同样的前驱索引路径可找到该节点
+    // 为了保证并发读的正确性，先设置要插入的节点指针，再设置原跳表中节点（prev）指针
     x->NoBarrier_SetNext(i, prev[i]->NoBarrier_Next(i));
+    // 每层前驱都进行插入节点操作
     prev[i]->SetNext(i, x);
   }
 }
@@ -503,6 +506,7 @@ inline void SkipList<Key, Comparator>::Iterator::Prev() {
   // Instead of using explicit "prev" links, we just search for the
   // last node that falls before key.
   assert(Valid());
+  // 找 <key 的节点
   node_ = list_->FindLessThan(node_->key);
   if (node_ == list_->head_) {
     node_ = nullptr;
@@ -511,6 +515,7 @@ inline void SkipList<Key, Comparator>::Iterator::Prev() {
 
 template <typename Key, class Comparator>
 inline void SkipList<Key, Comparator>::Iterator::Seek(const Key& target) {
+  // 同插入、查找中用的查找逻辑
   node_ = list_->FindGreaterOrEqual(target, nullptr);
 }
 
@@ -519,6 +524,7 @@ inline void SkipList<Key, Comparator>::Iterator::SeekToFirst() {
   node_ = list_->head_->Next(0);
 }
 
+// 和Prev类似，也是从头开始查找到最后的节点
 template <typename Key, class Comparator>
 inline void SkipList<Key, Comparator>::Iterator::SeekToLast() {
   node_ = list_->FindLast();
@@ -532,6 +538,8 @@ inline void SkipList<Key, Comparator>::Iterator::SeekToLast() {
 
 > 该迭代器没有为每个节点增加一个额外的 prev 指针以进行反向迭代，而是用了选择从 head 开始查找。这也是一种用时间换空间的取舍。当然，其假设是前向遍历情况相对较少。
 
+`Prev()`中的`FindLessThan`实现：
+
 ```cpp
 // db/skiplist.h
 template <typename Key, class Comparator>
@@ -541,7 +549,11 @@ SkipList<Key, Comparator>::FindLessThan(const Key& key) const {
   int level = GetMaxHeight() - 1;
   while (true) {
     assert(x == head_ || compare_(x->key, key) < 0);
+    // 从最高层往下找，直到底层链表
     Node* next = x->Next(level);
+    // 下一个节点为空 或者 在key后面则找下一层
+    // *  *  key]  *
+    // *  *]   *   *
     if (next == nullptr || compare_(next->key, key) >= 0) {
       if (level == 0) {
         return x;
@@ -558,13 +570,13 @@ SkipList<Key, Comparator>::FindLessThan(const Key& key) const {
 
 ## 5. 小结
 
-学习`MemTable`和跳表的实现细节。
+学习了`MemTable`和跳表的实现细节，跟踪梳理了跳表的插入、查询，以及迭代器代码逻辑。
 
 ## 6. 参考
 
 1、[leveldb](https://github.com/google/leveldb)
 
-2、[leveldb-handbook](https://leveldb-handbook.readthedocs.io/zh/latest/index.html)
+2、[leveldb-handbook 内存数据库](https://leveldb-handbook.readthedocs.io/zh/latest/memorydb.html)
 
 3、[漫谈 LevelDB 数据结构（一）：跳表（Skip List）](https://www.qtmuniao.com/2020/07/03/leveldb-data-structures-skip-list/)
 
