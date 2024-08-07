@@ -228,10 +228,12 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
                                 Version* base) {
   mutex_.AssertHeld();
   const uint64_t start_micros = env_->NowMicros();
+  // 文件元数据（定义在db/version_edit.h中，VersionEdit类中会有多个FileMetaData）
   FileMetaData meta;
+  // version文件计数+1，该数值也用于下面新增文件的文件名： db名称/编号.ldb
   meta.number = versions_->NewFileNumber();
   pending_outputs_.insert(meta.number);
-  // 获取传入memtable的迭代器
+  // 获取传入 memtable(实际immutable memtable) 的迭代器
   Iterator* iter = mem->NewIterator();
   Log(options_.info_log, "Level-0 table #%llu: started",
       (unsigned long long)meta.number);
@@ -240,6 +242,9 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   {
     mutex_.Unlock();
     // 这里通过 iter 写 sstable 文件
+    // 结束写入时：里面会写filter block、metaindex block、Write index block、Write footer
+    // 对应： ![写入结构示意图](https://leveldb-handbook.readthedocs.io/zh/latest/_images/sstable_logic.jpeg)
+    // meta作为指针传入，里面会做一些元数据设置
     s = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta);
     mutex_.Lock();
   }
@@ -270,6 +275,12 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   return s;
 }
 ```
+
+上面`BuildTable`中负责根据迭代器依次写入key-value数据，最后写入filter block、metaindex block、Write index block、Write footer等信息。
+
+对应写入结构示意图：
+
+![写入结构示意图](https://leveldb-handbook.readthedocs.io/zh/latest/_images/sstable_logic.jpeg)
 
 ## 3. gtest单元测试
 
