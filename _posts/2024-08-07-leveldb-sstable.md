@@ -22,8 +22,6 @@ leveldb学习笔记，本篇学习sstable实现。
 
 ## 2. memtable 转换处理
 
-### 2.1. DBImpl::MakeRoomForWrite：压缩任务判断入口
-
 前面讲写流程时没展开`MakeRoomForWrite`看，对应的`memtable`写`sstable`的转换就在该接口中。先简单贴下写接口。
 
 ```cpp
@@ -121,9 +119,11 @@ Status DBImpl::MakeRoomForWrite(bool force) {
 }
 ```
 
+## 3. memtable压缩
+
 继续看`MaybeScheduleCompaction`
 
-### 2.2. MaybeScheduleCompaction：压缩任务新增
+### 3.1. MaybeScheduleCompaction：新增压缩任务
 
 ```cpp
 // db/db_impl.cc
@@ -152,7 +152,7 @@ void DBImpl::MaybeScheduleCompaction() {
 
 `env_->Schedule`里面基于mutex和条件变量实现了一个生产-消费者模型，leveldb自己包装了一层`std::mutex`和`std::condition_variable`。
 
-### 2.3. DBImpl::BGWork：压缩任务回调处理
+### 3.2. DBImpl::BGWork：压缩回调函数
 
 ```cpp
 // db/db_impl.cc
@@ -199,8 +199,9 @@ void DBImpl::BackgroundCompaction() {
   }
   ...
 }
-
 ```
+
+`CompactMemTable`函数：
 
 ```cpp
 // db/db_impl.cc
@@ -220,7 +221,7 @@ void DBImpl::CompactMemTable() {
 }
 ```
 
-### 2.4. DBImpl::WriteLevel0Table：写sstable具体逻辑
+### 3.3. DBImpl::WriteLevel0Table：写sstable
 
 ```cpp
 // db/db_impl.cc
@@ -253,42 +254,148 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
       (unsigned long long)meta.number, (unsigned long long)meta.file_size,
       s.ToString().c_str());
   delete iter;
-  pending_outputs_.erase(meta.number);
-
-  // Note that if file_size is zero, the file has been deleted and
-  // should not be added to the manifest.
-  int level = 0;
-  if (s.ok() && meta.file_size > 0) {
-    const Slice min_user_key = meta.smallest.user_key();
-    const Slice max_user_key = meta.largest.user_key();
-    if (base != nullptr) {
-      level = base->PickLevelForMemTableOutput(min_user_key, max_user_key);
-    }
-    edit->AddFile(level, meta.number, meta.file_size, meta.smallest,
-                  meta.largest);
-  }
-
-  CompactionStats stats;
-  stats.micros = env_->NowMicros() - start_micros;
-  stats.bytes_written = meta.file_size;
-  stats_[level].Add(stats);
+  ...
   return s;
 }
 ```
 
-上面`BuildTable`中负责根据迭代器依次写入key-value数据，最后写入filter block、metaindex block、Write index block、Write footer等信息。
+上面`BuildTable`中负责根据迭代器依次写入key-value数据，最后(见下面小节)写入`filter block`、`meta index block`、`Write index block`、`Write footer`等信息。
 
-对应写入结构示意图：
+## 4. BuildTable 函数
+
+```cpp
+// db/builder.cc
+Status BuildTable(const std::string& dbname, Env* env, const Options& options,
+                  TableCache* table_cache, Iterator* iter, FileMetaData* meta) {
+  Status s;
+  meta->file_size = 0;
+  // 先到链表头
+  iter->SeekToFirst();
+
+  // 新sstable文件名为 db名称/编号.ldb
+  std::string fname = TableFileName(dbname, meta->number);
+  if (iter->Valid()) {
+    WritableFile* file;
+    s = env->NewWritableFile(fname, &file);
+    if (!s.ok()) {
+      return s;
+    }
+
+    // TableBuilder用于辅助sstable文件写入
+    TableBuilder* builder = new TableBuilder(options, file);
+    // 设置元数据信息，第一个key是最小的key
+    meta->smallest.DecodeFrom(iter->key());
+    Slice key;
+    for (; iter->Valid(); iter->Next()) {
+      key = iter->key();
+      // 依次添加key-value数据
+      builder->Add(key, iter->value());
+    }
+    if (!key.empty()) {
+      // 设置元数据信息，最后key是最大的key
+      meta->largest.DecodeFrom(key);
+    }
+
+    // Finish and check for builder errors
+    // 结束写入：里面会写filter block、metaindex block、Write index block、Write footer
+    // ![写入结构示意图](https://leveldb-handbook.readthedocs.io/zh/latest/_images/sstable_logic.jpeg)
+    s = builder->Finish();
+    if (s.ok()) {
+      meta->file_size = builder->FileSize();
+      assert(meta->file_size > 0);
+    }
+    ...
+  }
+  ...
+  return s;
+}
+```
+
+### 4.1. 写入结构示意图
+
+上述对应写入结构示意图：
 
 ![写入结构示意图](https://leveldb-handbook.readthedocs.io/zh/latest/_images/sstable_logic.jpeg)
 
-## 3. gtest单元测试
+* `data block` 中存储的数据是leveldb中的keyvalue键值对。
+    * 由于sstable中所有的keyvalue对都是严格按序存储的，为了节省存储空间，leveldb并不会为每一对keyvalue对都存储完整的key值，而是存储与上一个key非共享的部分，避免了key重复内容的存储。
+* `filter block` 存储的是`data block`数据的一些过滤信息，这里基于`布隆过滤器`实现。
+* `meta index block`用来存储`filter block`在整个sstable中的索引信息。
+* `index block`用来存储所有`data block`的相关索引信息(与meta index block类似)。
+* `footer`大小固定，为48字节，用来存储`meta index block`与`index block`在sstable中的索引信息，另外尾部还会存储一个magic word，内容为："`http://code.google.com/p/leveldb/`"字符串sha1哈希的前8个字节。
 
-## 4. 小结
+这里有不少巧妙的设计，具体参考原链接的说明：[leveldb-handbook sstable](https://leveldb-handbook.readthedocs.io/zh/latest/sstable.html)
+
+### 4.2. 代码印证上述示意图
+
+代码中依次写入`filter block`、`meta index block`、`Write index block`、`Write footer`等信息。
+
+```cpp
+// table/table_builder.cc
+Status TableBuilder::Finish() {
+  Rep* r = rep_;
+  Flush();
+  assert(!r->closed);
+  r->closed = true;
+
+  // 各处理
+  BlockHandle filter_block_handle, metaindex_block_handle, index_block_handle;
+
+  // Write filter block
+  if (ok() && r->filter_block != nullptr) {
+    WriteRawBlock(r->filter_block->Finish(), kNoCompression,
+                  &filter_block_handle);
+  }
+
+  // Write metaindex block
+  if (ok()) {
+    BlockBuilder meta_index_block(&r->options);
+    if (r->filter_block != nullptr) {
+      // Add mapping from "filter.Name" to location of filter data
+      std::string key = "filter.";
+      key.append(r->options.filter_policy->Name());
+      std::string handle_encoding;
+      filter_block_handle.EncodeTo(&handle_encoding);
+      meta_index_block.Add(key, handle_encoding);
+    }
+
+    // TODO(postrelease): Add stats and other meta blocks
+    WriteBlock(&meta_index_block, &metaindex_block_handle);
+  }
+
+  // Write index block
+  if (ok()) {
+    if (r->pending_index_entry) {
+      r->options.comparator->FindShortSuccessor(&r->last_key);
+      std::string handle_encoding;
+      r->pending_handle.EncodeTo(&handle_encoding);
+      r->index_block.Add(r->last_key, Slice(handle_encoding));
+      r->pending_index_entry = false;
+    }
+    WriteBlock(&r->index_block, &index_block_handle);
+  }
+
+  // Write footer
+  if (ok()) {
+    Footer footer;
+    footer.set_metaindex_handle(metaindex_block_handle);
+    footer.set_index_handle(index_block_handle);
+    std::string footer_encoding;
+    footer.EncodeTo(&footer_encoding);
+    r->status = r->file->Append(footer_encoding);
+    if (r->status.ok()) {
+      r->offset += footer_encoding.size();
+    }
+  }
+  return r->status;
+}
+```
+
+## 5. 小结
 
 学习梳理sstable实现逻辑。
 
-## 5. 参考
+## 6. 参考
 
 1、[leveldb](https://github.com/google/leveldb)
 
