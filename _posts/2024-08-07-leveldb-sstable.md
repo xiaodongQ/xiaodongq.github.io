@@ -315,7 +315,7 @@ Status BuildTable(const std::string& dbname, Env* env, const Options& options,
 
 上述对应写入结构示意图：
 
-![写入结构示意图](https://leveldb-handbook.readthedocs.io/zh/latest/_images/sstable_logic.jpeg)
+![写入结构示意图](/images/sstable_logic.jpeg)
 
 * `data block` 中存储的数据是leveldb中的keyvalue键值对。
     * 由于sstable中所有的keyvalue对都是严格按序存储的，为了节省存储空间，leveldb并不会为每一对keyvalue对都存储完整的key值，而是存储与上一个key非共享的部分，避免了key重复内容的存储。

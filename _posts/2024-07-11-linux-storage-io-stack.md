@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 学习Linux存储IO栈
+title: 学习Linux存储IO栈（一） -- 存储栈全貌图
 categories: 存储
 tags: 存储 IO
 ---
@@ -29,6 +29,10 @@ Linux内核的存储IO栈的全貌图：
 ![linux存储栈_4.10内核](/images/linux-storage-stack-diagram_v4.10.svg)  
 [出处](https://www.thomas-krenn.com/en/wiki/Linux_Storage_Stack_Diagram)
 
+这里有个简化版：  
+![Linux IO 栈的简化版](/images/2024-08-10-linux-io-stack-simple.png)  
+出处：[read 文件一个字节实际会发生多大的磁盘IO？](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247484994&idx=1&sn=20c63d5f6e2be4fced5ab09a3047da93&chksm=a6e3077991948e6f79b9a6a22f4a3305bced889d770cc8922ba7e68da2b3cd8c16f33b8fb3ed&scene=178&cur_album_id=1371808335259090944#rd)
+
 由图可见，从系统调用的接口再往下，Linux下的存储IO栈大致有三个层次：
 
 1. 文件系统层，以 `write(2)` 为例，内核拷贝了`write(2)`参数指定的用户态数据到文件系统Cache中，并适时向下层同步
@@ -48,6 +52,8 @@ Linux系统编程里用到的`Buffered IO`、`mmap(2)`、`Direct IO`，这些机
 参见下面的简图：
 
 ![linux io简图](/images/linux-io-syscall.png)
+
+说明：参考链接里这个图中说的`File System`指**具体**的文件系统，如etx4、xfs，暂忽略统一的`VFS`层；`mmap`和`direct io`等系统调用仍然是通过`VFS`进行IO交互的。
 
 1、传统的`Buffered IO`使用`read(2)`读取文件的过程什么样的？
 
@@ -239,6 +245,8 @@ CPU、磁盘、网络的耗时体感：
 
 2、[Linux_Storage_Stack_Diagram](https://www.thomas-krenn.com/en/wiki/Linux_Storage_Stack_Diagram)
 
-3、[系统性能优化，必知的一些延时数据（CPU仅1s，磁盘1个月，TCP包重传100年）](https://mp.weixin.qq.com/s/QjRKjpVxRGQAwaET1P51Vg)
+3、[read 文件一个字节实际会发生多大的磁盘IO？](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247484994&idx=1&sn=20c63d5f6e2be4fced5ab09a3047da93&chksm=a6e3077991948e6f79b9a6a22f4a3305bced889d770cc8922ba7e68da2b3cd8c16f33b8fb3ed&scene=178&cur_album_id=1371808335259090944#rd)
 
-4、[CPU性能和CACHE](https://plantegg.github.io/2021/07/19/CPU%E6%80%A7%E8%83%BD%E5%92%8CCACHE/)
+4、[系统性能优化，必知的一些延时数据（CPU仅1s，磁盘1个月，TCP包重传100年）](https://mp.weixin.qq.com/s/QjRKjpVxRGQAwaET1P51Vg)
+
+5、[CPU性能和CACHE](https://plantegg.github.io/2021/07/19/CPU%E6%80%A7%E8%83%BD%E5%92%8CCACHE/)
