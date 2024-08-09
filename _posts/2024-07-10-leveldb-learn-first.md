@@ -64,7 +64,7 @@ memtable的容量到达阈值时，便会转换成一个不可修改的memtable�
 
 #### 2.2.3. log(journal)
 
-leveldb在写内存之前会首先将所有的写操作写到日志文件中，也就是log文件，`预写日志（WAL，Write-Ahead Logging）`。当以下异常情况发生时，均可以通过日志文件进行恢复。
+leveldb在写内存之前会首先将所有的写操作写到日志文件中，也就是log文件，`预写日志（WAL，Write-Ahead Logging）`。当写log、内存、immutable memtable等异常时，均可以通过日志文件进行恢复。
 
 #### 2.2.4. sstable
 

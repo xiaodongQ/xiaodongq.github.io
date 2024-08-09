@@ -33,8 +33,8 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
     // 这里的writers_是 std::deque 双端队列，存放Writer*
     writers_.push_back(&w);
     ...
-    // 申请写入的空间，里面会检查是否需要转换memtable、是否需要压缩
-    // 声明为：Status DBImpl::MakeRoomForWrite(bool force)，updates为nullptr时压缩处理
+    // 申请写入的空间，里面会检查是否需要转换memtable、是否需要合并
+    // 声明为：Status DBImpl::MakeRoomForWrite(bool force)，updates为nullptr时合并处理
     // 调用 MakeRoomForWrite 前必定已持锁，里面会断言判断
     Status status = MakeRoomForWrite(updates == nullptr);
     uint64_t last_sequence = versions_->LastSequence();
@@ -72,7 +72,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
     } else if (imm_ != nullptr) {
       // We have filled up the current memtable, but the previous
       // one is still being compacted, so we wait.
-      // 若immutable memtable还没完成压缩，则等待
+      // 若immutable memtable还没完成合并，则等待
       Log(options_.info_log, "Current memtable full; waiting...\n");
       background_work_finished_signal_.Wait();
     } else if (versions_->NumLevelFiles(0) >= config::kL0_StopWritesTrigger) {
@@ -111,7 +111,7 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       mem_ = new MemTable(internal_comparator_);
       mem_->Ref();
       force = false;  // Do not force another compaction if have room
-      // 检查（immutable memtable和其他level）是否需要压缩
+      // 检查（immutable memtable和其他level）是否需要合并
       MaybeScheduleCompaction();
     }
   }
@@ -119,18 +119,18 @@ Status DBImpl::MakeRoomForWrite(bool force) {
 }
 ```
 
-## 3. memtable压缩
+## 3. memtable 合并写 sstable
 
 继续看`MaybeScheduleCompaction`
 
-### 3.1. MaybeScheduleCompaction：新增压缩任务
+### 3.1. MaybeScheduleCompaction：新增合并任务
 
 ```cpp
 // db/db_impl.cc
 void DBImpl::MaybeScheduleCompaction() {
   mutex_.AssertHeld();
   if (background_compaction_scheduled_) {
-    // 已经触发后台压缩调度，不需要再新增任务
+    // 已经触发后台合并调度，不需要再新增任务
     // Already scheduled
   } else if (shutting_down_.load(std::memory_order_acquire)) {
     // DB is being deleted; no more background compactions
@@ -142,17 +142,17 @@ void DBImpl::MaybeScheduleCompaction() {
   } else {
     background_compaction_scheduled_ = true;
     // 这里面会生产一个任务，并通知消费者进行线程处理
-    // 具体任务处理在 DBImpl::BGWork 回调函数里，负责后台压缩 immutable memtable
+    // 具体任务处理在 DBImpl::BGWork 回调函数里，负责后台合并 immutable memtable
     env_->Schedule(&DBImpl::BGWork, this);
   }
 }
 ```
 
-上面若需要压缩，则`env_->Schedule(&DBImpl::BGWork, this);`投递任务，其回调处理为`DBImpl::BGWork`。
+上面若需要合并，则`env_->Schedule(&DBImpl::BGWork, this);`投递任务，其回调处理为`DBImpl::BGWork`。
 
 `env_->Schedule`里面基于mutex和条件变量实现了一个生产-消费者模型，leveldb自己包装了一层`std::mutex`和`std::condition_variable`。
 
-### 3.2. DBImpl::BGWork：压缩回调函数
+### 3.2. DBImpl::BGWork：合并回调函数
 
 ```cpp
 // db/db_impl.cc
@@ -163,7 +163,7 @@ void DBImpl::BGWork(void* db) {
 
 ```cpp
 // db/db_impl.cc
-// 负责后台压缩 immutable memtable
+// 负责后台合并 immutable memtable
 void DBImpl::BackgroundCall() {
   MutexLock l(&mutex_);
   assert(background_compaction_scheduled_);
@@ -172,16 +172,16 @@ void DBImpl::BackgroundCall() {
   } else if (!bg_error_.ok()) {
     // No more background work after a background error.
   } else {
-    // 检查并进行后台压缩
+    // 检查并进行后台合并
     BackgroundCompaction();
   }
 
-  // 压缩完，重置任务调度标志
+  // 合并完，重置任务调度标志
   background_compaction_scheduled_ = false;
 
   // Previous compaction may have produced too many files in a level,
   // so reschedule another compaction if needed.
-  // 再检查一次是否要压缩
+  // 再检查一次是否要合并
   MaybeScheduleCompaction();
   background_work_finished_signal_.SignalAll();
 }
@@ -192,7 +192,7 @@ void DBImpl::BackgroundCall() {
 void DBImpl::BackgroundCompaction() {
   mutex_.AssertHeld();
 
-  // 存在immutable memtable则压缩并退出，immutable memtable压缩为level0层的sstable
+  // 存在immutable memtable则合并并退出，immutable memtable合并为level0层的sstable
   if (imm_ != nullptr) {
     CompactMemTable();
     return;
@@ -211,7 +211,7 @@ void DBImpl::CompactMemTable() {
 
   // Save the contents of the memtable as a new Table
   VersionEdit edit;
-  // 当前version（每次压缩完都会创建一个新的version）
+  // 当前version（每次合并完都会创建一个新的version）
   Version* base = versions_->current();
   base->Ref();
   // immutable memtable 写入到 level0
@@ -334,40 +334,57 @@ Status BuildTable(const std::string& dbname, Env* env, const Options& options,
 // table/table_builder.cc
 Status TableBuilder::Finish() {
   Rep* r = rep_;
+  // 把前面的 data block 写文件落盘
   Flush();
   assert(!r->closed);
   r->closed = true;
 
-  // 各处理
+  // 各部数据在sstable文件中的偏移+数据长度
   BlockHandle filter_block_handle, metaindex_block_handle, index_block_handle;
 
   // Write filter block
+  // filter block存储的是data block数据的一些过滤信息。
+  // 这些过滤数据一般指代布隆过滤器的数据，用于加快查询的速度
   if (ok() && r->filter_block != nullptr) {
+    // WriteRawBlock写原始数据（不需要压缩，而WriteBlock里可以对数据进行压缩）
+    // filter_block->Finish() 里面根据布隆过滤器实现
     WriteRawBlock(r->filter_block->Finish(), kNoCompression,
                   &filter_block_handle);
   }
 
   // Write metaindex block
+  // meta index block用来存储filter block在整个sstable中的索引信息。
   if (ok()) {
     BlockBuilder meta_index_block(&r->options);
     if (r->filter_block != nullptr) {
       // Add mapping from "filter.Name" to location of filter data
+      // key为："filter."与过滤器名字组成的常量字符串
       std::string key = "filter.";
       key.append(r->options.filter_policy->Name());
       std::string handle_encoding;
+      // value为：filter block在sstable中的索引信息序列化后的内容，
+      // 索引信息包括：（1）在sstable中的偏移量（2）数据长度。
       filter_block_handle.EncodeTo(&handle_encoding);
       meta_index_block.Add(key, handle_encoding);
     }
 
     // TODO(postrelease): Add stats and other meta blocks
+    // handle用于返回数据在文件的偏移和本次数据长度
     WriteBlock(&meta_index_block, &metaindex_block_handle);
   }
 
   // Write index block
+  // indexblock包含若干条记录，每一条记录代表一个data block的索引信息。
   if (ok()) {
+    // 前面Flush已经把data_block写完了，pending_index_entry也置true了
     if (r->pending_index_entry) {
+      // 一条索引包括以下内容：
+      // 1. data block i 中最大的key值；
+      // 2. 该data block起始地址在sstable中的偏移量；
+      // 3. 该data block的大小
       r->options.comparator->FindShortSuccessor(&r->last_key);
       std::string handle_encoding;
+      // 数据在文件中的偏移，以及数据长度
       r->pending_handle.EncodeTo(&handle_encoding);
       r->index_block.Add(r->last_key, Slice(handle_encoding));
       r->pending_index_entry = false;
@@ -378,10 +395,12 @@ Status TableBuilder::Finish() {
   // Write footer
   if (ok()) {
     Footer footer;
+    // footer大小固定，为48字节，用来存储meta index block与index block在sstable中的索引信息，另外尾部还会存储一个magic word
     footer.set_metaindex_handle(metaindex_block_handle);
     footer.set_index_handle(index_block_handle);
     std::string footer_encoding;
     footer.EncodeTo(&footer_encoding);
+    // 追加到文件中
     r->status = r->file->Append(footer_encoding);
     if (r->status.ok()) {
       r->offset += footer_encoding.size();
