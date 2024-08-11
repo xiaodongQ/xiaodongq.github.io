@@ -118,7 +118,7 @@ Cache* NewLRUCache(size_t capacity) { return new ShardedLRUCache(capacity); }
 LRU缓存实现类逻辑：实现在`LRUCache`类，`ShardedLRUCache`类包含了一个`LRUCache`类数组，数组成员`16`个，由key对应的hash进行分片处理。
 
 示意图（此处只展示4个分片，实际有16个）：  
-[ShardedLRUCache和Cache示意图](https://i.loli.net/2021/05/09/Dgba6dWsNerO28F.png)
+![ShardedLRUCache和Cache示意图](https://i.loli.net/2021/05/09/Dgba6dWsNerO28F.png)
 
 对应代码如下：
 
@@ -231,7 +231,7 @@ class LRUCache {
 ```
 
 HandleTable和LRUCache关系示意图：  
-[HandleTable和LRUCache关系示意图](https://i.loli.net/2021/05/09/iUc8ywmJATEH7pl.png)
+![HandleTable和LRUCache关系示意图](https://i.loli.net/2021/05/09/iUc8ywmJATEH7pl.png)
 
 ## 4. 哈希表结构：HandleTable
 
@@ -381,6 +381,22 @@ Cache::Handle* LRUCache::Insert(const Slice& key, uint32_t hash, void* value,
   }
 
   return reinterpret_cast<Cache::Handle*>(e);
+}
+```
+
+哈希表操作，如`table_.Insert(e)`、`table_.Remove`，见上面的`HandleTable`类说明。
+
+其中的`LRU_Append`逻辑：
+
+```cpp
+void LRUCache::LRU_Append(LRUHandle* list, LRUHandle* e) {
+  // Make "e" newest entry by inserting just before *list
+  // 链表操作，要新增的节点e，插入到list节点前面
+  e->next = list;
+  e->prev = list->prev;
+  // 前驱后继节点均调整对应指向
+  e->prev->next = e;
+  e->next->prev = e;
 }
 ```
 
