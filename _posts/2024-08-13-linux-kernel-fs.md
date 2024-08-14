@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 学习Linux存储IO栈（二） -- Linux文件系统层次和内核接口
+title: 学习Linux存储IO栈（二） -- Linux内核存储栈流程和接口
 categories: 存储
 tags: 存储 IO
 ---
@@ -8,7 +8,7 @@ tags: 存储 IO
 * content
 {:toc}
 
-梳理学习Linux文件系统层次和内核接口。
+梳理学习Linux内核存储栈相关流程和接口。
 
 
 
@@ -216,11 +216,22 @@ struct dentry_operations {
 ```cpp
 // linux-3.10.89/fs/ext4/file.c
 const struct file_operations ext4_file_operations = {
-    .llseek     = ext4_llseek,
-    .read       = do_sync_read,
-    .write      = do_sync_write,
-    .aio_read   = generic_file_aio_read,
-    ...
+	.llseek		= ext4_llseek,
+	.read		= do_sync_read,
+	.write		= do_sync_write,
+	.aio_read	= generic_file_aio_read,
+	.aio_write	= ext4_file_write,
+	.unlocked_ioctl = ext4_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl	= ext4_compat_ioctl,
+#endif
+	.mmap		= ext4_file_mmap,
+	.open		= ext4_file_open,
+	.release	= ext4_release_file,
+	.fsync		= ext4_sync_file,
+	.splice_read	= generic_file_splice_read,
+	.splice_write	= generic_file_splice_write,
+	.fallocate	= ext4_fallocate,
 };
 ```
 
@@ -722,9 +733,9 @@ trace_options文件：
 
 * 修改：拷贝一份`funcgraph`脚本修改：`cp funcgraph tmp_funcgraph`，添加：`echo nofuncgraph-irqs > trace_options`
 * 结果：然后就可以追踪打印了。。
-    * 多试几次影响了后面的追踪，ftrace需要再单独研究学习下
-* 但是，对比`trace_options`文件(cat出来)，ecs环境里多了`nopause-on-trace`
-    * 也试了`echo nopause-on-trace > trace_options`，第一次也能追踪到xfs，后面起funcgraph就报错了`echo: write error: Invalid argument`
+    * 虽然追踪到了堆栈，但多试几次读取发现影响了后面的追踪（**原因TODO**），ftrace需要再单独研究学习下
+    * 对比`trace_options`文件(cat出来)，ecs环境里多了`nopause-on-trace`
+        * 也试了`echo nopause-on-trace > trace_options`，第一次也能追踪到xfs，后面起funcgraph就报错了`echo: write error: Invalid argument`
 
 ```sh
 [root@xdlinux ➜ kernel git:(master) ✗ ]$ diff trace_options_ecs trace_options_centos8
@@ -803,9 +814,85 @@ Tracing "vfs_read" for PID 9294... Ctrl-C to end.
  10)   6.793 us    |  }
 ```
 
+#### 4.4.4. 映证读取代码逻辑
+
+通过上面ext4和xfs的读取堆栈，可看到都是走了`new_sync_read`，通过`f_op->read_iter`进行读取，而没有走`f_op->read`分支。
+
+可以往前翻下`struct file_operations xfs_file_operations` 定义时没有直接注册`read`、`write`等接口，而是`read_iter`、`write_iter`，跟这里是对应的。
+
+```cpp
+// linux-5.10.10/fs/read_write.c
+ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
+{
+    ...
+    ret = rw_verify_area(READ, file, pos, count);
+    ...
+    if (file->f_op->read)
+        // 调用具体文件系统的 read
+        ret = file->f_op->read(file, buf, count, pos);
+    else if (file->f_op->read_iter)
+        // 里面调用具体文件系统的 read_iter
+        // `read` 常用于简单的同步 I/O，适合标准文件系统操作；`read_iter` 则在需要最大效率的文件系统或高负载的应用中更有用
+        // `read_iter` 更适合高性能的异步操作，而 `read` 是传统的阻塞操作
+        ret = new_sync_read(file, buf, count, pos);
+    else
+        ret = -EINVAL;
+    if (ret > 0) {
+        fsnotify_access(file);
+        add_rchar(current, ret);
+    }
+    ...
+}
+```
+
+另外看下5.10内核的ext4文件系统`file_operations`定义，也是只注册了`read_iter`而没有`read`（上面3.10内核是`read`）
+
+对比：5.10 `read_iter`； 3.10 `read`和`aio_read`
+
+```cpp
+// linux-5.10.10/fs/ext4/file.c
+const struct file_operations ext4_file_operations = {
+	.llseek		= ext4_llseek,
+	.read_iter	= ext4_file_read_iter,
+	.write_iter	= ext4_file_write_iter,
+	.iopoll		= iomap_dio_iopoll,
+	.unlocked_ioctl = ext4_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl	= ext4_compat_ioctl,
+#endif
+	.mmap		= ext4_file_mmap,
+	.mmap_supported_flags = MAP_SYNC,
+	.open		= ext4_file_open,
+	.release	= ext4_release_file,
+	.fsync		= ext4_sync_file,
+	.get_unmapped_area = thp_get_unmapped_area,
+	.splice_read	= generic_file_splice_read,
+	.splice_write	= iter_file_splice_write,
+	.fallocate	= ext4_fallocate,
+};
+```
+
 ## 5. 小结
 
-学习梳理内核中文件系统相关的结构定义，并进行eBPF跟踪。
+学习梳理内核中文件系统相关的结构定义，并进行eBPF跟踪读取流程。
+
+限于篇幅，写入流程单独再实验跟踪。
+
+开头的问题："read 文件一个字节实际会发生多大的磁盘IO？"，此处直接贴一下参考链接的说明。
+
+* Page Cache 是以页为单位的，Linux 页大小一般是 4KB
+    * 如果 Page Cache 命中的话，根本就没有磁盘 IO 产生
+* 文件系统是以块(block)为单位来管理的。使用 dumpe2fs 可以查看，一般一个块默认是 4KB
+    * 说明：ext系列用`dumpe2fs`，xfs则是`xfs_info`
+* 通用块层是以段为单位来处理磁盘 IO 请求的，一个段为一个页或者是页的一部分
+* IO 调度程序通过 DMA 方式传输 N 个扇区到内存，扇区一般为 512 字节
+* 硬盘也是采用“扇区”的管理和传输数据的
+    * 现在的磁盘本身就会带一块缓存。另外现在的服务器都会组建磁盘阵列，在磁盘阵列里的核心硬件Raid卡里也会集成RAM作为缓存。
+    * 只有所有的缓存都不命中的时候，机械轴带着磁头才会真正工作。
+
+> 虽然我们从用户角度确实是只读了 1 个字节。但是在整个内核工作流中，最小的工作单位是磁盘的扇区，为512字节，比1个字节要大的多。
+
+> 另外 block、page cache 等高层组件工作单位更大。其中 Page Cache 的大小是一个内存页 4KB。所以一般一次磁盘读取是多个扇区（512字节）一起进行的。假设通用块层 IO 的段就是一个内存页的话，一次磁盘 IO 就是 4 KB（8 个 512 字节的扇区）一起进行读取。
 
 ## 6. 参考
 
