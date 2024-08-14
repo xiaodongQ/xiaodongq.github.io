@@ -33,6 +33,8 @@ Linux内核的存储IO栈的全貌图：
 ![Linux IO 栈的简化版](/images/2024-08-10-linux-io-stack-simple.png)  
 出处：[read 文件一个字节实际会发生多大的磁盘IO？](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247484994&idx=1&sn=20c63d5f6e2be4fced5ab09a3047da93&chksm=a6e3077991948e6f79b9a6a22f4a3305bced889d770cc8922ba7e68da2b3cd8c16f33b8fb3ed&scene=178&cur_album_id=1371808335259090944#rd)
 
+注意：图中的PageCache位置其实不大准确，应该是在具体文件系统下层，其中会根据open的选项（是否指定`O_DIRECT`）判断是否需经过PageCache。
+
 由图可见，从系统调用的接口再往下，Linux下的存储IO栈大致有三个层次：
 
 1. 文件系统层，以 `write(2)` 为例，内核拷贝了`write(2)`参数指定的用户态数据到文件系统Cache中，并适时向下层同步
@@ -53,7 +55,7 @@ Linux系统编程里用到的`Buffered IO`、`mmap(2)`、`Direct IO`，这些机
 
 ![linux io简图](/images/linux-io-syscall.png)
 
-说明：参考链接里这个图中说的`File System`指**具体**的文件系统，如etx4、xfs，暂忽略统一的`VFS`层；`mmap`和`direct io`等系统调用仍然是通过`VFS`进行IO交互的。
+说明：参考链接里这个图中说的`File System`指**具体**的文件系统，如etx4、xfs，暂忽略了统一的`VFS`层；`mmap`和`direct io`等系统调用仍然是通过`VFS`进行IO交互的。
 
 1、传统的`Buffered IO`使用`read(2)`读取文件的过程什么样的？
 

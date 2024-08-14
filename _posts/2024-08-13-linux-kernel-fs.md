@@ -51,7 +51,9 @@ demo运行的本地测试环境为：CentOS Linux release 8.5.2111 系统，内�
 
 下面看下上述各流程中，在内核中的相关定义。
 
-## 3. VFS 虚拟文件系统
+## 3. IO栈各层说明
+
+### 3.1. VFS 虚拟文件系统
 
 Linux 内核中，虚拟文件系统（VFS）是一个抽象层，提供一种统一的方式来处理不同类型的文件系统。
 
@@ -70,7 +72,7 @@ VFS中的几个核心结构：
 
 此外还有`file_system_type`、`vfsmount`、`address_space`等，此处暂不做展开。
 
-### 3.1. super_block
+#### 3.1.1. super_block
 
 super_block定义如下，截取部分内容：
 
@@ -101,7 +103,7 @@ struct super_operations {
 };
 ```
 
-### 3.2. inode
+#### 3.1.2. inode
 
 inode定义截取部分内容：
 
@@ -132,7 +134,7 @@ struct inode_operations {
 };
 ```
 
-### 3.3. file
+#### 3.1.3. file
 
 file定义截取部分内容：
 
@@ -169,7 +171,7 @@ struct file_operations {
 };
 ```
 
-### 3.4. dentry
+#### 3.1.4. dentry
 
 `dentry`则定义在include/linux/dcache.h中，定义截取部分内容如下：
 
@@ -203,9 +205,9 @@ struct dentry_operations {
 };
 ```
 
-## 4. 具体文件系统（xfs为例）
+### 3.2. 具体文件系统（xfs为例）
 
-### 4.1. 先看下ext系统
+#### 3.2.1. 先看下ext系统
 
 参考文章中，`do_generic_file_read`接口基于3.10的ext系统（在5.10内核里面没有该接口）。
 
@@ -214,15 +216,15 @@ struct dentry_operations {
 ```cpp
 // linux-3.10.89/fs/ext4/file.c
 const struct file_operations ext4_file_operations = {
-	.llseek     = ext4_llseek,
-	.read       = do_sync_read,
-	.write      = do_sync_write,
-	.aio_read   = generic_file_aio_read,
-	...
+    .llseek     = ext4_llseek,
+    .read       = do_sync_read,
+    .write      = do_sync_write,
+    .aio_read   = generic_file_aio_read,
+    ...
 };
 ```
 
-### 4.2. xfs系统
+#### 3.2.2. xfs系统
 
 根据自己测试环境（5.10内核）的目录对应的fs，这里是`xfs`文件系统。
 
@@ -245,39 +247,35 @@ const struct file_operations ext4_file_operations = {
 ```cpp
 // linux-5.10.10/fs/xfs/xfs_file.c
 const struct file_operations xfs_file_operations = {
-	.llseek		= xfs_file_llseek,
-	.read_iter	= xfs_file_read_iter,
-	.write_iter	= xfs_file_write_iter,
-	.splice_read	= generic_file_splice_read,
-	.splice_write	= iter_file_splice_write,
-	.iopoll		= iomap_dio_iopoll,
-	.unlocked_ioctl	= xfs_file_ioctl,
+    .llseek		= xfs_file_llseek,
+    .read_iter	= xfs_file_read_iter,
+    .write_iter	= xfs_file_write_iter,
+    .splice_read	= generic_file_splice_read,
+    .splice_write	= iter_file_splice_write,
+    .iopoll		= iomap_dio_iopoll,
+    .unlocked_ioctl	= xfs_file_ioctl,
 #ifdef CONFIG_COMPAT
-	.compat_ioctl	= xfs_file_compat_ioctl,
+    .compat_ioctl	= xfs_file_compat_ioctl,
 #endif
-	.mmap		= xfs_file_mmap,
-	.mmap_supported_flags = MAP_SYNC,
-	.open		= xfs_file_open,
-	.release	= xfs_file_release,
-	.fsync		= xfs_file_fsync,
-	.get_unmapped_area = thp_get_unmapped_area,
-	.fallocate	= xfs_file_fallocate,
-	.fadvise	= xfs_file_fadvise,
-	.remap_file_range = xfs_file_remap_range,
+    .mmap		= xfs_file_mmap,
+    .mmap_supported_flags = MAP_SYNC,
+    .open		= xfs_file_open,
+    .release	= xfs_file_release,
+    .fsync		= xfs_file_fsync,
+    .get_unmapped_area = thp_get_unmapped_area,
+    .fallocate	= xfs_file_fallocate,
+    .fadvise	= xfs_file_fadvise,
+    .remap_file_range = xfs_file_remap_range,
 };
 ```
 
-
-### 4.3. 对应的具体结构
-
-/Users/xd/Documents/workspace/src/cpp_path/linux-3.10.89/fs/xfs/xfs_inode.h
-
-
-## 5. Page Cache 页高速缓存
+### 3.3. Page Cache 页高速缓存
 
 Page Cache用于加速文件系统访问，通过缓存磁盘数据来减少直接磁盘I/O操作，从而加速文件读取和写入。
 
-我们在 [学习Linux存储IO栈（一） -- 存储栈全貌图](https://xiaodongq.github.io/2024/07/11/linux-storage-io-stack/) 中贴的耗时体感图，磁盘缓存命中时在`100微秒`内，磁盘连续读则在约`1ms`级别，随机读约`8ms`。
+上述具体文件系统接口读写时，会根据open时传入参数（是否指定`O_DIRECT`）判断是否需要经过Page Cache。
+
+我们在 [学习Linux存储IO栈（一） -- 存储栈全貌图](https://xiaodongq.github.io/2024/07/11/linux-storage-io-stack/) 中贴的耗时体感图，里面有个耗时对比：磁盘缓存命中时在`100微秒`内，磁盘连续读则在约`1ms`级别，随机读约`8ms`。
 
 在 Linux 内核中，页面缓存由一系列 `struct page` 组成，每个页结构代表一个内存页，页面缓存通过这些页结构来管理和存储缓存的数据。
 
@@ -305,89 +303,511 @@ struct page {
         };
         ...
     };
-    union { /* This union is 4 bytes in size. */
-        atomic_t _mapcount;
-        unsigned int page_type;
-        unsigned int active; /* SLAB */
-        int units;           /* SLOB */
-    };
     ...
 };
 ```
 
-## 6. 通用块层
+### 3.4. 通用块层
 
-通用块层 -> 驱动，下面跟踪下过程。
+通用块层 -> 驱动，后面就不跟踪贴代码了。直接在实际demo里跟踪下调用栈过程。
 
-## 7. 简单读取demo测试
+### 3.5. 读取时的简要代码流程
 
-### 7.1. demo
+```cpp
+// linux-5.10.10/fs/read_write.c
+SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
+{
+    return ksys_read(fd, buf, count);
+}
+
+ssize_t ksys_read(unsigned int fd, char __user *buf, size_t count)
+{
+    struct fd f = fdget_pos(fd);
+    ...
+    ret = vfs_read(f.file, buf, count, ppos);
+    ...
+}
+
+ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
+{
+    ...
+    ret = rw_verify_area(READ, file, pos, count);
+    ...
+    if (file->f_op->read)
+        // 调用具体文件系统的 read
+        ret = file->f_op->read(file, buf, count, pos);
+    else if (file->f_op->read_iter)
+        // 里面调用具体文件系统的 read_iter
+        // `read` 常用于简单的同步 I/O，适合标准文件系统操作；`read_iter` 则在需要最大效率的文件系统或高负载的应用中更有用
+        // `read_iter` 更适合高性能的异步操作，而 `read` 是传统的阻塞操作
+        ret = new_sync_read(file, buf, count, pos);
+    else
+        ret = -EINVAL;
+    if (ret > 0) {
+        fsnotify_access(file);
+        add_rchar(current, ret);
+    }
+    ...
+}
+```
+
+## 4. eBPF跟踪读取流程
+
+### 4.1. 追踪点说明
+
+看下系统支持的`tracepoint`和`kprobe`。直接到 `/sys/kernel/tracing/available_events` 和 `/sys/kernel/tracing/available_filter_functions` 中找下，可用下述tracepoint 或 kprobe：
+
+* tracepoint：`syscalls:sys_enter_read`、`syscalls:sys_exit_read`
+* kprobe：`vfs_read`、`__x64_sys_read`
+
+### 4.2. 追踪工具说明
+
+经过前面的学习实践（[eBPF学习实践系列](https://xiaodongq.github.io/2024/06/06/ebpf_learn/)、[追踪内核网络堆栈的几种方式](https://xiaodongq.github.io/2024/07/03/strace-kernel-network-stack/)等），手头已经有不少工具集了(太富裕了。。)，这里做下简单梳理。
+
+* [`bpftrace`](https://github.com/bpftrace/bpftrace) 写简便的eBPF功能，能满足日常大部分追踪需要了
+    * [tools](https://github.com/bpftrace/bpftrace/tree/master/tools)里面还有很多现成的bt脚本，也可以用
+* `bcc tools` bcc提供了很多现成的工具集
+    * 安装bcc后在/usr/share/bcc/tools/
+* [`libbpf-tools`](https://github.com/iovisor/bcc/tree/master/libbpf-tools) bcc仓库里基于libbpf的工具，直接编译出来的bin就可以用了
+    * 很快而且不用另外去装`bcc`
+* [`perf-tools`](https://github.com/brendangregg/perf-tools) 里面基于`ftrace`和`perf`也提供了很多便捷功能（`funcgraph`特别好用）
+    * 都是脚本，直接拷贝可用
+* 直接用 `perf record`/`perf report`，功能也强就是多了一点点步骤
+* 其他
+    * 如果是看网络，还有cilium的 [`pwru`(package, where are you)](https://github.com/cilium/pwru) 和 最近字节开源的 [net-cap](https://github.com/bytedance/netcap/)
+
+**追踪调用栈经验：结合`bpftrace`和`funcgraph`跟踪前后调用栈**
+
+* `bpftrace` 用来从上到下来跟踪到指定函数，即只能看到谁调用到指定追踪点
+* `funcgraph` 用来从指定函数往下追踪调用栈
+
+下面是简单实验对比的过程，可以略过不看，这里只放在这里作对比回忆。
+
+```sh
+* 1、bpftrace 从上往下到本次指定的event/kprobe
+
+bpftrace -e 'tracepoint:syscalls:sys_enter_read / comm=="a.out"/ { printf("comm:%s, kstack:%s\n", comm, kstack) }'
+bpftrace -e 'kprobe:vfs_read /comm=="a.out"/ { printf("comm:%s, kstack:%s\n", comm, kstack) }'
+
+[root@home bin]# bpftrace -e 'kprobe:vfs_read /comm=="a.out"/ { printf("comm:%s, kstack:%s\n", comm, kstack) }'
+Attaching 1 probe...
+comm:a.out, kstack:
+        vfs_read+1
+        ksys_read+95
+        do_syscall_64+61
+        entry_SYSCALL_64_after_hwframe+98
+
+* 2、bcc tools里的trace：只能看到调用了，没有具体信息
+
+e.g. trace 'do_sys_open "%s", arg2' -n main
+/usr/share/bcc/tools/trace 'vfs_read' -n "a.out"
+
+[root@home bin]# /usr/share/bcc/tools/trace 'vfs_read' -n "a.out"
+PID     TID     COMM            FUNC             
+27696   27696   a.out           vfs_read         
+27696   27696   a.out           vfs_read         
+27696   27696   a.out           vfs_read         
+27696   27696   a.out           vfs_read   
+
+* 3、perf tools里的functrace也满足不了需求
+
+[root@home bin]# ./functrace vfs_read
+Tracing "vfs_read"... Ctrl-C to end.
+           tuned-14187   [009] .... 2991651.244559: vfs_read <-ksys_read
+           tuned-14187   [009] .... 2991651.244571: vfs_read <-ksys_read
+           <...>-8506    [029] .... 2991651.244586: vfs_read <-ksys_read
+
+* 4、perf tools里的 funcgraph 看起来可以，追踪指定函数后面的堆栈(相对于bpftrace可以互补)，但是过滤不了进程名（调整demo接收信号即可）
+
+* 5、再看下perf tools里的kprobe，和上面的functrace和bcc tools里trace感觉差别不大
+
+[root@home bin]# ./kprobe 'p:vfs_read'
+Tracing kprobe vfs_read. Ctrl-C to end.
+             awk-14786   [010] .... 2992198.369464: vfs_read: (vfs_read+0x0/0x1b0)
+             awk-14786   [010] .... 2992198.369491: vfs_read: (vfs_read+0x0/0x1b0)
+              sh-14754   [001] .... 2992198.369503: vfs_read: (vfs_read+0x0/0x1b0)
+```
+
+### 4.3. 读取的demo程序
+
+由于`funcgraph`不支持过滤进程名，读取demo调整成接收信号(这里用`USR1`)触发的方式，通过pid跟踪过滤，要不系统里read操作太多了。
+
+funcgraph用法：
+
+```sh
+[root@xdlinux ➜ bin git:(master) ]$ ./funcgraph -h
+USAGE: funcgraph [-aCDhHPtT] [-m maxdepth] [-p PID] [-L TID] [-d secs] funcstring
+                 -a              # all info (same as -HPt)
+                 -C              # measure on-CPU time only
+                 -d seconds      # trace duration, and use buffers
+                 -D              # do not show function duration
+                 -h              # this usage message
+                 -H              # include column headers
+                 -m maxdepth     # max stack depth to show
+                 -p PID          # trace when this pid is on-CPU
+                 -L TID          # trace when this thread is on-CPU
+                 -P              # show process names & PIDs
+                 -t              # show timestamps
+                 -T              # comment function tails
+  eg,
+       funcgraph do_nanosleep    # trace do_nanosleep() and children
+       funcgraph -m 3 do_sys_open # trace do_sys_open() to 3 levels only
+       funcgraph -a do_sys_open    # include timestamps and process name
+       funcgraph -p 198 do_sys_open # trace vfs_read() for PID 198 only
+       funcgraph -d 1 do_sys_open >out # trace 1 sec, then write to file
+```
 
 使用`read`系统调用读取 /etc/fstab 文件内容。
 
 ```cpp
-// read_test.cpp
-#include <iostream>
-#include <fcntl.h>   // For open()
-#include <unistd.h>  // For read() and close()
-#include <sys/stat.h> // For mode_t and O_RDONLY
-#include <errno.h>   // For errno
-#include <cstring>   // For memset()
+// read_by_signal.cpp
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <errno.h>
+
+// 信号处理器函数
+void signal_handler(int signum) {
+    if (signum == SIGUSR1) {
+        // 打开 /etc/fstab 文件
+        int fd = open("/etc/fstab", O_RDONLY);
+        if (fd == -1) {
+            perror("Error opening file");
+            return;
+        }
+
+        char buffer[1024];
+        ssize_t bytes_read;
+
+        // 读取文件内容
+        while ((bytes_read = read(fd, buffer, sizeof(buffer))) > 0) {
+            write(STDOUT_FILENO, buffer, bytes_read);  // 输出到标准输出
+        }
+
+        if (bytes_read == -1) {
+            perror("Error reading file");
+        }
+
+        close(fd);  // 关闭文件描述符
+    }
+}
 
 int main() {
-    const char* filename = "/etc/fstab";
-    int fd;
-    char buffer[1024];
-    ssize_t bytesRead;
+    pid_t pid = getpid();
 
-    // 打开文件
-    if ((fd = open(filename, O_RDONLY)) == -1) {
-        std::cerr << "Error opening file: " << strerror(errno) << std::endl;
-        return 1;
+    // 打印进程ID
+    printf("Process ID: %d\n", pid);
+
+    // 设置信号处理器
+    signal(SIGUSR1, signal_handler);
+
+    // 进入无限循环等待信号
+    for (;;) {
+        pause();
     }
-
-    // 清空缓冲区
-    memset(buffer, 0, sizeof(buffer));
-
-    // 读取文件
-    if ((bytesRead = read(fd, buffer, sizeof(buffer) - 1)) == -1) {
-        std::cerr << "Error reading from file: " << strerror(errno) << std::endl;
-        close(fd);
-        return 1;
-    }
-
-    // 关闭文件
-    if (close(fd) == -1) {
-        std::cerr << "Error closing file: " << strerror(errno) << std::endl;
-        return 1;
-    }
-
-    // 输出文件内容
-    std::cout << "Content of /etc/fstab:" << std::endl;
-    std::cout << buffer << std::endl;
 
     return 0;
 }
 ```
 
-`g++ read_test.cpp -o read_test`
+`g++ read_by_signal.cpp -o read_fstab`
 
-### 7.2. ebpf跟踪系统调用
+### 4.4. 运行追踪
 
-看下系统支持的`tracepoint`和`kprobe`。
+#### 4.4.1. 本地CentOS8环境实验
 
-直接到 /sys/kernel/tracing/available_filter_functions 和 /sys/kernel/tracing/available_filter_functions 中找，可看到：
+1、运行demo：
 
-* tracepoint：`syscalls:sys_enter_read`、`syscalls:sys_exit_read`
-* kprobe：`vfs_read`
+```sh
+[root@xdlinux ➜ read_by_signal git:(main) ✗ ]$ ./read_fstab 
+Process ID: 8397
+```
 
+2、启动前后堆栈追踪
 
+`bpftrace -e 'kprobe:vfs_read /pid==8397/ { printf("comm:%s, kstack:%s\n", comm, kstack) }'`
 
-## 8. 小结
+`./funcgraph -H -p 8397 vfs_read`
 
-学习梳理内核中文件系统相关的结构定义。
+3、发送信号 `kill -USR1 8397`，触发读取，下面是追踪结果
 
-## 9. 参考
+bpftrace 结果：
+
+```sh
+[root@xdlinux ➜ ~ ]$ bpftrace -e 'kprobe:vfs_read /pid==8397/ { printf("comm:%s, kstack:%s\n", comm, kstack) }'
+Attaching 1 probe...
+comm:read_fstab, kstack:
+        vfs_read+1
+        ksys_read+79
+        do_syscall_64+91
+        entry_SYSCALL_64_after_hwframe+101
+
+comm:read_fstab, kstack:
+        vfs_read+1
+        ksys_read+79
+        do_syscall_64+91
+        entry_SYSCALL_64_after_hwframe+101
+```
+
+funcgraph 结果：
+
+```sh
+[root@xdlinux ➜ bin git:(master) ]$ ./funcgraph -H -p 8397 vfs_read
+Tracing "vfs_read" for PID 8397... Ctrl-C to end.
+# tracer: function_graph
+#
+# CPU  DURATION                  FUNCTION CALLS
+# |     |   |                     |   |   |   |
+  4)               |  vfs_read() {
+  4)   ==========> |
+  4)               |  smp_irq_work_interrupt() {
+  4)               |    irq_enter() {
+  4)   0.040 us    |      irqtime_account_irq();
+  4)   0.401 us    |    }
+  4)               |    __wake_up() {
+  4)               |      __wake_up_common_lock() {
+  4)   0.010 us    |        _raw_spin_lock_irqsave();
+  4)               |        __wake_up_common() {
+  4)               |          ...
+  4)   9.397 us    |        }
+  4)   0.020 us    |        _raw_spin_unlock_irqrestore();
+  4) + 10.119 us   |      }
+  4) + 10.259 us   |    }
+  4)               |    irq_exit() {
+  4)   0.030 us    |      irqtime_account_irq();
+  4)   0.010 us    |      idle_cpu();
+  4)   0.341 us    |    }
+  4) + 11.952 us   |  }
+  4)   <========== |
+  4)   7.835 us    |  } /* vfs_read */
+  4)               |  vfs_read() {
+  4)   ==========> |
+  4)               |  smp_irq_work_interrupt() {
+  4)               |    irq_enter() {
+  4)   0.070 us    |      irqtime_account_irq();
+  4)   0.251 us    |    }
+  4)               |    __wake_up() {
+  4)               |      __wake_up_common_lock() {
+  4)   0.020 us    |        _raw_spin_lock_irqsave();
+  4)   0.020 us    |        __wake_up_common();
+  4)   0.020 us    |        _raw_spin_unlock_irqrestore();
+  4)   0.501 us    |      }
+  4)   0.631 us    |    }
+  4)               |    irq_exit() {
+  4)   0.030 us    |      irqtime_account_irq();
+  4)   0.020 us    |      idle_cpu();
+  4)   0.341 us    |    }
+  4)   2.024 us    |  }
+  4)   <========== |
+  4)   0.912 us    |  } /* vfs_read */
+```
+
+4、结果分析
+
+`bpftrace`调用栈：`do_syscall`->`ksys_read`->`vfs_read`
+
+`funcgraph`：
+
+CentOS8（或者4.18内核？）有毒吧！！！每次funcgraph只能看到中断，别的信息都不打出来。坑货。
+
+还不明确什么原因 ~~待定 **TODO**~~ 原因见下面小节。
+
+#### 4.4.2. 阿里云ECS实验
+
+起一个阿里云抢占式ECS：Alibaba Cloud Linux 3.2104 LTS 64位（内核版本：5.10.134-16.1.al8.x86_64）
+
+文件系统是ext4：`/dev/vda3 on / type ext4 (rw,relatime)`
+
+环境安装工具：`yum install bpftrace g++ -y`、perf-tools传上去
+
+```sh
+[root@iZ2ze46ejz8k5jlayp9h26Z bin]# ./funcgraph -H -p 4879 vfs_read
+Tracing "vfs_read" for PID 4879... Ctrl-C to end.
+# tracer: function_graph
+#
+# CPU  DURATION                  FUNCTION CALLS
+# |     |   |                     |   |   |   |
+ 0)               |  vfs_read() {
+ 0)               |    irq_enter_rcu() {
+ 0)   0.217 us    |      irqtime_account_irq();
+ 0)   0.771 us    |    }
+ 0)               |    __sysvec_irq_work() {
+ 0)               |      __wake_up() {
+                    # (中间的中断相关处理省略)
+ 0)               |        ... 
+ 0) + 19.971 us   |      }
+ 0) + 20.655 us   |    }
+ 0)               |    irq_exit_rcu() {
+ 0)   0.183 us    |      irqtime_account_irq();
+ 0)   0.169 us    |      sched_core_idle_cpu();
+ 0)   0.862 us    |    }
+ 0)               |    rw_verify_area() {
+ 0)               |      security_file_permission() {
+ 0)   0.155 us    |        __fsnotify_parent();
+ 0)   0.457 us    |      }
+ 0)   0.730 us    |    }
+ 0)               |    new_sync_read() {
+ 0)               |      ext4_file_read_iter() {
+ 0)               |        generic_file_read_iter() {
+ 0)               |          generic_file_buffered_read() {
+ 0)               |            _cond_resched() {
+ 0)   0.149 us    |              rcu_all_qs();
+ 0)   0.431 us    |            }
+ 0)               |            generic_file_buffered_read_get_pages() {
+ 0)               |              find_get_pages_contig() {
+ 0)   0.217 us    |                PageHuge();
+ 0)   0.206 us    |                rcu_read_unlock_strict();
+ 0)   1.410 us    |              }
+ 0)   2.012 us    |            }
+ 0)   0.252 us    |            mark_page_accessed();
+ 0)               |            touch_atime() {
+ 0)               |              atime_needs_update() {
+ 0)               |                current_time() {
+ 0)   0.207 us    |                  ktime_get_coarse_real_ts64();
+ 0)   0.635 us    |                }
+ 0)   1.143 us    |              }
+ 0)   1.623 us    |            }
+ 0)   6.038 us    |          }
+ 0)   6.507 us    |        }
+ 0)   6.908 us    |      }
+ 0)   7.379 us    |    }
+ 0)   0.216 us    |    __fsnotify_parent();
+ 0) + 34.563 us   |  }
+                    #  又是一个vfs_read，跟上面调用栈差不多
+ 0)               |  vfs_read() {
+ 0)               |    rw_verify_area() {
+ 0)               |      security_file_permission() {
+ 0)   0.171 us    |        __fsnotify_parent();
+ 0)   0.495 us    |      }
+ 0)   0.845 us    |    }
+ 0)               |    new_sync_read() {
+ 0)               |      ...
+ 0)   4.224 us    |    }
+ 0)   5.719 us    |  }
+```
+
+#### 4.4.3. 本地funcgraph结果不完整问题定位
+
+perf-tools是基于`ftrace`和`perf`写的脚本，里面控制各种`ftrace`的参数，形式如下：
+
+```sh
+# funcgraph
+...
+if (( opt_time )); then
+    if ! echo funcgraph-abstime > trace_options; then
+        edie "ERROR: setting -t (funcgraph-abstime). Exiting."
+    fi
+fi  
+if (( opt_proc )); then
+    if ! echo funcgraph-proc > trace_options; then
+        edie "ERROR: setting -P (funcgraph-proc). Exiting."
+    fi
+fi
+...
+```
+
+trace_options文件：
+
+```sh
+[root@xdlinux ➜ kernel git:(master) ✗ ]$ find /sys/kernel/tracing -name trace_options
+/sys/kernel/tracing/trace_options
+```
+
+当前实验结果只有中断调用栈，搜了下如果不跟踪中断呢：[使用ftrace追踪内核函数调用](https://66ring.github.io/2021/01/30/universe/linux/ftrace_usage/)
+
+* 修改：拷贝一份`funcgraph`脚本修改：`cp funcgraph tmp_funcgraph`，添加：`echo nofuncgraph-irqs > trace_options`
+* 结果：然后就可以追踪打印了。。
+    * 多试几次影响了后面的追踪，ftrace需要再单独研究学习下
+* 但是，对比`trace_options`文件(cat出来)，ecs环境里多了`nopause-on-trace`
+    * 也试了`echo nopause-on-trace > trace_options`，第一次也能追踪到xfs，后面起funcgraph就报错了`echo: write error: Invalid argument`
+
+```sh
+[root@xdlinux ➜ kernel git:(master) ✗ ]$ diff trace_options_ecs trace_options_centos8
+23d22
+< nopause-on-trace
+[root@xdlinux ➜ kernel git:(master) ✗ ]$ grep nopause-on-trace trace_options_*
+trace_options_ecs:nopause-on-trace
+```
+
+追踪结果如下，可以看到xfs相关流程了：`vfs_read` -> `__vfs_read` -> `new_sync_read` -> `xfs_file_read_iter` 里面会经过pagecache
+
+```sh
+[root@xdlinux ➜ kernel git:(master) ✗ ]$ ./tmp_funcgraph -H -p 9294 vfs_read
+Tracing "vfs_read" for PID 9294... Ctrl-C to end.
+# tracer: function_graph
+#
+# CPU  DURATION                  FUNCTION CALLS
+# |     |   |                     |   |   |   |
+ 10)               |  vfs_read() {
+ 10)   7.314 us    |  }
+ 10)               |  vfs_read() {
+ 10)               |    rw_verify_area() {
+ 10)               |      security_file_permission() {
+ 10)   0.031 us    |        bpf_lsm_file_permission();
+ 10)               |        __fsnotify_parent() {
+ 10)   0.040 us    |          dget_parent();
+ 10)               |          dput() {
+ 10)               |            dput.part.34() {
+ 10)               |              _cond_resched() {
+ 10)   0.030 us    |                rcu_all_qs();
+ 10)   0.221 us    |              }
+ 10)   0.461 us    |            }
+ 10)   0.641 us    |          }
+ 10)   1.232 us    |        }
+ 10)   0.040 us    |        fsnotify();
+ 10)   1.964 us    |      }
+ 10)   2.144 us    |    }
+ 10)               |    __vfs_read() {
+ 10)               |      new_sync_read() {
+ 10)               |        xfs_file_read_iter [xfs]() {
+ 10)               |          xfs_file_buffered_aio_read [xfs]() {
+ 10)               |            xfs_ilock [xfs]() {
+ 10)               |              down_read() {
+ 10)               |                _cond_resched() {
+ 10)   0.030 us    |                  rcu_all_qs();
+ 10)   0.220 us    |                }
+ 10)   0.411 us    |              }
+ 10)   0.591 us    |            }
+ 10)               |            generic_file_read_iter() {
+ 10)               |              generic_file_buffered_read() {
+ 10)               |                _cond_resched() {
+ 10)   0.020 us    |                  rcu_all_qs();
+ 10)   0.240 us    |                }
+ 10)               |                pagecache_get_page() {
+ 10)               |                  find_get_entry() {
+ 10)   0.030 us    |                    PageHuge();
+ 10)   0.270 us    |                  }
+ 10)   0.471 us    |                }
+ 10)               |                touch_atime() {
+ 10)               |                  atime_needs_update() {
+ 10)               |                    current_time() {
+ 10)   0.030 us    |                      ktime_get_coarse_real_ts64();
+ 10)   0.030 us    |                      timestamp_truncate();
+ 10)   0.431 us    |                    }
+ 10)   0.631 us    |                  }
+ 10)   0.832 us    |                }
+ 10)   2.094 us    |              }
+ 10)   2.284 us    |            }
+ 10)               |            xfs_iunlock [xfs]() {
+ 10)   0.031 us    |              up_read();
+ 10)   0.231 us    |            }
+ 10)   3.627 us    |          }
+ 10)   3.827 us    |        }
+ 10)   4.077 us    |      }
+ 10)   4.278 us    |    }
+ 10)   6.793 us    |  }
+```
+
+## 5. 小结
+
+学习梳理内核中文件系统相关的结构定义，并进行eBPF跟踪。
+
+## 6. 参考
 
 1、[read 文件一个字节实际会发生多大的磁盘IO？](https://mp.weixin.qq.com/s/vekemOfUHBjZSy3uXb49Rw)
 
@@ -395,4 +815,6 @@ int main() {
 
 3、[write文件一个字节后何时发起写磁盘IO？](https://mp.weixin.qq.com/s/qEsK6X_HwthWUbbMGiydBQ)
 
-4、GPT
+4、[使用ftrace追踪内核函数调用](https://66ring.github.io/2021/01/30/universe/linux/ftrace_usage/)
+
+5、GPT
