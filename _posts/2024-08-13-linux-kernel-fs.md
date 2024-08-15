@@ -61,16 +61,23 @@ VFS中的几个核心结构：
 
 * `super_block`：文件系统的超级块，包含文件系统类型、状态、块大小、根目录等信息。
     * 每个文件系统在挂载时都会有一个与之相关联的 `struct super_block`，用于管理文件系统的通用状态信息。
-* `inode`：表示文件系统中的一个文件或目录，包含文件类型、权限、所有者信息、大小、时间戳以及指向数据块的指针等。
+* `inode`：索引节点，表示文件系统中的一个文件或目录，包含文件类型、权限、所有者信息、大小、时间戳以及**数据块在磁盘的位置**等。
     * `struct inode` 提供了与文件相关的元数据。
-* `dentry`：directory entry，目录中的一个条目，即目录与文件的映射关系，包含文件名和指向相应 `inode` 的指针。
+    * 索引节点是文件的唯一标识，它们之间一一对应，也同样都会被存储在硬盘中，所以索引节点同样占用磁盘空间
+* `dentry`：目录项（directory entry），目录中的一个条目，即目录与文件的映射关系，包含文件名和指向相应 `inode` 的指针。
     * `struct dentry` 主要用于路径解析，并实现了一个目录项的缓存机制，以提高访问效率。
+    * 目录项是由内核维护的一个数据结构，不存放于磁盘，而是缓存在内存
 * `file`：每个打开的文件在内核空间都有一个和这个数据结构相关的 `struct file`，包含文件偏移量、访问权限、指向 `dentry` 的指针等信息。
     * 该结构体用于跟踪进程打开的文件实例。
 
 上述结构，`super_block`、`inode`、`file`均定义在 include/linux/fs.h 中， `dentry`定义在 include/linux/dcache.h 中。
 
 此外还有`file_system_type`、`vfsmount`、`address_space`等，此处暂不做展开。
+
+索引节点、目录项以及文件数据的关系示意图：
+
+![索引节点、目录项以及文件数据的关系](https://cdn.xiaolincoding.com/gh/xiaolincoder/ImageHost/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F/%E6%96%87%E4%BB%B6%E7%B3%BB%E7%BB%9F/%E7%9B%AE%E5%BD%95%E9%A1%B9%E5%92%8C%E7%B4%A2%E5%BC%95%E5%85%B3%E7%B3%BB%E5%9B%BE.png)  
+[出处](https://www.xiaolincoding.com/os/6_file_system/file_system.html)
 
 #### 3.1.1. super_block
 
