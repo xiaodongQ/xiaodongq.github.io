@@ -1,0 +1,307 @@
+[root@xdlinux ➜ bin git:(master) ✗ ]$ ./funcgraph -H -p 4847 vfs_write 
+Tracing "vfs_write" for PID 4847... Ctrl-C to end.
+# tracer: function_graph
+#
+# CPU  DURATION                  FUNCTION CALLS
+# |     |   |                     |   |   |   |
+  4)               |  vfs_write() {
+  4)   ==========> |
+  4)               |  smp_irq_work_interrupt() {
+  4)               |    irq_enter() {
+  4)   0.051 us    |      irqtime_account_irq();
+  4)   0.441 us    |    }
+  4)               |    __wake_up() {
+  4)               |      __wake_up_common_lock() {
+  4)   0.020 us    |        _raw_spin_lock_irqsave();
+  4)               |        __wake_up_common() {
+  4)               |          autoremove_wake_function() {
+  4)               |            default_wake_function() {
+  4)               |              try_to_wake_up() {
+  4)   0.030 us    |                _raw_spin_lock_irqsave();
+  4)               |                select_task_rq_fair() {
+  4)   0.030 us    |                  available_idle_cpu();
+  4)   0.260 us    |                  available_idle_cpu();
+  4)   0.030 us    |                  available_idle_cpu();
+  4)   1.262 us    |                }
+  4)   0.030 us    |                ttwu_queue_wakelist();
+  4)   0.020 us    |                _raw_spin_lock();
+  4)   0.350 us    |                update_rq_clock();
+  4)               |                ttwu_do_activate() {
+  4)               |                  enqueue_task_fair() {
+  4)               |                    enqueue_entity() {
+  4)   0.020 us    |                      update_curr();
+  4)   0.050 us    |                      __update_load_avg_se();
+  4)   0.050 us    |                      __update_load_avg_cfs_rq();
+  4)   0.020 us    |                      update_cfs_group();
+  4)   0.020 us    |                      __enqueue_entity();
+  4)   2.074 us    |                    }
+  4)   0.020 us    |                    hrtick_update();
+  4)   2.826 us    |                  }
+  4)               |                  ttwu_do_wakeup() {
+  4)               |                    check_preempt_curr() {
+  4)               |                      resched_curr() {
+  4)               |                        native_smp_send_reschedule() {
+  4)               |                          default_send_IPI_single_phys() {
+  4)   0.031 us    |                            __default_send_IPI_dest_field();
+  4)   0.861 us    |                          }
+  4)   1.052 us    |                        }
+  4)   1.243 us    |                      }
+  4)   1.453 us    |                    }
+  4)   1.924 us    |                  }
+  4)   5.380 us    |                }
+  4)   0.020 us    |                _raw_spin_unlock_irqrestore();
+  4)   9.257 us    |              }
+  4)   9.438 us    |            }
+  4)   9.638 us    |          }
+  4) + 10.399 us   |        }
+  4)   0.020 us    |        _raw_spin_unlock_irqrestore();
+  4) + 11.101 us   |      }
+  4) + 11.281 us   |    }
+  4)               |    irq_exit() {
+  4)   0.030 us    |      irqtime_account_irq();
+  4)   0.020 us    |      idle_cpu();
+  4)   0.421 us    |    }
+  4) + 13.495 us   |  }
+  4)   <========== |
+  4) + 18.575 us   |  } /* vfs_write */
+  4)               |  vfs_write() {
+  4)   ==========> |
+  4)               |  smp_irq_work_interrupt() {
+  4)               |    irq_enter() {
+  4)   0.040 us    |      irqtime_account_irq();
+  4)   0.281 us    |    }
+  4)               |    __wake_up() {
+  4)               |      __wake_up_common_lock() {
+  4)   0.030 us    |        _raw_spin_lock_irqsave();
+  4)   0.030 us    |        __wake_up_common();
+  4)   0.030 us    |        _raw_spin_unlock_irqrestore();
+  4)   1.082 us    |      }
+  4)   1.263 us    |    }
+  4)               |    irq_exit() {
+  4)   0.030 us    |      irqtime_account_irq();
+  4)   0.020 us    |      idle_cpu();
+  4)   0.421 us    |    }
+  4)   2.715 us    |  }
+  4)   <========== |
+  4)   7.424 us    |  } /* vfs_write */
+  4)               |  vfs_write() {
+  4)               |    rw_verify_area() {
+  4)               |      security_file_permission() {
+  4)   0.030 us    |        bpf_lsm_file_permission();
+  4)   0.301 us    |      }
+  4)   0.521 us    |    }
+  4)               |    __sb_start_write() {
+  4)               |      _cond_resched() {
+  4)   0.040 us    |        rcu_all_qs();
+  4)   0.270 us    |      }
+  4)   0.961 us    |    }
+  4)               |    __vfs_write() {
+  4)               |      new_sync_write() {
+  4)               |        xfs_file_write_iter [xfs]() {
+  4)               |          xfs_file_buffered_aio_write [xfs]() {
+  4)               |            xfs_ilock [xfs]() {
+  4)               |              down_write() {
+  4)               |                _cond_resched() {
+  4)   0.030 us    |                  rcu_all_qs();
+  4)   0.270 us    |                }
+  4)   0.511 us    |              }
+  4)   0.772 us    |            }
+  4)               |            xfs_file_aio_write_checks [xfs]() {
+  4)   0.220 us    |              generic_write_check_limits.isra.47();
+  4)               |              xfs_break_layouts [xfs]() {
+  4)   0.201 us    |                xfs_break_leased_layouts [xfs]();
+  4)   0.651 us    |              }
+  4)   0.030 us    |              _raw_spin_lock();
+  4)               |              file_modified() {
+  4)   0.050 us    |                file_remove_privs();
+  4)               |                file_update_time() {
+  4)               |                  current_time() {
+  4)   0.040 us    |                    ktime_get_coarse_real_ts64();
+  4)   0.040 us    |                    timestamp_truncate();
+  4)   0.992 us    |                  }
+  4)   1.272 us    |                }
+  4)   1.803 us    |              }
+  4)   4.469 us    |            }
+  4)               |            iomap_file_buffered_write() {
+  4)               |              iomap_apply() {
+  4)               |                xfs_buffered_write_iomap_begin [xfs]() {
+  4)   0.231 us    |                  xfs_get_extsz_hint [xfs]();
+  4)               |                  xfs_ilock [xfs]() {
+  4)               |                    down_write() {
+  4)               |                      _cond_resched() {
+  4)   0.030 us    |                        rcu_all_qs();
+  4)   0.270 us    |                      }
+  4)   0.521 us    |                    }
+  4)   0.762 us    |                  }
+  4)   0.070 us    |                  xfs_iext_lookup_extent [xfs]();
+  4)               |                  xfs_qm_dqattach_locked [xfs]() {
+  4)   0.040 us    |                    xfs_qm_need_dqattach [xfs]();
+  4)   0.310 us    |                  }
+  4)   0.210 us    |                  xfs_iomap_prealloc_size.isra.18 [xfs]();
+  4)               |                  xfs_bmapi_reserve_delalloc [xfs]() {
+  4)   0.040 us    |                    xfs_trans_reserve_quota_nblks [xfs]();
+  4)   0.040 us    |                    xfs_bmap_worst_indlen.isra.14 [xfs]();
+  4)   0.160 us    |                    xfs_mod_fdblocks [xfs]();
+  4)   0.070 us    |                    xfs_mod_fdblocks [xfs]();
+  4)   0.030 us    |                    xfs_mod_delalloc [xfs]();
+  4)               |                    xfs_bmap_add_extent_hole_delay [xfs]() {
+  4)               |                      xfs_iext_prev [xfs]() {
+  4)   0.030 us    |                        xfs_iext_last [xfs]();
+  4)   0.320 us    |                      }
+  4)   0.040 us    |                      xfs_iext_get_extent [xfs]();
+  4)   0.030 us    |                      xfs_iext_get_extent [xfs]();
+  4)               |                      xfs_iext_insert [xfs]() {
+  4)   0.040 us    |                        xfs_iext_state_to_fork [xfs]();
+  4)               |                        kmem_alloc [xfs]() {
+  4)               |                          __kmalloc() {
+  4)   0.030 us    |                            kmalloc_slab();
+  4)               |                            _cond_resched() {
+  4)   0.030 us    |                              rcu_all_qs();
+  4)   0.260 us    |                            }
+  4)   0.030 us    |                            should_failslab();
+  4)   1.062 us    |                          }
+  4)   1.312 us    |                        }
+  4)   2.775 us    |                      }
+  4)   4.138 us    |                    }
+  4)   6.752 us    |                  }
+  4)               |                  xfs_iunlock [xfs]() {
+  4)   0.030 us    |                    up_write();
+  4)   0.321 us    |                  }
+  4)   0.160 us    |                  xfs_bmbt_to_iomap [xfs]();
+  4) + 12.764 us   |                }
+  4)               |                iomap_write_actor() {
+  4)               |                  iomap_write_begin() {
+  4)               |                    grab_cache_page_write_begin() {
+  4)               |                      pagecache_get_page() {
+  4)   0.200 us    |                        find_get_entry();
+  4)               |                        __page_cache_alloc() {
+  4)               |                          alloc_pages_current() {
+  4)   0.040 us    |                            get_task_policy.part.34();
+  4)   0.030 us    |                            policy_nodemask();
+  4)   0.050 us    |                            policy_node();
+  4)               |                            __alloc_pages_nodemask() {
+  4)               |                              _cond_resched() {
+  4)   0.050 us    |                                rcu_all_qs();
+  4)   0.321 us    |                              }
+  4)   0.040 us    |                              should_fail_alloc_page();
+  4)               |                              get_page_from_freelist() {
+  4)               |                                node_dirty_ok() {
+  4)   0.030 us    |                                  node_page_state();
+  4)   0.040 us    |                                  node_page_state();
+  4)   0.020 us    |                                  node_page_state();
+  4)   0.030 us    |                                  node_page_state();
+  4)   1.893 us    |                                }
+  4)   0.030 us    |                                __inc_numa_state();
+  4)   0.030 us    |                                __inc_numa_state();
+  4)   0.051 us    |                                prep_new_page();
+  4)   3.877 us    |                              }
+  4)   5.160 us    |                            }
+  4)   6.452 us    |                          }
+  4)   6.742 us    |                        }
+  4)               |                        add_to_page_cache_lru() {
+  4)               |                          __add_to_page_cache_locked() {
+  4)   0.040 us    |                            PageHuge();
+  4)   0.030 us    |                            shmem_mapping();
+  4)               |                            mem_cgroup_charge() {
+  4)   0.631 us    |                              get_mem_cgroup_from_mm();
+  4)               |                              try_charge() {
+  4)               |                                page_counter_try_charge() {
+  4)   0.211 us    |                                  propagate_protected_usage();
+  4)   0.040 us    |                                  propagate_protected_usage();
+  4)   0.030 us    |                                  propagate_protected_usage();
+  4)   0.060 us    |                                  propagate_protected_usage();
+  4)   1.923 us    |                                }
+  4)               |                                page_counter_try_charge() {
+  4)   0.040 us    |                                  propagate_protected_usage();
+  4)   0.200 us    |                                  propagate_protected_usage();
+  4)   0.030 us    |                                  propagate_protected_usage();
+  4)   0.030 us    |                                  propagate_protected_usage();
+  4)   1.793 us    |                                }
+  4)               |                                refill_stock() {
+  4)   0.050 us    |                                  drain_stock.isra.56();
+  4)   0.330 us    |                                }
+  4)   4.959 us    |                              }
+  4)               |                              mem_cgroup_charge_statistics.isra.74() {
+  4)   0.181 us    |                                __count_memcg_events.part.73();
+  4)   0.431 us    |                              }
+  4)   0.030 us    |                              memcg_check_events();
+  4)   7.224 us    |                            }
+  4)   0.040 us    |                            _raw_spin_lock_irq();
+  4)               |                            __mod_lruvec_page_state() {
+  4)               |                              __mod_lruvec_state() {
+  4)   0.050 us    |                                __mod_node_page_state();
+  4)               |                                __mod_memcg_lruvec_state() {
+  4)   0.040 us    |                                  __mod_memcg_state.part.71();
+  4)   0.460 us    |                                }
+  4)   1.372 us    |                              }
+  4)   1.993 us    |                            }
+  4) + 11.462 us   |                          }
+  4)   0.271 us    |                          lru_cache_add();
+  4) + 12.263 us   |                        }
+  4) + 20.348 us   |                      }
+  4)   0.040 us    |                      wait_for_stable_page();
+  4) + 21.249 us   |                    }
+  4)   0.060 us    |                    iomap_page_create();
+  4)   0.050 us    |                    iomap_adjust_read_range();
+  4)   0.040 us    |                    iomap_set_range_uptodate();
+  4) + 23.705 us   |                  }
+  4)               |                  iomap_write_end.isra.32() {
+  4)   0.020 us    |                    iomap_set_range_uptodate();
+  4)               |                    iomap_set_page_dirty() {
+  4)   0.051 us    |                      page_mapping();
+  4)   0.050 us    |                      lock_page_memcg();
+  4)               |                      __set_page_dirty() {
+  4)   0.211 us    |                        _raw_spin_lock_irqsave();
+  4)               |                        account_page_dirtied() {
+  4)               |                          __mod_lruvec_page_state() {
+  4)               |                            __mod_lruvec_state() {
+  4)   0.060 us    |                              __mod_node_page_state();
+  4)               |                              __mod_memcg_lruvec_state() {
+  4)   0.381 us    |                                __mod_memcg_state.part.71();
+  4)   1.824 us    |                              }
+  4)   4.429 us    |                            }
+  4)   5.601 us    |                          }
+  4)               |                          __inc_zone_page_state() {
+  4)   0.070 us    |                            __inc_zone_state();
+  4)   0.721 us    |                          }
+  4)               |                          __inc_node_page_state() {
+  4)   0.030 us    |                            __inc_node_state();
+  4)   0.341 us    |                          }
+  4)               |                          mem_cgroup_track_foreign_dirty_slowpath() {
+  4)   0.030 us    |                            __msecs_to_jiffies();
+  4)   0.791 us    |                          }
+  4) + 10.129 us   |                        }
+  4)   0.040 us    |                        _raw_spin_unlock_irqrestore();
+  4) + 12.533 us   |                      }
+  4)               |                      unlock_page_memcg() {
+  4)   0.030 us    |                        __unlock_page_memcg();
+  4)   0.450 us    |                      }
+  4)               |                      __mark_inode_dirty() {
+  4)   0.030 us    |                        _raw_spin_lock();
+  4)               |                        locked_inode_to_wb_and_lock_list() {
+  4)   0.140 us    |                          _raw_spin_lock();
+  4)   0.852 us    |                        }
+  4)   0.050 us    |                        inode_io_list_move_locked();
+  4)   3.176 us    |                      }
+  4) + 49.563 us   |                    }
+  4)   0.061 us    |                    unlock_page();
+  4) + 50.495 us   |                  }
+  4)               |                  _cond_resched() {
+  4)   0.050 us    |                    rcu_all_qs();
+  4)   0.692 us    |                  }
+  4)   0.260 us    |                  balance_dirty_pages_ratelimited();
+  4) + 77.705 us   |                }
+  4)   0.611 us    |                xfs_buffered_write_iomap_end [xfs]();
+  4) + 93.405 us   |              }
+  4) + 94.347 us   |            }
+  4)               |            xfs_iunlock [xfs]() {
+  4)   0.040 us    |              up_write();
+  4)   0.541 us    |            }
+  4) ! 101.641 us  |          }
+  4) ! 102.573 us  |        }
+  4) ! 103.665 us  |      }
+  4) ! 104.085 us  |    }
+  4)   0.050 us    |    __fsnotify_parent();
+  4)   0.090 us    |    fsnotify();
+  4)   0.211 us    |    __sb_end_write();
+  4) ! 108.193 us  |  }
