@@ -468,7 +468,9 @@ USAGE: funcgraph [-aCDhHPtT] [-m maxdepth] [-p PID] [-L TID] [-d secs] funcstrin
        funcgraph -d 1 do_sys_open >out # trace 1 sec, then write to file
 ```
 
-使用`read`系统调用读取 /etc/fstab 文件内容。
+使用`read`系统调用读取 /etc/fstab 文件内容，代码如下：
+
+[此处](https://github.com/xiaodongQ/prog-playground/tree/main/storage/read_by_signal)也有归档。
 
 ```cpp
 // read_by_signal.cpp
@@ -526,7 +528,7 @@ int main() {
 }
 ```
 
-`g++ read_by_signal.cpp -o read_fstab`
+编译：`g++ read_by_signal.cpp -o read_fstab`
 
 ### 4.4. 运行追踪
 
@@ -541,9 +543,9 @@ Process ID: 8397
 
 2、启动前后堆栈追踪
 
-`bpftrace -e 'kprobe:vfs_read /pid==8397/ { printf("comm:%s, kstack:%s\n", comm, kstack) }'`
+* `bpftrace -e 'kprobe:vfs_read /pid==8397/ { printf("comm:%s, kstack:%s\n", comm, kstack) }'`
 
-`./funcgraph -H -p 8397 vfs_read`
+* `./funcgraph -H -p 8397 vfs_read`
 
 3、发送信号 `kill -USR1 8397`，触发读取，下面是追踪结果
 
