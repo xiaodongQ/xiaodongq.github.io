@@ -14,23 +14,26 @@ tags: 存储 IO
 
 ## 1. 背景
 
-[学习Linux存储IO栈（二） -- Linux内核存储栈流程和接口](https://xiaodongq.github.io/2024/08/13/linux-kernel-fs/) 中，我们跟踪了读取的IO调用栈，本篇跟踪下简单写入操作时的IO调用栈。
+[学习Linux存储IO栈（二） -- Linux内核存储栈流程和接口](https://xiaodongq.github.io/2024/08/13/linux-kernel-fs/) 中，我们跟踪了读取的IO调用栈，本篇跟踪下写入操作时的IO调用栈。
 
-环境说明：  
-同上一篇一样，本地CentOS8.5环境只追踪到中断调用栈，先起ECS进行实验了：Alibaba Cloud Linux 3.2104 LTS 64位（内核版本：5.10.134-16.1.al8.x86_64）
+环境说明：同上一篇一样，本地CentOS8.5环境只追踪到中断调用栈，先起ECS进行实验了：Alibaba Cloud Linux 3.2104 LTS 64位（内核版本：5.10.134-16.1.al8.x86_64）
 
 ## 2. 跟踪点和方式说明
 
-跟上篇类似，这里跟踪VFS层的写操作`vfs_write`，分别用`bpftrace`和`perf-tools`里的`funcgraph`（其实用的就是`ftrace`）进行跟踪。
+方法跟上篇类似，跟踪VFS层的写操作：`vfs_write`，分别用`bpftrace`和`perf-tools`里的`funcgraph`（其中用的就是`ftrace`）进行跟踪。
+
+对应命令：
 
 * `bpftrace -e 'kprobe:vfs_write { printf("comm:%s, kstack:%s\n", comm, kstack) }'`，并过滤pid
 * `funcgraph -H vfs_write`，并用`-p`指定进程pid进行过滤
 
 ## 3. demo：经过page cache写
 
-通过信号触发的方式来启动写入，以便追踪时过滤进程号。
+通过信号的方式来触发写入，以便追踪时过滤进程号。
 
 由于`printf`也会用到VFS，注释掉打印提示，只保留一个`write`文件的`vfs_write`调用。
+
+代码：
 
 ```cpp
 // write_by_signal.cpp
@@ -82,7 +85,9 @@ int main()
 
 编译：`g++ -o write_tempfile write_by_signal.cpp`
 
-## 4. 运行跟踪
+代码和Makefile归档：[write_by_signal](https://github.com/xiaodongQ/prog-playground/tree/main/storage/write_by_signal)
+
+### 3.1. 运行跟踪
 
 1、运行：
 
@@ -98,7 +103,7 @@ pid:4137
 
 3、发送信号 `kill -USR1 4137`，追踪结果下面进行分析
 
-### 4.1. bpftrace结果
+### 3.2. bpftrace结果
 
 这里是调用`vfs_write`函数的调用栈。
 
@@ -112,7 +117,7 @@ comm:write_tempfile, kstack:
         entry_SYSCALL_64_after_hwframe+97
 ```
 
-### 4.2. funcgraph结果
+### 3.3. funcgraph结果
 
 调用栈特别长，下面用`-m`限制一下堆栈的深度。不限制层数的完整结果见：[funcgragh结果](/images/srcfiles/funcgragh_write_stack.txt)
 
@@ -197,13 +202,13 @@ Tracing "vfs_write" for PID 4137... Ctrl-C to end.
  0) + 77.161 us   |  }
 ```
 
-## 5. demo：不经过page cache写
+## 4. demo：不经过page cache写
 
 `open`时指定`O_DIRECT`。
 
-### 5.1. 错误示例
+### 4.1. 错误示例
 
-注意：`O_DIRECT`有严格限制，下面的demo在运行时会报错：`write: Invalid argument`
+注意：`O_DIRECT`有严格限制，下面的demo在运行时会**报错：`write: Invalid argument`**
 
 ```cpp
 // write_by_signal_direct.cpp
@@ -259,7 +264,7 @@ int main()
 
 编译：`g++ -o write_direct write_by_signal_direct.cpp`
 
-### 5.2. O_DIRECT 的要求
+### 4.2. O_DIRECT 的要求
 
 * 1、对齐要求
     * 对于`O_DIRECT`，数据缓冲区和写入长度必须是文件系统块大小的倍数，比如`xfs`为4K
@@ -267,7 +272,9 @@ int main()
 * 2、缓冲区大小：确保你的缓冲区大小与你尝试写入的数据量匹配，并且都是文件系统块大小的整数倍。
 * 3、文件位置：确保文件指针的位置也是文件系统块大小的倍数。如果你试图写入的部分数据位于文件系统块边界之间，则会失败。
 
-### 5.3. 正确示例
+### 4.3. 正确示例
+
+代码如下，主要通过`posix_memalign`申请内存对齐的数据：
 
 ```cpp
 #include <stdio.h>
@@ -356,7 +363,11 @@ int main(void)
 
 编译：`g++ -o write_direct write_by_signal_direct.cpp`
 
-#### 5.3.1. 追踪结果
+代码和Makefile归档：[write_by_signal_direct](https://github.com/xiaodongQ/prog-playground/tree/main/storage/write_by_signal_direct)
+
+### 4.4. 追踪结果
+
+* 调用到`vfs_write`的堆栈：
 
 ```sh
 [root@iZ2zeftv45jk9frk8u0d0rZ ~]# bpftrace -e 'kprobe:vfs_write / pid==8016 / { printf("comm:%s, kstack:%s\n", comm, kstack) }'
@@ -367,6 +378,8 @@ comm:write_direct, kstack:
         do_syscall_64+51
         entry_SYSCALL_64_after_hwframe+97
 ```
+
+* `vfs_write`处理的堆栈
 
 `funcgraph`跟踪的调用栈特别长，完整内容见：[O_DIRECT写入调用栈](/images/srcfiles/funcgragh_write_direct_stack.txt)
 
@@ -457,11 +470,11 @@ Tracing "vfs_write" for PID 8016... Ctrl-C to end.
  0) ! 725.418 us  |  } /* vfs_write */
 ```
 
-## 6. 小结
+## 5. 小结
 
-基于bpftrace和funcgraph跟踪存储IO写流程，后续进一步跟踪调用栈的接口进行学习梳理。
+基于`bpftrace`和`funcgraph`跟踪存储IO写流程，后续基于调用栈，结合代码进一步跟踪学习和梳理。
 
-## 7. 参考
+## 6. 参考
 
 1、[write文件一个字节后何时发起写磁盘IO？](https://mp.weixin.qq.com/s/qEsK6X_HwthWUbbMGiydBQ)
 
