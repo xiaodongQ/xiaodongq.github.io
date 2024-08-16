@@ -32,8 +32,9 @@ layout: default
                 </li>
                 <li class="post-copyright-link">
                     <strong>本文链接：</strong>
-                    <a href="{{ 'https://xiaodongq.github.io' | page.url | prepend: site.baseurl }}" title="{{page.title}}">{{ site.post_site }}{{
-                        page.url }}</a>
+                    <!-- <a href="{{ page.url | prepend: site.baseurl }}" title="{{page.title}}">{{ site.post_site }}{{
+                        page.url }}</a> -->
+                        <a href="{{ site.url }}{{ site.baseurl }}{{ page.url }}" title="{{ page.title }}">{{ site.url }}{{ site.baseurl }}{{ page.url }}</a>
                 </li>
                 <li class="post-copyright-license">
                     <strong>版权声明： </strong>本文遵循 CC BY-NC-SA 4.0，可以自由拷贝，转载，请注明出处，谢谢！ 🤝
