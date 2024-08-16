@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 学习Linux存储IO栈（三） -- Linux内核通用块层
+title: 学习Linux存储IO栈（三） -- eBPF和ftrace跟踪存储IO写流程
 categories: 存储
 tags: 存储 IO
 ---
@@ -8,29 +8,29 @@ tags: 存储 IO
 * content
 {:toc}
 
-梳理学习Linux内核通用块层的相关定义和接口流程。
+跟踪Linux存储IO写流程。
 
 
 
 ## 1. 背景
 
-[学习Linux存储IO栈（二） -- Linux内核存储栈流程和接口](https://xiaodongq.github.io/2024/08/13/linux-kernel-fs/) 中，我们跟踪了读取的IO调用栈，本篇跟踪下简单写入操作时的IO调用栈，并学习梳理通用块层的流程和接口。
+[学习Linux存储IO栈（二） -- Linux内核存储栈流程和接口](https://xiaodongq.github.io/2024/08/13/linux-kernel-fs/) 中，我们跟踪了读取的IO调用栈，本篇跟踪下简单写入操作时的IO调用栈。
 
-前置说明：
+环境说明：  
+同上一篇一样，本地CentOS8.5环境只追踪到中断调用栈，先起ECS进行实验了：Alibaba Cloud Linux 3.2104 LTS 64位（内核版本：5.10.134-16.1.al8.x86_64）
 
-* demo运行的本地测试环境为：CentOS Linux release 8.5.2111 系统，内核版本为 4.18.0-348.7.1.el8_5.x86_64
-* 内核代码基于之前常用的5.10.10版本，分析流程类似
-
-## 2. eBPF 和 ftrace 跟踪写流程
-
-### 2.1. 跟踪点和方式说明
+## 2. 跟踪点和方式说明
 
 跟上篇类似，这里跟踪VFS层的写操作`vfs_write`，分别用`bpftrace`和`perf-tools`里的`funcgraph`（其实用的就是`ftrace`）进行跟踪。
 
 * `bpftrace -e 'kprobe:vfs_write { printf("comm:%s, kstack:%s\n", comm, kstack) }'`，并过滤pid
 * `funcgraph -H vfs_write`，并用`-p`指定进程pid进行过滤
 
-### 2.2. demo：经过page cache写
+## 3. demo：经过page cache写
+
+通过信号触发的方式来启动写入，以便追踪时过滤进程号。
+
+由于`printf`也会用到VFS，注释掉打印提示，只保留一个`write`文件的`vfs_write`调用。
 
 ```cpp
 // write_by_signal.cpp
@@ -41,12 +41,12 @@ tags: 存储 IO
 #include <unistd.h>
 
 
-#define FILE_PATH "/tmp/testfile"
+#define FILE_PATH "/home/tempfile"
 
 void signal_handler(int sig)
 {
     if (sig == SIGUSR1) {
-        printf("Received SIGUSR1 signal, writing to file...\n");
+        // printf("Received SIGUSR1 signal, writing to file...\n");
         FILE *fp = fopen(FILE_PATH, "w");
         if (fp == NULL) {
             perror("fopen");
@@ -55,8 +55,6 @@ void signal_handler(int sig)
         if (fprintf(fp, "hello world\n") < 0) {
             printf("write failed!\n");
             perror("fprintf");
-        } else {
-            printf("write success\n");
         }
         fclose(fp);
     }
@@ -84,142 +82,126 @@ int main()
 
 编译：`g++ -o write_tempfile write_by_signal.cpp`
 
-### 2.3. 运行跟踪
+## 4. 运行跟踪
 
 1、运行：
 
 ```sh
-[root@xdlinux ➜ write_by_signal git:(main) ✗ ]$ ./write_tempfile 
-pid:4847
+[root@iZ2zeftv45jk9frk8u0d0rZ ~]# ./write_tempfile 
+pid:4137
 ```
 
 2、起不同终端，启动跟踪
 
-* `bpftrace -e 'kprobe:vfs_write / pid==4847 / { printf("comm:%s, kstack:%s\n", comm, kstack) }'`
-* `./funcgraph -H -p 4847 vfs_write`
+* `bpftrace -e 'kprobe:vfs_write / pid==4137 / { printf("comm:%s, kstack:%s\n", comm, kstack) }'`
+* `./funcgraph -H -p 4137 vfs_write`
 
-3、发送信号 `kill -USR1 4847`，追踪结果下面进行分析
+3、发送信号 `kill -USR1 4137`，追踪结果下面进行分析
 
-```sh
-[root@xdlinux ➜ write_by_signal git:(main) ✗ ]$ ./write_tempfile 
-pid:4847
-Received SIGUSR1 signal, writing to file...
-write success
-```
+### 4.1. bpftrace结果
 
-#### 2.3.1. bpftrace结果
-
-这里是调用`vfs_write`之前的调用栈。
-
-疑问：为什么会追踪到3次`vfs_write`？
+这里是调用`vfs_write`函数的调用栈。
 
 ```sh
-[root@xdlinux ➜ bin git:(master) ✗ ]$ bpftrace -e 'kprobe:vfs_write / pid==4847 / { printf("comm:%s, kstack:%s\n", comm, kstack) }'
+[root@iZ2zeftv45jk9frk8u0d0rZ ~]# bpftrace -e 'kprobe:vfs_write / pid==4137 / { printf("comm:%s, kstack:%s\n", comm, kstack) }'
 Attaching 1 probe...
 comm:write_tempfile, kstack:
         vfs_write+1
         ksys_write+79
-        do_syscall_64+91
-        entry_SYSCALL_64_after_hwframe+101
-
-comm:write_tempfile, kstack:
-        vfs_write+1
-        ksys_write+79
-        do_syscall_64+91
-        entry_SYSCALL_64_after_hwframe+101
-
-comm:write_tempfile, kstack:
-        vfs_write+1
-        ksys_write+79
-        do_syscall_64+91
-        entry_SYSCALL_64_after_hwframe+101
+        do_syscall_64+51
+        entry_SYSCALL_64_after_hwframe+97
 ```
 
-#### 2.3.2. funcgraph结果
+### 4.2. funcgraph结果
 
-调用栈特别长，下面截取部分。完整结果见：[funcgragh结果](/images/srcfiles/funcgragh_write_stack.txt)
+调用栈特别长，下面用`-m`限制一下堆栈的深度。不限制层数的完整结果见：[funcgragh结果](/images/srcfiles/funcgragh_write_stack.txt)
 
-可大致看到流程：`vfs_write`->`new_sync_write`-> xfs文件系统的`xfs_file_write_iter`，而后写page cache
+可大致看到流程：`vfs_write`->`new_sync_write`-> ext4文件系统的`ext4_file_write_iter`，而后获取page cache、写page cache
 
 ```sh
-  1)               |  vfs_write() {
-  2)               |    rw_verify_area() {
-  3)               |      security_file_permission() {
-  4)   0.030 us    |        bpf_lsm_file_permission();
-  5)   0.301 us    |      }
-  6)   0.521 us    |    }
-  7)               |    __sb_start_write() {
-  8)               |      _cond_resched() {
-  9)   0.040 us    |        rcu_all_qs();
-  10)  0.270 us    |      }
-  11)  0.961 us    |    }
-  12)              |    __vfs_write() {
-  13)              |      new_sync_write() {
-  14)              |        xfs_file_write_iter [xfs]() {
-  15)              |          xfs_file_buffered_aio_write [xfs]() {
-  16)              |            xfs_ilock [xfs]() {
-  17)              |              down_write() {
-  18)              |                _cond_resched() {
-  19)  0.030 us    |                  rcu_all_qs();
-  20)  0.270 us    |                }
-  21)  0.511 us    |              }
-  22)  0.772 us    |            }
-  23)              |            xfs_file_aio_write_checks [xfs]() {
-                                    ...
-  7)   4.469 us    |            }
-  8)               |            iomap_file_buffered_write() {
-  9)               |              iomap_apply() {
-  10)              |                xfs_buffered_write_iomap_begin [xfs]() {
-  11)  0.231 us    |                  xfs_get_extsz_hint [xfs]();
-                                        ...
-  54) + 12.764 us   |                }
-  55)              |                iomap_write_actor() {
-  56)              |                  iomap_write_begin() {
-  57)              |                    grab_cache_page_write_begin() {
-  58)              |                      pagecache_get_page() {
-  59)  0.200 us    |                        find_get_entry();
-  60)              |                        __page_cache_alloc() {
-  61)              |                          alloc_pages_current() {
-                                                ...
-  82)  6.452 us    |                          }
-  83)  6.742 us    |                        }
-  84)              |                        add_to_page_cache_lru() {
-                                                ...
-  123) + 12.263 us   |                        }
-  124) + 20.348 us   |                      }
-  125) 0.040 us    |                      wait_for_stable_page();
-  126) + 21.249 us   |                    }
-  127) 0.060 us    |                    iomap_page_create();
-  128) 0.050 us    |                    iomap_adjust_read_range();
-  129) 0.040 us    |                    iomap_set_range_uptodate();
-  130) + 23.705 us   |                  }
-  131)             |                  iomap_write_end.isra.32() {
-                                        ...
-  27) + 50.495 us   |                  }
-  28)              |                  _cond_resched() {
-  29)  0.050 us    |                    rcu_all_qs();
-  30)  0.692 us    |                  }
-  31)  0.260 us    |                  balance_dirty_pages_ratelimited();
-  32) + 77.705 us   |                }
-  33)  0.611 us    |                xfs_buffered_write_iomap_end [xfs]();
-  34) + 93.405 us   |              }
-  35) + 94.347 us   |            }
-  36)              |            xfs_iunlock [xfs]() {
-  37)  0.040 us    |              up_write();
-  38)  0.541 us    |            }
-  39) ! 101.641 us  |          }
-  40) ! 102.573 us  |        }
-  41) ! 103.665 us  |      }
-  42) ! 104.085 us  |    }
-  43)  0.050 us    |    __fsnotify_parent();
-  44)  0.090 us    |    fsnotify();
-  45)  0.211 us    |    __sb_end_write();
-  46) ! 108.193 us  |  }
+[root@iZ2zeftv45jk9frk8u0d0rZ bin]# ./funcgraph -H -p 4137 -m 9 vfs_write
+Tracing "vfs_write" for PID 4137... Ctrl-C to end.
+# tracer: function_graph
+#
+# CPU  DURATION                  FUNCTION CALLS
+# |     |   |                     |   |   |   |
+ 0)               |  vfs_write() {
+ 0)               |    irq_enter_rcu() {
+ 0)   0.236 us    |      irqtime_account_irq();
+ 0)   0.779 us    |    }
+                        ...
+ 0)               |    rw_verify_area() {
+ 0)   0.214 us    |      security_file_permission();
+ 0)   0.657 us    |    }
+ 0)               |    new_sync_write() {
+ 0)               |      ext4_file_write_iter() {
+ 0)               |        ext4_buffered_write_iter() {
+ 0)   0.201 us    |          ext4_fc_start_update();
+ 0)   0.195 us    |          down_write();
+ 0)               |          ext4_generic_write_checks() {
+ 0)               |            generic_write_checks() {
+ 0)   0.240 us    |              generic_write_check_limits();
+ 0)   0.635 us    |            }
+ 0)   0.997 us    |          }
+ 0)               |          file_modified() {
+ 0)   0.195 us    |            file_remove_privs();
+ 0)               |            file_update_time() {
+ 0)               |              current_time() {
+ 0)   0.163 us    |                ktime_get_coarse_real_ts64();
+ 0)   0.505 us    |              }
+ 0)   0.861 us    |            }
+ 0)   1.782 us    |          }
+ 0)               |          generic_perform_write() {
+ 0)               |            ext4_da_write_begin() {
+ 0)   0.291 us    |              ext4_nonda_switch();
+ 0)               |              grab_cache_page_write_begin() {
+ 0)               |                pagecache_get_page() {
+ 0)   0.415 us    |                  find_get_entry();
+ 0)   2.448 us    |                  alloc_pages_current();
+ 0)   8.323 us    |                  add_to_page_cache_lru();
+ 0)   0.403 us    |                  irq_enter_rcu();
+ 0)   1.275 us    |                  __sysvec_irq_work();
+ 0)   0.326 us    |                  irq_exit_rcu();
+ 0) + 16.397 us   |                }
+ 0)   0.158 us    |                wait_for_stable_page();
+ 0) + 17.226 us   |              }
+ 0)   0.155 us    |              wait_for_stable_page();
+ 0)               |              __block_write_begin() {
+ 0)               |                __block_write_begin_int() {
+ 0)   1.481 us    |                  create_page_buffers();
+ 0)   6.616 us    |                  ext4_da_get_block_prep();
+ 0)   0.967 us    |                  clean_bdev_aliases();
+ 0) + 11.644 us   |                }
+ 0) + 12.471 us   |              }
+ 0) + 31.420 us   |            }
+ 0)               |            ext4_da_write_end() {
+ 0)               |              ext4_da_do_write_end() {
+ 0)               |                block_write_end() {
+ 0)   3.480 us    |                  __block_commit_write.constprop.0.isra.0();
+ 0)   4.213 us    |                }
+ 0)   0.839 us    |                ext4_da_should_update_i_disksize();
+ 0)   0.201 us    |                unlock_page();
+ 0)   7.056 us    |              }
+ 0)   7.951 us    |            }
+ 0)               |            _cond_resched() {
+ 0)   0.229 us    |              rcu_all_qs();
+ 0)   0.638 us    |            }
+ 0)   0.748 us    |            balance_dirty_pages_ratelimited();
+ 0) + 42.959 us   |          }
+ 0)   0.223 us    |          up_write();
+ 0)   0.206 us    |          ext4_fc_stop_update();
+ 0) + 48.619 us   |        }
+ 0) + 49.156 us   |      }
+ 0) + 50.222 us   |    }
+ 0)   0.458 us    |    __fsnotify_parent();
+ 0) + 77.161 us   |  }
 ```
 
-### 2.4. demo：不经过page cache写
+## 5. demo：不经过page cache写
 
 `open`时指定`O_DIRECT`。
+
+### 5.1. 错误示例
 
 注意：`O_DIRECT`有严格限制，下面的demo在运行时会报错：`write: Invalid argument`
 
@@ -232,7 +214,7 @@ comm:write_tempfile, kstack:
 #include <fcntl.h>
 #include <unistd.h>
 
-#define FILE_PATH "/tmp/testfile"
+#define FILE_PATH "/home/tempfile"
 
 // write错误
 void signal_handler(int sig)
@@ -277,37 +259,210 @@ int main()
 
 编译：`g++ -o write_direct write_by_signal_direct.cpp`
 
-#### 2.4.1. O_DIRECT 的要求
+### 5.2. O_DIRECT 的要求
 
 * 1、对齐要求
-    * 对于`O_DIRECT`，数据缓冲区和写入长度必须是文件系统块大小的倍数，比如此处`xfs`为4K
+    * 对于`O_DIRECT`，数据缓冲区和写入长度必须是文件系统块大小的倍数，比如`xfs`为4K
     * 缓冲区地址本身也必须是对齐的。例如，在 64 位系统上，缓冲区地址可能需要对齐到 4K 边界。
-
-```sh
-[root@xdlinux ➜ write_by_signal_direct git:(main) ✗ ]$ xfs_info /home
-meta-data=/dev/mapper/cl_desktop--mme7h3a-home isize=512    agcount=4, agsize=4193792 blks
-         =                       sectsz=512   attr=2, projid32bit=1
-         =                       crc=1        finobt=1, sparse=1, rmapbt=0
-         =                       reflink=1
-data     =                       bsize=4096   blocks=16775168, imaxpct=25
-         =                       sunit=0      swidth=0 blks
-naming   =version 2              bsize=4096   ascii-ci=0, ftype=1
-log      =internal log           bsize=4096   blocks=8191, version=2
-         =                       sectsz=512   sunit=0 blks, lazy-count=1
-realtime =none                   extsz=4096   blocks=0, rtextents=0
-```
-
 * 2、缓冲区大小：确保你的缓冲区大小与你尝试写入的数据量匹配，并且都是文件系统块大小的整数倍。
 * 3、文件位置：确保文件指针的位置也是文件系统块大小的倍数。如果你试图写入的部分数据位于文件系统块边界之间，则会失败。
 
-## 3. 小结
+### 5.3. 正确示例
 
-学习梳理内核中通用块层的定义和接口流程。
+```cpp
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <string.h>
 
-## 4. 参考
+#define FILENAME "/home/tempfile"
+#define BUFFER_SIZE (4096 * 2) // 假设文件系统块大小为 4KB，这里写8KB数据
+#define BLOCK_SIZE 4096 // 文件系统块大小，通常是 4KB，用于下面的对齐
+
+int fd;
+char *buffer;
+off_t offset;
+
+void handle_signal(int signum)
+{
+	if (signum != SIGUSR1) {
+		printf("signum: %d not expected!\n", signum);
+		exit(1);
+	}
+    // 写入数据
+    if (write(fd, buffer + offset, BUFFER_SIZE - offset) != (BUFFER_SIZE - offset)) {
+        perror("Error writing to file");
+        exit(1);
+    }
+
+    // 更新偏移量
+    offset += (BUFFER_SIZE - offset);
+
+    // 如果文件写满了，重置偏移量
+    if (offset >= BUFFER_SIZE) {
+        offset = 0;
+    }
+
+    // printf("Wrote %zu bytes to file.\n", BUFFER_SIZE - offset);
+}
+
+int main(void)
+{
+    pid_t pid = getpid();
+    printf("pid:%d\n", pid);
+
+    void *ptr;
+
+    // 初始化偏移量
+    offset = 0;
+
+    // 打开文件，使用 O_DIRECT 标志
+    fd = open(FILENAME, O_WRONLY | O_CREAT | O_DIRECT, S_IRUSR | S_IWUSR);
+    if (fd == -1) {
+        perror("Error opening file");
+        return 1;
+    }
+
+    // 分配缓冲区，并确保它是在页面边界上对齐
+    if (posix_memalign(&ptr, BLOCK_SIZE, BUFFER_SIZE) != 0) {
+        perror("Memory allocation failed");
+        close(fd);
+        return 1;
+    }
+
+    buffer = (char *)ptr;
+
+    // 填充缓冲区
+    memset(buffer, 'X', BUFFER_SIZE);
+
+    // 设置信号处理函数
+    signal(SIGUSR1, handle_signal);
+
+    // 主循环
+    while (1) {
+        pause();
+    }
+
+    // 不会执行到这里，因为程序是无限循环
+    free(buffer);
+    close(fd);
+    return 0;
+}
+```
+
+编译：`g++ -o write_direct write_by_signal_direct.cpp`
+
+#### 5.3.1. 追踪结果
+
+```sh
+[root@iZ2zeftv45jk9frk8u0d0rZ ~]# bpftrace -e 'kprobe:vfs_write / pid==8016 / { printf("comm:%s, kstack:%s\n", comm, kstack) }'
+Attaching 1 probe...
+comm:write_direct, kstack:
+        vfs_write+1
+        ksys_write+79
+        do_syscall_64+51
+        entry_SYSCALL_64_after_hwframe+97
+```
+
+`funcgraph`跟踪的调用栈特别长，完整内容见：[O_DIRECT写入调用栈](/images/srcfiles/funcgragh_write_direct_stack.txt)
+
+这里限制下栈深度，大致流程如下：  
+`vfs_write`->`new_sync_write`->`ext4_file_write_iter`，走的是`ext4_dio_write_iter`，就不过page cache了 -> 后面还有io调度处理：`blk_io_schedule`
+
+```sh
+[root@iZ2zeftv45jk9frk8u0d0rZ bin]# ./funcgraph -H -p 8016 -m 8 vfs_write
+Tracing "vfs_write" for PID 8016... Ctrl-C to end.
+# tracer: function_graph
+#
+# CPU  DURATION                  FUNCTION CALLS
+# |     |   |                     |   |   |   |
+ 1)               |  vfs_write() {
+ 1)               |    irq_enter_rcu() {
+ 1)   0.322 us    |      irqtime_account_irq();
+ 1)   1.066 us    |    }
+                        ...
+ 1)               |    new_sync_write() {
+ 1)               |      ext4_file_write_iter() {
+ 1)               |        ext4_dio_write_iter() {
+ 1)   0.355 us    |          down_read();
+ 1)   0.542 us    |          ext4_inode_journal_mode();
+ 1)               |          ext4_dio_write_checks() {
+ 1)               |            ext4_generic_write_checks() {
+ 1)               |              generic_write_checks() {
+ 1)   0.306 us    |                generic_write_check_limits();
+ 1)   0.752 us    |              }
+ 1)   1.137 us    |            }
+ 1)               |            ext4_map_blocks() {
+ 1)               |              ext4_es_lookup_extent() {
+ 1)   0.321 us    |                _raw_read_lock();
+ 1)   0.933 us    |              }
+ 1)               |              __check_block_validity.constprop.0() {
+ 1)   1.295 us    |                ext4_inode_block_valid();
+ 1)   1.916 us    |              }
+ 1)   3.816 us    |            }
+ 1)               |            file_modified() {
+ 1)   0.305 us    |              file_remove_privs();
+ 1)               |              file_update_time() {
+ 1)   0.440 us    |                current_time();
+ 1)   0.476 us    |                __mnt_want_write_file();
+ 1) + 18.490 us   |                generic_update_time();
+ 1)   0.224 us    |                __mnt_drop_write_file();
+ 1) + 21.440 us   |              }
+ 1) + 22.449 us   |            }
+ 1) + 29.051 us   |          }
+ 1)               |          iomap_dio_rw() {
+ 1)               |            __iomap_dio_rw() {
+ 1)               |              kmem_cache_alloc_trace() {
+ 1)   0.225 us    |                should_failslab();
+ 1)   0.884 us    |              }
+ 1)               |              filemap_write_and_wait_range() {
+ 1)   0.230 us    |                filemap_check_errors();
+ 1)   0.759 us    |              }
+ 1)   0.494 us    |              invalidate_inode_pages2_range();
+ 1)   0.246 us    |              blk_start_plug();
+ 1)               |              iomap_apply() {
+ 1)   1.830 us    |                ext4_iomap_overwrite_begin();
+ 1) + 22.641 us   |                iomap_dio_actor();
+ 1)   0.239 us    |                ext4_iomap_end();
+ 1) + 26.515 us   |              }
+ 1)               |              blk_finish_plug() {
+ 1)   0.251 us    |                flush_plug_callbacks();
+ 1) + 16.815 us   |                blk_mq_flush_plug_list();
+ 1) + 17.997 us   |              }
+ 1)               |              blk_io_schedule() {
+ 1)               |                io_schedule_timeout() {
+ 0) ! 596.777 us  |                } /* io_schedule_timeout */
+ 0)   0.614 us    |                irq_enter_rcu();
+ 0) + 15.096 us   |                __sysvec_irq_work();
+ 0)   0.511 us    |                irq_exit_rcu();
+ 0) ! 616.815 us  |              } /* blk_io_schedule */
+ 0) ! 667.862 us  |            } /* __iomap_dio_rw */
+ 0)               |            iomap_dio_complete() {
+ 0)   0.381 us    |              ext4_dio_write_end_io();
+ 0)   0.283 us    |              wake_up_bit();
+ 0)               |              kfree() {
+ 0)   0.247 us    |                __slab_free();
+ 0)   1.239 us    |              }
+ 0)   3.027 us    |            }
+ 0) ! 671.601 us  |          } /* iomap_dio_rw */
+ 0)   0.183 us    |          up_read();
+ 0) ! 703.376 us  |        } /* ext4_dio_write_iter */
+ 0) ! 703.909 us  |      } /* ext4_file_write_iter */
+ 0) ! 704.567 us  |    } /* new_sync_write */
+ 0)   0.424 us    |    __fsnotify_parent();
+ 0) ! 725.418 us  |  } /* vfs_write */
+```
+
+## 6. 小结
+
+基于bpftrace和funcgraph跟踪存储IO写流程，后续进一步跟踪调用栈的接口进行学习梳理。
+
+## 7. 参考
 
 1、[write文件一个字节后何时发起写磁盘IO？](https://mp.weixin.qq.com/s/qEsK6X_HwthWUbbMGiydBQ)
 
-2、[7.1 文件系统全家桶](https://www.xiaolincoding.com/os/6_file_system/file_system.html)
-
-3、GPT
+2、GPT

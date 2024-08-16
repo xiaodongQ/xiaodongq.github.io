@@ -635,7 +635,7 @@ Tracing "vfs_read" for PID 8397... Ctrl-C to end.
 
 CentOS8（或者4.18内核？）有毒吧！！！每次funcgraph只能看到中断，别的信息都不打出来。坑货。
 
-还不明确什么原因 ~~待定 **TODO**~~ 原因见下面小节。
+还不明确什么原因 ~~待定 **TODO**~~ 见下面尝试定位的小节。
 
 #### 4.4.2. 阿里云ECS实验
 
@@ -741,10 +741,13 @@ trace_options文件：
 当前实验结果只有中断调用栈，搜了下如果不跟踪中断呢：[使用ftrace追踪内核函数调用](https://66ring.github.io/2021/01/30/universe/linux/ftrace_usage/)
 
 * 修改：拷贝一份`funcgraph`脚本修改：`cp funcgraph tmp_funcgraph`，添加：`echo nofuncgraph-irqs > trace_options`
-* 结果：然后就可以追踪打印了。。
-    * 虽然追踪到了堆栈，但多试几次读取发现影响了后面的追踪（**原因TODO**），ftrace需要再单独研究学习下
-    * 对比`trace_options`文件(cat出来)，ecs环境里多了`nopause-on-trace`
-        * 也试了`echo nopause-on-trace > trace_options`，第一次也能追踪到xfs，后面起funcgraph就报错了`echo: write error: Invalid argument`
+* 结果：（靠巧合）追踪到一个相关调用栈了
+
+问题：（**原因待定位 TODO**）
+
+* 虽然靠**巧合**追踪到了堆栈，但多试几次读取发现堆栈又没了
+* 对比`trace_options`文件(cat出来)，ecs环境里多了`nopause-on-trace`
+    * 试了下`echo nopause-on-trace > trace_options`，起funcgraph报错`echo: write error: Invalid argument`
 
 ```sh
 [root@xdlinux ➜ kernel git:(master) ✗ ]$ diff trace_options_ecs trace_options_centos8
