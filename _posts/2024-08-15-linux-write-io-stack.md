@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 学习Linux存储IO栈（三） -- eBPF和ftrace跟踪存储IO写流程
+title: 学习Linux存储IO栈（三） -- eBPF和ftrace跟踪IO写流程
 categories: 存储
 tags: 存储 IO
 ---
@@ -140,6 +140,7 @@ Tracing "vfs_write" for PID 4137... Ctrl-C to end.
  0)   0.657 us    |    }
  0)               |    new_sync_write() {
  0)               |      ext4_file_write_iter() {
+                           # 没指定 O_DIRECT 则走此分支
  0)               |        ext4_buffered_write_iter() {
  0)   0.201 us    |          ext4_fc_start_update();
  0)   0.195 us    |          down_write();
@@ -296,10 +297,10 @@ off_t offset;
 
 void handle_signal(int signum)
 {
-	if (signum != SIGUSR1) {
-		printf("signum: %d not expected!\n", signum);
-		exit(1);
-	}
+    if (signum != SIGUSR1) {
+        printf("signum: %d not expected!\n", signum);
+        exit(1);
+    }
     // 写入数据
     if (write(fd, buffer + offset, BUFFER_SIZE - offset) != (BUFFER_SIZE - offset)) {
         perror("Error writing to file");
@@ -400,6 +401,7 @@ Tracing "vfs_write" for PID 8016... Ctrl-C to end.
                         ...
  1)               |    new_sync_write() {
  1)               |      ext4_file_write_iter() {
+                           # 原始文件指定了 O_DIRECT 则走此分支
  1)               |        ext4_dio_write_iter() {
  1)   0.355 us    |          down_read();
  1)   0.542 us    |          ext4_inode_journal_mode();
@@ -470,11 +472,112 @@ Tracing "vfs_write" for PID 8016... Ctrl-C to end.
  0) ! 725.418 us  |  } /* vfs_write */
 ```
 
-## 5. 小结
+## 5. 代码映证
+
+根据上述堆栈流程，和内核的代码相互映证。
+
+### 5.1. VFS：vfs_write
+
+```cpp
+// linux-5.10.10/fs/read_write.c
+ssize_t vfs_write(struct file *file, const char __user *buf, size_t count, loff_t *pos)
+{
+    ...
+    ret = rw_verify_area(WRITE, file, pos, count);
+    ...
+    file_start_write(file);
+    if (file->f_op->write)
+        ret = file->f_op->write(file, buf, count, pos);
+    else if (file->f_op->write_iter)
+        // 目前看ext4和xfs都走了该分支
+        ret = new_sync_write(file, buf, count, pos);
+    else
+        ret = -EINVAL;
+    ...
+}
+```
+
+### 5.2. VFS：new_sync_write
+
+```cpp
+static ssize_t new_sync_write(struct file *filp, const char __user *buf, size_t len, loff_t *ppos)
+{
+    // struct iovec 是一个在 Unix 和类 Unix 系统（包括 Linux）中广泛使用的结构体，
+        // 用于支持分散读取（scatter read）和聚合写入（gather write）的 I/O 操作。
+        // 这种机制允许程序在一个系统调用中从多个不同的缓冲区读取或写入数据，而不是像普通的 read 或 write 系统调用那样只处理单一的缓冲区。
+        // 使用场景：`readv`、`writev`
+    struct iovec iov = { .iov_base = (void __user *)buf, .iov_len = len };
+    struct kiocb kiocb;
+    // `struct iov_iter` 是 Linux 内核中用于管理 I/O 操作中数据缓冲区的迭代器。
+    struct iov_iter iter;
+    ssize_t ret;
+
+    // `struct kiocb`结构，Kernel I/O Control Block
+        // 用于处理异步 I/O 操作，为每个异步 I/O 请求提供详细的信息和操作控制
+        // kiocb 结构体是 aio（异步 I/O）操作的核心数据结构之一，用于描述一个异步 I/O 请求的所有必要信息。
+    // 此处根据file结构里的信息初始化IO控制块
+    init_sync_kiocb(&kiocb, filp);
+    kiocb.ki_pos = (ppos ? *ppos : 0);
+    iov_iter_init(&iter, WRITE, &iov, 1, len);
+
+    // 里面调用具体文件的.write_iter
+    ret = call_write_iter(filp, &kiocb, &iter);
+    BUG_ON(ret == -EIOCBQUEUED);
+    if (ret > 0 && ppos)
+        *ppos = kiocb.ki_pos;
+    return ret;
+}
+```
+
+```cpp
+// linux-5.10.10/include/linux/fs.h
+static inline ssize_t call_write_iter(struct file *file, struct kiocb *kio,
+                      struct iov_iter *iter)
+{
+    // 调用具体文件系统的 write_iter 注册接口
+    return file->f_op->write_iter(kio, iter);
+}
+```
+
+### 5.3. ext4：ext4_file_write_iter
+
+ext4的注册接口：
+
+```cpp
+// linux-5.10.10/fs/ext4/file.c
+const struct file_operations ext4_file_operations = {
+    .llseek		= ext4_llseek,
+    .read_iter	= ext4_file_read_iter,
+    // vfs写会调用此处注册的接口
+    .write_iter	= ext4_file_write_iter,
+    ...
+};
+```
+
+`ext4_file_write_iter`实现如下，可以跟上述分别不带和带`O_DIRECT`的两个堆栈对应起来：
+
+```cpp
+// ext4注册给 .write_iter 的实现接口
+static ssize_t
+ext4_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
+{
+    // 从 struct file 里获取 inode
+    struct inode *inode = file_inode(iocb->ki_filp);
+    ...
+    // vfs层根据file初始化了iocb，file若带了O_DIRECT则进此处语句块
+    if (iocb->ki_flags & IOCB_DIRECT)
+        return ext4_dio_write_iter(iocb, from);
+    else
+        // file未指定O_DIRECT，则走buffer写接口
+        return ext4_buffered_write_iter(iocb, from);
+}
+```
+
+## 6. 小结
 
 基于`bpftrace`和`funcgraph`跟踪存储IO写流程，后续基于调用栈，结合代码进一步跟踪学习和梳理。
 
-## 6. 参考
+## 7. 参考
 
 1、[write文件一个字节后何时发起写磁盘IO？](https://mp.weixin.qq.com/s/qEsK6X_HwthWUbbMGiydBQ)
 
