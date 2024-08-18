@@ -30,10 +30,20 @@ tags: 存储 MySQL
 
 ## 2. MySQL介绍和整体架构
 
-基本介绍：
+一些基本介绍：
+
+* 基于C和C++开发，用`CMake`来管理构建
+* 使用各种不同的编译器进行测试
+* 使用 `Purify` (一个商业内存泄漏检测器)以及`Valgrind`进行测试
+* 使用具有独立模块的多层服务设计
+* 
+
+参考：
 
 * [what-is-mysql](https://dev.mysql.com/doc/refman/5.7/en/what-is-mysql.html)
 * [The Main Features of MySQL](https://dev.mysql.com/doc/refman/5.7/en/features.html)
+
+
 
 有人纠结读音，感觉没必要，语境对齐即可：
 
