@@ -1,8 +1,8 @@
 ---
 layout: post
 title: MIT6.824学习笔记（一） -- 课程介绍 及 MapReduce
-categories: 名校课程
-tags: 分布式 MIT6.824
+categories: 6.824
+tags: 分布式 MIT6.824 MapReduce
 ---
 
 * content
