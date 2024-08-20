@@ -45,16 +45,38 @@ MIT 6.824: Distributed System，这门课每节课都会精读一篇分布式系
 
 ![6-824_6-5840_schedule-2024](/images/6-824_6-5840_schedule-2024.png)
 
-课程建议课前都先看下对应的论文。
+### 2.1. 课程结构
+
+这门课有几个重要组成部分：
+
+* 课堂授课
+    * 授课内容会围绕分布式系统的两个方面：`性能`和`容错`
+    * 许多课程我们将会以`案例分析`为主要形式
+* 几乎每节课都有论文阅读
+    * 这里的论文每周需要读一篇，论文主要是研究论文（有一些最近发布的论文），也有一些经典论文，有的是工业界关于现实问题的解决方案
+    * 希望通过这些论文可以让你们弄清楚，什么是`基本的问题`，研究者们`有哪些想法`，这些想法可能会，也可能不会对解决分布式系统的问题有用
+    * 有时会讨论这些论文中的一些`实施细节`、我们同样会花一些时间去看人们`对系统的评估`
+* 两次考试
+    * 一次是随堂期中，大概在春假前最后一节课；并且会在学期期末周迎来期末考试。
+* 编程实验
+    * 有几节课会介绍一些关于编程实验的内容。
+    * 有`四次`编程实验：`简单的MapReduce实验`、`实现Raft算法`、`可容错的KV服务`、`分片式KV服务`
+* 可选的项目（与Lab4二选一）
+
+关于论文：
+
+> 希望你们在每次讲课前，都可以完成相关论文的阅读。如果没有`提前阅读`，光是课程本身的内容或许没有那么有意义，因为我们没有足够的时间来解释论文中的所有内容，同时来`反思`论文中一些有意思的地方。
+
+> 我也希望快速高效的读论文会是这堂课的一个收获，比如跳过一些并不太重要的部分，而**关注作者重要的想法**。
 
 ## 3. 学习方式说明
 
 以`Lecture 1 - Introduction`为例，说明下暂时的学习方式，后面可参考该流程进行：
 
-* 1、先学习一遍B站视频：[2020 MIT 6.824 分布式系统：Lecture 1 -Introduction](https://www.bilibili.com/video/BV1R7411t71W/?spm_id_from=333.999.0.0&vd_source=477b80445c7c1a81617bbea3bdf9a3c1)
-* 2、看课程对应的论文：[Google-MapReduce-cn.pdf](https://github.com/xiaodongQ/prog-playground/blob/main/classic_papers/MapReduce/Google-MapReduce-cn.pdf)
+* 1、看课程对应的论文：[Google-MapReduce-cn.pdf](https://github.com/xiaodongQ/prog-playground/blob/main/classic_papers/MapReduce/Google-MapReduce-cn.pdf)
+* 2、先学习一遍B站视频：[2020 MIT 6.824 分布式系统：Lecture 1 -Introduction](https://www.bilibili.com/video/BV1R7411t71W/?spm_id_from=333.999.0.0&vd_source=477b80445c7c1a81617bbea3bdf9a3c1)
     * 可参考下别人的论文笔记和想法：[MapReduce论文阅读](https://tanxinyu.work/mapreduce-thesis/)
-* 4、跟着课程的中文翻译再学习一下：[Lecture 01 - Introduction](https://mit-public-courses-cn-translatio.gitbook.io/mit6-824/lecture-01-introduction)
+* 3、跟着课程的中文翻译再学习一下：[Lecture 01 - Introduction](https://mit-public-courses-cn-translatio.gitbook.io/mit6-824/lecture-01-introduction)
     * 可参考下别人的学习笔记：[MIT 6.824 2020 视频笔记一：绪论](https://www.qtmuniao.com/2020/02/29/6-824-video-notes-1/)
 
 碰到问题再多回头找找视频、论文、笔记中的对应内容，带着问题学习，动态调整。
@@ -156,11 +178,56 @@ GFS 把每个文件按 64MB 一个 Block 分隔，每个 Block 保存在多台�
 
 ## 5. 课程笔记
 
+### 5.1. 课程总体预览
 
+课程主要介绍几种基础架构的类型：主要是`存储`，`通信（网络）`和`计算`。
+
+目标是**抽象**这些基础架构，通过设计一些简单的接口，将`分布式特性`隐藏在系统内。从应用程序的角度看，整个系统是一个`非分布式`的系统，但是实际上又是一个有极高的`性能`和`容错性`的分布式系统。
+
+为了实现这个目标，用到的一些构建分布式系统的工具和手段：
+
+* `RPC（Remote Procedure Call）`
+* 线程
+* 并发控制（比如 锁）
+
+分布式系统需要的特性：
+
+* 可扩展性（Scalability），希望增加计算机就能实现性能整体提升
+    * 我们希望可以通过增加机器的方式来实现扩展，但是现实中这很难实现，需要一些架构设计来将这个可扩展性无限推进下去。
+* 可用性（Availability），在特定的错误类型下，系统仍然能够正常运行（`容错`）
+    * 另一种容错特性是 自我可恢复性（recoverability），修复后系统可正常运行。是一个比可用性更弱的需求，但也很重要。
+    * 为了实现这些特性，有很多工具。其中最重要的有两个：`非易失存储（non-volatile storage）` 和 `复制（replication）`
+* 一致性（Consistency），多个副本间的数据一致性。分为 `强一致（Strong Consistency）` 和 `弱一致`
+    * 人们常常会使用弱一致系统，弱一致对于应用程序来说很有用，并且它可以用来获取高的性能。
+
+### 5.2. MapReduce
+
+基本是讲了上述论文内容，讲述得更为形象一些，具体细节还是需要进到论文里看下。
+
+Google碰到的问题，以及为了解决问题设计了`MapReduce`分布式框架。一个具象的示例：为了给所有网页（当时`数十TB`级别）建立索引，需要整体做排序，希望将运算任务分布到`几千台机器`运行，以提升运算效率。
+
+工程师只需要实现应用程序的核心，就能将应用程序运行在数千台计算机上，而**不用考虑**如何将运算工作分发到数千台计算机，如何组织这些计算机，如何移动数据，如何处理故障等等这些细节。所以，当时Google需要一种框架，使得**普通工程师**也可以很容易的完成并运行大规模的分布式运算。这就是`MapReduce`出现的背景。
+
+`MapReduce`的思想是，应用程序设计人员和分布式运算的使用者，只需要写简单的`Map`函数和`Reduce`函数，而不需要知道任何有关分布式的事情，MapReduce框架会处理剩下的事情。
+
+术语：
+
+* Job。整个MapReduce计算称为Job
+* Task。每一次MapReduce调用称为Task
+
+### 5.3. 问答
+
+问答内容也很有价值，可参考课程翻译这里的问答记录：[课堂：MapReduce的基本框架相关问题和解答](https://mit-public-courses-cn-translatio.gitbook.io/mit6-824/lecture-01-introduction/1.8-mapreduce-han-shu)。
+
+这里放一个教授关于之前和现在（2020）数据读取的对比解答：
+
+`网络通信`（通过网络读取拷贝数据副本）是`2004年`限制MapReduce的瓶颈，受限于之前的网络架构；而在`2020年`现代数据中心中，root交换机比过去快了很多，而且会有很多个root交换机，每个机架交换机都与每个root交换机相连，网络流量在多个root交换机之间做负载分担。所以，现代数据中心网络的吞吐大多了。
+
+> 我认为Google几年前就不再使用MapReduce了，不过在那之前，现代的MapReduce已经不再尝试在GFS数据存储的服务器上运行Map函数了，它乐意从任何地方加载数据，因为网络已经足够快了。
 
 ## 6. 小结
 
-启动了6.824课程学习，进行了一部分资料搜集。学习了第一堂课，以及涉及到的MapReduce论文。
+启动了6.824课程学习，进行了一部分资料搜集。学习了第一堂课，以及涉及到的MapReduce论文。看经典论文跟看优秀的技术文章差不多，有不少正反馈。
 
 目前主要还是学习并作部分记录输出，不求完整。后续在工作、学习时，碰到对应问题动态补充文章内容。
 
@@ -170,7 +237,7 @@ GFS 把每个文件按 64MB 一个 Block 分隔，每个 Block 保存在多台�
 
 2、[MIT6.824中文翻译](https://mit-public-courses-cn-translatio.gitbook.io/mit6-824)
 
-3、[2020 MIT 6.824 分布式系统](https://www.bilibili.com/video/BV1R7411t71W/?spm_id_from=333.999.0.0&vd_source=477b80445c7c1a81617bbea3bdf9a3c1)
+3、[视频：Lecture 1 - Introduction](https://www.bilibili.com/video/BV1R7411t71W/?spm_id_from=333.999.0.0&vd_source=477b80445c7c1a81617bbea3bdf9a3c1)
 
 4、[MapReduce: Simplified Data Processing on Large Clusters](https://pdos.csail.mit.edu/6.824/papers/mapreduce.pdf)
 
