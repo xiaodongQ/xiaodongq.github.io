@@ -74,6 +74,7 @@ MIT 6.824: Distributed System，这门课每节课都会精读一篇分布式系
 以`Lecture 1 - Introduction`为例，说明下暂时的学习方式，后面可参考该流程进行：
 
 * 1、看课程对应的论文：[Google-MapReduce-cn.pdf](https://github.com/xiaodongQ/prog-playground/blob/main/classic_papers/MapReduce/Google-MapReduce-cn.pdf)
+* 8.26更新：发现上课前先看下英文讲义效果还不错，[lecture01讲义](http://nil.csail.mit.edu/6.824/2020/notes/l01.txt)
 * 2、先学习一遍B站视频：[2020 MIT 6.824 分布式系统：Lecture 1 -Introduction](https://www.bilibili.com/video/BV1R7411t71W/?spm_id_from=333.999.0.0&vd_source=477b80445c7c1a81617bbea3bdf9a3c1)
     * 可参考下别人的论文笔记和想法：[MapReduce论文阅读](https://tanxinyu.work/mapreduce-thesis/)
 * 3、跟着课程的中文翻译再学习一下：[Lecture 01 - Introduction](https://mit-public-courses-cn-translatio.gitbook.io/mit6-824/lecture-01-introduction)
