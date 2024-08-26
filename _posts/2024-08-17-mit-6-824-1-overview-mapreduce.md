@@ -29,7 +29,7 @@ MIT6.824（2020）学习笔记，此为第一篇。
     * “随着欧美众多名校将质量极高的计算机课程全部开源，自学 CS 成了一件可操作性极强的事情。毫不夸张地说，只要你有毅力和兴趣，自学的成果完全不亚于你在国内任何一所大学受到的本科 CS 教育（当然，这里单指计算机专业领域，大学带给你的显然不止是专业知识）。”
 * [MIT6.824课程视频中文翻译](https://mit-public-courses-cn-translatio.gitbook.io/mit6-824)
 * [MIT 6.824 2020 视频笔记](https://www.qtmuniao.com/2020/02/29/6-824-video-notes-1/)
-* [6.824 分布式系统课程学习总结_](https://tanxinyu.work/6-824/)
+* [6.824 分布式系统课程学习总结](https://tanxinyu.work/6-824/)
 
 这里还是先跟着2020版学习，此为第一篇。
 
@@ -236,12 +236,16 @@ Google碰到的问题，以及为了解决问题设计了`MapReduce`分布式框
 
 1、[CS自学指南-MIT6.824: Distributed System](https://csdiy.wiki/%E5%B9%B6%E8%A1%8C%E4%B8%8E%E5%88%86%E5%B8%83%E5%BC%8F%E7%B3%BB%E7%BB%9F/MIT6.824/)
 
-2、[MIT6.824中文翻译](https://mit-public-courses-cn-translatio.gitbook.io/mit6-824)
+2、[lecture01讲义](http://nil.csail.mit.edu/6.824/2020/notes/l01.txt)
 
 3、[视频：Lecture 1 - Introduction](https://www.bilibili.com/video/BV1R7411t71W/?spm_id_from=333.999.0.0&vd_source=477b80445c7c1a81617bbea3bdf9a3c1)
 
-4、[MapReduce: Simplified Data Processing on Large Clusters](https://pdos.csail.mit.edu/6.824/papers/mapreduce.pdf)
+4、[MIT6.824中文翻译](https://mit-public-courses-cn-translatio.gitbook.io/mit6-824)
 
-5、[MapReduce论文阅读](https://tanxinyu.work/mapreduce-thesis/)
+5、[MapReduce: Simplified Data Processing on Large Clusters](https://pdos.csail.mit.edu/6.824/papers/mapreduce.pdf)
 
-6、[MIT 6.824 2020 视频笔记一：绪论](https://www.qtmuniao.com/2020/02/29/6-824-video-notes-1/)
+6、[MapReduce论文阅读](https://tanxinyu.work/mapreduce-thesis/)
+
+7、[MIT 6.824 2020 视频笔记一：绪论](https://www.qtmuniao.com/2020/02/29/6-824-video-notes-1/)
+
+8、 [6.824 分布式系统课程学习总结](https://tanxinyu.work/6-824/)
