@@ -45,6 +45,8 @@ MIT 6.824: Distributed System，这门课每节课都会精读一篇分布式系
 
 ![6-824_6-5840_schedule-2024](/images/6-824_6-5840_schedule-2024.png)
 
+2020版的课表如下：[6.824 Schedule: Spring 2020](http://nil.csail.mit.edu/6.824/2020/schedule.html)，可以在其中找到每堂课程的讲义。
+
 ### 2.1. 课程结构
 
 这门课有几个重要组成部分：
@@ -74,7 +76,6 @@ MIT 6.824: Distributed System，这门课每节课都会精读一篇分布式系
 以`Lecture 1 - Introduction`为例，说明下暂时的学习方式，后面可参考该流程进行：
 
 * 1、看课程对应的论文：[Google-MapReduce-cn.pdf](https://github.com/xiaodongQ/prog-playground/blob/main/classic_papers/MapReduce/Google-MapReduce-cn.pdf)
-* 8.26更新：发现上课前先看下英文讲义效果还不错，[lecture01讲义](http://nil.csail.mit.edu/6.824/2020/notes/l01.txt)
 * 2、先学习一遍B站视频：[2020 MIT 6.824 分布式系统：Lecture 1 -Introduction](https://www.bilibili.com/video/BV1R7411t71W/?spm_id_from=333.999.0.0&vd_source=477b80445c7c1a81617bbea3bdf9a3c1)
     * 可参考下别人的论文笔记和想法：[MapReduce论文阅读](https://tanxinyu.work/mapreduce-thesis/)
 * 3、跟着课程的中文翻译再学习一下：[Lecture 01 - Introduction](https://mit-public-courses-cn-translatio.gitbook.io/mit6-824/lecture-01-introduction)
@@ -82,9 +83,13 @@ MIT 6.824: Distributed System，这门课每节课都会精读一篇分布式系
 
 碰到问题再多回头找找视频、论文、笔记中的对应内容，带着问题学习，动态调整。
 
+（8.26更新：发现上课前先看下英文讲义效果还不错，[lecture01讲义](http://nil.csail.mit.edu/6.824/2020/notes/l01.txt)）
+
+（8.27更新：不追求完美，先过一遍、小步快跑，要不时间线会拉得很长）
+
 ## 4. MapReduce 论文（Lecture 1）
 
-为了处理大量的原始数据，比如文档抓取、 Web 请求日志等；也为了计算处理各种类型的衍生数据，比如倒排索引、Web 文档的图结构的各种表示形式、每台主机上网络爬虫抓取的页面数量的汇总、每天被请求的最多的查询的集合等等，Google公司于2004年发表了论文：[MapReduce: Simplified Data Processing on Large Clusters](https://pdos.csail.mit.edu/6.824/papers/mapreduce.pdf)。
+为了处理大量的原始数据，比如文档抓取、 Web 请求日志等；也为了计算处理各种类型的衍生数据，比如倒排索引、Web 文档的图结构的各种表示形式、每台主机上网络爬虫抓取的页面数量的汇总、每天被请求的最多的查询的集合等等，Google公司于**2004年**发表了论文：[MapReduce: Simplified Data Processing on Large Clusters](https://pdos.csail.mit.edu/6.824/papers/mapreduce.pdf)。
 
 另外找了篇中文版作为参考：[Google-MapReduce-cn.pdf](https://github.com/xiaodongQ/prog-playground/blob/main/classic_papers/MapReduce/Google-MapReduce-cn.pdf)
 
@@ -236,16 +241,18 @@ Google碰到的问题，以及为了解决问题设计了`MapReduce`分布式框
 
 1、[CS自学指南-MIT6.824: Distributed System](https://csdiy.wiki/%E5%B9%B6%E8%A1%8C%E4%B8%8E%E5%88%86%E5%B8%83%E5%BC%8F%E7%B3%BB%E7%BB%9F/MIT6.824/)
 
-2、[lecture01讲义](http://nil.csail.mit.edu/6.824/2020/notes/l01.txt)
+2、[6.824 Schedule: Spring 2020](http://nil.csail.mit.edu/6.824/2020/schedule.html)
 
-3、[视频：Lecture 1 - Introduction](https://www.bilibili.com/video/BV1R7411t71W/?spm_id_from=333.999.0.0&vd_source=477b80445c7c1a81617bbea3bdf9a3c1)
+3、[lecture01讲义](http://nil.csail.mit.edu/6.824/2020/notes/l01.txt)
 
-4、[MIT6.824中文翻译](https://mit-public-courses-cn-translatio.gitbook.io/mit6-824)
+4、[视频：Lecture 1 - Introduction](https://www.bilibili.com/video/BV1R7411t71W/?spm_id_from=333.999.0.0&vd_source=477b80445c7c1a81617bbea3bdf9a3c1)
 
-5、[MapReduce: Simplified Data Processing on Large Clusters](https://pdos.csail.mit.edu/6.824/papers/mapreduce.pdf)
+5、[MIT6.824中文翻译](https://mit-public-courses-cn-translatio.gitbook.io/mit6-824)
 
-6、[MapReduce论文阅读](https://tanxinyu.work/mapreduce-thesis/)
+6、[MapReduce: Simplified Data Processing on Large Clusters](https://pdos.csail.mit.edu/6.824/papers/mapreduce.pdf)
 
-7、[MIT 6.824 2020 视频笔记一：绪论](https://www.qtmuniao.com/2020/02/29/6-824-video-notes-1/)
+7、[MapReduce论文阅读](https://tanxinyu.work/mapreduce-thesis/)
 
-8、 [6.824 分布式系统课程学习总结](https://tanxinyu.work/6-824/)
+8、[MIT 6.824 2020 视频笔记一：绪论](https://www.qtmuniao.com/2020/02/29/6-824-video-notes-1/)
+
+9、 [6.824 分布式系统课程学习总结](https://tanxinyu.work/6-824/)
