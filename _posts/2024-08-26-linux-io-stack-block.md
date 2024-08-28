@@ -16,27 +16,223 @@ tags: 存储 IO
 
 [学习Linux存储IO栈（二） -- Linux内核存储栈流程和接口](https://xiaodongq.github.io/2024/08/13/linux-kernel-fs/) 中简单带过了一下通用块层，并在 [学习Linux存储IO栈（三） -- eBPF和ftrace跟踪IO写流程](https://xiaodongq.github.io/2024/08/15/linux-write-io-stack) 中追踪IO写流程时追踪到对应的io调度处理相关堆栈，本篇来具体看下通用块层的对应流程。
 
-另外，想起来之前看过的极客时间课程，回头看了下存储模块相关的文章：[24 | 基础篇：Linux 磁盘I/O是怎么工作的（上）](https://time.geekbang.org/column/article/77010)，发现作为概述和索引用来查漏补缺挺好的。之前更多的是对CPU/内存/存储/网络等对应有哪些观测工具和指标有个总览的了解，浮于“知道”（且容易忘）的层面，深入去看则发现有很多东西需要自己另外花心思去啃。这时再看文章有了不同的角度，收获到一些新的东西。
+另外，想起来之前看过的极客时间课程，回头看了下存储模块相关的系列文章：[基础篇：Linux 磁盘I/O是怎么工作的（上）](https://time.geekbang.org/column/article/77010)，发现作为概述和索引用来查漏补缺挺好的。之前更多的是对CPU/内存/存储/网络等对应有哪些观测工具和指标有个总览的了解，浮于“知道”（且容易忘）的层面，深入去看则发现有很多东西需要自己另外花心思去啃。这时再看文章有了不同的角度，收获到一些新的东西。
 
-前段时间看别人说《代码整洁之道》常看常有新收获，还有[木鸟杂记](https://www.qtmuniao.com/)大佬对DDIA的重读分享([《DDIA 逐章精读》](https://ddia.qtmuniao.com/#/preface))，都是人在不同认知阶段看到不同的东西。最近在看CSAPP，回想~~早年~~大学时上课，大多都是浮于表面的被动接收，现在趁机会夯实基础，倒可以多动手、多嚼一嚼经典著作。
+前段时间看别人说《代码整洁之道》常看常有新收获，还有[木鸟杂记](https://www.qtmuniao.com/)大佬对DDIA的重读分享([《DDIA 逐章精读》](https://ddia.qtmuniao.com/#/preface))，都提及在不同认知阶段看到不同的东西。最近在看CSAPP，回想~~早年~~大学时上课，大多都是浮于表面的被动接收，现在趁机会夯实基础，倒可以多动手、多嚼一嚼经典著作。
 
-## 再看下IO栈全貌图
+## 2. 再看下IO栈全貌图
 
-存储IO栈出现很多次了，贯穿整个系列学习：
+存储IO栈出现很多次了，贯穿整个系列学习。
+
+此处还是放这张基于4.10内核的图，更高内核版本也可从出处中获取。
 
 ![linux存储栈_4.10内核](/images/linux-storage-stack-diagram_v4.10.svg)  
 [出处](https://www.thomas-krenn.com/en/wiki/Linux_Storage_Stack_Diagram)
 
-此处还是放这张基于4.10内核，更高内核版本也可从上面的出处中获取。
+从图中可看到，BIO（Block I/O）有3个来源：`Page Cache`、`Direct I/O`、还有通过`网络`过来的block io，如`iscsi`。bio后面到了`通用块层（Block Layer）`。
 
-和`VFS`类似，为了减小不同`块设备`的差异带来的影响，Linux用一个统一的`通用块层`来管理各种块设备。
+## 3. 通用块层的作用
+
+和`VFS`类似，为了减小不同`块设备`的差异带来的影响，Linux用一个统一的`通用块层`来管理各种不同的块设备。通用块层主要有两个作用：
+
+* 第一个功能和VFS类似
+    * 向上，为文件系统和应用程序，提供访问块设备的标准接口；
+    * 向下，把各种异构的磁盘设备抽象为统一的块设备，并提供统一框架来管理这些设备的驱动程序。
+* 第二个功能，通用块层还会给文件系统和应用程序发来的 I/O 请求排队（即`I/O调度`），并通过重新排序、请求合并等方式，提高磁盘读写的效率。
+    * Linux 内核支持的几种 I/O 调度算法，分别是 `NONE`、`NOOP`、`CFQ` 以及 `DeadLine`。还有其他调度器，此处暂不展开，如mq-deadline、bfq
+    * 1、`NONE`：更确切来说，并不能算 I/O 调度算法，因为它完全不使用任何 I/O 调度器，对文件系统和应用程序的 I/O 其实**不做任何处理**，常用在`虚拟机`中（此时磁盘 I/O 调度完全由物理机负责）。
+    * 2、`NOOP`（No-Operation）：是最简单的一种 I/O 调度算法。它实际上是一个`先入先出的队列`，只做一些最基本的请求合并，常用于 SSD 磁盘。
+    * 3、`CFQ`（Completely Fair Queueing），也被称为`完全公平调度器`，是现在很多发行版的**默认** I/O 调度器，它为每个进程维护了一个 I/O 调度队列，并按照`时间片`来均匀分布每个进程的 I/O 请求。
+    * 4、`DeadLine`调度算法：分别为读、写请求创建了不同的 I/O 队列，可以提高机械磁盘的吞吐量，并确保达到最终期限（deadline）的请求被优先处理。DeadLine 调度算法，多用在 I/O 压力比较重的场景，比如`数据库`等。
+
+## 4. 查看系统block相关信息
+
+### 4.1. sysfs
+
+sysfs 是 Linux 内核中一种特殊的文件系统，它主要用于在内核和用户空间之间传递设备信息和状态。sysfs 提供了一个统一的接口，使得用户空间程序可以访问和控制内核中的各种设备和子系统，而无需直接与硬件交互或深入理解底层的设备驱动程序。
+
+sysfs 的根目录是 /sys，从这里开始，可以浏览整个设备树，访问各种设备和子系统的相关信息。例如，/sys/class 目录包含了按类别分类的所有设备，如 `/sys/class/block` 包含所有块设备的信息，/sys/class/net 包含所有网络设备的信息。
+
+#### 4.1.1. /sys/block
+
+`/sys/class/block` 和 `/sys/block`里都能看到block设备相关信息，这里先基于`/sys/block`看下。
+
+`/sys/block`目录是Linux内核用于存储和提供块设备相关信息的虚拟文件系统的一部分。在这个目录下，可以找到系统中所有块设备的子目录，每个子目录代表一个具体的块设备，如硬盘、SSD、USB 存储设备等。块设备是指那些可以进行随机访问的设备，数据可以按块为单位进行读写操作。
+
+```sh
+[root@local ~]# ll /sys/block/sdg/ 
+total 0
+-r--r--r-- 1 root root 4096 Aug 28 16:43 alignment_offset
+lrwxrwxrwx 1 root root    0 Aug 28 16:33 bdi -> ../../../../../../../../virtual/bdi/8:96
+-r--r--r-- 1 root root 4096 Aug 28 16:43 capability
+-r--r--r-- 1 root root 4096 Aug 28 16:33 dev
+# 包含设备的硬件信息，如制造商、型号、序列号等
+lrwxrwxrwx 1 root root    0 Aug 28 16:22 device -> ../../../3:0:0:0
+-r--r--r-- 1 root root 4096 Aug 28 16:43 discard_alignment
+-r--r--r-- 1 root root 4096 Aug 28 16:43 events
+-r--r--r-- 1 root root 4096 Aug 28 16:43 events_async
+-rw-r--r-- 1 root root 4096 Aug 28 16:43 events_poll_msecs
+-r--r--r-- 1 root root 4096 Aug 28 16:43 ext_range
+-r--r--r-- 1 root root 4096 Aug 28 16:33 hidden
+drwxr-xr-x 2 root root    0 Aug 28 16:21 holders
+-r--r--r-- 1 root root 4096 Aug 28 16:43 inflight
+drwxr-xr-x 3 root root    0 Aug 28 16:33 mq
+drwxr-xr-x 2 root root    0 Aug 28 16:33 power
+# 包含设备队列的信息，如读写策略、I/O 调度算法、设备是否为旋转式磁盘（rotational 文件）等
+drwxr-xr-x 3 root root    0 Aug 28 16:21 queue
+-r--r--r-- 1 root root 4096 Aug 28 16:43 range
+# 指示设备是否可移动（例如，USB 设备）
+-r--r--r-- 1 root root 4096 Aug 28 16:33 removable
+-r--r--r-- 1 root root 4096 Aug 28 16:33 ro
+# 块设备可能有多个分区，每个分区子目录也包含类似的信息，如分区的大小、类型等
+# 分区里有 start：显示分区起始位置的扇区号
+drwxr-xr-x 5 root root    0 Aug 28 16:33 sdg1
+drwxr-xr-x 5 root root    0 Aug 28 16:33 sdg2
+drwxr-xr-x 5 root root    0 Aug 28 16:33 sdg3
+# 设备或分区的总扇区个数
+-r--r--r-- 1 root root 4096 Aug 28 16:21 size
+drwxr-xr-x 2 root root    0 Aug 28 16:33 slaves
+# 显示设备的统计信息，如读写操作次数、读写字节数、等待时间等
+-r--r--r-- 1 root root 4096 Aug 28 16:21 stat
+lrwxrwxrwx 1 root root    0 Aug 28 16:33 subsystem -> ../../../../../../../../../class/block
+drwxr-xr-x 2 root root    0 Aug 28 16:33 trace
+# 触发 udev 事件，通知系统设备状态的改变
+-rw-r--r-- 1 root root 4096 Aug 28 16:43 uevent
+```
+
+看下uevent内容：
+
+```sh
+[root@local ~]# cat  /sys/block/sdg/uevent
+MAJOR=8
+MINOR=96
+DEVNAME=sdg
+DEVTYPE=disk
+```
+
+#### 4.1.2. 主、次设备号
+
+在 Linux 中，每个设备都被分配了一个`唯一的设备号`，这个设备号由`主设备号（MAJOR）`和`次设备号（MINOR）`组成。设备号是操作系统内核用于识别和管理硬件设备的一种方式。块设备，如硬盘、SSD 和 USB 存储设备，也不例外。
+
+* 主设备号（MAJOR）：标识设备驱动程序。不同的设备类型通常对应不同的主设备号。
+    * 例如，8 通常代表 IDE 硬盘，202 代表 SCSI 设备，65 代表 SD 和 MMC 卡等。
+    * 主设备号帮助内核确定应该使用哪个驱动程序来与设备通信。
+* 次设备号（MINOR）：在同一类设备中区分不同的物理设备或设备的不同部分（如分区）。
+    * 例如，在同一个 SCSI 设备中，不同的次设备号可以代表不同的逻辑单元（LUNs）或者在同一个硬盘上，不同的次设备号代表不同的分区。
+
+在`内核层面`，设备号用于查找和引用设备驱动程序，以及管理设备的 I/O 请求。在`用户空间`，设备号用于创建和管理设备节点，以及在编程中打开和操作设备文件。
+
+在 Linux 中，`设备文件`（如 /dev/sda）实际上是一个特殊类型的文件，称为`设备节点`。当你在 /dev 目录下看到设备文件时，它们背后都有一个与之关联的设备号。
+
+例如：假设有一个名为 sda 的硬盘，它是一个 SCSI 类型的设备，主设备号为 8（实际上，现代 Linux 中 SCSI 硬盘的主设备号可能是 202 或其他）。假设 sda 的次设备号为 0，那么这个设备的完整设备号就是 (8, 0) 或 (202, 0)。对于 sda 上的第一个分区 sda1，它的次设备号可能是 1，因此设备号为 (8, 1) 或 (202, 1)。
+
+stat可以查看设备文件的主设备号和次设备号：（`Device type: 8,16`）
+
+```sh
+[root@local ~]# stat /dev/sdb
+  File: /dev/sdb
+  Size: 0               Blocks: 0          IO Block: 4096   block special file
+Device: 0,5     Inode: 161         Links: 1     Device type: 8,16
+Access: (0660/brw-rw----)  Uid: (    0/    root)   Gid: (    6/    disk)
+Access: 2024-08-28 16:35:24.375317114 +0800
+Modify: 2024-08-26 19:42:03.769065231 +0800
+Change: 2024-08-26 19:42:03.769065231 +0800
+ Birth: -
+```
+
+sys文件系统也可查看对应的设备号：
+
+```sh
+[root@local ~]# ll /sys/class/block/sdb/
+-r--r--r-- 1 root root 4096 Aug 28 17:08 alignment_offset
+lrwxrwxrwx 1 root root    0 Aug 28 17:08 bdi -> ../../../../../../../../../../../../../../virtual/bdi/8:16
+-r--r--r-- 1 root root 4096 Aug 28 17:08 capability
+...
+```
+
+### 4.2. 设备背后的各种文件
+
+上面提到的：当你在 /dev 目录下看到设备文件时，它们背后都有一个与之关联的设备号。
+
+```sh
+[root@local ~]# ll /dev/
+drwxr-xr-x 2 root root         580 Aug 28 10:04 block
+drwxr-xr-x 3 root root          60 Aug 27 03:41 bus
+...
+drwxr-xr-x 8 root root         180 Aug 27 03:41 cpu
+brw-rw---- 1 root disk      8,   0 Aug 28 10:03 sda
+brw-rw---- 1 root disk      8,  16 Aug 26 19:42 sdb
+brw-rw---- 1 root disk      8,  48 Aug 26 19:42 sdd
+...
+```
+
+/dev/里的块设备，软链接到外层：
+
+```sh
+[root@local ~]# ll /dev/block/
+lrwxrwxrwx 1 root root 7 Aug 26 19:42 253:0 -> ../dm-0
+...
+lrwxrwxrwx 1 root root 8 Aug 26 19:42 7:0 -> ../loop0
+lrwxrwxrwx 1 root root 8 Aug 26 19:42 7:1 -> ../loop1
+...
+lrwxrwxrwx 1 root root 6 Aug 28 10:03 8:0 -> ../sda
+lrwxrwxrwx 1 root root 6 Aug 26 19:42 8:112 -> ../sdh
+lrwxrwxrwx 1 root root 7 Aug 26 19:42 8:113 -> ../sdh1
+lrwxrwxrwx 1 root root 6 Aug 28 10:03 8:128 -> ../sdi
+...
+```
+
+硬盘设备：
+
+```sh
+[root@local ~]# ll /dev/disk/
+total 0
+drwxr-xr-x 2 root root 800 Aug 28 10:04 by-id
+drwxr-xr-x 2 root root  60 Aug 26 19:42 by-partlabel
+drwxr-xr-x 2 root root 120 Aug 26 19:42 by-partuuid
+drwxr-xr-x 2 root root 440 Aug 28 10:04 by-path
+drwxr-xr-x 2 root root 300 Aug 28 10:04 by-uuid
+```
+
+各种维度的硬盘设备分类统计，都软链接到/dev/对应的设备：
+
+```sh
+[root@local ~]# ll /dev/disk/by-uuid/
+total 0
+lrwxrwxrwx 1 root root  9 Aug 26 19:42 2ed88d87-0c31-4437-a477-908f06f29e14 -> ../../sdb
+lrwxrwxrwx 1 root root  9 Aug 26 19:42 496980bb-989c-42ff-bd35-fe6136c5d353 -> ../../sde
+lrwxrwxrwx 1 root root  9 Aug 26 19:42 4cf1a2e9-13ce-484e-a6a2-2c4bbe056103 -> ../../sdf
 
 
+[root@local ~]# ll /dev/disk/by-path/
+total 0
+lrwxrwxrwx 1 root root  9 Aug 26 19:42 pci-0000:00:17.0-ata-3 -> ../../sdg
+lrwxrwxrwx 1 root root  9 Aug 26 19:42 pci-0000:00:17.0-ata-3.0 -> ../../sdg
+lrwxrwxrwx 1 root root 10 Aug 26 19:42 pci-0000:00:17.0-ata-3.0-part1 -> ../../sdg1
 
-## 6. 小结
+[root@local ~]# ll /dev/disk/by-partuuid/
+total 0
+lrwxrwxrwx 1 root root 10 Aug 26 19:42 01854901-bbc9-4532-9362-2c87f900e290 -> ../../sdg1
+lrwxrwxrwx 1 root root 10 Aug 26 19:42 25921828-a308-48d6-b84b-d63fad62f0e5 -> ../../sdh1
+
+[root@local ~]# ll /dev/disk/by-id
+total 0
+lrwxrwxrwx 1 root root  9 Aug 26 19:42 ata-ST1000NX0313_W472MP7P -> ../../sdg
+lrwxrwxrwx 1 root root 10 Aug 26 19:42 ata-ST1000NX0313_W472MP7P-part1 -> ../../sdg1
+lrwxrwxrwx 1 root root 10 Aug 26 19:42 ata-ST1000NX0313_W472MP7P-part2 -> ../../sdg2
+lrwxrwxrwx 1 root root 10 Aug 26 19:42 ata-ST1000NX0313_W472MP7P-part3 -> ../../sdg3
+lrwxrwxrwx 1 root root  9 Aug 28 10:03 ata-ST1000VX000-1CU162_S1DD1B7F -> ../../sdj
 
 
-## 7. 参考
+[root@local ~]# ll /dev/disk/by-partlabel/
+total 0
+lrwxrwxrwx 1 root root 10 Aug 26 19:42 'EFI\x20System\x20Partition' -> ../../sdg1
+```
 
-1、[24 | 基础篇：Linux 磁盘I/O是怎么工作的（上）](https://time.geekbang.org/column/article/77010)
+## 5. 小结
+
+
+## 6. 参考
+
+1、[基础篇：Linux 磁盘I/O是怎么工作的（上）](https://time.geekbang.org/column/article/77010)
 
