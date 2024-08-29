@@ -31,7 +31,7 @@ tags: 存储 IO
 
 从图中可看到，BIO（Block I/O）有3个来源：`Page Cache`、`Direct I/O`、还有通过`网络`过来的block io，如`iscsi`。bio后面到了`通用块层（Block Layer）`。
 
-## 3. 通用块层的作用
+### 2.1. 通用块层的作用
 
 和`VFS`类似，为了减小不同`块设备`的差异带来的影响，Linux用一个统一的`通用块层`来管理各种不同的块设备。通用块层主要有两个作用：
 
@@ -49,15 +49,150 @@ Linux 内核支持的几种 I/O 调度算法，分别为 `NONE`、`NOOP`、`CFQ`
 * 3、`CFQ`（Completely Fair Queueing），也被称为`完全公平调度器`，是现在很多发行版的**默认** I/O 调度器，它为每个进程维护了一个 I/O 调度队列，并按照`时间片`来均匀分布每个进程的 I/O 请求。
 * 4、`DeadLine`调度算法：分别为读、写请求创建了不同的 I/O 队列，可以提高机械磁盘的吞吐量，并确保达到最终期限（deadline）的请求被优先处理。DeadLine 调度算法，多用在 I/O 压力比较重的场景，比如`数据库`等。
 
-## 4. block层逻辑
+## 3. block层逻辑
 
-先找几篇文章，待梳理：
+先找几篇文章，进行梳理学习：
 
 * [Linux block 层详解（3）- IO请求处理过程](https://zhuanlan.zhihu.com/p/501198341)
 * [Linux 内核的 blk-mq（Block IO 层多队列）机制](https://www.bluepuni.com/archives/linux-blk-mq/)
 * [linux IO Block layer 解析](https://www.cnblogs.com/Linux-tech/p/12961286.html)
 
-## 5. blktrace 工具介绍
+### 3.1. block层框架
+
+Linux上传统的块设备层和IO调度器（如`cfq`）主要是针对`HDD`设计的。HDD设备的随机IO性能很差，吞吐量大约是几百IOPS，延迟在毫秒级（耗时参考[之前文章](https://xiaodongq.github.io/2024/07/11/linux-storage-io-stack/)的耗时体感图和IOPS对比），所以当时IO性能的瓶颈在硬件，而不是内核。
+
+但是，随着高速`SSD`的出现并展现出越来越高的性能，百万级甚至千万级IOPS的数据访问已成为一大趋势，传统的块设备层已无法满足这么高的IOPS需求，逐渐成为系统IO性能的瓶颈。
+
+为了适配现代存设备高IOPS、低延迟的IO特征，新的块设备层框架`Block multi-queue（blk-mq）`应运而生。
+
+block层框架对比图：
+
+![block层框架对比](/images/block-queue-framework.png)
+
+### 3.2. funcgraph调用栈
+
+block层提供了`submit_bio`的接口，上层可以调用这个接口来提交请求。
+
+在 [学习Linux存储IO栈（三） -- eBPF和ftrace跟踪IO写流程](https://xiaodongq.github.io/2024/08/15/linux-write-io-stack) 中，通过`funcgraph`追踪到了block层的调用栈，不过层数太多，完整没贴在文章中，完整内容见：[O_DIRECT写入调用栈](/images/srcfiles/funcgragh_write_direct_stack.txt)。
+
+这里贴一下block层相关的调用栈（去除了一些细节和其他调用，可通过括号匹配层级）：
+
+```sh
+[root@iZ2zeftv45jk9frk8u0d0rZ bin]# ./funcgraph -H -p 8016 vfs_write
+Tracing "vfs_write" for PID 8016... Ctrl-C to end.
+# tracer: function_graph
+#
+# CPU  DURATION                  FUNCTION CALLS
+# |     |   |                     |   |   |   |
+ 0)               |  vfs_write() {
+ 0)               |    irq_enter_rcu() {
+ 0)   0.247 us    |      irqtime_account_irq();
+ 0)   0.808 us    |    }
+                       ...
+ 0)               |    new_sync_write() {
+ 0)               |      ext4_file_write_iter() {
+ 0)               |        ext4_dio_write_iter() {
+                             ...
+ 0)               |          iomap_dio_rw() {
+ 0)               |            __iomap_dio_rw() {
+ 0)               |              iomap_apply() {
+                                   ...
+                                   # 追踪到有多个iomap_dio_actor，这里只保留了一个
+ 0)               |                iomap_dio_actor() {
+ 0)               |                  iomap_dio_bio_actor() {
+                                       ...
+ 0)               |                    iomap_dio_submit_bio() {
+                                         # 数据提交到block层
+ 0)               |                      submit_bio() {
+ 0)               |                        submit_bio_checks() {
+                                             ...
+ 0)   6.840 us    |                        } /* submit_bio_checks */
+ 0)               |                        submit_bio_noacct_nocheck() {
+ 0)   0.152 us    |                          blk_cgroup_bio_start();
+ 0)   0.194 us    |                          ktime_get();
+ 0)               |                          __submit_bio_noacct_mq() {
+ 0)               |                            blk_queue_enter() {
+ 0)   0.448 us    |                              rcu_read_unlock_strict();
+ 0)   0.156 us    |                              rcu_read_unlock_strict();
+ 0)   1.335 us    |                            }
+                                               # 新的块设备层框架Block multi-queue（blk-mq）
+ 0)               |                            blk_mq_submit_bio() {
+ 0)   0.422 us    |                              blk_queue_bounce();
+                                                 # bio 拆分（split）
+ 0)   0.395 us    |                              __blk_queue_split();
+ 0)   0.224 us    |                              bio_integrity_prep();
+                                                 # bio 合并（merge）
+ 0)   0.152 us    |                              blk_attempt_plug_merge();
+ 0)               |                              __blk_mq_sched_bio_merge() {
+ 0)               |                                dd_bio_merge() {
+ 0)   0.322 us    |                                  _raw_spin_lock();
+ 0)               |                                  blk_mq_sched_try_merge() {
+ 0)               |                                    elv_merge() {
+ 0)   0.465 us    |                                      elv_rqhash_find();
+ 0)               |                                      dd_request_merge() {
+ 0)   0.309 us    |                                        elv_rb_find();
+ 0)   0.876 us    |                                      }
+ 0)   2.318 us    |                                    }
+ 0)   2.703 us    |                                  }
+ 0)   3.574 us    |                                }
+ 0)   4.205 us    |                              }
+ 0)               |                              __rq_qos_throttle() {
+ 0)   0.310 us    |                                blkcg_iolatency_throttle();
+ 0)   1.547 us    |                              }
+ 0)               |                              __blk_mq_alloc_request() {
+                                                   ...
+ 0)   3.376 us    |                              }
+                                                 ...
+ 0) + 16.640 us   |                            }
+ 0) + 18.884 us   |                          }
+ 0) + 20.092 us   |                        }
+ 0) + 27.731 us   |                      }
+ 0) + 28.220 us   |                    }
+ 0) + 44.491 us   |                  }
+ 0) + 44.894 us   |                }
+ 0)   0.160 us    |                ext4_iomap_end();
+ 0) + 51.164 us   |              }
+                                 ...
+ 0)               |              blk_finish_plug() {
+ 0)   0.252 us    |                flush_plug_callbacks();
+                                   ...
+ 0) + 40.725 us   |              }
+                                 # bio调度
+ 0)               |              blk_io_schedule() {
+ 0)               |                io_schedule_timeout() {
+ 0)               |                  schedule_timeout() {
+                                       ...
+                                       # 调度
+ 0)               |                    schedule() {
+                                         ...
+ 0)   0.164 us    |                      update_nr_uninterruptible_fair();
+ 0)               |                      dequeue_task_fair() {
+ 0)               |                        dequeue_entity() {
+                                             ...
+ 0)   4.464 us    |                        }
+ 0)   0.150 us    |                        hrtick_update();
+ 0)   5.087 us    |                      }
+                                         ...
+ 0) ! 859.440 us  |                    }
+                                       ...
+ 0) ! 866.350 us  |                  }
+ 0) ! 866.856 us  |                }
+ 0) ! 867.403 us  |              }
+ 0)   1007.251 us |            }
+ 0)               |            iomap_dio_complete() {
+ 0)   0.373 us    |              ext4_dio_write_end_io();
+ 0)   0.284 us    |              wake_up_bit();
+ 0)   0.719 us    |              kfree();
+ 0)   3.587 us    |            }
+ 0)   1011.723 us |          }
+ 0)   1137.818 us |        }
+ 0)   1138.400 us |      }
+ 0)   1139.020 us |    }
+ 0)   0.984 us    |    __fsnotify_parent();
+ 0)   1168.973 us |  }
+```
+
+## 4. 扩展：blktrace 工具介绍
 
 看了下`blktrace`这个工具，加入工具箱，后续需要定位block层问题备用。
 
@@ -66,17 +201,17 @@ Linux 内核支持的几种 I/O 调度算法，分别为 `NONE`、`NOOP`、`CFQ`
 * `blktrace` 提供了对通用块层（block layer）的 I/O 跟踪机制。它可以生成跟踪文件，记录每个 I/O 请求到达块层的时间戳以及请求的详细信息。
 * `btt（Block Trace Tools）`是一套用于分析由 `blktrace` 生成的跟踪文件的工具，它包括多个脚本和程序，用于处理和可视化跟踪数据，以便更容易地理解 I/O 行为。
 
-## 6. 扩展：如何查看系统block设备信息
+## 5. 扩展：如何查看系统block设备信息
 
-这里提到了block层，扩展一下，说明下实际环境中如何通过`sys`文件系统，进一步查看`/dev`下块设备（block device）其他设备文件的信息。
+这里提到了block层，扩展一下，说明下实际环境中如何通过`sys`文件系统，来进一步查看`/dev`下块设备（block device）和其他设备文件的信息。
 
-### 6.1. sysfs
+### 5.1. sysfs
 
 sysfs 是 Linux 内核中一种特殊的文件系统，它主要用于在内核和用户空间之间传递设备信息和状态。sysfs 提供了一个统一的接口，使得用户空间程序可以访问和控制内核中的各种设备和子系统，而无需直接与硬件交互或深入理解底层的设备驱动程序。
 
 sysfs 的根目录是 /sys，从这里开始，可以浏览整个设备树，访问各种设备和子系统的相关信息。例如，/sys/class 目录包含了按类别分类的所有设备，如 `/sys/class/block` 包含所有块设备的信息，/sys/class/net 包含所有网络设备的信息。
 
-### 6.2. /sys/block
+### 5.2. /sys/block
 
 `/sys/class/block` 和 `/sys/block`里都能看到block设备相关信息。若一个块设备有多个分区，`/sys/class/block`里是平铺的，`/sys/block`里则是每个分区作为子目录。这里先基于`/sys/block`看下。
 
@@ -133,7 +268,7 @@ DEVNAME=sdg
 DEVTYPE=disk
 ```
 
-### 6.3. 主、次设备号
+### 5.3. 主、次设备号
 
 在 Linux 中，每个设备都被分配了一个`唯一的设备号`，这个设备号由`主设备号（MAJOR）`和`次设备号（MINOR）`组成。设备号是操作系统内核用于识别和管理硬件设备的一种方式。块设备，如硬盘、SSD 和 USB 存储设备，也不例外。
 
@@ -173,7 +308,7 @@ lrwxrwxrwx 1 root root    0 Aug 28 17:08 bdi -> ../../../../../../../../../../..
 ...
 ```
 
-### 6.4. /dev/disk/和/dev/block/
+### 5.4. /dev/disk/和/dev/block/
 
 上面提到的：当你在 /dev 目录下看到设备文件时，它们背后都有一个与之关联的设备号。
 
@@ -260,10 +395,10 @@ total 0
 lrwxrwxrwx 1 root root 10 Aug 26 19:42 'EFI\x20System\x20Partition' -> ../../sdg1
 ```
 
-## 7. 小结
+## 6. 小结
 
 
-## 8. 参考
+## 7. 参考
 
 1、[基础篇：Linux 磁盘I/O是怎么工作的（上）](https://time.geekbang.org/column/article/77010)
 
