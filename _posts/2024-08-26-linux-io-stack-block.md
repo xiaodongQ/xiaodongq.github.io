@@ -49,17 +49,34 @@ Linux 内核支持的几种 I/O 调度算法，分别为 `NONE`、`NOOP`、`CFQ`
 * 3、`CFQ`（Completely Fair Queueing），也被称为`完全公平调度器`，是现在很多发行版的**默认** I/O 调度器，它为每个进程维护了一个 I/O 调度队列，并按照`时间片`来均匀分布每个进程的 I/O 请求。
 * 4、`DeadLine`调度算法：分别为读、写请求创建了不同的 I/O 队列，可以提高机械磁盘的吞吐量，并确保达到最终期限（deadline）的请求被优先处理。DeadLine 调度算法，多用在 I/O 压力比较重的场景，比如`数据库`等。
 
-## 4. 如何查看系统block设备信息
+## 4. block层逻辑
+
+先找几篇文章，待梳理：
+
+* [Linux block 层详解（3）- IO请求处理过程](https://zhuanlan.zhihu.com/p/501198341)
+* [Linux 内核的 blk-mq（Block IO 层多队列）机制](https://www.bluepuni.com/archives/linux-blk-mq/)
+* [linux IO Block layer 解析](https://www.cnblogs.com/Linux-tech/p/12961286.html)
+
+## 5. blktrace 工具介绍
+
+看了下`blktrace`这个工具，加入工具箱，后续需要定位block层问题备用。
+
+可参考：[利用 BLKTRACE 和 BTT 分析磁盘 IO 性能](https://www.xtplayer.cn/linux/disk/blktrace-btt-test-io/#google_vignette)
+
+* `blktrace` 提供了对通用块层（block layer）的 I/O 跟踪机制。它可以生成跟踪文件，记录每个 I/O 请求到达块层的时间戳以及请求的详细信息。
+* `btt（Block Trace Tools）`是一套用于分析由 `blktrace` 生成的跟踪文件的工具，它包括多个脚本和程序，用于处理和可视化跟踪数据，以便更容易地理解 I/O 行为。
+
+## 6. 扩展：如何查看系统block设备信息
 
 这里提到了block层，扩展一下，说明下实际环境中如何通过`sys`文件系统，进一步查看`/dev`下块设备（block device）其他设备文件的信息。
 
-### 4.1. sysfs
+### 6.1. sysfs
 
 sysfs 是 Linux 内核中一种特殊的文件系统，它主要用于在内核和用户空间之间传递设备信息和状态。sysfs 提供了一个统一的接口，使得用户空间程序可以访问和控制内核中的各种设备和子系统，而无需直接与硬件交互或深入理解底层的设备驱动程序。
 
 sysfs 的根目录是 /sys，从这里开始，可以浏览整个设备树，访问各种设备和子系统的相关信息。例如，/sys/class 目录包含了按类别分类的所有设备，如 `/sys/class/block` 包含所有块设备的信息，/sys/class/net 包含所有网络设备的信息。
 
-### 4.2. /sys/block
+### 6.2. /sys/block
 
 `/sys/class/block` 和 `/sys/block`里都能看到block设备相关信息。若一个块设备有多个分区，`/sys/class/block`里是平铺的，`/sys/block`里则是每个分区作为子目录。这里先基于`/sys/block`看下。
 
@@ -116,7 +133,7 @@ DEVNAME=sdg
 DEVTYPE=disk
 ```
 
-### 4.3. 主、次设备号
+### 6.3. 主、次设备号
 
 在 Linux 中，每个设备都被分配了一个`唯一的设备号`，这个设备号由`主设备号（MAJOR）`和`次设备号（MINOR）`组成。设备号是操作系统内核用于识别和管理硬件设备的一种方式。块设备，如硬盘、SSD 和 USB 存储设备，也不例外。
 
@@ -156,7 +173,7 @@ lrwxrwxrwx 1 root root    0 Aug 28 17:08 bdi -> ../../../../../../../../../../..
 ...
 ```
 
-### 4.4. /dev/disk/和/dev/block/
+### 6.4. /dev/disk/和/dev/block/
 
 上面提到的：当你在 /dev 目录下看到设备文件时，它们背后都有一个与之关联的设备号。
 
@@ -243,11 +260,13 @@ total 0
 lrwxrwxrwx 1 root root 10 Aug 26 19:42 'EFI\x20System\x20Partition' -> ../../sdg1
 ```
 
-## 5. 小结
+## 7. 小结
 
 
-## 6. 参考
+## 8. 参考
 
 1、[基础篇：Linux 磁盘I/O是怎么工作的（上）](https://time.geekbang.org/column/article/77010)
 
-2、GPT
+2、[利用 BLKTRACE 和 BTT 分析磁盘 IO 性能](https://www.xtplayer.cn/linux/disk/blktrace-btt-test-io/#google_vignette)
+
+3、GPT
