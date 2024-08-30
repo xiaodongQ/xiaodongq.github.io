@@ -59,17 +59,165 @@ Linux 内核支持的几种 I/O 调度算法，分别为 `NONE`、`NOOP`、`CFQ`
 
 ### 3.1. block层框架
 
-Linux上传统的块设备层和IO调度器（如`cfq`）主要是针对`HDD`设计的。HDD设备的随机IO性能很差，吞吐量大约是几百IOPS，延迟在毫秒级（耗时参考[之前文章](https://xiaodongq.github.io/2024/07/11/linux-storage-io-stack/)的耗时体感图和IOPS对比），所以当时IO性能的瓶颈在硬件，而不是内核。
+Linux上传统的块设备层和IO调度器（如`cfq`）主要是针对`HDD`设计的。HDD设备的随机IO性能很差，吞吐量大约是几百IOPS，延迟在毫秒级（耗时可参考[之前文章](https://xiaodongq.github.io/2024/07/11/linux-storage-io-stack/)的耗时体感图和IOPS对比），所以当时IO性能的瓶颈在硬件，而不是内核。
 
 但是，随着高速`SSD`的出现并展现出越来越高的性能，百万级甚至千万级IOPS的数据访问已成为一大趋势，传统的块设备层已无法满足这么高的IOPS需求，逐渐成为系统IO性能的瓶颈。
 
-为了适配现代存设备高IOPS、低延迟的IO特征，新的块设备层框架`Block multi-queue（blk-mq）`应运而生。
+为了适配现代存储设备高IOPS、低延迟的IO特征，新的块设备层框架`Block multi-queue（blk-mq）`应运而生。
 
-block层框架对比图：
+block层单队列（single queue） 和 多队列（mutil-queue）架构图对比图：
 
 ![block层框架对比](/images/block-queue-framework.png)
 
-### 3.2. funcgraph调用栈
+**single-queue 框架（blk-sq）：**
+
+在高IOPS的情况下，会有非常高的软件开销，主要体现在对锁的竞争上。使用`spinlock`来同步`请求队列（request queue）`的访问，向队列插入/删除、io提交、io排序和调度时都需要请求该锁。
+
+**multi-queue 框架（blk-mq）：**
+
+使用了**两层队列**，将单个请求队列锁的竞争分散多个队列中，极大的提高了Block Layer并发处理IO的能力，适用于高 IOPS 要求的多队列存储设备。
+
+* `软件暂存队列（Software Staging Queue）`：blk-mq中为每个cpu分配一个软件队列，bio的提交/完成处理、IO请求暂存（合并、排序等）、IO请求标记、IO调度、IO记账都在这个队列上进行。
+    * 由于每个cpu有单独的队列，所以每个cpu上的这些IO操作可以同时进行，而不存在锁竞争问题
+    * 一般也称为 `software queue`、`software staging queue`、`ctx (context)`
+    * 对应于数据结构 `blk_mq_ctx`
+* `硬件派发队列（Hardware Dispatch Queue）`：blk-mq为存储器件的每个硬件队列（目前多数存储器件只有1个）分配一个硬件派发队列，负责存放软件队列往这个硬件队列派发的IO请求。
+    * 在存储设备**驱动初始化时**，blk-mq会通过固定的`映射关系`将一个或多个软件队列`映射（map）`到一个硬件派发队列，之后这些软件队列上的IO请求会往对应的硬件队列上派发
+    * 一般也称为 `hardware queue`、`hctx (hardware context)`、`hwq` 等
+    * 对应于数据结构 `blk_mq_hw_ctx`
+    * 进入该队列的 request 意味着已经经过了调度
+
+### 3.2. 数据结构
+
+相关的数据结构可以分成两大类：一是 IO 请求本身，二是管理 IO 请求用到的队列，理解这些数据结构是了解 block 层设计逻辑的基础。
+
+#### 3.2.1. IO请求相关结构
+
+按照 **`IO请求`** 的生命周期，IO请求被抽象成：
+
+* `bio`
+    * bio 是描述 `io请求` 的最小单位，bio 描述了数据的位置属性
+    * 访问存储器件上相邻区域的`bio`可能会被**合并**，称为`bio merge`
+    * 若bio的长度超过软件或者硬件的限制，`bio`会被**拆分**成多个，称为`bio split`
+* `request`（简称 `rq`）
+    * request是 `io调度` 的最小单位
+    * block 层接收到一个 bio 后，这个bio将生成一个新的request，或者合并到已有的request中，所以一个request可能包含多个bio
+    * 相邻区域的`request`可能会被合并，称为`request merge`
+* `cmd`
+    * `cmd`是`设备驱动`处理的IO请求，设备驱动程序根据器件协议，将`request`转换成`cmd`，然后发送给器件处理
+
+上述结构和生命周期中涉及的操作示意图：
+
+![io请求的生命周期](/images/bio-request-lifetime.png)
+
+#### 3.2.2. IO队列相关结构
+
+上述的IO请求需要经过`多级缓冲队列`管理，包含如下队列：
+
+* `plug list`
+    * 进程私有的`plug list`，其中存放的是io请求（`request`/`rq`），引入这个缓冲队列的目的是为了性能
+    * 进程提交一个`bio`后，短时间类很可能还会有新的bio，这些bio被暂存在`plug list`中，因为这个队列只有本进程能操作，所以不用加锁就可以进行`bio merge`操作
+* `elevator q`
+    * 其中存放的是io请求（`request`/`rq`）
+    * single-queue的调度器有`noop`、`cfq`；multi-queue的调度器有`mq-deadline`、`bfq`、`kyber`。每个调度器有都实现了专门的数据结构管理`rq`（链表、红黑树等），这里统以`elevator q`称呼
+        * 基本调度算法介绍，也可参考：[linux IO Block layer 解析](https://www.cnblogs.com/Linux-tech/p/12961286.html)
+    * 一般情况下，调度器不会主动将`rq`移到设备分发队列中，而是由设备驱动程序`主动来取`rq。
+* `device dispatch q`
+    * 设备分发队列，也可以称作`hardware dispatch q`
+    * 这是软件实现的队列。存储器件空闲时，其设备驱动程序主动从调度器中拉取一个rq存在设备分发队列中，分发队列中的rq按照先进先出顺序被封装成cmd下发给器件。
+    * 对于multi-queue，设备分发队列包中还额外包含`per-core软件队列`，它是为硬件分发队列服务的，可以把它理解成设备分发队列中的一部分
+* `hw q`
+    * 硬件队列。队列中存放的是按器件协议封装的cmd，一些器件是单hw队列
+
+#### 3.2.3. 内核中的结构定义
+
+说明：数据结构相关示意图，详情可见 [linux IO Block layer 解析](https://www.cnblogs.com/Linux-tech/p/12961286.html)
+
+`bio`结构：
+
+```cpp
+// linux-5.10.10/include/linux/blk_types.h
+struct bio {
+    struct bio          *bi_next;	/* request queue link */
+    struct gendisk      *bi_disk;
+    unsigned int        bi_opf;
+    unsigned short      bi_flags;	/* status, etc and bvec pool number */
+    unsigned short      bi_ioprio;
+    unsigned short      bi_write_hint;
+    blk_status_t        bi_status;
+    u8                  bi_partno;
+    atomic_t            __bi_remaining;
+    struct bvec_iter    bi_iter;
+    
+    ...
+    unsigned short      bi_vcnt;	/* how many bio_vec's */
+    unsigned short      bi_max_vecs;	/* max bvl_vecs we can hold */
+    atomic_t            __bi_cnt;	/* pin count */
+    // 多个内存段
+    struct bio_vec      *bi_io_vec;	/* the actual vec list */
+    struct bio_set      *bi_pool;
+    struct bio_vec      bi_inline_vecs[];
+};
+```
+
+linux系统调用`readv`、`writev`支持`scatter-gather I/O`，所以bio的内存端需用多个`[ page地址， 页内偏移， 长度 ]`描述不连续的内存段，每一个[ page地址， 页内偏移， 长度 ]在linux中称为`bio_vector`（对应上面`bio`结构中的`struct bio_vec	 *bi_io_vec;`成员）。
+
+`request`结构：
+
+```cpp
+// linux-5.10.10/include/linux/blkdev.h
+struct request {
+    struct request_queue    *q;
+    struct blk_mq_ctx       *mq_ctx;
+    struct blk_mq_hw_ctx    *mq_hctx;
+    unsigned int cmd_flags; /* op and common flags */
+    req_flags_t rq_flags;
+
+    int tag;
+    int internal_tag;
+
+    /* the following two fields are internal, NEVER access directly */
+    unsigned int __data_len;    /* total data len */
+    sector_t __sector;          /* sector cursor */
+
+    struct bio *bio;
+    struct bio *biotail;
+
+    struct list_head queuelist;
+    ...
+};
+```
+
+`scsi_cmnd`结构：
+
+```cpp
+// linux-5.10.10/include/scsi/scsi_cmnd.h
+struct scsi_cmnd {
+    struct scsi_request req;
+    struct scsi_device *device;
+    struct list_head eh_entry; /* entry for the host eh_cmd_q */
+    struct delayed_work abort_work;
+
+    struct rcu_head rcu;
+    ...
+    unsigned short cmd_len;
+    enum dma_data_direction sc_data_direction;
+
+    /* These elements define the operation we are about to perform */
+    unsigned char *cmnd;
+
+    /* These elements define the operation we ultimately want to perform */
+    struct scsi_data_buffer sdb;
+    struct scsi_data_buffer *prot_sdb;
+
+    unsigned underflow;
+    unsigned transfersize;
+    struct request *request;
+    ...
+};
+```
+
+### 3.3. funcgraph调用栈
 
 block层提供了`submit_bio`的接口，上层可以调用这个接口来提交请求。
 
@@ -139,10 +287,15 @@ Tracing "vfs_write" for PID 8016... Ctrl-C to end.
  0)               |                              __rq_qos_throttle() {
  0)   0.310 us    |                                blkcg_iolatency_throttle();
  0)   1.547 us    |                              }
+                                                 # 分配request
  0)               |                              __blk_mq_alloc_request() {
                                                    ...
  0)   3.376 us    |                              }
-                                                 ...
+ 0)   0.146 us    |                              __rq_qos_track();
+ 0)               |                              blk_account_io_start() {
+                                                   ...
+ 0)   2.892 us    |                              }
+ 0)   0.248 us    |                              blk_add_rq_to_plug();
  0) + 16.640 us   |                            }
  0) + 18.884 us   |                          }
  0) + 20.092 us   |                        }
@@ -192,7 +345,9 @@ Tracing "vfs_write" for PID 8016... Ctrl-C to end.
  0)   1168.973 us |  }
 ```
 
-## 4. 扩展：blktrace 工具介绍
+## 4. 扩展
+
+### 4.1. 扩展：blktrace 工具介绍
 
 看了下`blktrace`这个工具，加入工具箱，后续需要定位block层问题备用。
 
@@ -201,17 +356,17 @@ Tracing "vfs_write" for PID 8016... Ctrl-C to end.
 * `blktrace` 提供了对通用块层（block layer）的 I/O 跟踪机制。它可以生成跟踪文件，记录每个 I/O 请求到达块层的时间戳以及请求的详细信息。
 * `btt（Block Trace Tools）`是一套用于分析由 `blktrace` 生成的跟踪文件的工具，它包括多个脚本和程序，用于处理和可视化跟踪数据，以便更容易地理解 I/O 行为。
 
-## 5. 扩展：如何查看系统block设备信息
+### 4.2. 扩展：如何查看系统block设备信息
 
 这里提到了block层，扩展一下，说明下实际环境中如何通过`sys`文件系统，来进一步查看`/dev`下块设备（block device）和其他设备文件的信息。
 
-### 5.1. sysfs
+#### 4.2.1. sysfs
 
 sysfs 是 Linux 内核中一种特殊的文件系统，它主要用于在内核和用户空间之间传递设备信息和状态。sysfs 提供了一个统一的接口，使得用户空间程序可以访问和控制内核中的各种设备和子系统，而无需直接与硬件交互或深入理解底层的设备驱动程序。
 
 sysfs 的根目录是 /sys，从这里开始，可以浏览整个设备树，访问各种设备和子系统的相关信息。例如，/sys/class 目录包含了按类别分类的所有设备，如 `/sys/class/block` 包含所有块设备的信息，/sys/class/net 包含所有网络设备的信息。
 
-### 5.2. /sys/block
+#### 4.2.2. /sys/block
 
 `/sys/class/block` 和 `/sys/block`里都能看到block设备相关信息。若一个块设备有多个分区，`/sys/class/block`里是平铺的，`/sys/block`里则是每个分区作为子目录。这里先基于`/sys/block`看下。
 
@@ -268,7 +423,7 @@ DEVNAME=sdg
 DEVTYPE=disk
 ```
 
-### 5.3. 主、次设备号
+#### 4.2.3. 主、次设备号
 
 在 Linux 中，每个设备都被分配了一个`唯一的设备号`，这个设备号由`主设备号（MAJOR）`和`次设备号（MINOR）`组成。设备号是操作系统内核用于识别和管理硬件设备的一种方式。块设备，如硬盘、SSD 和 USB 存储设备，也不例外。
 
@@ -308,7 +463,7 @@ lrwxrwxrwx 1 root root    0 Aug 28 17:08 bdi -> ../../../../../../../../../../..
 ...
 ```
 
-### 5.4. /dev/disk/和/dev/block/
+#### 4.2.4. /dev/disk/和/dev/block/
 
 上面提到的：当你在 /dev 目录下看到设备文件时，它们背后都有一个与之关联的设备号。
 
@@ -395,13 +550,20 @@ total 0
 lrwxrwxrwx 1 root root 10 Aug 26 19:42 'EFI\x20System\x20Partition' -> ../../sdg1
 ```
 
-## 6. 小结
+## 5. 小结
 
+简单学习梳理了通用块层的结构，了解了其中对应的数据结构和基本操作。具体流程暂未深入，后续根据实际场景按需再具体跟踪。
 
-## 7. 参考
+## 6. 参考
 
 1、[基础篇：Linux 磁盘I/O是怎么工作的（上）](https://time.geekbang.org/column/article/77010)
 
 2、[利用 BLKTRACE 和 BTT 分析磁盘 IO 性能](https://www.xtplayer.cn/linux/disk/blktrace-btt-test-io/#google_vignette)
 
-3、GPT
+3、 [Linux block 层详解（3）- IO请求处理过程](https://zhuanlan.zhihu.com/p/501198341)
+
+4、 [Linux 内核的 blk-mq（Block IO 层多队列）机制](https://www.bluepuni.com/archives/linux-blk-mq/)
+
+5、 [linux IO Block layer 解析](https://www.cnblogs.com/Linux-tech/p/12961286.html)
+
+6、GPT
