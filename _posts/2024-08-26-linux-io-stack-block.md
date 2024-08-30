@@ -18,7 +18,7 @@ tags: 存储 IO
 
 另外，想起来之前看过的极客时间课程，回头看了下存储模块相关的系列文章：[基础篇：Linux 磁盘I/O是怎么工作的（上）](https://time.geekbang.org/column/article/77010)，发现作为概述和索引用来查漏补缺挺好的。之前更多的是对CPU/内存/存储/网络等对应有哪些观测工具和指标有个总览的了解，浮于“知道”（且容易忘）的层面，深入去看则发现有很多东西需要自己另外花心思去啃。这时再看文章有了不同的角度，收获到一些新的东西。
 
-前段时间看别人说《代码整洁之道》常看常有新收获，还有[木鸟杂记](https://www.qtmuniao.com/)大佬对DDIA的重读分享([《DDIA 逐章精读》](https://ddia.qtmuniao.com/#/preface))，都提及在不同认知阶段看到不同的东西。最近在看CSAPP，回想~~早年~~大学时上课，大多都是浮于表面的被动接收，现在趁机会夯实基础，倒可以多动手、多嚼一嚼经典著作。
+前段时间看别人说《代码整洁之道》常看常有新收获，还有[木鸟杂记](https://www.qtmuniao.com/)大佬对DDIA的重读分享([《DDIA 逐章精读》](https://ddia.qtmuniao.com/#/preface))，都提及在不同认知阶段看到不同的东西。最近在看CSAPP，回想~~早年~~大学时上课，大多都是浮于表面的被动接收，现在趁机会夯实基础，倒可以多思考一点，稍微深入一点。
 
 ## 2. 再看下IO栈全貌图
 
@@ -110,6 +110,8 @@ block层单队列（single queue） 和 多队列（mutil-queue）架构图对�
 
 ![io请求的生命周期](/images/bio-request-lifetime.png)
 
+其中 bio2 被拆分，bio3、bio4 合并到一个 request 中，最后都由驱动转换成cmd（如`scsi_cmnd`结构），由存储设备处理。
+
 #### 3.2.2. IO队列相关结构
 
 上述的IO请求需要经过`多级缓冲队列`管理，包含如下队列：
@@ -128,6 +130,10 @@ block层单队列（single queue） 和 多队列（mutil-queue）架构图对�
     * 对于multi-queue，设备分发队列包中还额外包含`per-core软件队列`，它是为硬件分发队列服务的，可以把它理解成设备分发队列中的一部分
 * `hw q`
     * 硬件队列。队列中存放的是按器件协议封装的cmd，一些器件是单hw队列
+
+上述block IO相关队列示意图如下：
+
+![block IO相关队列](/images/block-io-queues.png)
 
 #### 3.2.3. 内核中的结构定义
 
@@ -308,6 +314,11 @@ Tracing "vfs_write" for PID 8016... Ctrl-C to end.
                                  ...
  0)               |              blk_finish_plug() {
  0)   0.252 us    |                flush_plug_callbacks();
+ 0)               |                blk_mq_flush_plug_list() {
+ 0)               |                  blk_mq_sched_insert_requests() {
+                                        ...
+ 0) + 39.086 us   |                  }
+ 0) + 39.507 us   |                }
                                    ...
  0) + 40.725 us   |              }
                                  # bio调度
@@ -345,9 +356,7 @@ Tracing "vfs_write" for PID 8016... Ctrl-C to end.
  0)   1168.973 us |  }
 ```
 
-## 4. 扩展
-
-### 4.1. 扩展：blktrace 工具介绍
+## 4. 扩展：blktrace 工具介绍
 
 看了下`blktrace`这个工具，加入工具箱，后续需要定位block层问题备用。
 
@@ -356,17 +365,17 @@ Tracing "vfs_write" for PID 8016... Ctrl-C to end.
 * `blktrace` 提供了对通用块层（block layer）的 I/O 跟踪机制。它可以生成跟踪文件，记录每个 I/O 请求到达块层的时间戳以及请求的详细信息。
 * `btt（Block Trace Tools）`是一套用于分析由 `blktrace` 生成的跟踪文件的工具，它包括多个脚本和程序，用于处理和可视化跟踪数据，以便更容易地理解 I/O 行为。
 
-### 4.2. 扩展：如何查看系统block设备信息
+## 5. 扩展：如何查看系统block设备信息
 
 这里提到了block层，扩展一下，说明下实际环境中如何通过`sys`文件系统，来进一步查看`/dev`下块设备（block device）和其他设备文件的信息。
 
-#### 4.2.1. sysfs
+### 5.1. sysfs
 
 sysfs 是 Linux 内核中一种特殊的文件系统，它主要用于在内核和用户空间之间传递设备信息和状态。sysfs 提供了一个统一的接口，使得用户空间程序可以访问和控制内核中的各种设备和子系统，而无需直接与硬件交互或深入理解底层的设备驱动程序。
 
 sysfs 的根目录是 /sys，从这里开始，可以浏览整个设备树，访问各种设备和子系统的相关信息。例如，/sys/class 目录包含了按类别分类的所有设备，如 `/sys/class/block` 包含所有块设备的信息，/sys/class/net 包含所有网络设备的信息。
 
-#### 4.2.2. /sys/block
+### 5.2. /sys/block
 
 `/sys/class/block` 和 `/sys/block`里都能看到block设备相关信息。若一个块设备有多个分区，`/sys/class/block`里是平铺的，`/sys/block`里则是每个分区作为子目录。这里先基于`/sys/block`看下。
 
@@ -423,7 +432,7 @@ DEVNAME=sdg
 DEVTYPE=disk
 ```
 
-#### 4.2.3. 主、次设备号
+### 5.3. 主、次设备号
 
 在 Linux 中，每个设备都被分配了一个`唯一的设备号`，这个设备号由`主设备号（MAJOR）`和`次设备号（MINOR）`组成。设备号是操作系统内核用于识别和管理硬件设备的一种方式。块设备，如硬盘、SSD 和 USB 存储设备，也不例外。
 
@@ -463,7 +472,7 @@ lrwxrwxrwx 1 root root    0 Aug 28 17:08 bdi -> ../../../../../../../../../../..
 ...
 ```
 
-#### 4.2.4. /dev/disk/和/dev/block/
+### 5.4. /dev/disk/和/dev/block/
 
 上面提到的：当你在 /dev 目录下看到设备文件时，它们背后都有一个与之关联的设备号。
 
@@ -550,11 +559,11 @@ total 0
 lrwxrwxrwx 1 root root 10 Aug 26 19:42 'EFI\x20System\x20Partition' -> ../../sdg1
 ```
 
-## 5. 小结
+## 6. 小结
 
 简单学习梳理了通用块层的结构，了解了其中对应的数据结构和基本操作。具体流程暂未深入，后续根据实际场景按需再具体跟踪。
 
-## 6. 参考
+## 7. 参考
 
 1、[基础篇：Linux 磁盘I/O是怎么工作的（上）](https://time.geekbang.org/column/article/77010)
 
