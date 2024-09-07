@@ -14,7 +14,7 @@ tags: 存储 MySQL
 
 ## 1. 背景
 
-在日常工作和学习中，MySQL是使用比较广泛的一个应用，不过没太系统地学习梳理。前面梳理学习了一下基于`LSM-Tree`的leveldb，此篇开始，深入学习下基于`B树/B+树`的MySQL。
+MySQL一直没太系统地学习梳理，前面梳理学习了一下基于`LSM-Tree`的leveldb，此篇开始，深入学习下基于`B树/B+树`的MySQL。
 
 学习过程中正好结合场景，对相关联的Linux存储、CPU、内存管理、进程管理等模块知识查漏补缺。
 
@@ -26,9 +26,17 @@ tags: 存储 MySQL
     * [MySQL 实战 45 讲](https://time.geekbang.org/column/intro/100020801)
     * [图解MySQL](https://www.xiaolincoding.com/mysql/)
 
+9.7更新：之前（8月）此篇开篇后只写了一小部分，而后投入6.824学习，一直没继续，调整下日期重新续上。
+
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
 ## 2. MySQL介绍和整体架构
+
+MySQL和MariaDB背景了解：
+
+* `MySQL` 是以联合创始人 [Monty Widenius](https://en.wikipedia.org/wiki/Michael_Widenius) 的女儿 `My` 命名的。
+* 2008 年 1 月，Monty 和其他几位创始人决定将`MySQL AB`公司出售给 Sun Microsystems。一年后，甲骨文收购了 Sun，把 MySQL 也收归麾下。2009 年 2 月 5 日，Monty 宣布离开 Sun 公司，在 MySQL 代码库的一个分支上开发出了一款数据库 `MariaDB`，以他最小的女儿的名字命名。同时，Monty 创办了 Monty Program AB 公司。
+* （[参考](https://www.infoq.cn/article/3xtSDtHUgTKRsyw3kZXH)）
 
 一些基本介绍：
 
@@ -45,7 +53,7 @@ tags: 存储 MySQL
 
 
 
-有人纠结读音，感觉没必要，语境对齐即可：
+有人纠结读音，官方并不具体要求，语境对齐即可：
 
 > The official way to pronounce “MySQL” is “My Ess Que Ell” (not “my sequel”), but we do not mind if you pronounce it as “my sequel” or in some other localized way.
 
