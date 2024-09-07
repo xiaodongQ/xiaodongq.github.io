@@ -38,13 +38,12 @@ MySQL和MariaDB背景了解：
 * 2008 年 1 月，Monty 和其他几位创始人决定将`MySQL AB`公司出售给 Sun Microsystems。一年后，甲骨文收购了 Sun，把 MySQL 也收归麾下。2009 年 2 月 5 日，Monty 宣布离开 Sun 公司，在 MySQL 代码库的一个分支上开发出了一款数据库 `MariaDB`，以他最小的女儿的名字命名。同时，Monty 创办了 Monty Program AB 公司。
 * （[参考](https://www.infoq.cn/article/3xtSDtHUgTKRsyw3kZXH)）
 
-一些基本介绍：
+MySQL主要特性：
 
 * 基于C和C++开发，用`CMake`来管理构建
 * 使用各种不同的编译器进行测试
 * 使用 `Purify` (一个商业内存泄漏检测器)以及`Valgrind`进行测试
 * 使用具有独立模块的多层服务设计
-* 
 
 参考：
 
