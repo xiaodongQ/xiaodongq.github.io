@@ -38,7 +38,7 @@ MySQL和MariaDB背景了解：
 * 2008 年 1 月，Monty 和其他几位创始人决定将`MySQL AB`公司出售给 Sun Microsystems。一年后，甲骨文收购了 Sun，把 MySQL 也收归麾下。2009 年 2 月 5 日，Monty 宣布离开 Sun 公司，在 MySQL 代码库的一个分支上开发出了一款数据库 `MariaDB`，以他最小的女儿的名字命名。同时，Monty 创办了 Monty Program AB 公司。
 * （[参考](https://www.infoq.cn/article/3xtSDtHUgTKRsyw3kZXH)）
 
-MySQL主要特性：
+MySQL是开源的关系型数据库，基于客户端/服务器模式，主要特性说明：
 
 * 基于C和C++开发，用`CMake`来管理构建
 * 使用各种不同的编译器进行测试
