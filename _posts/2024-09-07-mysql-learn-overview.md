@@ -152,7 +152,7 @@ MySQL总体分为 `Server层` 和 `存储引擎层`。
 
 ## 4. MySQL目录结构和启动流程
 
-在自己的CentOS8.5机器上安装MySQL用于实验跟踪：`yum install mysql-server mysql`
+在本地CentOS8.5机器上安装MySQL用于实验跟踪：`yum install mysql-server mysql`
 
 ### 4.1. 目录结构
 
@@ -227,6 +227,116 @@ drwxr-x--- 2 mysql mysql   28 Sep 10 14:50  sys
 -rw-r----- 1 mysql mysql  16M Sep 10 14:52  undo_002
 ```
 
+### 启动流程
+
+看下启动流程。`main` -> `mysqld_main`，单函数有点长，`mysqld_main`实现有1000多行。
+
+```cpp
+// mysql-server_8.0.26/sql/main.cc
+int main(int argc, char **argv) { return mysqld_main(argc, argv); }
+```
+
+精简部分内容：
+
+```cpp
+// mysql-server_8.0.26/sql/mysqld.cc
+int mysqld_main(int argc, char **argv)
+{
+  ...
+  // 初始化线程环境pthread，锁资源
+  // my_init函数中设置了创建新文件、新目录的权限。mysql默认创建新文件、新目录的权限为0640、0750（UMASK和UMASK_DIR）
+  if (my_init())  // init my_sys library & pthreads
+  {
+    LogErr(ERROR_LEVEL, ER_MYINIT_FAILED);
+    flush_error_log_messages();
+    return 1;
+  }
+  ...
+  // 处理配置文件及启动参数
+  if (load_defaults(MYSQL_CONFIG_NAME, load_default_groups, &argc, &argv,
+                    &argv_alloc)) {
+    flush_error_log_messages();
+    return 1;
+  }
+  ...
+  server_components_initialized();
+
+  ...
+  mysql_mutex_lock(&LOCK_socket_listener_active);
+  // Make it possible for the signal handler to kill the listener.
+  socket_listener_active = true;
+  mysql_mutex_unlock(&LOCK_socket_listener_active);
+
+  if (opt_daemonize) {
+    if (nstdout != nullptr) {
+      // Show the pid on stdout if deamonizing and connected to tty
+      fprintf(nstdout, "mysqld is running as pid %lu\n", current_pid);
+      fclose(nstdout);
+      nstdout = nullptr;
+    }
+
+    mysqld::runtime::signal_parent(pipe_write_fd, 1);
+  }
+
+  mysqld_socket_acceptor->check_and_spawn_admin_connection_handler_thread();
+  mysqld_socket_acceptor->connection_event_loop();
+#endif /* _WIN32 */
+  server_operational_state = SERVER_SHUTTING_DOWN;
+  sysd::notify("STOPPING=1\nSTATUS=Server shutdown in progress\n");
+
+  DBUG_PRINT("info", ("No longer listening for incoming connections"));
+
+  mysql_audit_notify(MYSQL_AUDIT_SERVER_SHUTDOWN_SHUTDOWN,
+                     MYSQL_AUDIT_SERVER_SHUTDOWN_REASON_SHUTDOWN,
+                     MYSQLD_SUCCESS_EXIT);
+
+  terminate_compress_gtid_table_thread();
+  /*
+    Save set of GTIDs of the last binlog into gtid_executed table
+    on server shutdown.
+  */
+  if (opt_bin_log)
+    if (gtid_state->save_gtids_of_last_binlog_into_table())
+      LogErr(WARNING_LEVEL, ER_CANT_SAVE_GTIDS);
+
+#ifndef _WIN32
+  mysql_mutex_lock(&LOCK_socket_listener_active);
+  // Notify the signal handler that we have stopped listening for connections.
+  socket_listener_active = false;
+  mysql_cond_broadcast(&COND_socket_listener_active);
+  mysql_mutex_unlock(&LOCK_socket_listener_active);
+#endif  // !_WIN32
+
+#ifdef HAVE_PSI_THREAD_INTERFACE
+  /*
+    Disable the main thread instrumentation,
+    to avoid recording events during the shutdown.
+  */
+  PSI_THREAD_CALL(delete_current_thread)();
+#endif /* HAVE_PSI_THREAD_INTERFACE */
+
+  DBUG_PRINT("info", ("Waiting for shutdown proceed"));
+  int ret = 0;
+#ifdef _WIN32
+  if (shutdown_restart_thr_handle.handle)
+    ret = my_thread_join(&shutdown_restart_thr_handle, NULL);
+  shutdown_restart_thr_handle.handle = NULL;
+  if (0 != ret)
+    LogErr(WARNING_LEVEL, ER_CANT_JOIN_SHUTDOWN_THREAD, "shutdown ", ret);
+#else
+  if (signal_thread_id.thread != 0)
+    ret = my_thread_join(&signal_thread_id, nullptr);
+  signal_thread_id.thread = 0;
+  if (0 != ret)
+    LogErr(WARNING_LEVEL, ER_CANT_JOIN_SHUTDOWN_THREAD, "signal_", ret);
+#endif  // _WIN32
+
+  clean_up(true);
+  sysd::notify("STATUS=Server shutdown complete");
+  mysqld_exit(signal_hand_thr_exit_code);
+}
+```
+
 ## 5. 小结
 
 通过SQL查询和更新语句的处理流程，了解MySQL的基本架构。
@@ -245,4 +355,6 @@ drwxr-x--- 2 mysql mysql   28 Sep 10 14:50  sys
 
 6、[MySQL 一行记录是怎么存储的？](https://www.xiaolincoding.com/mysql/base/row_format.html)
 
-7、GPT
+7、[MySQL实例启动过程（上）：server层](https://developer.aliyun.com/article/1205737)
+
+8、GPT
