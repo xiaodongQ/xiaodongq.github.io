@@ -167,10 +167,10 @@ mysql> show variables like "datadir";
 +---------------+-----------------+
 ```
 
-下面进行相应用途说明：
+该目录下相关文件目录的用途说明：
 
 ```sh
-[root@xdlinux ➜ mysql ]$ ls -lh
+[root@xdlinux ➜ mysql ]$ ls -lh /var/lib/mysql/
 total 185M
 # 这是一个自动生成的配置文件，通常包含MySQL实例的唯一标识符（UUID）
 -rw-r----- 1 mysql mysql   56 Sep 10 14:50  auto.cnf
@@ -227,16 +227,52 @@ drwxr-x--- 2 mysql mysql   28 Sep 10 14:50  sys
 -rw-r----- 1 mysql mysql  16M Sep 10 14:52  undo_002
 ```
 
-### 启动流程
+每创建一个数据库，都会在数据目录（此处为`/var/lib/mysql/`）。如下建库建表示例：
 
-看下启动流程。`main` -> `mysqld_main`，单函数有点长，`mysqld_main`实现有1000多行。
+```sh
+# 建库
+mysql> create database xdtestdb;
+Query OK, 1 row affected (0.07 sec)
+
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| performance_schema |
+| sys                |
+| xdtestdb           |
++--------------------+
+
+# 建表
+mysql> create table test1(id int primary key, name varchar(32));
+mysql> show tables;
++--------------------+
+| Tables_in_xdtestdb |
++--------------------+
+| test1              |
++--------------------+
+```
+
+数据目录多了：`/var/lib/mysql/xdtestdb`，其中包含**表数据**文件`test1.ibd`
+
+```sh
+[root@xdlinux ➜ ~ ]$ ll /var/lib/mysql/xdtestdb -ltrh
+total 112K
+-rw-r----- 1 mysql mysql 112K Sep 11 14:43 test1.ibd
+```
+
+### 4.2. 启动流程
+
+看下启动流程，入口代码在`sql/main.cc`。`main` -> `mysqld_main`，单函数有点长，`mysqld_main`实现有1000多行。
 
 ```cpp
 // mysql-server_8.0.26/sql/main.cc
 int main(int argc, char **argv) { return mysqld_main(argc, argv); }
 ```
 
-精简部分内容：
+启动流程部分内容：
 
 ```cpp
 // mysql-server_8.0.26/sql/mysqld.cc
@@ -259,77 +295,25 @@ int mysqld_main(int argc, char **argv)
     return 1;
   }
   ...
-  server_components_initialized();
-
+  /* Determine default TCP port and unix socket name */
+  set_ports();
+  // 初始化核心组件，包括众多核心模块的初始化，如innodb启动、插件初始化、error log启动等
+  if (init_server_components()) unireg_abort(MYSQLD_ABORT_EXIT);
   ...
-  mysql_mutex_lock(&LOCK_socket_listener_active);
-  // Make it possible for the signal handler to kill the listener.
-  socket_listener_active = true;
-  mysql_mutex_unlock(&LOCK_socket_listener_active);
-
-  if (opt_daemonize) {
-    if (nstdout != nullptr) {
-      // Show the pid on stdout if deamonizing and connected to tty
-      fprintf(nstdout, "mysqld is running as pid %lu\n", current_pid);
-      fclose(nstdout);
-      nstdout = nullptr;
-    }
-
-    mysqld::runtime::signal_parent(pipe_write_fd, 1);
-  }
-
-  mysqld_socket_acceptor->check_and_spawn_admin_connection_handler_thread();
+  if (!opt_initialize && (dd::upgrade::no_server_upgrade_required() ||
+                        opt_upgrade_mode == UPGRADE_MINIMAL))
+    // 从 mysql数据库 表中初始化结构数据
+    servers_init(nullptr);
+  ...
+  // 这里就完成了mysqld的启动过程，在此处开始循环接受客户端连接
   mysqld_socket_acceptor->connection_event_loop();
-#endif /* _WIN32 */
-  server_operational_state = SERVER_SHUTTING_DOWN;
-  sysd::notify("STOPPING=1\nSTATUS=Server shutdown in progress\n");
+  ...
 
-  DBUG_PRINT("info", ("No longer listening for incoming connections"));
-
-  mysql_audit_notify(MYSQL_AUDIT_SERVER_SHUTDOWN_SHUTDOWN,
-                     MYSQL_AUDIT_SERVER_SHUTDOWN_REASON_SHUTDOWN,
-                     MYSQLD_SUCCESS_EXIT);
-
-  terminate_compress_gtid_table_thread();
-  /*
-    Save set of GTIDs of the last binlog into gtid_executed table
-    on server shutdown.
-  */
-  if (opt_bin_log)
-    if (gtid_state->save_gtids_of_last_binlog_into_table())
-      LogErr(WARNING_LEVEL, ER_CANT_SAVE_GTIDS);
-
-#ifndef _WIN32
-  mysql_mutex_lock(&LOCK_socket_listener_active);
-  // Notify the signal handler that we have stopped listening for connections.
-  socket_listener_active = false;
-  mysql_cond_broadcast(&COND_socket_listener_active);
-  mysql_mutex_unlock(&LOCK_socket_listener_active);
-#endif  // !_WIN32
-
-#ifdef HAVE_PSI_THREAD_INTERFACE
-  /*
-    Disable the main thread instrumentation,
-    to avoid recording events during the shutdown.
-  */
-  PSI_THREAD_CALL(delete_current_thread)();
-#endif /* HAVE_PSI_THREAD_INTERFACE */
-
-  DBUG_PRINT("info", ("Waiting for shutdown proceed"));
-  int ret = 0;
-#ifdef _WIN32
-  if (shutdown_restart_thr_handle.handle)
-    ret = my_thread_join(&shutdown_restart_thr_handle, NULL);
-  shutdown_restart_thr_handle.handle = NULL;
-  if (0 != ret)
-    LogErr(WARNING_LEVEL, ER_CANT_JOIN_SHUTDOWN_THREAD, "shutdown ", ret);
-#else
   if (signal_thread_id.thread != 0)
     ret = my_thread_join(&signal_thread_id, nullptr);
   signal_thread_id.thread = 0;
   if (0 != ret)
     LogErr(WARNING_LEVEL, ER_CANT_JOIN_SHUTDOWN_THREAD, "signal_", ret);
-#endif  // _WIN32
 
   clean_up(true);
   sysd::notify("STATUS=Server shutdown complete");
