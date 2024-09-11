@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 深入学习MySQL（一） -- MySQL事务
+title: 深入学习MySQL（二） -- MySQL事务
 categories: MySQL
 tags: 存储 MySQL
 ---
