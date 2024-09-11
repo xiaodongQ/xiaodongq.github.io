@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 深入学习MySQL（一） -- 整体架构和基本操作
+title: 深入学习MySQL（一） -- 整体架构和基本操作的流程
 categories: MySQL
 tags: 存储 MySQL
 ---
@@ -8,7 +8,7 @@ tags: 存储 MySQL
 * content
 {:toc}
 
-深入学习MySQL，本篇介绍整体架构和基本操作。
+深入学习MySQL，本篇介绍整体架构和基本操作的流程。
 
 
 
@@ -155,6 +155,20 @@ MySQL总体分为 `Server层` 和 `存储引擎层`。
 ## 6. MySQL目录结构和启动流程
 
 在本地CentOS8.5机器上安装MySQL用于实验跟踪：`yum install mysql-server mysql`
+
+查看默认存储引擎，可知其为`InnoDB`。
+
+```sh
+mysql> show variables like "%storage_engine%";
++---------------------------------+-----------+
+| Variable_name                   | Value     |
++---------------------------------+-----------+
+| default_storage_engine          | InnoDB    |
+| default_tmp_storage_engine      | InnoDB    |
+| disabled_storage_engines        |           |
+| internal_tmp_mem_storage_engine | TempTable |
++---------------------------------+-----------+
+```
 
 ### 6.1. 目录结构
 
@@ -335,7 +349,7 @@ int mysqld_main(int argc, char **argv)
 
 3、[专访“MySQL 之父”：我曾创造 MySQL，也将颠覆 MySQL](https://www.infoq.cn/article/3xtSDtHUgTKRsyw3kZXH)
 
-4、[MySQL45讲-01 基础架构：一条SQL查询语句是如何执行的？](https://time.geekbang.org/column/article/68319)
+4、[MySQL实战45讲-01 基础架构：一条SQL查询语句是如何执行的？](https://time.geekbang.org/column/article/68319)
 
 5、[执行一条 select 语句，期间发生了什么？](https://www.xiaolincoding.com/mysql/base/how_select.html)
 
