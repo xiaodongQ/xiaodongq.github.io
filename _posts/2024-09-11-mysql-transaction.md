@@ -120,9 +120,67 @@ MySQL有2种`开启事务`的命令，对应的`启动事务`时机是不同的�
 
 * 开始事务后（执行`begin`语句后），并在执行第一个查询语句（`select`）后，会创建一个 `Read View`，**后续的查询语句利用这个`Read View`**，通过这个 `Read View` 就可以在 `undo log` 版本链找到事务开始时的数据，所以事务过程中每次查询的数据都是一样的，即使中途有其他事务插入了新纪录，是查询不出来这条数据的，所以就很好了避免幻读问题。
 
-### 4.1. Read View
+### 4.1. 事务类定义
 
+事务类`struct trx_t`定义如下，可看到前面小节对应的4种隔离级别枚举值。
 
+```cpp
+// mysql-server_8.0.26/storage/innobase/include/trx0trx.h
+struct trx_t {
+    // 4种隔离级别枚举
+    enum isolation_level_t {
+        READ_UNCOMMITTED,
+        READ_COMMITTED,
+        REPEATABLE_READ,
+        SERIALIZABLE
+    };
+    ...
+    mutable TrxMutex mutex;
+    ...
+    trx_id_t id; /*!< transaction id */
+    trx_id_t no; /*!< transaction serialization number */
+    std::atomic<trx_state_t> state;
+    bool skip_lock_inheritance;
+    ReadView *read_view; /*!< consistent read view used in the
+                       transaction, or NULL if not yet set */
+    UT_LIST_NODE_T(trx_t) no_list;
+    ...
+    bool is_read_uncommitted() const {
+        return (isolation_level == READ_UNCOMMITTED);
+    }
+    ...
+};
+```
+
+### 4.2. Read View
+
+`ReadView`定义在read0types.h中，InnoDB引擎中的源代码文件一般为`xx0yy.h/xx0yy.cc`形式：
+
+```cpp
+// mysql-server_8.0.26/storage/innobase/include/read0types.h
+class ReadView {
+    // 类似于vector
+    class ids_t {
+        ...
+        ulint capacity() const { return (m_reserved); }
+        void assign(const value_type *start, const value_type *end);
+        void insert(value_type value);
+        ...
+        void push_back(value_type value);
+        ...
+    };
+
+private:
+    ...
+    trx_id_t m_creator_trx_id;
+    ids_t m_ids;
+    ...
+    typedef UT_LIST_NODE_T(ReadView) node_t;
+
+    byte pad1[64 - sizeof(node_t)];
+    node_t m_view_list;
+};
+```
 
 ## 5. 小结
 
