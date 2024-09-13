@@ -124,6 +124,8 @@ MySQL有2种`开启事务`的命令，对应的`启动事务`时机是不同的�
 
 事务类`struct trx_t`定义如下，可看到前面小节对应的4种隔离级别枚举值。
 
+InnoDB引擎中的源代码文件一般为`xx0yy.h/xx0yy.cc`形式。
+
 ```cpp
 // mysql-server_8.0.26/storage/innobase/include/trx0trx.h
 struct trx_t {
@@ -152,9 +154,52 @@ struct trx_t {
 };
 ```
 
+事务系统`trx_sys_t`定义在`trx0sys.h`中：
+
+```cpp
+// mysql-server_8.0.26/storage/innobase/include/trx0sys.h
+struct trx_sys_t {
+    // 代码中有很多cache line对齐的处理，减少缓存污染（cache thrashing），提升性能
+    char pad0[ut::INNODB_CACHE_LINE_SIZE];
+    // 多版本并发控制管理
+    MVCC *mvcc;
+    // rollback segments
+    Rsegs rsegs;
+    Rsegs tmp_rsegs;
+    char pad1[ut::INNODB_CACHE_LINE_SIZE];
+    // 用于生成下一个事务ID
+    std::atomic<trx_id_t> next_trx_id_or_no;
+    ...
+    // 事务在完全提交之前会保持在这个列表中，确保事务的正确序列化顺序
+    UT_LIST_BASE_NODE_T(trx_t, no_list) serialisation_list;
+    // 当前活跃事务的最大事务号
+    trx_id_t rw_max_trx_no;
+    // 确保下一个成员变量与前一个成员变量位于不同的缓存行上，以避免缓存竞争（cache contention）
+    char pad3[ut::INNODB_CACHE_LINE_SIZE];
+    // 用于管理事务序列化级别下的最小事务号。这在事务隔离级别为可重复读（REPEATABLE READ）或更高时尤为重要
+    std::atomic<trx_id_t> serialisation_min_trx_no;
+    ...
+    // 当前系统中最旧活跃事务的事务ID，这对于确定哪些事务可以提交或回滚非常重要
+    std::atomic<trx_id_t> min_active_trx_id;
+    char pad5[ut::INNODB_CACHE_LINE_SIZE];
+    // 管理当前活跃的读写事务
+    // 列表是根据事务ID (trx_id) 排序的，最大的事务ID排在最前面
+    UT_LIST_BASE_NODE_T(trx_t, trx_list) rw_trx_list;
+    char pad6[ut::INNODB_CACHE_LINE_SIZE];
+    // 管理MySQL客户端发起的事务
+    UT_LIST_BASE_NODE_T(trx_t, mysql_trx_list) mysql_trx_list;
+    // 用于MVCC快照管理，存储当前活跃的读写事务ID
+    // 当一个事务创建一个ReadView时，它会基于rw_trx_ids中的事务ID创建一个快照（snapshot），这个快照决定了哪些更改对该事务是可见的
+    trx_ids_t rw_trx_ids;
+    // 当前系统中的最大事务ID
+    std::atomic<trx_id_t> rw_max_trx_id;
+    ...
+};
+```
+
 ### 4.2. Read View
 
-`ReadView`定义在read0types.h中，InnoDB引擎中的源代码文件一般为`xx0yy.h/xx0yy.cc`形式：
+`ReadView`定义在`read0types.h`中：
 
 ```cpp
 // mysql-server_8.0.26/storage/innobase/include/read0types.h
@@ -169,14 +214,22 @@ class ReadView {
         void push_back(value_type value);
         ...
     };
-
+    ...
 private:
-    ...
+    // 高水位，大于等于这个ID的事务均不可见
+    trx_id_t m_low_limit_id;
+    // 低水位：小于这个ID的事务均可见
+    trx_id_t m_up_limit_id;
+    // 创建该 Read View 的事务ID
     trx_id_t m_creator_trx_id;
+    // 创建视图时的活跃事务id列表
     ids_t m_ids;
-    ...
-    typedef UT_LIST_NODE_T(ReadView) node_t;
 
+    trx_id_t m_low_limit_no;
+    trx_id_t m_view_low_limit_no;
+    // 标记视图是否被关闭
+    bool m_closed;
+    typedef UT_LIST_NODE_T(ReadView) node_t;
     byte pad1[64 - sizeof(node_t)];
     node_t m_view_list;
 };
@@ -196,3 +249,5 @@ private:
 4、[数据库内核月报－2015/04：MySQL · 引擎特性 · InnoDB undo log 漫游](http://mysql.taobao.org/monthly/2015/04/01/)
 
 5、[MySQL · 源码分析 · InnoDB的read view，回滚段和purge过程简介](https://developer.aliyun.com/article/560506#:~:text=Read%20view.)
+
+6、[MySQL 8.0 MVCC 核心原理解析（核心源码）](https://zhuanlan.zhihu.com/p/286775643)
