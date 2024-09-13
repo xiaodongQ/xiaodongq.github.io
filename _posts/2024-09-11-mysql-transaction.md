@@ -199,7 +199,7 @@ struct trx_sys_t {
 
 ### 4.2. Read View
 
-`ReadView`定义在`read0types.h`中：
+`ReadView`定义在`read0types.h`中。
 
 ```cpp
 // mysql-server_8.0.26/storage/innobase/include/read0types.h
@@ -235,12 +235,19 @@ private:
 };
 ```
 
+参考链接里的`m_ids`、`min_trx_id`、`max_trx_id`、`creator_trx_id`对应到上述类定义中分别是：
+
+* `ids_t m_ids;` 创建视图时的活跃事务id列表
+* `trx_id_t m_low_limit_id;` 当前数据库中活跃事务中 事务id 最小的事务
+* `trx_id_t m_up_limit_id;` 创建 Read View 时当前数据库中应该给下一个事务的 id 值
+* `trx_id_t m_creator_trx_id;` 创建该 Read View 的事务的事务 id
+
 ## 5. 小结
 
 
 ## 6. 参考
 
-1、[MySQL实战45讲-3 事务隔离：为什么你改了我还看不见？](https://jiketime.geekbang.org/column/article/68963)
+1、[MySQL实战45讲-3 事务隔离：为什么你改了我还看不见？](https://time.geekbang.org/column/article/68963)
 
 2、[事务隔离级别是怎么实现的？](https://www.xiaolincoding.com/mysql/transaction/mvcc.html)
 
