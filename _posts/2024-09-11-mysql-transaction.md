@@ -98,6 +98,8 @@ mysql> show global variables like 'transaction_isolation';
 
 ## 4. 事务隔离的实现
 
+### 4.1. 总体说明
+
 上述4种隔离级别的实现方式：
 
 * `读未提交`隔离级别的事务：因为可以读到未提交事务修改的数据，所以直接读取最新的数据就好
@@ -116,11 +118,119 @@ MySQL有2种`开启事务`的命令，对应的`启动事务`时机是不同的�
 
 上面所述的不同时刻启动的事务会有不同的`Read View`，同一条记录在系统中可以存在多个版本，这就是数据库的 **`MVCC（多版本并发控制，Multi-Version Concurrency Control）`** 机制。
 
+MySQL InnoDB引擎实现的`MVCC`，主要依赖数据行的 **隐式字段** 与 `undo log` 生成的`日志版本链`，再结合`Read View`可见性判断机制实现。
+
+#### 4.1.1. 隐式字段
+
+InnoDB向数据库中存储的每一行添加三个字段：
+
+* `DB_ROW_ID`：隐藏的自增ID，对于MVCC可忽略该字段
+    * 如果InnoDB自动生成聚集索引，则索引包含这个行ID值。否则，`DB_ROW_ID`列不会出现在任何索引中
+* `DB_TRX_ID`：插入或更新行的最后一个事务ID，用于`MVCC`的`Read View`判断事务id
+* `DB_ROLL_PTR`：回滚指针，用于`MVCC`中指向`undo log`记录
+
+对于使用InnoDB存储引擎的数据库表，它的聚簇索引记录中都包含`DB_TRX_ID`和`DB_ROLL_PTR`两个隐藏列。插入一条记录，记录示意如下图所示：
+
+![插入记录后的字段示意图](/images/2024-09-14-insert-mvcc-case.png)  
+[出处](https://www.xiaolincoding.com/mysql/transaction/mvcc.html)
+
+对应逻辑在`dict_table_add_system_columns`中：
+
+```cpp
+// mysql-server_8.0.26/storage/innobase/dict/dict0dict.cc
+void dict_table_add_system_columns(dict_table_t *table, mem_heap_t *heap) {
+    ...
+    dict_mem_table_add_col(table, heap, "DB_ROW_ID", DATA_SYS,
+                         DATA_ROW_ID | DATA_NOT_NULL, DATA_ROW_ID_LEN, false);
+
+    dict_mem_table_add_col(table, heap, "DB_TRX_ID", DATA_SYS,
+                            DATA_TRX_ID | DATA_NOT_NULL, DATA_TRX_ID_LEN, false);
+
+    if (!table->is_intrinsic()) {
+        dict_mem_table_add_col(table, heap, "DB_ROLL_PTR", DATA_SYS,
+                            DATA_ROLL_PTR | DATA_NOT_NULL, DATA_ROLL_PTR_LEN,
+                            false);
+    }
+}
+```
+
+#### 4.1.2. undo log
+
+在事务中，`insert`/`update`/`delete`每一个sql语句的**更改&&都会写入`undo log`，当事务回滚时，可以利用 `undo log` 来进行回滚。
+
+`undo log`相关操作在`trx_undo_report_row_operation`函数中（mysql-server_8.0.26/storage/innobase/trx/trx0rec.cc）
+
+* insert undo log：指在`insert`操作中产生的undo log，仅用于事务回滚
+    * 因为insert操作的记录只对事务本身可见，对其它事务不可见，所以该日志可以在事务`commit`后直接删除，不需要进行`purge(后台清除线程)`操作
+    * 对应函数：`trx_undo_page_report_insert`
+* update undo log：对`delete`和`update`操作产生的的undo log
+    * 该undo log可能需要提供MVCC机制，因此不能在事务commit后就进行删除。提交时放入undo log链表，等待`purge(后台清除线程)`进行最后的删除
+    * 对应函数：`trx_undo_page_report_modify`
+* 相关流程梳理可参考：[【MySQL】MVCC原理分析 + 源码解读](https://cloud.tencent.com/developer/article/2184720)，此处暂不展开分析。
+
+#### 4.1.3. Read View
+
+`ReadView`定义在`read0types.h`中。
+
+```cpp
+// mysql-server_8.0.26/storage/innobase/include/read0types.h
+class ReadView {
+    // 类似于vector
+    class ids_t {
+        ...
+        ulint capacity() const { return (m_reserved); }
+        void assign(const value_type *start, const value_type *end);
+        void insert(value_type value);
+        ...
+        void push_back(value_type value);
+        ...
+    };
+    ...
+    inline void prepare(trx_id_t id);
+    inline void copy_prepare(const ReadView &other);
+    inline void copy_complete();
+    void creator_trx_id(trx_id_t id) {
+        ...
+    }
+private:
+    // 尚未分配的最小事务id，>= 这个ID的事务均不可见
+    trx_id_t m_low_limit_id;
+    // 最小活动未提交事务id，< 这个ID的事务均可见
+    trx_id_t m_up_limit_id;
+    // 创建该 Read View 的事务ID
+    trx_id_t m_creator_trx_id;
+    // 创建视图时的所有活跃未提交事务id列表
+    ids_t m_ids;
+
+    trx_id_t m_low_limit_no;
+    trx_id_t m_view_low_limit_no;
+    // 标记视图是否被关闭
+    bool m_closed;
+    typedef UT_LIST_NODE_T(ReadView) node_t;
+    byte pad1[64 - sizeof(node_t)];
+    node_t m_view_list;
+};
+```
+
+参考链接里的4个重要字段：`m_ids`、`min_trx_id`、`max_trx_id`、`creator_trx_id`，和上述类定义对应（其中`min_trx_id`对应`m_low_limit_id`）。
+
+部分内联函数在声明时实现了，其余函数实现在：`mysql-server_8.0.26/storage/innobase/read/read0read.cc`中，此处不做展开，后续再深入梳理。
+
+### 4.2. 可重复读 过程说明
+
 可重复读的过程说明：
 
 * 开始事务后（执行`begin`语句后），并在执行第一个查询语句（`select`）后，会创建一个 `Read View`，**后续的查询语句利用这个`Read View`**，通过这个 `Read View` 就可以在 `undo log` 版本链找到事务开始时的数据，所以事务过程中每次查询的数据都是一样的，即使中途有其他事务插入了新纪录，是查询不出来这条数据的，所以就很好了避免幻读问题。
 
-### 4.1. 事务类定义
+结合上面的4个重要字段和参考链接的示例：
+
+
+
+### 4.3. 读提交 过程说明
+
+读提交隔离级别是在每次读取数据时，都会生成一个新的 Read View
+
+### 4.4. 事务类定义
 
 事务类`struct trx_t`定义如下，可看到前面小节对应的4种隔离级别枚举值。
 
@@ -197,53 +307,10 @@ struct trx_sys_t {
 };
 ```
 
-### 4.2. Read View
-
-`ReadView`定义在`read0types.h`中。
-
-```cpp
-// mysql-server_8.0.26/storage/innobase/include/read0types.h
-class ReadView {
-    // 类似于vector
-    class ids_t {
-        ...
-        ulint capacity() const { return (m_reserved); }
-        void assign(const value_type *start, const value_type *end);
-        void insert(value_type value);
-        ...
-        void push_back(value_type value);
-        ...
-    };
-    ...
-private:
-    // 高水位，大于等于这个ID的事务均不可见
-    trx_id_t m_low_limit_id;
-    // 低水位：小于这个ID的事务均可见
-    trx_id_t m_up_limit_id;
-    // 创建该 Read View 的事务ID
-    trx_id_t m_creator_trx_id;
-    // 创建视图时的活跃事务id列表
-    ids_t m_ids;
-
-    trx_id_t m_low_limit_no;
-    trx_id_t m_view_low_limit_no;
-    // 标记视图是否被关闭
-    bool m_closed;
-    typedef UT_LIST_NODE_T(ReadView) node_t;
-    byte pad1[64 - sizeof(node_t)];
-    node_t m_view_list;
-};
-```
-
-参考链接里的`m_ids`、`min_trx_id`、`max_trx_id`、`creator_trx_id`对应到上述类定义中分别是：
-
-* `ids_t m_ids;` 创建视图时的活跃事务id列表
-* `trx_id_t m_low_limit_id;` 当前数据库中活跃事务中 事务id 最小的事务
-* `trx_id_t m_up_limit_id;` 创建 Read View 时当前数据库中应该给下一个事务的 id 值
-* `trx_id_t m_creator_trx_id;` 创建该 Read View 的事务的事务 id
 
 ## 5. 小结
 
+梳理学习事务并发可能存在的问题，MySQL中`InnoDB引擎`的事务逻辑，简要实现流程学习，初步查看相关代码，后续按需再深入梳理。
 
 ## 6. 参考
 
@@ -257,4 +324,4 @@ private:
 
 5、[MySQL · 源码分析 · InnoDB的read view，回滚段和purge过程简介](https://developer.aliyun.com/article/560506#:~:text=Read%20view.)
 
-6、[MySQL 8.0 MVCC 核心原理解析（核心源码）](https://zhuanlan.zhihu.com/p/286775643)
+6、[【MySQL】MVCC原理分析 + 源码解读](https://cloud.tencent.com/developer/article/2184720)
