@@ -20,7 +20,7 @@ tags: 存储 MySQL
 
 ## 2. 索引的常见数据结构
 
-几种常见的数据结构：
+几种常见的实现索引的数据结构：
 
 * 哈希表
     * 比较适合`等值查询`场景；但`范围/区间查询`效率较低
@@ -31,7 +31,7 @@ tags: 存储 MySQL
     * 查找、插入的时间复杂度都为`O(logN)`，能有效减少搜索次数，也能较好地满足区间查询
 * 跳表、LSM树
     * 跳表相较于搜索树，效率在同一个数量级（`O(logN)`），但从实现的角度来说简单许多
-    * `LevelDB`就是基于LSM树结构，其中的`memtable`就是基于跳表实现，之前的学习笔记有相关记录：[leveldb学习笔记（四） -- memtable结构实现](https://xiaodongq.github.io/2024/08/02/leveldb-memtable-skiplist/)
+    * `LevelDB`就是基于LSM树结构，其中的`memtable`就是基于跳表实现，之前的学习笔记也有相关记录：[leveldb学习笔记（四） -- memtable结构实现](https://xiaodongq.github.io/2024/08/02/leveldb-memtable-skiplist/)
 
 ## 3. InnoDB引擎的索引
 
