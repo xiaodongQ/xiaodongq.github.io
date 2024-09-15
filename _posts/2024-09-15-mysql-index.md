@@ -18,7 +18,7 @@ tags: 存储 MySQL
 
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
-## 索引的常见数据结构
+## 2. 索引的常见数据结构
 
 几种常见的数据结构：
 
@@ -33,14 +33,18 @@ tags: 存储 MySQL
     * 跳表相较于搜索树，效率在同一个数量级（`O(logN)`），但从实现的角度来说简单许多
     * `LevelDB`就是基于LSM树结构，其中的`memtable`就是基于跳表实现，之前的学习笔记有相关记录：[leveldb学习笔记（四） -- memtable结构实现](https://xiaodongq.github.io/2024/08/02/leveldb-memtable-skiplist/)
 
-## InnoDB引擎的索引
+## 3. InnoDB引擎的索引
+
+在MySQL中，索引是在存储引擎层实现的。
+
+InnoDB引擎使用了`B+树`索引模型，所以数据都是存储在`B+树`中的。**每一个索引在 InnoDB 里面对应一棵 B+ 树。**
 
 
 
-## 5. 小结
+## 4. 小结
 
 
-## 6. 参考
+## 5. 参考
 
 1、[MySQL实战45讲 深入浅出索引](https://time.geekbang.org/column/article/69236)
 
