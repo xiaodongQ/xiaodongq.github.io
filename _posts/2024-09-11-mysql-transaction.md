@@ -320,7 +320,7 @@ struct trx_sys_t {
 
 ## 5. 小结
 
-梳理学习事务并发可能存在的问题，MySQL中`InnoDB引擎`的事务逻辑，简要实现流程学习，初步查看相关代码，后续按需再深入梳理。
+梳理学习事务并行时可能存在的问题，MySQL中`InnoDB引擎`的事务隔离逻辑，简要实现流程学习，初步查看相关代码，后续按需再深入梳理。
 
 ## 6. 参考
 
@@ -335,3 +335,5 @@ struct trx_sys_t {
 5、[MySQL · 源码分析 · InnoDB的read view，回滚段和purge过程简介](https://developer.aliyun.com/article/560506#:~:text=Read%20view.)
 
 6、[【MySQL】MVCC原理分析 + 源码解读](https://cloud.tencent.com/developer/article/2184720)
+
+7、GPT
