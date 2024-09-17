@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Rust学习实践（一） -- Rust基本使用
+title: Rust学习实践（一） -- 总体说明和基本使用
 categories: Rust
 tags: Rust
 ---
@@ -8,7 +8,7 @@ tags: Rust
 * content
 {:toc}
 
-Rust学习实践，本篇为开篇，介绍。
+Rust学习实践，本篇为开篇，总体说明和基本使用。
 
 
 
@@ -47,7 +47,7 @@ Rust的优势此处不做过多描述，可参见这篇介绍（“自夸”）�
 
 * [官网](https://www.rust-lang.org/zh-CN/)
 * [官方GitHub](https://github.com/rust-lang)
-* [官网-Learn Rust](https://www.rust-lang.org/zh-CN/learn) 里面推荐了一些开源学习资料，包括下面的一些开源书籍
+* [学习Rust](https://www.rust-lang.org/zh-CN/learn) 里面推荐了一些开源学习资料，包括下面的一些开源书籍
     * 核心文档
         * [标准库](https://doc.rust-lang.org/std/index.html)：详尽的 Rust 标准库 API 手册
         * [Rust 版本指南](https://doc.rust-lang.org/edition-guide/index.html)：介绍各版本特性及兼容性说明
@@ -59,9 +59,10 @@ Rust的优势此处不做过多描述，可参见这篇介绍（“自夸”）�
 一、基础内容
 
 * [The Rust Programming Language](https://doc.rust-lang.org/book/)
-    * 中文版：[Rust 程序设计语言](https://kaisery.github.io/trpl-zh-cn/title-page.html)
-    * 《Rust 程序设计语言》被亲切地称为“圣经”
-* [Rust开源教程](https://course.rs/about-book.html)
+    * 中文翻译版：[Rust 程序设计语言](https://kaisery.github.io/trpl-zh-cn/)
+        * `Rustacean`中文意思为 Rust 开发者，Rust 用户，Rust 爱好者。注意，Rust开发者**不要**写成 `Ruster`，另外 Rustacean 一般第一个字母为大写形式，就和 Rust 一样，[参考](https://rustwiki.org/wiki/translate/other-translation/#the-rust-programing-language)
+    * 《Rust 程序设计语言》被亲切地称为“圣经”，其中文出版书名为《Rust 权威指南》
+* [Rust开源教程：Rust Course](https://course.rs/about-book.html)
 * [Rust Cookbook](https://rust-lang-nursery.github.io/rust-cookbook/)
     * [中文版](https://rustwiki.org/zh-CN/rust-cookbook/)
 
@@ -77,12 +78,39 @@ Rust的优势此处不做过多描述，可参见这篇介绍（“自夸”）�
 * [Rust设计模式](https://rust-unofficial.github.io/patterns/)
     * [中文版](https://chuxiuhong.com/chuxiuhong-rust-patterns-zh/)
 
-## 3. 小结
+## 3. Rust基础
+
+前置说明：
+
+* 1、基于《Rust 程序设计语言》（中文版：[Rust 程序设计语言](https://kaisery.github.io/trpl-zh-cn/)）大概过一下，之前的初步学习笔记在：[Rust.md](https://github.com/xiaodongQ/devNoteBackup/blob/master/%E5%90%84%E5%88%86%E7%B1%BB%E8%AE%B0%E5%BD%95/Rust/Rust.md)
+* 2、上述资料大概看了一下，[Rust开源教程：Rust Course](https://course.rs/about-book.html) 的内容比较贴合自己当前的偏好，先基于该教程学习梳理，其他作为辅助。
+* 3、代码练习还是复用之前的仓库：[rust_learning](https://github.com/xiaodongQ/rust_learning)
+* 4、VSCode插件（《Rust编程第一课》中推荐的插件）
+    + `rust-analyzer`：它会实时编译和分析你的 Rust 代码，提示代码中的错误，并对类型进行标注。你也可以使用官方的 Rust 插件取代。
+        + 官方的`Rust`插件已经不维护了
+    + ~~`crates`~~ `Dependi`：帮助你分析当前项目的依赖是否是最新的版本。
+        + crates插件已经不维护了，主页中推荐切换为`Dependi`，支持多种语言的依赖管理：Rust, Go, JavaScript, TypeScript, Python and PHP
+    + ~~`better toml`~~ `Even Better TOML`：Rust 使用 toml 做项目的配置管理。该插件可以帮你语法高亮，并展示 toml 文件中的错误。
+        + better toml插件也不维护了，其主页推荐切换为`Even Better TOML`
+    + 其他插件，暂不安装
+        + `rust syntax`：为代码提供语法高亮（有必要性？前面插件会提供语法高亮）
+        + `rust test lens`：rust test lens：可以帮你快速运行某个 Rust 测试（也不维护了）
+        + `Tabnine`：基于 AI 的自动补全，可以帮助你更快地撰写代码（暂时用的`CodeGeeX`，当作`Copilot`平替）
+
+### 3.1. 编译说明
+
+* `rustc`方式
+* `cargo`方式
+
+结果物说明：相对于go编译产物，rust运行时还是需要依赖系统libc库（go自带运行时库，不需要libc库）
+
+## 4. 小结
 
 
-## 4. 参考
+## 5. 参考
 
 1、[学习 Rust](https://www.rust-lang.org/zh-CN/learn)
 
 2、[进入 Rust 编程世界](https://course.rs/into-rust.html)
 
+3、[陈天 · Rust 编程第一课](https://time.geekbang.org/column/article/408400)
