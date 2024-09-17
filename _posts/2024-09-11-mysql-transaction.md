@@ -156,7 +156,7 @@ void dict_table_add_system_columns(dict_table_t *table, mem_heap_t *heap) {
 
 #### 4.1.2. undo log
 
-在事务中，`insert`/`update`/`delete`每一个sql语句的**更改&&都会写入`undo log`，当事务回滚时，可以利用 `undo log` 来进行回滚。
+在事务中，`insert`/`update`/`delete`每一个sql语句的**更改**都会写入`undo log`，当事务回滚时，可以利用 `undo log` 来进行回滚。
 
 `undo log`相关操作在`trx_undo_report_row_operation`函数中（mysql-server_8.0.26/storage/innobase/trx/trx0rec.cc）
 
