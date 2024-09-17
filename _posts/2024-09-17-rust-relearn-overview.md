@@ -99,8 +99,71 @@ Rust的优势此处不做过多描述，可参见这篇介绍（“自夸”）�
 
 ### 3.1. 编译说明
 
-* `rustc`方式
-* `cargo`方式
+* `rustc`方式：`rustc main.rs`
+* `cargo`方式：`cargo build`编译、`cargo run`运行（若未编译则会先编译）、`cargo check`只检查不编译
+
+以 [hello_cargo](https://github.com/xiaodongQ/rust_learning/tree/master/hello_cargo) 为例，说明下cargo编译生成的内容：
+
+* `Cargo.lock`：记录了所有直接依赖和间接依赖的确切版本，确保了项目的依赖关系在每次构建时都保持一致
+* `target目录`：这是Cargo用来存放所有编译输出的地方
+    * `CACHEDIR.TAG`：一个特殊的文件，用来标记这个目录是一个缓存目录，不应该被包含在版本控制中
+    * `debug`或者`release`：分别对应debug模式和release模式，debug模式会包含调试信息，release模式则会进行优化
+    * `debug/deps`目录：存放了所有依赖的编译输出，包含二进制文件（`hello_cargo-70b7650f2196efb1`和`debug/hello_cargo`是同一个文件）
+    * `target/debug/build`目录：若toml里通过`build`指定了构建脚本，则对应输出会在该目录
+    * `target/debug/examples`目录：如果项目包含示例程序（在examples目录下的.rs文件），那么这些程序会被编译并放置在这个目录下
+    * `target/debug/hello_cargo`：项目的主可执行文件
+    * `target/debug/incremental`：该目录存储了增量编译的信息，使得Cargo能够在再次编译时跳过那些没有变化的代码部分，从而加快编译速度
+    * `target/debug/hello_cargo.d` 和其他`.d`文件：这些文件用于支持增量编译。它们记录了编译过程中的依赖关系，帮助Cargo决定哪些模块需要重新编译
+
+```sh
+# build编译前
+[CentOS-root@xdlinux ➜ hello_cargo git:(master) ✗ ]$ tree 
+.
+├── Cargo.toml
+└── src
+    └── main.rs
+
+# cargo build
+[CentOS-root@xdlinux ➜ hello_cargo git:(master) ✗ ]$ cargo build
+   Compiling hello_cargo v0.1.0 (/home/workspace/rust_path/rust_learning/hello_cargo)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.19s
+[CentOS-root@xdlinux ➜ hello_cargo git:(master) ✗ ]$ tree
+.
+├── Cargo.lock
+├── Cargo.toml
+├── src
+│   └── main.rs
+└── target
+    ├── CACHEDIR.TAG
+    └── debug
+        ├── build
+        ├── deps
+        │   ├── hello_cargo-70b7650f2196efb1
+        │   └── hello_cargo-70b7650f2196efb1.d
+        ├── examples
+        ├── hello_cargo
+        ├── hello_cargo.d
+        └── incremental
+            └── hello_cargo-3haf20exhib74
+                ├── s-h00uhsc9pb-05zloq4-45etctwclne9bdzz71m5zmpm7
+                │   ├── 0bcqf7ztek5t6s4d87ed816uz.o
+                │   ├── 0vf1n5voilrp7673zix3s1mk8.o
+                │   ├── 48zynk25prcjtyan91sp1xfvo.o
+                │   ├── 53zmz46glgdq0hhcx61nbxdn6.o
+                │   ├── 61k02pkquc42pjwqtetozi8sf.o
+                │   ├── 6oeh93pcajoe4x07y2xnxmueg.o
+                │   ├── 76cr3fg6p6n8csy70e1d5ugvs.o
+                │   ├── al8okrhaqv7m0kggosakeijdw.o
+                │   ├── b4wsfus5ugvvekyy3brvvakrf.o
+                │   ├── dep-graph.bin
+                │   ├── dqqzbj9vq1ggxsduc75riz3xs.o
+                │   ├── e39bv2imh011dqqelnop4qaf6.o
+                │   ├── query-cache.bin
+                │   └── work-products.bin
+                └── s-h00uhsc9pb-05zloq4.lock
+
+9 directories, 23 files
+```
 
 结果物说明：相对于go编译产物，rust运行时还是需要依赖系统libc库（go自带运行时库，不需要libc库）
 
