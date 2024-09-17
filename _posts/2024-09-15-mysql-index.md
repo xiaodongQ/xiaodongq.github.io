@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 深入学习MySQL（三） -- MySQL索引
+title: MySQL学习实践（三） -- MySQL索引
 categories: MySQL
 tags: 存储 MySQL
 ---
@@ -8,7 +8,7 @@ tags: 存储 MySQL
 * content
 {:toc}
 
-深入学习MySQL，本篇学习梳理MySQL索引。
+MySQL学习实践，本篇学习梳理MySQL索引。
 
 
 
