@@ -28,7 +28,7 @@ Rust的优势此处不做过多描述，可参见这篇介绍（“自夸”）�
 
 几点随想：
 
-* 之前看文章看到[Draven](https://draveness.me/)大佬[2020总结](https://draveness.me/2020-summary/)里提到用`OKR`管理个人目标，正好在尝试用工作上的Scrum敏捷模式管理自己的工作以外部分事项的进度，收获不少，自己后续也可以这个方式调整下（OKR+Scrum）
+* 之前看文章看到[Draven](https://draveness.me/)大佬[2020总结](https://draveness.me/2020-summary/)里提到用`OKR`管理个人目标，正好在尝试用工作上的Scrum敏捷模式管理自己的工作以外部分事项的进度，收获不少，自己后续也可以按这个方式调整下（OKR+Scrum）
     * [如何管理自己的时间资产](https://draveness.me/few-words-time-management/)
 * 看[木鸟杂记](https://www.qtmuniao.com/)大佬的文章，提到[课代表立正](https://space.bilibili.com/491306902/)，去看了下up主讲的一些方法论和思路，让自己的想法拓展和清晰不少，也很有收获，工作/学习/生活里可以借鉴参考
 * 想法：多输入，多输出，产生正循环，让“飞轮”滚动起来
@@ -47,7 +47,7 @@ Rust的优势此处不做过多描述，可参见这篇介绍（“自夸”）�
 
 * [官网](https://www.rust-lang.org/zh-CN/)
 * [官方GitHub](https://github.com/rust-lang)
-* [学习Rust](https://www.rust-lang.org/zh-CN/learn) 里面推荐了一些开源学习资料，包括下面的一些开源书籍
+* [官网 -- 学习Rust](https://www.rust-lang.org/zh-CN/learn) 里面推荐了一些开源学习资料，也包括下面提及的部分开源书籍
     * 核心文档
         * [标准库](https://doc.rust-lang.org/std/index.html)：详尽的 Rust 标准库 API 手册
         * [Rust 版本指南](https://doc.rust-lang.org/edition-guide/index.html)：介绍各版本特性及兼容性说明
@@ -82,8 +82,8 @@ Rust的优势此处不做过多描述，可参见这篇介绍（“自夸”）�
 
 前置说明：
 
-* 1、基于[《The Rust Programming Language》](https://doc.rust-lang.org/book/)（中文版：[Rust 程序设计语言](https://kaisery.github.io/trpl-zh-cn/)）大概过一下，之前的初步学习笔记在：[Rust.md](https://github.com/xiaodongQ/devNoteBackup/blob/master/%E5%90%84%E5%88%86%E7%B1%BB%E8%AE%B0%E5%BD%95/Rust/Rust.md)
-* 2、上述资料大概看了一下，[Rust开源教程：Rust Course](https://course.rs/about-book.html) 的内容比较贴合自己当前的偏好，先基于该教程学习梳理，其他作为辅助。
+* 1、基于[《The Rust Programming Language》](https://doc.rust-lang.org/book/)（中文版：[Rust 程序设计语言](https://kaisery.github.io/trpl-zh-cn/)）大概过一下，部分术语的英文表达参考这里。之前的初步学习笔记在：[Rust.md](https://github.com/xiaodongQ/devNoteBackup/blob/master/%E5%90%84%E5%88%86%E7%B1%BB%E8%AE%B0%E5%BD%95/Rust/Rust.md)
+* 2、上述罗列的参考资料大概看了一下，[Rust开源教程：Rust语言圣经(Rust Course)](https://course.rs/about-book.html) 的内容比较贴合自己当前的偏好，先基于该教程学习梳理，其他作为辅助。
 * 3、代码练习还是复用之前的仓库：[rust_learning](https://github.com/xiaodongQ/rust_learning)
 * 4、VSCode插件（《Rust编程第一课》中推荐的插件）
     + `rust-analyzer`：它会实时编译和分析你的 Rust 代码，提示代码中的错误，并对类型进行标注。你也可以使用官方的 Rust 插件取代。
@@ -94,10 +94,12 @@ Rust的优势此处不做过多描述，可参见这篇介绍（“自夸”）�
         + better toml插件也不维护了，其主页推荐切换为`Even Better TOML`
     + 其他插件，暂不安装
         + `rust syntax`：为代码提供语法高亮（有必要性？前面插件会提供语法高亮）
-        + `rust test lens`：rust test lens：可以帮你快速运行某个 Rust 测试（也不维护了）
+        + `rust test lens`：rust test lens：可以帮你快速运行某个 Rust 测试（也不维护更新了）
         + `Tabnine`：基于 AI 的自动补全，可以帮助你更快地撰写代码（暂时用的`CodeGeeX`，当作`Copilot`平替）
 
 ### 3.1. 编译说明
+
+两种方式：
 
 * `rustc`方式：`rustc main.rs`
 * `cargo`方式：`cargo build`编译、`cargo run`运行（若未编译则会先编译）、`cargo check`只检查不编译
@@ -171,8 +173,8 @@ Rust的优势此处不做过多描述，可参见这篇介绍（“自夸”）�
 
 ### 3.2. 基本类型和函数
 
-* 变量绑定：`let a = "hello world"`，其他语言里叫赋值
-    * Rust 的变量在默认情况下是不可变的，通过 `mut` 关键字让变量变为可变
+* 变量绑定：`let a = "hello world"`
+    * Rust 的变量在默认情况下是**不可变**的，可通过 `mut` 关键字让变量变为可变：`let a mut = "hello world"`
     * 创建了一个变量却不在任何地方使用它，Rust通常会给一个警告，可以用下划线作为变量名的开头来消除警告：`let _x = 5;`
 
 * 整型：`i8`/`u8`、`i16`/`u16`、`i32`/`u32`、`i64`/`u64`、`i128`/`u128`、`isize`/`usize`
@@ -210,11 +212,11 @@ fn main() {
     * 每个函数参数都需要标注类型
     * 返回值：
         * 表达一个函数没有返回值：`fn test(i: i32) {}` 或者 `fn test(i: i32) -> () {}`，返回值类型都是单元类型 `()`
-        * `fn dead_end() -> ! { xxx }`，`!` 是一个特殊的类型，表示函数永不返回(diverge function)，这种语法往往用做会导致程序崩溃的函数：
+        * 发散函数（`diverging function`）：`fn dead_end() -> ! { xxx }`，`!` 是一个特殊标记，表示空类型，表示函数永不返回(diverge function)，这种语法往往用做 终止进程 或者 永远循环 的函数，比如下面的示例
             * `fn dead_end() -> ! { panic!("This call never returns") }`
             * `fn forever() -> ! { loop {} }`
 
-示例：
+表达式返回值示例：
 
 ```rust
 fn add(i: i32, j: i32) -> i32 {
@@ -223,11 +225,36 @@ fn add(i: i32, j: i32) -> i32 {
 }
 ```
 
-Rust函数构成示意图：
+Rust函数构成结构示意图：
 
-![Rust函数构成示意图](/images/2024-09-18-rust-function.png)
+![Rust函数构成结构示意图](/images/2024-09-18-rust-function.png)
 
-可在 [Rust By Practice](https://practice-zh.course.rs/basic-types/functions.html) 上进行练习，直接网页上修改运行。
+* 闭包（closures）：Rust的`闭包`是可以保存在变量中或作为参数传递给其他函数的`匿名函数`
+    * 闭包通常不要求像 `fn` 函数那样对参数和返回值进行类型注解（fn是因为要显式暴露给用户，达成一致理解）
+    * 闭包通常较短，并且只与特定的上下文相关，而不是适用于任意情境。在这些有限的上下文中，编译器可以推断参数和返回值的类型，类似于它推断大多数变量类型的方式
+    * [闭包：可以捕获环境的匿名函数](https://kaisery.github.io/trpl-zh-cn/ch13-01-closures.html)
+
+闭包示例：
+
+```rust
+let expensive_closure = |num: u32| -> u32 {
+    println!("calculating slowly...");
+    thread::sleep(Duration::from_secs(2));
+    num
+};
+
+// 下述定义都是正常的
+// 定义函数
+fn  add_one_v1   (x: u32) -> u32 { x + 1 }
+// 完整闭包定义
+let add_one_v2 = |x: u32| -> u32 { x + 1 };
+// 省略了类型注解 的闭包定义
+let add_one_v3 = |x|             { x + 1 };
+// 去掉了可选的大括号 的闭包定义
+let add_one_v4 = |x|               x + 1  ;
+```
+
+可在 [Rust By Practice](https://practice-zh.course.rs/basic-types/functions.html) 上进行练习，直接网页上修改运行即可。
 
 ### 3.3. 流程控制
 
@@ -352,14 +379,14 @@ Rust有一个叫做`Copy`的特征，可以用在类似整型这样在`栈`中�
 * `可变引用`可以解决上述问题，可修改引用指向的值
     * `fn change(some_string: &mut String) { some_string.push_str(", world"); }`，这里`some_string`是可变借用，可以修改
     * 需要在定义时指定`mut`，传参时也指定`mut`。定义：`let mut s = String::from("hello");`，调用：`change(&mut s);`，否则会报错
-* 同一**作用域**，特定数据只能有一个可变引用（脱离作用域后，引用失效，再进行可变引用不会报错）。编译器会进行借用检查（borrow checker），确保引用有效性，在**编译器**就避免数据竞争（data race）
+* 同一**作用域**，特定数据只能有一个可变引用（脱离作用域后，引用失效，再进行可变引用不会报错）。编译器会进行`借用检查（borrow checker）`，确保引用有效性，在**编译器**就避免数据竞争（data race）
     * 数据竞争可能由下述行为造成
         * 两个或更多的指针同时访问同一数据
         * 至少有一个指针被用来写入数据
         * 没有同步数据访问的机制
-    * 可通过大括号`{}`手动限定变量的作用域，从而解决编译器借用检查的问题
+    * 可通过大括号`{}`手动限定变量的作用域，从而解决编译器`借用检查`的问题
 * `可变引用`与`不可变引用`不能同时存在
-    * Rust 的编译器一直在优化，早期的（`Rust 1.31 前`）编译器，引用的作用域跟`变量作用域`是一致的，这对日常使用带来了很大的困扰
+    * Rust 的编译器一直在优化，早期的（`Rust 1.31前`）编译器，引用的作用域跟`变量作用域`是一致的，这对日常使用带来了很大的困扰
     * 但是在新的编译器中，引用作用域的结束位置从花括号变成`最后一次使用的位置`
     * 对于这种编译器优化行为，Rust 专门起了一个名字 —— `Non-Lexical Lifetimes(NLL)`，专门用于找到某个引用在作用域(`}`)结束前就不再被使用的代码位置。
 
@@ -369,6 +396,10 @@ Rust有一个叫做`Copy`的特征，可以用在类似整型这样在`栈`中�
 
 Rust编译器中可以确保引用**永远也不会变成悬垂状态**。
 
+### 3.5. 复合类型
+
+* 结构体：`struct`
+
 ## 4. 小结
 
 Rust学习系列开篇，并温习了Rust基础语法。
@@ -377,8 +408,12 @@ Rust学习系列开篇，并温习了Rust基础语法。
 
 1、[Rust开源教程：Rust语言圣经(Rust Course)](https://course.rs/about-book.html)
 
-2、[官网-学习 Rust](https://www.rust-lang.org/zh-CN/learn)
+2、[《The Rust Programming Language》](https://doc.rust-lang.org/book/)
 
-3、[进入 Rust 编程世界](https://course.rs/into-rust.html)
+3、[官网 -- 学习 Rust](https://www.rust-lang.org/zh-CN/learn)
 
-4、[陈天 · Rust 编程第一课](https://time.geekbang.org/column/article/408400)
+4、[Rust Course -- 进入 Rust 编程世界](https://course.rs/into-rust.html)
+
+5、[闭包：可以捕获环境的匿名函数](https://kaisery.github.io/trpl-zh-cn/ch13-01-closures.html)
+
+6、[陈天 · Rust 编程第一课](https://time.geekbang.org/column/article/408400)
