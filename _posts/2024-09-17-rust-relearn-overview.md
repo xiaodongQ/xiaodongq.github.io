@@ -404,7 +404,8 @@ Rust编译器中可以确保引用**永远也不会变成悬垂状态**。
     * 基本操作
         * 结构体定义：`struct User { username: String, email: String }`
         * 使用：`let user1 = User { username: String::from("test"), email: String::from("test@gmaild.com") };`
-        * 读取访问：`println!("{}", user1.email);`
+        * 访问，使用`.`：`println!("{}", user1.email);`
+            * Rust中的结构体，不存在使用`->`进行访问成员（不像C/C++），使用`.`时会自动引用和解引用（automatic referencing and dereferencing）
         * 修改：若需要修改，则需要定义为`let mut user1 = xxx`，而后可修改赋值 `user1.username = "test222"`
     * 结构体更新语法：`let user2 = User {email: String::from("another@example.com"), ..user1};`
         * `..` 语法表明凡是我们没有显式声明的字段，全部从 user1 中自动获取。需要注意的是 `..user1` 必须在结构体的尾部使用。
@@ -440,6 +441,45 @@ Rust编译器中可以确保引用**永远也不会变成悬垂状态**。
 * 数组：固定大小的类型组合
     * 如`let a = [1, 2, 3, 4, 5];`，`let a: [i32; 5] = [1, 2, 3, 4, 5];`（i32 是元素类型，分号后面的数字5是数组长度），`let a = [3; 5];`（数组初始化为3，长度为5）
     * 在实际开发中，使用最多的是数组切片`[T]`，我们往往通过引用的方式去使用`&[T]`，因为后者有固定的类型大小
+
+### 3.6. 模式匹配
+
+在 Rust 中，`模式匹配（Pattern Matching）`最常用的就是 `match` 和 `if let`。
+
+`match`跟其他语言中的 `switch case` 非常像，`_` 类似于 `switch` 中的 `default`。
+
+* match 的匹配必须要穷举出所有可能，因此用 `_` 来代表未列出的所有可能性
+* match 的每一个分支都必须是一个表达式，且所有分支的表达式最终返回值的类型必须相同
+    * 如果分支有多行代码，那么需要用 `{}` 包裹，同时最后一行代码需要是一个表达式
+    * `match` 本身也是一个表达式，因此可以用它来赋值：`let ip_str = match ip1 { Direction::V4 => "IPv4", Direction::V6 => "IPv6" };`
+* 一个分支有两个部分：一个`模式`和针对该模式的`处理代码`
+    * 通过 `=>` 运算符将模式和将要运行的代码分开，`Direction::East => println!("East"),`
+
+示例如下：
+
+```rust
+enum Direction {
+    East,
+    West,
+    North,
+    South,
+}
+
+fn main() {
+    let dire = Direction::South;
+    match dire {
+        // 每一个分支都是一个表达式
+        // 使用 `=>`运算符 进行模式匹配后的处理
+        Direction::East => println!("East"),
+        // 使用{}表达式，里面是语句块，可以包含多个语句
+        Direction::North | Direction::South => {
+            println!("South or North");
+        },
+        // 其他情况
+        _ => println!("West"),
+    };
+}
+```
 
 ## 4. 小结
 
