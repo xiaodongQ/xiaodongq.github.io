@@ -95,7 +95,7 @@ Rust的优势此处不做过多描述，可参见这篇介绍（“自夸”）�
     + 其他插件，暂不安装
         + `rust syntax`：为代码提供语法高亮（有必要性？前面插件会提供语法高亮）
         + `rust test lens`：rust test lens：可以帮你快速运行某个 Rust 测试（也不维护更新了）
-        + `Tabnine`：基于 AI 的自动补全，可以帮助你更快地撰写代码（暂时用的`CodeGeeX`，当作`Copilot`平替）
+        + `Tabnine`：基于 AI 的自动补全，可以帮助你更快地撰写代码（暂时用智普AI的 **`CodeGeeX`插件**，当作`Copilot`平替）
 
 ### 3.1. 编译说明
 
@@ -109,6 +109,8 @@ Rust的优势此处不做过多描述，可参见这篇介绍（“自夸”）�
 以 [hello_cargo](https://github.com/xiaodongQ/rust_learning/tree/master/hello_cargo) 为例，说明下cargo编译生成的内容：
 
 * `Cargo.lock`：记录了所有直接依赖和间接依赖的确切版本，确保了项目的依赖关系在每次构建时都保持一致
+    * 倾向于将 Cargo.lock 文件包含在版本控制系统中
+    * 运行 cargo build 或其他 Cargo 命令时，Cargo 不会从互联网上拉取依赖项的最新版本，而是会使用 Cargo.lock 中记录的确切版本。这样可以确保所有构建都是一致的，并且避免了由于依赖项版本更新而导致的潜在问题。
 * `target目录`：这是Cargo用来存放所有编译输出的地方
     * `CACHEDIR.TAG`：一个特殊的文件，用来标记这个目录是一个缓存目录，不应该被包含在版本控制中
     * `debug`或者`release`：分别对应debug模式和release模式，debug模式会包含调试信息，release模式则会进行优化
@@ -169,7 +171,7 @@ Rust的优势此处不做过多描述，可参见这篇介绍（“自夸”）�
 9 directories, 23 files
 ```
 
-结果物说明：相对于go编译产物，rust运行时还是需要依赖系统libc库（go自带运行时，不需要依赖libc和其他库即可运行，更便于分发）
+结果物说明：相对于Go编译产物，rust运行时还是需要依赖系统libc库（Go自带运行时，不需要依赖libc和其他库即可运行，更便于分发）
 
 ### 3.2. 基本类型和函数
 
@@ -229,7 +231,7 @@ Rust函数构成结构示意图：
 
 ![Rust函数构成结构示意图](/images/2024-09-18-rust-function.png)
 
-* 闭包（closures）：Rust的`闭包`是可以保存在变量中或作为参数传递给其他函数的`匿名函数`
+* 闭包（closures）：Rust的`闭包`是可以保存在变量中或作为参数传递给其他函数的`匿名函数` （类比C++中的lamba表达式 和 Go的匿名函数）
     * 闭包通常不要求像 `fn` 函数那样对参数和返回值进行类型注解（fn是因为要显式暴露给用户，达成一致理解）
     * 闭包通常较短，并且只与特定的上下文相关，而不是适用于任意情境。在这些有限的上下文中，编译器可以推断参数和返回值的类型，类似于它推断大多数变量类型的方式
     * [闭包：可以捕获环境的匿名函数](https://kaisery.github.io/trpl-zh-cn/ch13-01-closures.html)
@@ -399,6 +401,45 @@ Rust编译器中可以确保引用**永远也不会变成悬垂状态**。
 ### 3.5. 复合类型
 
 * 结构体：`struct`
+    * 基本操作
+        * 结构体定义：`struct User { username: String, email: String }`
+        * 使用：`let user1 = User { username: String::from("test"), email: String::from("test@gmaild.com") };`
+        * 读取访问：`println!("{}", user1.email);`
+        * 修改：若需要修改，则需要定义为`let mut user1 = xxx`，而后可修改赋值 `user1.username = "test222"`
+    * 结构体更新语法：`let user2 = User {email: String::from("another@example.com"), ..user1};`
+        * `..` 语法表明凡是我们没有显式声明的字段，全部从 user1 中自动获取。需要注意的是 `..user1` 必须在结构体的尾部使用。
+        * 执行后，user1 的部分字段所有权被转移到 user2 中；user1**无法**再被使用，但其未转移所有权的其他字段（`Copy`类型）可继续使用
+    * 结构体信息打印：使用`#[derive(Debug)]` 结合 `{:?}`/`{:#?}`，后者会带缩进
+        * 如果要使用`{}`来格式化输出，那对应的类型就必须实现 `Display` 特征，以前学习的基本类型，都默认实现了该特征（比如`i32`、`f64`等）
+        * `#[derive(Debug)] struct Rectangle { width: u32, height: u32,}` （继承实现了`Debug`特征）
+        * 另外，还有个`dbg!`宏，会拿走表达式的所有权，然后打印出相应的文件名、行号等debug信息，以及表达式求值结果。如：`dbg!(&rect1)`
+
+* 切片（slice）：`[开始索引..终止索引]`（右边是开区间）
+    * 切片是**引用**，所以不会发生所有权转移。
+    * 字符串切片： `let s = String::from("hello world");`，`let h = &s[0..5];`，此处的`h`就是切片，表示字符串`s`的0到5个字符，即`hello`。
+        * `h`切片的类型为 `&str`
+    * 数组切片：`let a = [1, 2, 3, 4, 5];`，`let slice = &a[1..3];`，此处的`slice`就是切片，表示数组`a`的1到3个元素，即`[2, 3]`。
+        * 该数组切片的类型是 `&[i32]`
+* 字符串
+    * Rust 在语言级别，只有一种字符串类型：`str`，它通常是以**引用类型**出现：`&str`，也就是上文提到的字符串切片。
+        * Rust 中的`字符`是 `Unicode` 类型，因此每个字符占据 4 个字节内存空间，但是在字符串中不一样，`字符串`是 `UTF-8` 编码，也就是字符串中的字符所占的字节数是变化的(1 - 4)
+    * 虽然语言级别只有上述的 `str` 类型，但是在标准库里，还有多种不同用途的字符串类型，其中使用最广的即是 `String` 类型。
+    * 转换
+        * `&str`生成`String`：`String::from("hello,world")` 和 `"hello,world".to_string()`
+        * `String`生成`&str`：`let s = String::from("hello,world");`，`let s_slice: &str = &s;`，即通过引用实现切片
+    * `String`操作：
+        * `push_str()`追加字符串，`push()`追加单个字符。如 `s.push_str("rust");`、`s.push('!');`
+        * `insert_str`和`insert`分别插入字符串和字符。如 `s.insert(5, ',');`
+        * `replace`替换：如 `s.replace("rust", "Rust");`
+        * `replacen`、`replace_range`、`pop()`、`remove()`、`truncate()`、`clear()`等
+* 元组（tuple）：多种类型组合
+    * 如`let tup = (500, 6.4, 1);`，`let (x, y, z) = tup;`
+    * 通过`.`访问指定索引的元素，索引从`0`开始：`let five_hundred = tup.0;`
+* 枚举（enum）：定义一组类型，每个类型都有名字和一组相关的值
+    * 如`enum IpAddrKind { V4, V6 }`，`let four = IpAddrKind::V4;`
+* 数组：固定大小的类型组合
+    * 如`let a = [1, 2, 3, 4, 5];`，`let a: [i32; 5] = [1, 2, 3, 4, 5];`（i32 是元素类型，分号后面的数字5是数组长度），`let a = [3; 5];`（数组初始化为3，长度为5）
+    * 在实际开发中，使用最多的是数组切片`[T]`，我们往往通过引用的方式去使用`&[T]`，因为后者有固定的类型大小
 
 ## 4. 小结
 
