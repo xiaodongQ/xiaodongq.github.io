@@ -39,7 +39,7 @@ tags: 网络
 ## 3. TCP握手和断开总体流程
 
 ![TCP握手断开过程和相关控制参数](/images/tcp-connect-close.png)  
-基于[出处1](https://mp.weixin.qq.com/s/YpSlU1yaowTs-pF6R43hMw?poc_token=HKCgSGaji2dgAtvVc7gzTQykh3Aw6neDWcojHyB8)、[出处2](https://time.geekbang.org/column/article/284912)
+基于[出处1](https://mp.weixin.qq.com/s/YpSlU1yaowTs-pF6R43hMw?poc_token=HKCgSGaji2dgAtvVc7gzTQykh3Aw6neDWcojHyB8)、[出处2](https://time.geekbang.org/column/article/284912)画图
 
 说明：三次握手时，客户端先设置`SYN_SENT`状态再发`SYN`
 
@@ -559,6 +559,8 @@ TCP协议的Seq显示修改成原始值(Protocol->TCP->取消相对Seq)，能更
 1. **内核drop掉的包，是否会被tcpdump抓到？(待定，TODO)**
 2. **全连接队列溢出导致内核drop掉的包，是否会被tcpdump抓到？**
 
+（后续更新：得分是接收过程还是发送过程。接收过程先过tcpdump挂接的协议，是可以抓到的；而发送过程的丢包由于先过netfilter再经过tcpdump挂接的协议，抓取不到。具体可见此篇博客笔记：[TCP发送接收过程（三） -- 学习netfilter和iptables](https://xiaodongq.github.io/2024/07/05/netfilter-iptables-learn/)）
+
 查资料上述两种情况若是drop了包，应该就抓不到包，所以包没有被drop掉。问题是服务端既然收到了客户端对于其`SYN+ACK`的`ACK`确认包，就应该是握手成功两端都`ESTABLISHED`了，为什么还要重传`SYN+ACK`呢？
 
 再理解了一下参考文章，所以还是我理解后画的图有问题，应该明确客户端回应`ACK`后服务端处理的先后顺序：此处应该为收到`ACK`->从半连接取连接放到全连接->状态`ESTABLISHED`，完成三次握手。如果是这样就理顺了。 (待定：跟踪源码确定这块的逻辑 TODO)
@@ -630,7 +632,7 @@ const struct proto_ops inet_stream_ops = {
 
 结合内核源码跟踪流程，具体见：[笔记记录](https://github.com/xiaodongQ/devNoteBackup/blob/master/%E5%90%84%E5%88%86%E7%B1%BB%E8%AE%B0%E5%BD%95/Linux%E5%86%85%E6%A0%B8%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0.md)
 
-代码位置：`__sys_listen`，\linux-5.10.176\net\socket.c
+代码位置：`__sys_listen`，linux-5.10.10/net/socket.c
 （Linux的系统调用在内核中的入口函数都是 `sys_xxx` ，但是如果我们拿着内核源码去搜索的话，就会发现根本找不到 `sys_xxx` 的函数定义，这是因为Linux的系统调用对应的函数全部都是由 `SYSCALL_DEFINE` 相关的宏来定义的。）
 
 ```c
@@ -668,7 +670,7 @@ int inet_listen(struct socket *sock, int backlog)
     struct sock *sk = sock->sk;
     lock_sock(sk);
     ...
-    // __sys_listen(linux-5.10.176\net\socket.c)调用时，传进来的的backlog值是min(调__sys_listen传入的backlog, 系统net.core.somaxconn)
+    // __sys_listen(linux-5.10.10/net/socket.c)调用时，传进来的的backlog值是min(调__sys_listen传入的backlog, 系统net.core.somaxconn)
     // 此处设置到struct socket中struct sock相应成员中： sk_max_ack_backlog
     WRITE_ONCE(sk->sk_max_ack_backlog, backlog);
     ...
