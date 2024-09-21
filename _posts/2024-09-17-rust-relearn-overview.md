@@ -85,13 +85,16 @@ Rust的优势此处不做过多描述，可参见这篇介绍（“自夸”）�
 * 1、基于[《The Rust Programming Language》](https://doc.rust-lang.org/book/)（中文版：[Rust 程序设计语言](https://kaisery.github.io/trpl-zh-cn/)）大概过一下，部分术语的英文表达参考这里。之前的初步学习笔记在：[Rust.md](https://github.com/xiaodongQ/devNoteBackup/blob/master/%E5%90%84%E5%88%86%E7%B1%BB%E8%AE%B0%E5%BD%95/Rust/Rust.md)
 * 2、上述罗列的参考资料大概看了一下，[Rust开源教程：Rust语言圣经(Rust Course)](https://course.rs/about-book.html) 的内容比较贴合自己当前的偏好，先基于该教程学习梳理，其他作为辅助。
 * 3、代码练习还是复用之前的仓库：[rust_learning](https://github.com/xiaodongQ/rust_learning)
-* 4、VSCode插件（《Rust编程第一课》中推荐的插件）
+* 4、VSCode插件（结合《Rust编程第一课》和 [墙推 VSCode!](https://course.rs/first-try/editor.html) 中推荐的插件）
     + `rust-analyzer`：它会实时编译和分析你的 Rust 代码，提示代码中的错误，并对类型进行标注。你也可以使用官方的 Rust 插件取代。
         + 官方的`Rust`插件已经不维护了
     + ~~`crates`~~ `Dependi`：帮助你分析当前项目的依赖是否是最新的版本。
         + crates插件已经不维护了，主页中推荐切换为`Dependi`，支持多种语言的依赖管理：Rust, Go, JavaScript, TypeScript, Python and PHP
     + ~~`better toml`~~ `Even Better TOML`：Rust 使用 toml 做项目的配置管理。该插件可以帮你语法高亮，并展示 toml 文件中的错误。
         + better toml插件也不维护了，其主页推荐切换为`Even Better TOML`
+    + `Error Lens`：更好的获得错误展示，包括错误代码、错误类型、错误位置等
+        + 提示有点密，按需要在单独的workpsace中启用，感觉markdown中提示太频繁了，暂时关闭
+    + `CodeLLDB`：Debugger程序，可以调试Rust代码
     + 其他插件，暂不安装
         + `rust syntax`：为代码提供语法高亮（有必要性？前面插件会提供语法高亮）
         + `rust test lens`：rust test lens：可以帮你快速运行某个 Rust 测试（也不维护更新了）
@@ -381,7 +384,7 @@ Rust有一个叫做`Copy`的特征，可以用在类似整型这样在`栈`中�
 * `可变引用`可以解决上述问题，可修改引用指向的值
     * `fn change(some_string: &mut String) { some_string.push_str(", world"); }`，这里`some_string`是可变借用，可以修改
     * 需要在定义时指定`mut`，传参时也指定`mut`。定义：`let mut s = String::from("hello");`，调用：`change(&mut s);`，否则会报错
-* 同一**作用域**，特定数据只能有一个可变引用（脱离作用域后，引用失效，再进行可变引用不会报错）。编译器会进行`借用检查（borrow checker）`，确保引用有效性，在**编译器**就避免数据竞争（data race）
+* 同一**作用域**，特定数据只能有一个可变引用（脱离作用域后，引用失效，再进行可变引用不会报错）。编译器会进行`借用检查（borrow checker）`，确保引用有效性，在**编译期**就避免数据竞争（data race）
     * 数据竞争可能由下述行为造成
         * 两个或更多的指针同时访问同一数据
         * 至少有一个指针被用来写入数据
@@ -438,6 +441,9 @@ Rust编译器中可以确保引用**永远也不会变成悬垂状态**。
     * 通过`.`访问指定索引的元素，索引从`0`开始：`let five_hundred = tup.0;`
 * 枚举（enum）：定义一组类型，每个类型都有名字和一组相关的值
     * 如`enum IpAddrKind { V4, V6 }`，`let four = IpAddrKind::V4;`
+    * `Option 枚举`：包含两个成员，一个成员表示含有值：`Some(T)`, 另一个表示没有值：`None`
+        * 定义如下：`enum Option<T> { Some(T), None, }`。其中`T`是泛型参数，`Some(T)`表示该枚举成员的数据类型是`T`，换句话说，`Some`可以包含任何类型的数据。
+        * 使用示例：`let some_number = Some(5);`，`let some_string = Some("a string");`，`let absent_number: Option<i32> = None;`
 * 数组：固定大小的类型组合
     * 如`let a = [1, 2, 3, 4, 5];`，`let a: [i32; 5] = [1, 2, 3, 4, 5];`（i32 是元素类型，分号后面的数字5是数组长度），`let a = [3; 5];`（数组初始化为3，长度为5）
     * 在实际开发中，使用最多的是数组切片`[T]`，我们往往通过引用的方式去使用`&[T]`，因为后者有固定的类型大小
@@ -480,6 +486,88 @@ fn main() {
     };
 }
 ```
+
+* 模式绑定：可以在匹配过程中，将匹配到的值绑定到一个变量上，从枚举中提取值。具体可见：[模式绑定](https://course.rs/basic/match-pattern/match-if-let.html#%E6%A8%A1%E5%BC%8F%E7%BBp[%91%E5%AE%9A)
+* `if let 匹配`，当只需要匹配一个条件，且忽略其他条件时就可以用 `if let` ，否则都用 `match`
+    * 示例：`if let Some(x) = some_option_value { println!("x is {}", x); }`
+    * 若用`match`方式，则需要写两个分支，如：`match some_option_value { Some(x) => println!("x is {}", x), _ => (), }`
+
+### 3.7. 方法（Method）
+
+Rust的`方法（Method）`和`函数（Function）`类似，区别在于`方法`是定义在某个类型上的，而`函数`是定义在某个作用域上的。
+
+* Rust的对象定义和方法定义是分离的，对于其他语言（如C++、Java）来说，对象和方法的定义是放在一起的，都是放在类中。
+* `self`、`&self` 和 `&mut self`
+    * `self`表示对象本身，`&self`表示对象的引用，`&mut self`表示可变引用
+    * 对于下述示例，`self`表示`Point`对象本身，`&self`表示`Point`对象的引用，`&mut self`表示可变引用
+
+使用`impl`关键字来定义方法，并通过`.`访问，示例如下：
+
+```rust
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+impl Point {
+    // 定义一个关联函数，不需要实例化对象就可以调用
+    fn new(x: i32, y: i32) -> Point {
+        Point { x, y }
+    }
+    // 定义一个方法，需要实例化对象才可以调用（此处`&self`是Point对象的不可变引用）
+    fn get_x(&self) -> i32 {
+        self.x
+    }
+}
+
+fn main() {
+    let p = Point::new(1, 2);
+    println!("x is {}", p.get_x());
+}
+```
+
+### 3.8. 泛型（Generic）、特征（Trait）和生命周期（Lifetime）
+
+**泛型（Generic）**：泛型允许我们定义一个可以在`多种类型`上工作的函数、结构体或枚举，而不需要具体地指定每个类型。
+
+* 使用泛型参数，有一个先决条件，必需在使用前对其进行声明
+    * 如：`fn largest<T>(list: &[T]) -> T { xxx }`
+        * 首先 `largest<T>` 对泛型参数 `T` 进行了声明，然后才在函数参数中进行使用该泛型参数 `list: &[T]`
+    * 泛型参数的命名：通常使用单个字母，如`T`、`U`、`V`等（可使用任意字母，通常使用简短的字母）
+* 结构体中使用泛型
+    * `struct Point<T> { x: T, y: T }`，其中`T`是泛型参数，`x`和`y`的类型都是`T`
+* 枚举中使用泛型
+    * `enum Option<T> { Some(T), None }`，其中`T`是泛型参数，`Some`成员的数据类型是`T`
+* 方法中使用泛型
+    * `impl<T> Point<T> { fn get_x(&self) -> &T { &self.x } }`，其中`T`是泛型参数，`get_x`方法返回的是`Point`对象的`x`字段的引用
+* const泛型：`Rust1.51`版本引入了`const泛型`，允许我们定义一个泛型参数，该参数的值在编译时是已知的。
+    * 此处暂时留个印象，后续按需再深入了解
+
+泛型的性能说明：
+
+* 在Rust中泛型是零成本的抽象，意味着你在使用泛型时，完全不用担心性能上的问题。
+    * 代价（tradeoff）是损失了 编译速度 和 增大了最终生成文件的大小
+* Rust在`编译期`会为泛型对应的多个类型，生成各自的代码，因此损失了编译速度和增大了最终生成文件的大小。
+* 即：Rust 通过在编译时进行泛型代码的 `单态化(monomorphization)`来保证效率。单态化是一个通过填充编译时使用的具体类型，将通用代码转换为特定代码的过程。
+
+**特征（Trait）**：特征类似于其他语言中的接口（interface或抽象类），用于定义共享的行为。
+
+* 特征定义了一组可以被共享的行为，只要实现了特征，就能使用这组行为
+* 定义特征：使用`trait`关键字
+    * 如：`trait Summary { fn summarize(&self) -> String; }`
+    * 还可以添加public关键字，表示该特征是公开的，可以被其他模块使用：`pub trait Summary { fn summarize(&self) -> String; }`
+* 实现特征中的方法：使用`impl`关键字
+    * 实现特征的语法与为结构体、枚举实现方法很像：`impl Summary for Post`，读作“为`Post`类型实现`Summary`特征”，然后在`impl`的花括号中实现该特征的具体方法。
+    * 如：`impl Summary for Tweet { fn summarize(&self) -> String { format!("{}: {}", self.username, self.content) } }`
+
+**生命周期（Lifetime）**：生命周期用于指定引用的有效期，确保引用在有效期内不会悬垂。
+
+
+### 3.9. 集合
+
+### 3.10. 返回值和错误处理
+
+### 3.11. 包和模块
 
 ## 4. 小结
 
