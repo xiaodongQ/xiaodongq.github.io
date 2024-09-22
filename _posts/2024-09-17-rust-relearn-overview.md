@@ -93,7 +93,7 @@ Rust的优势此处不做过多描述，可参见这篇介绍（“自夸”）�
     + ~~`better toml`~~ `Even Better TOML`：Rust 使用 toml 做项目的配置管理。该插件可以帮你语法高亮，并展示 toml 文件中的错误。
         + better toml插件也不维护了，其主页推荐切换为`Even Better TOML`
     + `Error Lens`：更好的获得错误展示，包括错误代码、错误类型、错误位置等
-        + 提示有点密，按需要在单独的workpsace中启用，感觉markdown中提示太频繁了，暂时关闭
+        + 提示有点密，按需要在单独的workpsace中启用，感觉markdown中提示太频繁了，暂时关闭并仅在此处Rust练习工程中启用
     + `CodeLLDB`：Debugger程序，可以调试Rust代码
     + 其他插件，暂不安装
         + `rust syntax`：为代码提供语法高亮（有必要性？前面插件会提供语法高亮）
@@ -560,20 +560,244 @@ fn main() {
     * 实现特征的语法与为结构体、枚举实现方法很像：`impl Summary for Post`，读作“为`Post`类型实现`Summary`特征”，然后在`impl`的花括号中实现该特征的具体方法。
     * 如：`impl Summary for Tweet { fn summarize(&self) -> String { format!("{}: {}", self.username, self.content) } }`
 
-**生命周期（Lifetime）**：生命周期用于指定引用的有效期，确保引用在有效期内不会悬垂。
+**生命周期（Lifetime）**：生命周期用于指定引用的有效期，确保引用在有效期内不会悬垂（dangling）。
 
+`生命周期标注`语法：以 `'` 开头，名称往往是一个单独的小写字母，大多数人都用 `'a` 来作为生命周期的名称。
 
-### 3.9. 集合
+* 为什么需要生命周期标注：因为Rust编译器需要知道引用的寿命，以便在编译时检查引用的有效性。
+    * 在存在多个引用时，编译器有时会无法自动推导生命周期，此时就需要我们手动去标注，通过为参数标注合适的生命周期来帮助编译器进行借用检查的分析。
+    * 示例：`fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {}`，其中`'a`是一个生命周期参数，表示`x`和`y`的生命周期都至少要和`'a`一样长。
+    * 不使用则会报错的示例：`fn longest(x: &str, y: &str) -> &str {}`，因为编译器无法确定`x`和`y`的生命周期，可能会出现悬垂引用。
+* 一个生命周期标注，它自身并不具有什么意义，因为生命周期的作用就是告诉编译器多个引用之间的关系。
+    * 例如，有一个函数，它的第一个参数 first 是一个指向 i32 类型的引用，具有生命周期 `'a`，该函数还有另一个参数 second，它也是指向 i32 类型的引用，并且同样具有生命周期 `'a`
+    * `fn useless<'a>(first: &'a i32, second: &'a i32) {}`
+* 如果是引用类型的参数，那么生命周期会位于引用符号 `&` 之后，并用一个空格来将生命周期和引用参数分隔开
+    * `&i32` 一个引用
+    * `&'a i32` 具有显式生命周期的引用
+    * `&'a mut i32` 具有显式生命周期的可变引用
+* 函数签名中的生命周期标注
+    * 在通过函数签名指定生命周期参数时，我们并没有改变传入引用或者返回引用的真实生命周期，而是告诉编译器当不满足此约束条件时，就拒绝编译通过。
+* 还有结构体、方法等生命周期的使用场景，后面具体用到时，再参考：[生命周期](https://course.rs/basic/lifetime.html)
+    * 生命周期消除规则、编译器标注规则；静态生命周期 `'static`、生命周期省略规则
+
+### 3.9. 集合（Collection）
+
+Rust提供了多种内置的集合类型，如`Vec`、`HashMap`、`String`等。`String`也是一个集合类型，它是一个可变的、动态分配的、UTF-8编码的字符串。
+
+* `Vec`：动态数组，可以动态地增加和减少元素
+    * 创建
+        * 使用`new`关联函数创建：`let v: Vec<i32> = Vec::new();`
+        * 使用`with_capacity`创建：如果预先知道要存储的元素个数，可以使用 `Vec::with_capacity(capacity)` 创建动态数组
+            * 这样可以避免因为插入大量新数据导致频繁的内存分配和拷贝，提升性能
+            * `with_capacity`示例：`let v = Vec::with_capacity(10);`，此处创建了一个容量为10的动态数组
+        * 使用宏`vec!`创建数组： `let v = vec![1, 2, 3];`
+    * 操作
+        * 添加元素：`v.push(4);`
+        * 读取元素：通过下标或者`get`函数，`let third = &v[2];`，`let third = v.get(2);`。其中`get`函数返回一个`Option`类型，需要`match`匹配来解构
+        * 迭代：`for i in &v { println!("{}", i); }`；也可以迭代时修改元素：`for i in &mut v { *i += 50; }`
+    * Vector常用方法
+        * `len`：返回Vector的长度
+        * `is_empty`：判断Vector是否为空
+        * `push`：向Vector中添加元素
+        * `pop`：从Vector中移除并返回最后一个元素
+        * `remove`：从Vector中移除指定位置的元素
+        * `insert`：在指定位置插入元素
+        * 排序：`v.sort()`、`v.sort_unstable()`、`v.sort_by_key(|k| k.to_string())`
+        * ...
+* `HashMap`：键值对集合，可以快速地通过键来查找值
+    * 使用`HashMap`时，需要从标准库中引入到当前的作用域中来：`use std::collections::HashMap;`（String和Vec则不用，默认在`prelude`中）
+    * 创建：
+        * 使用`new`关联函数创建：`let mut scores = HashMap::new();`
+        * 使用`迭代器`和`collect`方法创建：
+            * `teams_list`是个`Vec`动态数组，`let teams_map: HashMap<_,_> = teams_list.into_iter().collect();`
+            * `into_iter` 方法将列表转为迭代器，接着通过 `collect` 进行收集
+            * `collect` 方法在内部实际上支持生成多种类型的目标集合，因此需要通过类型标注 `HashMap<_,_>` 来告诉编译器：请帮我们收集为 `HashMap` 集合类型，具体的 `KV` 类型
+    * 操作
+        * 插入或更新键值对：`scores.insert(String::from("Blue"), 10);`
+        * 查询新插入的值：`scores.get("Blue");`
 
 ### 3.10. 返回值和错误处理
 
+* `panic!`：当程序遇到无法处理的错误时，可以使用`panic!`宏来使程序崩溃并输出错误信息
+    * 比如：`panic!("crash and burn");`
+* 错误返回值：`Result<T, E>`枚举（`T`/`E`都是泛型参数）
+    * 其定义为：`enum Result<T, E> { Ok(T), Err(E), }`，其中`T`是成功时返回的类型，`E`是错误时返回的类型
+    * 用法：`let f = File::open("hello.txt");`，`f`的类型是`Result<T, E>`，其中`T`是`std::fs::File`，`E`是`std::io::Error`，表示文件打开失败时的错误类型。而后可以使用`match`匹配来处理错误，或者使用`unwrap`方法来直接返回错误
+* 传播错误返回值
+    * 可从函数中返回错误，交给调用链的上游，比如：`fn read_username_from_file() -> Result<String, io::Error> { ... }`
+    * 通过`?`操作符，将错误传播给调用者，`?`操作符会返回`Result`类型，如果`Ok`则返回`Ok`中的值，如果`Err`则返回`Err`中的值
+        * 比如：`let f = File::open("hello.txt")?;`，如果文件打开失败，则返回`Err`，否则返回`Ok`中的文件句柄
+        * 和`match`匹配相比，`?`操作符可以简化代码，避免重复的错误处理逻辑。相对于Go中的`if err != nil`，Rust的`?`操作符更加简洁和优雅。
+    * `try!`宏：在`?`之前，Rust有一个`try!`宏，用于将错误传播给调用者，但是`try!`宏已经被弃用，建议使用`?`操作符。
+
+下面是通过`match`和`?`操作符两种方式来处理错误的示例，都可以传递错误给调用者：
+
+```rust
+// match方式
+fn read_username_from_file() -> Result<String, io::Error> {
+    let f = File::open("hello.txt");
+    // 判断open函数的返回值，并向调用者返回错误
+    let mut f = match f {
+        Ok(file) => file,
+        Err(e) => return Err(e),
+    };
+    ...
+    // 保证返回和返回值类型一致
+    return Ok("success");
+}
+
+// ?方式
+fn read_username_from_file() -> Result<String, io::Error> {
+    // ?操作符会返回Result类型，如果Ok则返回Ok中的值，如果Err则返回Err中的值
+    // 和上面的match方式类似，但是更简洁
+    let mut f = File::open("hello.txt")?;
+    ...
+    return Ok("success");
+}
+```
+
 ### 3.11. 包和模块
 
-## 4. 小结
+Rust提供的包管理相关机制：
 
-Rust学习系列开篇，并温习了Rust基础语法。
+**包（Crate）**：一个包是一个独立的可编译单元，可以包含多个库或可执行文件
 
-## 5. 参考
+* 编译后会生成一个`可执行文件`或者一个`库`
+* 同一个包中不能有同名的类型，但是在不同包中就可以
+
+**项目（Package）**：一个项目是一个工作空间，可以包含多个包
+
+* 包的名称被crate占用，此处Package就翻译为项目了
+* 由于 Package 就是一个项目，因此它包含有独立的 `Cargo.toml` 文件，以及因为功能性被组织在一起的一个或多个包。
+* 一个 Package 只能包含**一个库(library)类型**的包(crate)，但是可以包含**多个二进制可执行类型**的包。
+    * 二进制Package：前面示例创建的都是默认的二进制Package
+    * 库Package：`cargo new my-lib --lib`，创建一个库Package，库Package会生成一个`src/lib.rs`文件，用于定义库的公共API。
+        * `cargo run`会报错，因为库类型的 Package 不能直接运行，只能作为三方库被其它项目引用。
+
+典型的Package结构：（这种目录结构基本上是 Rust 的标准目录结构，在 GitHub 的大多数项目上，你都将看到它的身影。）
+
+```sh
+.
+├── Cargo.toml
+├── Cargo.lock
+├── src
+│   ├── main.rs         # 默认二进制包：src/main.rs，编译后生成的可执行文件与 Package 同名
+│   ├── lib.rs          # 唯一库包：src/lib.rs
+│   └── bin             # 其余二进制包，会分别生成一个文件同名的可执行文件
+│       └── main1.rs
+│       └── main2.rs
+├── tests               # 集成测试文件
+│   └── some_integration_tests.rs
+├── benches             # 基准性能测试 benchmark 文件
+│   └── simple_bench.rs
+└── examples            # 项目示例
+    └── simple_example.rs
+```
+
+**模块（Module）**：一个模块是一个逻辑上的代码组织单元，可以包含多个函数、结构体、枚举等
+
+* 使用`模块`可以将包中的代码按照功能性进行重组，最终实现更好的`可读性`及`易用性`。还能灵活地控制代码的可见性，进一步强化Rust的`安全性`。
+* 使用 `mod` 关键字来创建新模块，后面紧跟着模块名称
+    * 模块可以嵌套；
+    * 可以定义各种 Rust 类型，例如函数、结构体、枚举、特征等
+    * 所有模块均定义在同一个文件中
+* 模块可见性
+    * Rust出于安全的考虑，默认情况下，所有的类型都是`私有化`的，包括函数、方法、结构体、枚举、常量，就连模块本身也是私有化的。
+        * 父模块完全无法访问子模块中的私有项，但是子模块却可以访问父模块的私有项
+        * 模块可见性不代表模块内部项的可见性，模块的可见性仅仅是允许其它模块去引用它，但是想要引用它内部的项，还得继续将对应的项标记为`pub`
+    * `pub`关键字，类似于其他语言的`public`和Go中的首字母大写
+
+模块定义和使用示例：
+
+```rust
+mod my_module {
+    // 模块中的函数
+    pub fn my_function() {
+        println!("Hello from my_module!");
+    }
+    // 模块中的结构体
+    pub struct MyStruct {
+        // 结构体字段
+        pub field: i32,
+    }
+    // 模块中的枚举
+    pub enum MyEnum {
+        // 枚举变体
+        Variant,
+    }
+    // 模块中的特征
+    pub trait MyTrait {
+        // 特征方法
+        fn my_method(&self);
+    }
+}
+
+// 模块的使用示例
+fn main() {
+    // 使用模块中的函数
+    my_module::my_function();
+
+    // 使用模块中的结构体
+    let my_struct = my_module::MyStruct { field: 42 };
+    println!("Field value: {}", my_struct.field);
+
+    // 使用模块中的枚举
+    let my_enum = my_module::MyEnum::Variant;
+}
+```
+
+## 4. Rust规范
+
+### 4.1. 注释和文档
+
+注释类型：
+
+* 单行注释：`//`
+* 多行注释/块注释：`/* ... */`
+* 文档注释：
+    * `///`用于生成文档行注释，`/** ... */`文档块注释
+    * 通过`cargo doc`，可直接生成 HTML 文件，放入target/doc目录下
+* 包和模块级别的注释（其实也算文档注释）
+    * 除了函数、结构体等 Rust 项的注释，还可以给包和模块添加注释，这些注释要添加到包、模块的最上方
+    * 包级别的注释也分为两种：行注释 `//!` 和块注释 `/*! ... */`
+
+文档测试：
+
+* Rust 允许我们在文档注释中写单元测试用例，这些测试用例会在我们运行 `cargo test` 时自动运行
+
+比如，下面的注释不仅仅是文档，还可以作为单元测试的用例运行，可使用`cargo test`运行测试。
+
+```rust
+/// `add_one` 将指定值加1
+///
+/// # Examples11
+///
+/// ```
+/// let arg = 5;
+/// let answer = world_hello::compute::add_one(arg);
+///
+/// assert_eq!(6, answer);
+/// ```
+pub fn add_one(x: i32) -> i32 {
+    x + 1
+}
+```
+
+### 4.2. 代码规范
+
+参考：[Rust 编码规范 V 1.0 beta](https://rust-coding-guidelines.github.io/rust-coding-guidelines-zh/)
+
+上面链接里也贴了一些社区公开的Rust编码规范：
+
+* 官方：[Rust API Guidelines](https://rust-lang.github.io/api-guidelines/about.html)
+* 官方：[Rust Style Guide](https://github.com/rust-lang/rust/tree/HEAD/src/doc/style-guide/src)
+* 还有PingCAP、Google Fuchsia 操作系统、RustAnalyzer编码风格等
+
+## 5. 小结
+
+Rust学习系列开篇，并学习梳理了Rust的基础语法，进行基本的demo练习操作。相关特性及使用和实现细节，在后续的学习实践中进一步深入理解。
+
+## 6. 参考
 
 1、[Rust开源教程：Rust语言圣经(Rust Course)](https://course.rs/about-book.html)
 
@@ -586,3 +810,5 @@ Rust学习系列开篇，并温习了Rust基础语法。
 5、[闭包：可以捕获环境的匿名函数](https://kaisery.github.io/trpl-zh-cn/ch13-01-closures.html)
 
 6、[陈天 · Rust 编程第一课](https://time.geekbang.org/column/article/408400)
+
+7、GPT
