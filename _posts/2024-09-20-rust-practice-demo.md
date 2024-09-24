@@ -24,9 +24,9 @@ Rust学习实践，进行Rust的“实战”（Demo）练习：文件搜索工�
 
 需求：构建一个简化版本的`grep`命令行程序，能够实现文件搜索功能。（客户需求比较模糊）
 
-### 2.1. 需求包
+### 2.1. 需求列表
 
-对需求进行分析拆分，梳理需求包如下：
+对需求进行分析拆分，梳理需求列表如下：
 
 * 支持从命令行参数中读取指定的文件名和字符串（必须）
 * 在相应的文件中找到包含该字符串的内容，最终打印出来（必须）
@@ -41,7 +41,7 @@ Rust学习实践，进行Rust的“实战”（Demo）练习：文件搜索工�
 
 暂实现必须需求，后续根据需要再迭代实现。
 
-### 2.2. 需求拆解
+### 2.2. 需求分解
 
 需求分解为任务项：
 
@@ -68,9 +68,100 @@ Rust学习实践，进行Rust的“实战”（Demo）练习：文件搜索工�
 * 各特性完成自身任务并进行单元测试
 * 模块集成后进行集成测试，通过后进行发测交付并进入下一个迭代
 
-## 3. 基本功能
+## 3. 基本功能实现
+
+说明：先跟着参考文章实现。
 
 创建项目：`cargo new minigrep`。
+
+### 3.1. 参数解析
+
+借助标准库中`std::env`模块的 `args()`函数进行命令参数解析。
+
+* `std::env`模块
+    * 进程环境的检查和操作，例如获取环境变量、命令行参数等
+    * [Module std::env](https://doc.rust-lang.org/std/env/index.html)
+* `std::env::args()`函数
+    * [Function std::env::args]((https://doc.rust-lang.org/std/env/fn.args.html))
+
+```rust
+use std::env;
+
+fn main() {
+    // 通过 collect 方法输出一个集合类型 Vector
+    let args : Vec<String> = env::args().collect();
+    // dbg!(&args);
+
+    // 暂只支持传入1个文件
+    if args.len() != 3 {
+        println!("usage: minigrep <query> <filename>");
+        return;
+    }
+
+    let query = &args[1];
+    let filename = &args[2];
+    println!("query:{}, filename:{}", query, filename);
+}
+```
+
+### 3.2. 文件读取
+
+借助标准库中`std::fs`模块，提供文件系统控制操作，例如文件读写、目录遍历等。
+
+* `std::fs`模块
+    * 文件系统控制操作，例如文件读写、目录遍历等
+    * [Module std::fs](https://doc.rust-lang.org/std/fs/index.html)
+* `std::fs::read_to_string`函数
+    * 读取整个文件内容到字符串中
+    * [Function std::fs::read_to_string](https://doc.rust-lang.org/std/fs/fn.read_to_string.html)
+
+读取参数指定的文件内容：
+
+```rust
+use std::env;
+use std::fs;
+
+fn main() {
+    // 省略参数解析
+    ...
+    // 通过std::fs模块的 read_to_string 读取文件内容
+    // 返回结果为 std::io::Result<String>，对应于 Result<T, E>，T为String，E为Error
+    let contents = std::fs::read_to_string(filename);
+    match contents {
+        Ok(contents) => println!("{}", contents),
+        Err(error) => println!("Problem opening the file: {:?}", error),
+    }
+}
+```
+
+运行：
+
+```shell
+[MacOS-xd@qxd ➜ minigrep git:(master) ✗ ]$ cargo run a Cargo.toml 
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running `target/debug/minigrep a Cargo.toml`
+query:a, filename:Cargo.toml
+[package]
+name = "minigrep"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+```
+
+不存在的文件：
+
+```shell
+[MacOS-xd@qxd ➜ minigrep git:(master) ✗ ]$ cargo run a Cargo.toml1
+   Compiling minigrep v0.1.0 (/Users/xd/Documents/workspace/src/rust_path/rust_learning/minigrep)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.46s
+     Running `target/debug/minigrep a Cargo.toml1`
+query:a, filename:Cargo.toml1
+Problem opening the file: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+```
+
+### 3.3. 文件搜索
+
 
 
 ## 4. 小结
@@ -79,3 +170,5 @@ Rust学习实践，进行Rust的“实战”（Demo）练习：文件搜索工�
 ## 5. 参考
 
 1、[入门实战：文件搜索工具](https://course.rs/basic-practice/intro.html)
+
+2、[Module std::env](https://doc.rust-lang.org/std/env/index.html)
