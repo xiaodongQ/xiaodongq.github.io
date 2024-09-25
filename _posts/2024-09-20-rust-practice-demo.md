@@ -170,8 +170,12 @@ Problem opening the file: Os { code: 2, kind: NotFound, message: "No such file o
     * 关注点分离(Separation of Concerns)
 * 命令行解析是比较基础的功能，还是放在 main.rs 中
 
-逐步优化：[minigrep代码](https://github.com/xiaodongQ/rust_learning/tree/master/minigrep/src/bin)
+代码逐步优化：[minigrep bin](https://github.com/xiaodongQ/rust_learning/tree/master/minigrep/src/bin) 和 [minigrep main](https://github.com/xiaodongQ/rust_learning/tree/master/minigrep/src/)
 
+* 参数解析处理抽取为函数
+* 解析函数返回值由 2个元素的元组 调整为 struct结构体(定义`struct Config`)
+* 创建Config实例的方式，由函数调整为`impl`实现结构体方法（关联函数） `new`，面向对象编程
+* 方法返回`Result<T, E>`错误码，方法名调整为`build`（语义更合适），并通过`闭包`处理错误
 
 ## 5. 小结
 
