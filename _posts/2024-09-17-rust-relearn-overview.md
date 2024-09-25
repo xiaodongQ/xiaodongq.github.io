@@ -602,6 +602,7 @@ Rust提供了多种内置的集合类型，如`Vec`、`HashMap`、`String`等。
         * `pop`：从Vector中移除并返回最后一个元素
         * `remove`：从Vector中移除指定位置的元素
         * `insert`：在指定位置插入元素
+        * 还可以像数组切片的方式获取动态数组的部分元素：`let v = vec![11, 22, 33, 44, 55];`，`assert_eq!(&v[1..=3], &[22, 33, 44])`
         * 排序：`v.sort()`、`v.sort_unstable()`、`v.sort_by_key(|k| k.to_string())`
         * ...
 * `HashMap`：键值对集合，可以快速地通过键来查找值
