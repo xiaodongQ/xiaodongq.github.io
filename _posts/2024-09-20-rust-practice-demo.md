@@ -170,12 +170,20 @@ Problem opening the file: Os { code: 2, kind: NotFound, message: "No such file o
     * 关注点分离(Separation of Concerns)
 * 命令行解析是比较基础的功能，还是放在 main.rs 中
 
-代码逐步优化：[minigrep bin](https://github.com/xiaodongQ/rust_learning/tree/master/minigrep/src/bin) 和 [minigrep main](https://github.com/xiaodongQ/rust_learning/tree/master/minigrep/src/)
+代码逐步优化：（过程代码见：[minigrep bin](https://github.com/xiaodongQ/rust_learning/tree/master/minigrep/src/bin) 和 [minigrep main](https://github.com/xiaodongQ/rust_learning/tree/master/minigrep/src/)）
 
 * 参数解析处理抽取为函数
+    * `fn parse_args(args : &Vec<String>) -> (&str, &str) { xxx }`
 * 解析函数返回值由 2个元素的元组 调整为 struct结构体(定义`struct Config`)
+    * `fn parse_args(args : &Vec<String>) -> Config { xxx }`
 * 创建Config实例的方式，由函数调整为`impl`实现结构体方法（关联函数） `new`，面向对象编程
+    * `impl Config { fn new(args : &[String]) -> Config { xxx} }`
+    * 处理：`let config = Config::new(&args);`
 * 方法返回`Result<T, E>`错误码，方法名调整为`build`（语义更合适），并通过`闭包`处理错误
+    * `impl Config { fn build(args : &[String]) -> Result<Config, &'static str> { xxx } }`
+    * 处理：`let config = Config::build(&args).unwrap_or_else(|err| { xxx }`
+    * `unwrap_or_else` 是定义在 `Result<T,E>` 上的常用方法，如果`Result`是`Ok`，那该方法就类似`unwrap`：返回`Ok`内部的值；如果是`Err`，就调用闭包中的自定义代码对错误进行进一步处理
+
 
 ## 5. 小结
 
