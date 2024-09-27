@@ -460,6 +460,9 @@ Rust编译器中可以确保引用**永远也不会变成悬垂状态**。
     * `match` 本身也是一个表达式，因此可以用它来赋值：`let ip_str = match ip1 { Direction::V4 => "IPv4", Direction::V6 => "IPv6" };`
 * 一个分支有两个部分：一个`模式`和针对该模式的`处理代码`
     * 通过 `=>` 运算符将模式和将要运行的代码分开，`Direction::East => println!("East"),`
+* **变量遮蔽**：`match`处理中若使用同名变量，会发生变量遮蔽，相当于新变量
+    * match 中的变量遮蔽其实不是那么的容易看出，最好不要使用同名，避免难以理解
+    * 比如：`match some_number { Some(some_number) => println!("{}", some_number), }`，Some中绑定的`some_number`会遮蔽外部的`some_number`，最好是使用不同的变量名，如`Some(value) => println!("{}", value),`
 
 示例如下：
 

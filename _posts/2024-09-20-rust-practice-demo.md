@@ -55,6 +55,10 @@ Rust学习实践，进行Rust的“实战”（Demo）练习：文件搜索工�
 * 持续集成模块
     * CI脚本编写，支持自动构建、测试、发布
 
+假设工具名为`minigrep`，流程示意图：
+
+![流程示意图](/images/2024-09-27-minigrep.png)
+
 ### 2.3. 迭代设计
 
 **迭代安排：**
@@ -160,30 +164,136 @@ query:a, filename:Cargo.toml1
 Problem opening the file: Os { code: 2, kind: NotFound, message: "No such file or directory" }
 ```
 
-### 3.3. 文件搜索
+### 3.3. 文件行匹配
+
+```rust
+fn main() {
+    // 省略参数解析
+    ...
+    // 通过std::fs模块的 read_to_string 读取文件内容
+    // 返回结果为 std::io::Result<String>，对应于 Result<T, E>，T为String，E为Error
+    let contents = std::fs::read_to_string(filename);
+    ...
+
+    let mut file_contents = String::new();
+    match contents {
+        // 此处Ok的模式匹配，绑定变量text，尽量不要用同名变量contents，会发生变量遮蔽，容易混淆
+        Ok(text) => {
+            file_contents = text;
+            println!("file contents:\n{}", file_contents);
+        }
+        Err(error) => println!("Problem opening the file: {:?}", error),
+    }
+
+    // 匹配逻辑
+    println!("\n==============result:==============");
+    for line in file_contents.lines() {
+        if line.contains(query) {
+            println!("{}", line);
+        }
+    }
+}
+```
+
+执行：
+
+```shell
+[MacOS-xd@qxd ➜ minigrep git:(master) ✗ ]$ cargo run --bin main1 name Cargo.toml 
+   Compiling minigrep v0.1.0 (/Users/xd/Documents/workspace/src/rust_path/rust_learning/minigrep)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.55s
+     Running `target/debug/main1 name Cargo.toml`
+cmd:target/debug/main1, query:name, file_path:Cargo.toml
+file contents:
+[package]
+name = "minigrep"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+
+==============result:==============
+name = "minigrep"
+```
+
+完整代码在：[minigrep main1](https://github.com/xiaodongQ/rust_learning/tree/master/minigrep/src/main1.rs)
 
 ## 4. 模块化设计
 
-上述代码都放在一个文件甚至一个main函数里，进行模块化拆分。
+上述代码都放在一个文件甚至一个main函数里，且部分逻辑不够简洁，进行模块化拆分和逻辑优化。
 
 * 程序分割为 main.rs 和 lib.rs，并将程序的逻辑代码移动到 lib.rs 内。
     * 关注点分离(Separation of Concerns)
 * 命令行解析是比较基础的功能，还是放在 main.rs 中
 
-代码逐步优化：（过程代码见：[minigrep bin](https://github.com/xiaodongQ/rust_learning/tree/master/minigrep/src/bin) 和 [minigrep main](https://github.com/xiaodongQ/rust_learning/tree/master/minigrep/src/)）
+代码逐步优化：（过程代码见：[minigrep main](https://github.com/xiaodongQ/rust_learning/tree/master/minigrep/src/)）
 
-* 参数解析处理抽取为函数
-    * `fn parse_args(args : &Vec<String>) -> (&str, &str) { xxx }`
-* 解析函数返回值由 2个元素的元组 调整为 struct结构体(定义`struct Config`)
+* 优化1：解析传入参数抽取为函数；匹配逻辑由 `match` 调整为 `unwrap()` 处理
+    * 抽取函数：`fn parse_args(args : &Vec<String>) -> (&str, &str) { xxx }`
+    * `match`模式匹配调整为`unwarp()`：`let file_contents = std::fs::read_to_string(file_path).unwrap();`
+        * unwrap 方法用于处理 Result 类型，如果 Result 类型是 Ok，则返回 Ok 中的值，否则程序会 panic
+    * 对应代码：[minigrep main2](https://github.com/xiaodongQ/rust_learning/tree/master/minigrep/src/bin/main2.rs)
+* 优化2：解析函数返回值由 2个元素的元组 调整为 struct结构体(定义`struct Config`)
     * `fn parse_args(args : &Vec<String>) -> Config { xxx }`
-* 创建Config实例的方式，由函数调整为`impl`实现结构体方法（关联函数） `new`，面向对象编程
+    * 对应代码：[minigrep main3](https://github.com/xiaodongQ/rust_learning/tree/master/minigrep/src/bin/main3.rs)
+* 优化3：创建Config实例的方式，由函数调整为`impl`实现结构体方法（关联函数）`new`，面向对象编程
     * `impl Config { fn new(args : &[String]) -> Config { xxx} }`
-    * 处理：`let config = Config::new(&args);`
-* 方法返回`Result<T, E>`错误码，方法名调整为`build`（语义更合适），并通过`闭包`处理错误
+        * 处理：`let config = Config::new(&args);`
+    * 对应代码：[minigrep main4](https://github.com/xiaodongQ/rust_learning/tree/master/minigrep/src/bin/main4.rs)
+* 优化4：使用`Result<T, E>`方式处理错误，方法名调整为`build`（语义更合适），并通过`闭包`处理错误
     * `impl Config { fn build(args : &[String]) -> Result<Config, &'static str> { xxx } }`
-    * 处理：`let config = Config::build(&args).unwrap_or_else(|err| { xxx }`
-    * `unwrap_or_else` 是定义在 `Result<T,E>` 上的常用方法，如果`Result`是`Ok`，那该方法就类似`unwrap`：返回`Ok`内部的值；如果是`Err`，就调用闭包中的自定义代码对错误进行进一步处理
+        * 处理：`let config = Config::build(&args).unwrap_or_else(|err| { xxx }`
+        * `unwrap_or_else` 是定义在 `Result<T,E>` 上的常用方法，如果`Result`是`Ok`，那该方法就类似`unwrap`：返回`Ok`内部的值；如果是`Err`，就调用闭包中的自定义代码对错误进行进一步处理
+    * 对应代码：[minigrep main5](https://github.com/xiaodongQ/rust_learning/tree/master/minigrep/src/bin/main5.rs)
+* 优化5：分离main里的业务逻辑，抽取为 run 函数
+    * `fn run(config : Config) -> Result<(), Box<dyn std::error::Error>> { xxx }`
+        * std::error::Error 是Rust标准库的一个 trait，定义了错误处理的行为
+        * dyn 表示动态分派，是Rust中的一种动态分派机制
+    * 对应代码：[minigrep main6](https://github.com/xiaodongQ/rust_learning/tree/master/minigrep/src/bin/main6.rs)
+* 优化6：分离业务逻辑到库包`lib.rs`中，并在`main.rs`里`use`引入；同时业务逻辑 `run` 中的匹配部分，继续抽取为 `search` 函数
+    * 注意分离到`lib.rs`中的结构体和函数定义，需要标记为`pub`，否则在`main.rs`中无法使用
+    * 可通过`use minigrep::Config;`，引入`lib.rs`中的`Config`结构体，然后使用`Config`；也可按`minigrep::Config`使用，显式指定包名
+    * 对应代码：[minigrep main](https://github.com/xiaodongQ/rust_learning/tree/master/minigrep/src/main.rs) 和 [minigrep lib](https://github.com/xiaodongQ/rust_learning/tree/master/minigrep/src/lib.rs)
 
+最后优化后的`main.rs`代码如下（`minigrep::run`逻辑则定义在`lib.rs`包中，完整内容见上述链接）：
+
+```rust
+use std::env;
+use minigrep::Config;
+
+fn main() {
+    // 模块化代码
+    // 通过 env::args() 获取命令行参数，返回一个迭代器。而后用 collect 方法输出一个集合类型 Vector
+    let args : Vec<String> = env::args().collect();
+    // 此处 unwrap_or_else 是Result实现的方法，使用闭包来处理错误
+    let config = Config::build(&args).unwrap_or_else(|err| {
+        println!("Problem parsing arguments: {}", err);
+        // 标准库，处理进程退出
+        std::process::exit(1);
+    });
+    println!("cmd:{}, query:{}, file_path:{}", &args[0], config.query, config.file_path);
+
+    // 匹配业务逻辑
+    // 用 if...let语法替换上一个文件中的match语法，更为简洁
+    if let Err(err) = minigrep::run(config) {
+        println!("run error: {}", err);
+        std::process::exit(1);
+    }
+}
+```
+
+运行结果：
+
+```shell
+[MacOS-xd@qxd ➜ minigrep git:(master) ✗ ]$ cargo run --bin minigrep name Cargo.toml 
+   Compiling minigrep v0.1.0 (/Users/xd/Documents/workspace/src/rust_path/rust_learning/minigrep)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.65s
+     Running `target/debug/minigrep name Cargo.toml`
+cmd:target/debug/minigrep, query:name, file_path:Cargo.toml
+
+========grep result:========
+name = "minigrep"
+```
 
 ## 5. 小结
 
