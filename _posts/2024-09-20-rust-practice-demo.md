@@ -295,11 +295,77 @@ cmd:target/debug/minigrep, query:name, file_path:Cargo.toml
 name = "minigrep"
 ```
 
-## 5. 小结
+## 5. 单元测试
 
+### 5.1. 典型结构
 
-## 6. 参考
+```rust
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+        assert_eq!(2 + 2, 4);
+    }
+}
+```
+
+* tests 就是一个**测试模块**，里面可以包含多个测试函数，比如`it_works`、`another_test`等
+* 测试函数需要使用 **`test`属性** 进行标注。测试模块既可以定义测试函数又可以定义非测试函数
+    * 相关断言：`assert_eq!`、`panic!`等
+* 运行测试用例：`cargo test`
+* 进一步学习可参考：[如何在 Rust 中编写测试代码](https://course.rs/test/intro.html)
+
+### 5.2. minigrep用例
+
+在lib.rs中新增如下单元测试，测试`search`匹配逻辑：
+
+```rust
+// 测试用例，测试 search 匹配逻辑
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // 通过 test属性 标注该函数为 测试函数
+    #[test]
+    fn one_result() {
+        let query = "duct";
+        let contents = "\
+Rust:
+safe, fast, productive.
+Pick three.
+Duct tape.";
+        assert_eq!(search(query, contents), vec!["safe, fast, productive."]);
+    }
+}
+```
+
+运行`cargo test`结果：
+
+```shell
+[MacOS-xd@qxd ➜ minigrep git:(master) ✗ ]$ cargo test
+   Compiling minigrep v0.1.0 (/Users/xd/Documents/workspace/src/rust_path/rust_learning/minigrep)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.09s
+     Running unittests src/lib.rs (target/debug/deps/minigrep-4f47be9d45c4d8b6)
+
+# 可看到运行了一个单元测试
+running 1 test
+test tests::one_result ... ok
+
+# 统计执行情况
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+# 下面还会检查 src/bin/main1.rs、main2.rs ... 等文件中是否有单元测试，如果有则运行
+...
+```
+
+## 6. 小结
+
+通过demo项目实践，对前面涉及的Rust基础语法和部分高级特性有了进一步的体感。前面看起来都懂了但是写起来还是得回头翻，果然还是需要多动手，做会而不是看会。
+
+## 7. 参考
 
 1、[入门实战：文件搜索工具](https://course.rs/basic-practice/intro.html)
 
 2、[Module std::env](https://doc.rust-lang.org/std/env/index.html)
+
+3、[如何在 Rust 中编写测试代码](https://course.rs/test/intro.html)
