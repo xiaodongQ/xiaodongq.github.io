@@ -798,6 +798,100 @@ pub fn add_one(x: i32) -> i32 {
 * 官方：[Rust Style Guide](https://github.com/rust-lang/rust/tree/HEAD/src/doc/style-guide/src)
 * 还有PingCAP、Google Fuchsia 操作系统、RustAnalyzer编码风格等
 
+此处贴几个常用的：
+
+* 空格使用
+    * 在冒号之后添加空格，在冒号之前不要加空格
+        * `fn lorem<T: Eq>(t: T)`
+    * 在范围（range）操作符（..和..=）前后不要使用空格
+        * `let ipsum = 0..=10;`、`let lorem = 0..10;`
+    * 在+或=操作符前后要加空格
+        * `let lorem: Dolor = Lorem`
+        * `let answer = 1 + 2;`
+    * 参考：[P.FMT.09 不同的场景，使用不同的空格风格](https://rust-coding-guidelines.github.io/rust-coding-guidelines-zh/safe-guides/code_style/fmt/P.FMT.09.html)
+
+```rust
+fn lorem<T: Eq>(t: T) {
+    let lorem: Dolor = Lorem {
+        ipsum: dolor,
+        sit: amet,
+    };
+}
+```
+
+* 括号：
+    * 左花括号与其定义保持同一行，包括 控制结构（if / match 等）、函数、结构体、枚举等
+    * 但是如果携带 `where` 语句，则要求换行，并且where 子句和 where 关键字不在同一行
+    * 参考：[P.FMT.04 左花括号位置](https://rust-coding-guidelines.github.io/rust-coding-guidelines-zh/safe-guides/code_style/fmt/P.FMT.04.html)
+
+```rust
+fn main() {
+    if lorem {
+        println!("ipsum!");
+    } else {
+        println!("dolor!");
+    }
+}
+
+// 左花括号和 函数语言项定义在同一行
+fn lorem() { 
+    // body
+}
+
+fn lorem<T>(ipsum: T)
+where // `where` 子句和 `where` 关键字不在同一行
+    T: Add + Sub + Mul + Div,
+{ // 当有 `where` 子句的时候，花括号换行
+    // body
+}
+
+// 结构体
+struct Lorem {
+    ipsum: bool,
+}
+```
+
+* 函数设计
+    * 函数返回值不要使用 `return`
+        * Rust中函数块会自动返回最后一个表达式的值，不需要显式地指定`return`
+        * 只有在函数过程中需要**提前返回**的时候再加`return`
+    * 函数的参数最长不宜超过五个
+    * 参考：[3.9 函数设计](https://rust-coding-guidelines.github.io/rust-coding-guidelines-zh/safe-guides/coding_practice/fn-design.html)
+
+```rust
+fn foo(x: usize) -> usize {
+    if x < 42{
+        return x;
+    }
+    x + 1 // 符合
+}
+```
+
+* 布尔值，使用`not()`方法代替逻辑取反运算符 `!`
+    * 相对较长的逻辑表达式来说很不显眼，`.not()`更容易吸引注意力
+    * `if cache.contains(&key).not() { xxx }`
+* 结构体：Rust的惯用方式是构建即初始化，避免先`::new()`再`set`，而是直接在初始化时赋值
+* 表达式
+    * 自增或自减运算使用`+=`或`-=`
+        * `++i`、`i++`、`i--`等不是合法的Rust表达式，`--i`虽然是合法的Rust表达式，但是表达对`i`取反两次，而不是自减语义
+* 控制流程
+    * 当需要通过多个`if`判断来比较大小来区分不同情况时，优先使用`match`和`cmp`来代替`if`表达式
+    * `if`条件表达式分支中如果包含了`else if`分支，也应该包含`else`分支
+* 集合容器
+    * 创建`HashMap`、`VecDeque`时，可以预先分配大约足够的容量来避免后续操作中产生多次分配
+        * `let mut map = HashMap::with_capacity(3);` vs ~~`let mut map = HashMap::new();`~~
+* 错误处理
+    * 在确定 `Option<T>` 和 `Result<T, E>`类型的值不可能或不应该是 `None` 或 `Err` 时，请用 `expect` 代替 `unwrap()`
+        * 虽然直接 `unwrap()` 也是可以的，但使用 `expect` 会有更加明确的语义
+        * 并且，在指定 `expect` 输出消息的时候，请使用肯定的描述，而非否定，用于提升可读性
+        * > expect 的语义：我不打算处理 None 或 Err 这种可能性，因为我知道这种可能性永远不会发生，或者，它不应该发生。但是 类型系统并不知道它永远不会发生。所以，我需要像类型系统保证，如果它确实发生了，它可以认为是一种错误，并且程序应该崩溃，并带着可以用于跟踪和修复该错误的栈跟踪信息。
+        * `let config = Config::read("some_config.toml").expect("Provide the correct configuration file");`
+        * vs ~~`let config = Config::read("some_config.toml").expect("No configuration file provided");`~~
+    * 不要滥用 `expect`，请考虑用 `unwrap_or_系列` 方法代替
+* 模块
+    * 将模块的测试移动到单独的文件，有助于增加编译速度。如`src/codes.rs`和`src/codes_test.rs`
+    * 导入模块不要随便使用 通配符`*`
+
 ## 5. 小结
 
 Rust学习系列开篇，并学习梳理了Rust的基础语法，进行基本的demo练习操作。相关特性及使用和实现细节，在后续的学习实践中进一步深入理解。
@@ -816,4 +910,6 @@ Rust学习系列开篇，并学习梳理了Rust的基础语法，进行基本的
 
 6、[陈天 · Rust 编程第一课](https://time.geekbang.org/column/article/408400)
 
-7、GPT
+7、[Rust 编码规范 V 1.0 beta](https://rust-coding-guidelines.github.io/rust-coding-guidelines-zh/)
+
+8、GPT
