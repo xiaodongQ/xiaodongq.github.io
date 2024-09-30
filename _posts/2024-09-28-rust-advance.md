@@ -30,9 +30,12 @@ Rust学习实践，进一步学习梳理Rust特性。
 * [Rust语言圣经(Rust Course) -- 进阶学习：生命周期](https://course.rs/advance/lifetime/intro.html)
 * [The Rust Programming Language -- Validating References with Lifetimes](https://doc.rust-lang.org/book/ch10-03-lifetime-syntax.html)
 
+对应代码练习，在 [test_lifetime](https://github.com/xiaodongQ/rust_learning/tree/master/test_lifetime)。
+
 > 在大多数时候，我们无需手动的声明生命周期，因为编译器可以自动进行推导。但是当多个生命周期存在，且编译器无法推导出某个引用的生命周期时，就需要我们手动标明生命周期。
 
 **生命周期标注并不会改变任何引用的实际作用域**，标记生命周期只是告诉Rust编译器，多个引用之间的生命周期关系。
+
 
 ### 2.1. 函数中的生命周期示例
 
@@ -282,13 +285,129 @@ struct Ref<'a, T> {
 }
 ```
 
+### 2.7. 其他
+
+#### 2.7.1. 闭包函数的消除规则
+
+下面两个一模一样功能的函数，一个正常编译，一个却报错，错误原因是编译器无法推测返回的引用和传入的引用谁活得更久：
+
+```rust
+// 对于函数的生命周期而言，它的消除规则之所以能生效是因为它的生命周期完全体现在签名的引用类型上，在函数体中无需任何体现
+fn fn_elision(x: &i32) -> &i32 { x }
+
+// 会报错
+// 闭包并没有函数那么简单，它的生命周期分散在参数和闭包函数体中(主要是它没有确切的返回值签名)
+// Rust 语言开发者目前其实是有意针对函数和闭包实现了两种不同的生命周期消除规则
+let closure_slision = |x: &i32| -> &i32 { x };
+```
+
+> 上述类似的问题，可能很难被解决，建议大家遇到后，还是老老实实用正常的函数，不要秀闭包了。
+
+#### 2.7.2. NLL: Non-Lexical Lifetimes
+
+`NLL: Non-Lexical Lifetimes`，**非词法生命周期**：
+
+`NLL` 是 Rust 1.31 版本引入的一个新特性，它允许编译器在编译时自动推导出生命周期，无需手动标注。
+
+在 `NLL` 出现之前，Rust 使用一种相对简单的“**词法**”生命周期规则，这意味着一个引用的有效范围通常由包含它的最内层大括号 `{}` 来界定。`NLL`引入了一种更加智能的方式来确定变量的生命周期。
+
+规则变化：由 "引用的生命周期正常来说应该从借用开始一直持续到作用域结束" 变为 "**引用的生命周期从借用处开始，一直持续到最后一次使用的地方**"
+
+```rust
+fn test_nll() {
+   let mut s = String::from("hello");
+
+    let r1 = &s;
+    let r2 = &s;
+    println!("{} and {}", r1, r2);
+    // 新编译器中(1.31开始)，r1,r2作用域在这里结束
+
+    let r3 = &mut s;
+    println!("{}", r3);
+
+    // 若此处还访问r1,r2，则可变引用r3存在，r1,r2被借用，无法访问。编译器会报错
+    // println!("{}", r2);
+}
+```
+
+#### 2.7.3. reborrow: 再借用
+
+```rust
+fn test_reborrow() {
+    let mut p = Point { x: 0, y: 0 };
+    let r = &mut p;
+    // 对于再借用而言，rr 再借用时不会破坏借用规则，但是不能在它的生命周期内再使用原来的借用 r
+    let rr: &Point = &*r;
+    // rr最后一次使用，基于NLL规则，rr作用域在这里结束
+
+    println!("{:?}", rr);
+    // 在 rr 的生命周期外，r 依然可以使用
+    r.move_to(10, 10);
+    println!("{:?}", r);
+}
+
+// 上面需要的结构体和方法定义
+#[derive(Debug)]
+struct Point {
+    x: i32,
+    y: i32,
+}
+impl Point {
+    fn move_to(&mut self, x: i32, y: i32) {
+        self.x = x;
+        self.y = y;
+    }
+}
+```
+
+#### 2.7.4. `&'static`生命周期
+
+`&'static` 生命周期表示一个引用存活得跟剩下的程序一样久。
+
+* `&'static`针对的仅仅是引用指向的数据，而不是持有该引用的变量，对于变量来说，还是要遵循相应的作用域规则。
+* 常见场景：字符串字面值 和 特征对象 的生命周期都是 `'static`
+    * `&'static` 是一种具体的引用类型，指代那些引用了程序全程有效数据的引用。意味着该引用指向的数据在程序的整个运行期间都是有效的。
+    * `T: 'static` 是一个泛型约束，其中`T`是某个类型参数。这里的 `'static` 表示类型 T 中包含的所有引用（如果有的话）都需要至少有 `'static` 生命周期
+
+```rust
+fn main() {
+    let mark_twain: &str = "Samuel Clemens";
+    print_author(mark_twain);
+    print(mark_twain);
+    get_memory_location();
+}
+
+// 'static 生命周期
+fn print_author(author: &'static str) {
+    println!("{}", author);
+}
+
+// 特征对象的生命周期也是 'static
+// T: 'static
+fn print<T: Display + 'static>(message: &T) {
+    println!("{}", message);
+}
+
+// &'static 生命周期针对的仅仅是引用，而不是持有该引用的变量，对于变量来说，还是要遵循相应的作用域规则
+fn get_memory_location() -> (usize, usize) {
+    // “Hello World” 是字符串字面量，因此它的生命周期是 `'static`.
+    // 但持有它的变量 `string` 的生命周期就不一样了，它完全取决于变量作用域，对于该例子来说，也就是当前的函数范围
+    let string = "Hello World!";
+    let pointer = string.as_ptr() as usize;
+    let length = string.len();
+    (pointer, length)
+    // `string` 在这里被 drop 释放
+    // 虽然变量被释放，无法再被访问，但是"Hello World!"数据依然还会继续存活
+}
+```
+
 ## 3. 小结
 
 
 ## 4. 参考
 
-1、[Rust语言圣经(Rust Course) -- Rust 进阶学习](https://course.rs/advance/intro.html)
+1、[Rust语言圣经(Rust Course) -- 基础入门：认识生命周期](https://course.rs/basic/lifetime.html)
 
-2、[Rust语言圣经(Rust Course) -- 基础入门：认识生命周期](https://course.rs/basic/lifetime.html)
+2、[Rust语言圣经(Rust Course) -- Rust 进阶学习](https://course.rs/advance/intro.html)
 
 3、[The Rust Programming Language -- Validating References with Lifetimes](https://doc.rust-lang.org/book/ch10-03-lifetime-syntax.html)
