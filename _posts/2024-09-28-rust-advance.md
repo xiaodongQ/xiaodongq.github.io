@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Rust学习实践（三） -- Rust特性进阶学习（上）
+title: Rust学习实践（三） -- Rust特性进阶学习：生命周期及函数式编程
 categories: Rust
 tags: Rust
 ---
@@ -16,13 +16,15 @@ Rust学习实践，进一步学习梳理Rust特性。
 
 上两篇过了一遍Rust基础语法并进行demo练习，本篇继续进一步学习下Rust特性。
 
-相关特性主要包含：生命周期、函数式编程（迭代器和闭包）、智能指针、循环引用、多线程并发编程；异步编程、Macro宏编程、Unsafe等，分两篇博客笔记梳理记录。
+相关特性主要包含：生命周期、函数式编程（迭代器和闭包）、智能指针、循环引用、多线程并发编程；异步编程、Macro宏编程、Unsafe等。
+
+限于篇幅，分多篇博客笔记梳理记录，本篇学习梳理：**生命周期** 及 **函数式编程（涉及闭包和迭代器）**。
 
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
 ## 2. 生命周期
 
-[之前](https://xiaodongq.github.io/2024/09/17/rust-relearn-overview/)过基础语法时，简单提到过生命周期的基本使用，这次进一步理解下。
+[之前](https://xiaodongq.github.io/2024/09/17/rust-relearn-overview/)过基础语法时，简单提到过生命周期的基本使用，这次进一步学习下。
 
 基于下述链接梳理学习：
 
@@ -35,7 +37,6 @@ Rust学习实践，进一步学习梳理Rust特性。
 > 在大多数时候，我们无需手动的声明生命周期，因为编译器可以自动进行推导。但是当多个生命周期存在，且编译器无法推导出某个引用的生命周期时，就需要我们手动标明生命周期。
 
 **生命周期标注并不会改变任何引用的实际作用域**，标记生命周期只是告诉Rust编译器，多个引用之间的生命周期关系。
-
 
 ### 2.1. 函数中的生命周期示例
 
@@ -332,6 +333,8 @@ fn test_nll() {
 
 #### 2.7.3. reborrow: 再借用
 
+对借用(`&`)的再进行借用：`& (*借用变量)`
+
 ```rust
 fn test_reborrow() {
     let mut p = Point { x: 0, y: 0 };
@@ -401,13 +404,386 @@ fn get_memory_location() -> (usize, usize) {
 }
 ```
 
-## 3. 小结
+## 3. 函数式编程
+
+函数式特性：闭包Closure、迭代器Iterator、模式匹配、枚举。这些函数式特性可以让代码的可读性和易写性大幅提升。
+
+### 3.1. 闭包基本示例
+
+[第一篇](https://xiaodongq.github.io/2024/09/17/rust-relearn-overview/) 简单介绍过闭包，下面用一个简单示例看闭包的好处（完整代码见 [github work_example](https://github.com/xiaodongQ/rust_learning/tree/master/test_functional/bin/work_example.rs)）。
+
+1、基础代码：不同公司工作不同工作时长，工作内容是写代码
+
+```rust
+/* ================== 基本工作：要求写指定时长的代码 =================== */
+fn program(duration: u32) {
+    println!("program duration:{}", duration);
+}
+
+fn work(time_base: u32, company_type: &str) {
+    if company_type == "955" {
+        program(time_base * 1);
+    } else if company_type == "996" {
+        program(time_base * 2);
+    } else {
+        println!("other company");
+    }
+}
+```
+
+2、新需求1：工作内容需要转换，`program()`改成`write_ppt()`
+
+* 存在的问题：需定义新的工作内容函数，并且要修改多处调用函数的位置。
+* 解决方式：使用函数成员，调用处统一修改为函数成员即可。
+
+```rust
+/* ================== 新需求1：工作内容修改为写ppt =================== */
+// 通过函数变量来修改工作内容
+fn write_ppt(duration: u32) {
+    println!("write_ppt duration:{}", duration);
+}
+fn work2(time_base: u32, company_type: &str) {
+    // 函数作为参数传递，可以动态修改工作内容
+    // let action = program;
+    let action = write_ppt;
+    if company_type == "955" {
+        action(time_base * 1);
+    } else if company_type == "996" {
+        action(time_base * 2);
+    } else {
+        println!("other company");
+    }
+}
+```
+
+2、新需求2：工作内容需要转换，`program()`改成`write_ppt()`，`write_ppt()`改成`write_report()`
+
+* 存在的问题：不仅入参需修改，工作内容函数也需要修改，并且要修改多处调用函数的位置。
+* 解决方式：使用闭包，后续再修改工作内容，只需修改闭包即可，无需修改其它地方。
+
+```rust
+/* ================== 新需求2：工作内容修改为销售，由时长调整为质量等级 =================== */
+// 使用闭包，并捕获外部变量
+fn work3(level: &str, company_type: &str) {
+    let action = || {
+        println!("company_type:{}, sell product, achieve level:{}", company_type, level);
+    };
+
+    if company_type == "955" {
+        action();
+    } else if company_type == "996" {
+        action();
+    } else {
+        println!("other company");
+    }
+}
+```
+
+```rust
+fn main() {
+    work(8, "955");
+    work2(8, "996");
+    work3("good", "955");
+}
+```
+
+运行：
+
+```sh
+[MacOS-xd@qxd ➜ test_functional git:(master) ✗ ]$ cargo run --bin work_example 
+   Compiling test_functional v0.1.0 (/Users/xd/Documents/workspace/src/rust_path/rust_learning/test_functional)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.52s
+     Running `target/debug/work_example`
+program duration:8
+write_ppt duration:16
+company_type:955, sell product, achieve level:good
+```
+
+通过上述示例，无论要修改什么，只要修改闭包 `action` 的实现即可，其它地方只负责调用。
+
+### 3.2. 闭包相关特性
+
+#### 3.2.1. 闭包的类型推导
+
+* 编译器会对闭包的类型进行推导
+    * `let sum = |x, y| x + y`
+        * 针对sum闭包，如果你只进行了声明，但是没有使用，编译器会报错提示你为x和y添加类型标注，因为它缺乏必要的上下文
+        * 如果加上`println!("sum(1, 2) = {}", sum(1, 2));`，则编译器会自动推导出x和y的类型为i32，编译正常
+    * 也可以显式标注类型：`let sum = |x: i32, y: i32| -> i32 { x + y };`
+* 虽然类型推导很好用，但是它不是泛型，当编译器推导出一种类型后，它就会一直使用该类型
+
+#### 3.2.2. 闭包的3种`Fn`系列特征
+
+当闭包从环境中捕获一个值时，会分配内存去存储这些值。与之相比，函数就不会去捕获这些环境值，因此定义和使用函数不会拥有这种内存负担。
+
+闭包捕获变量有三种途径，对应三种`Fn`特征(`trait`)：
+
+* 1、`FnOnce` 特征：该类型的闭包会拿走被捕获变量的所有权。**只能调用一次**，不能对已失去所有权的闭包变量进行二次调用。
+
+```rust
+fn fn_once<F>(func: F)
+where
+    F: FnOnce(usize) -> bool,
+{
+    println!("{}", func(3));
+    
+    // 下面会报错，因为 FnOnce 只能调用一次，上面调用后 func 的所有权已经转移
+    println!("{}", func(4));
+    // 上面where子句中，也在约束里添加Copy特征，即：`F: FnOnce(usize) -> bool + Copy,`，
+    // 则调用时使用的将是它的拷贝，所以并没有发生所有权的转移。那么第二次调用 func(4) 就不会报错了
+}
+
+// 使用方式
+fn test_fn_once() {
+    println!("=========== test_fn_once ===========");
+    let x = vec![1, 2, 3];
+
+    fn_once(|z|{z == x.len()});
+
+    // 如果要强制闭包转移所有权，可以使用在参数列表前加上 `move` 关键字
+    // fn_once(move |z|{z == x.len()});
+}
+```
+
+2、`FnMut` 特征：以**可变借用**的方式捕获环境中的值，可以修改该值
+
+```rust
+fn test_fn_mut() {
+    println!("=========== test_fn_mut ===========");
+    let mut s = String::new();
+
+    // 若按此处定义，则update_string调用时编译器会报错，内部不支持变量的可变借用。需要将update_string定义为可变闭包
+    // 添加mut关键字，可看到rust-analyzer推断其类型为 `impl FnMut(&str)`
+    // let update_string = |str| s.push_str(str);
+
+    let mut update_string = |str| s.push_str(str);
+
+    update_string("hello");
+    update_string(", world");
+
+    println!("{:?}", s);
+}
+```
+
+上面也可转换为下述形式，将闭包传给一个函数，并标记其类型为可变闭包，由编译器自动推导出其类型：
+
+```rust
+fn test_fn_mut_param() {
+    println!("=========== test_fn_mut_param ===========");
+    let mut s = String::new();
+    let update_string =  |str| s.push_str(str);
+    // 闭包作为参数传递给函数，此处会转移所有权
+    exec_fn_mut(update_string);
+    println!("{:?}", s);
+}
+
+// 泛型参数标注闭包为 FnMut 特征，并传递可变借用
+fn exec_fn_mut<'a, F: FnMut(&'a str)>(mut f: F) {
+    f("hello2");
+    f(", world2");
+}
+```
+
+上面`exec`处会转移闭包的所有权，可知此处闭包没有实现`Copy`特征。但并不是所有闭包都是没实现`Copy`特征的。
+
+* 闭包自动实现`Copy`特征(trait)的规则是：只要闭包捕获的类型都实现了`Copy`特征的话，这个闭包就会默认实现`Copy`特征。
+
+3、`Fn` 特征：以**不可变借用**的方式捕获环境中的值
+
+```rust
+fn test_fn_trait() {
+    println!("=========== test_fn_trait ===========");
+    let mut s = "hello".to_string();
+
+    // 传给 exec_fn 会报错，该闭包中要修改变量，而 Fn 特征要求闭包为不可变借用
+    // let update_string =  |str| s.push_str(str);
+
+    let update_string = |str| println!("{}, {}", s, str);
+    exec_fn(update_string);
+
+    println!("s: {:?}", s);
+}
+
+// 泛型参数标注闭包为 Fn 特征，并传递不可变借用的闭包
+fn exec_fn<'a, F: Fn(&'a str)>(f: F) {
+    f("world")
+}
+```
+
+上述完整代码([test_fn_trait](https://github.com/xiaodongQ/rust_learning/tree/master/test_functional/bin/test_fn_trait.rs))运行结果：
+
+```sh
+# cargo run --bin test_fn_trait
+...
+sum(1, 2) = 3
+=========== test_fn_once ===========
+fn_once: true
+=========== test_fn_mut ===========
+"hello, world"
+=========== test_fn_mut_param ===========
+"hello2, world2"
+=========== test_fn_trait ===========
+hello, world
+s: "hello"
+```
+
+**三种 `Fn`特征 的关系：**
+
+* 所有的闭包都自动实现了 `FnOnce` 特征，因此任何一个闭包都至少可以被调用一次
+* 没有 移出所捕获变量所有权 的闭包自动实现了 `FnMut` 特征
+* 不需要对捕获变量进行改变的闭包自动实现了 `Fn` 特征
+
+#### 3.2.3. 闭包作为函数返回值
+
+```rust
+fn main() {
+    let f = factory(2);
+    println!("f(3) = {}", f(3));
+}
+
+fn factory(x:i32) -> impl Fn(i32) -> i32 {
+
+    let num = 5;
+    move |x| x + num
+
+    // 注意：impl Trait 的返回方式有一个非常大的局限，就是只能返回同样的类型
+    // 就算签名一样的闭包，类型也是不同的，因此在这种情况下，就无法再使用 impl Trait 的方式去返回闭包
+    // if x > 1{
+    //     move |x| x + num
+    // } else {
+    //     move |x| x - num
+    // }
+}
+```
+
+前面学习Rust基本特性时，特征(`trait`)一带而过，本篇有好几处涉及到trait的一些特性，在稍后也补充学习下这块的模糊留白。
+
+### 3.3. 迭代器
 
 
-## 4. 参考
+
+## 4. 特征：Trait
+
+类似其他语言中的接口（`interface`）和抽象类（`abstract class`），定义了某个类型必须实现的一组方法，用于定义共享的行为。
+
+### 4.1. 基本使用示例
+
+```rust
+// 定义一个特征
+pub trait Summary {
+    // 签名，不包含具体实现
+    fn summarize_author(&self) -> String;
+
+    // 也可以定义默认实现，为类型impl实现时可进行重载
+    fn summarize(&self) -> String {
+        format!("(Read more from {}...)", self.summarize_author())
+    }
+}
+
+// 定义一个类型，并为其实现特征
+pub struct Weibo {
+    pub username: String,
+    pub content: String
+}
+// 实现特征
+impl Summary for Weibo {
+    fn summarize_author(&self) -> String {
+        format!("@{}", self.username)
+    }
+}
+
+// 使用方式
+fn main() {
+    let weibo = Weibo{username: "sunface".to_string(),content: "好像微博没Tweet好用".to_string()};
+    println!("{}",weibo.summarize());
+}
+```
+
+### 4.2. 作为函数参数
+
+```rust
+pub fn notify(item: &impl Summary) {
+    println!("Breaking news! {}", item.summarize());
+}
+```
+
+意思是：实现了`Summary`特征 的 `item` 参数。可以使用任何实现了`Summary`特征的类型作为该函数的参数，同时在函数体内，还可以调用该特征的方法。
+
+### 4.3. 特征约束
+
+`impl Trait`语法实际是一个语法糖，形如 `T: Summary` 被称为**特征约束**。
+
+下面是几种使用形式：
+
+```rust
+// 函数接受一个实现了 Summary特征 的 iterm
+pub fn notify<T: Summary>(item: &T) {
+    println!("Breaking news! {}", item.summarize());
+}
+
+// 两个参数是同一类型，且该类型实现了 Summary特征
+pub fn notify<T: Summary>(item1: &T, item2: &T) {}
+
+// 多重特征约束，实现了 Summary特征 和 Display特征
+pub fn notify<T: Summary + Display>(item: &T) {}
+// 不用特征约束的话，可以这么写
+pub fn notify(item: &(impl Summary + Display)) {}
+
+// 特征约束很复杂的时候，可以使用 where 简化
+fn some_function<T: Display + Clone, U: Clone + Debug>(t: &T, u: &U) -> i32 {}
+// 用 where约束 简化如下：
+fn some_function<T, U>(t: &T, u: &U) -> i32
+    where T: Display + Clone,
+          U: Clone + Debug
+{}
+```
+
+### 4.4. 作为返回值
+
+这种返回值方式有一个很大的限制：只能有一个具体的类型。要实现返回不同类型，需要使用"**特征对象**"
+
+```rust
+// 对于 returns_summarizable 的调用者而言，只知道返回了一个实现了 Summary 特征的对象，但是并不知道返回了一个 Weibo 类型
+fn returns_summarizable() -> impl Summary {
+    Weibo {
+        username: String::from("sunface"),
+        content: String::from(
+            "m1 max太厉害了，电脑再也不会卡",
+        )
+    }
+}
+```
+
+### 4.5. 通过`derive`派生特征
+
+`#[derive(Debug)]`形式，是一种`特征派生`语法，被 `derive` 标记的对象会自动实现对应的默认特征代码，继承相应的功能。（`derive /dɪ'raɪv/`，源于）
+
+* 例如 `Debug` 特征，它有一套自动实现的默认代码，当你给一个结构体标记后，就可以使用 `println!("{:?}", s)` 的形式打印该结构体的对象。
+* 再如 `Copy` 特征，它也有一套自动实现的默认代码，当标记到一个类型上时，可以让这个类型自动实现 `Copy` 特征，进而可以调用 `copy` 方法，进行自我复制。
+
+> 总之，`derive` 派生出来的是 Rust 默认给我们提供的特征，在开发过程中极大的简化了自己手动实现相应特征的需求，当然，如果你有特殊的需求，还可以自己手动重载该实现。
+
+### 4.6. 通过`std::prelude`引入特征
+
+如果你要使用一个特征的方法，那么你需要将该特征引入当前的作用域中。
+
+Rust 提供了一个非常便利的办法，即把**最常用的标准库中的特征**通过 `std::prelude` 模块提前引入到当前作用域中。（`prelude /'preljuːd/`，开端，序幕）
+
+```rust
+use std::prelude;
+// xxx
+```
+
+## 5. 小结
+
+梳理学习 生命周期、函数式编程（涉及闭包和迭代器）、特征（trait）等特性。其他特性在另外的篇幅继续学习。
+
+## 6. 参考
 
 1、[Rust语言圣经(Rust Course) -- 基础入门：认识生命周期](https://course.rs/basic/lifetime.html)
 
 2、[Rust语言圣经(Rust Course) -- Rust 进阶学习](https://course.rs/advance/intro.html)
 
 3、[The Rust Programming Language -- Validating References with Lifetimes](https://doc.rust-lang.org/book/ch10-03-lifetime-syntax.html)
+
+4、[特征 Trait](https://course.rs/basic/trait/trait.html)
