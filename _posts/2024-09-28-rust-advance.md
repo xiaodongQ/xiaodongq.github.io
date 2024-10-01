@@ -14,7 +14,7 @@ Rust学习实践，进一步学习梳理Rust特性。
 
 ## 1. 背景
 
-上两篇过了一遍Rust基础语法并进行demo练习，本篇继续进一步学习下Rust特性。
+上两篇过了一遍Rust基础语法并进行demo练习，本篇继续学习下Rust特性。
 
 相关特性主要包含：生命周期、函数式编程（迭代器和闭包）、智能指针、循环引用、多线程并发编程；异步编程、Macro宏编程、Unsafe等。
 
@@ -367,10 +367,12 @@ impl Point {
 
 `&'static` 生命周期表示一个引用存活得跟剩下的程序一样久。
 
-* `&'static`针对的仅仅是引用指向的数据，而不是持有该引用的变量，对于变量来说，还是要遵循相应的作用域规则。
-* 常见场景：字符串字面值 和 特征对象 的生命周期都是 `'static`
-    * `&'static` 是一种具体的引用类型，指代那些引用了程序全程有效数据的引用。意味着该引用指向的数据在程序的整个运行期间都是有效的。
-    * `T: 'static` 是一个泛型约束，其中`T`是某个类型参数。这里的 `'static` 表示类型 T 中包含的所有引用（如果有的话）都需要至少有 `'static` 生命周期
+`&'static`针对的仅仅是引用指向的数据，而不是持有该引用的变量，对于变量来说，还是要遵循相应的作用域规则。
+
+常见场景：字符串字面值 和 特征对象 的生命周期都是 `'static`
+
+* `&'static` 是一种具体的引用类型，指代那些引用了程序全程有效数据的引用。意味着该引用指向的数据在程序的整个运行期间都是有效的。
+* `T: 'static` 是一个泛型约束，其中`T`是某个类型参数。这里的 `'static` 表示类型 T 中包含的所有引用（如果有的话）都需要至少有 `'static` 生命周期
 
 ```rust
 fn main() {
@@ -505,12 +507,14 @@ company_type:955, sell product, achieve level:good
 
 #### 3.2.1. 闭包的类型推导
 
-* 编译器会对闭包的类型进行推导
-    * `let sum = |x, y| x + y`
-        * 针对sum闭包，如果你只进行了声明，但是没有使用，编译器会报错提示你为x和y添加类型标注，因为它缺乏必要的上下文
-        * 如果加上`println!("sum(1, 2) = {}", sum(1, 2));`，则编译器会自动推导出x和y的类型为i32，编译正常
-    * 也可以显式标注类型：`let sum = |x: i32, y: i32| -> i32 { x + y };`
-* 虽然类型推导很好用，但是它不是泛型，当编译器推导出一种类型后，它就会一直使用该类型
+编译器会对闭包的类型进行推导
+
+* `let sum = |x, y| x + y`
+    * 针对sum闭包，如果你只进行了声明，但是没有使用，编译器会报错提示你为x和y添加类型标注，因为它缺乏必要的上下文
+    * 如果加上`println!("sum(1, 2) = {}", sum(1, 2));`，则编译器会自动推导出x和y的类型为i32，编译正常
+* 也可以显式标注类型：`let sum = |x: i32, y: i32| -> i32 { x + y };`
+
+虽然类型推导很好用，但是它不是泛型，当编译器推导出一种类型后，它就会一直使用该类型
 
 #### 3.2.2. 闭包的3种`Fn`系列特征
 
@@ -518,7 +522,7 @@ company_type:955, sell product, achieve level:good
 
 闭包捕获变量有三种途径，对应三种`Fn`特征(`trait`)：
 
-* 1、`FnOnce` 特征：该类型的闭包会拿走被捕获变量的所有权。**只能调用一次**，不能对已失去所有权的闭包变量进行二次调用。
+1、`FnOnce` 特征：该类型的闭包会拿走被捕获变量的所有权。**只能调用一次**，不能对已失去所有权的闭包变量进行二次调用。
 
 ```rust
 fn fn_once<F>(func: F)
@@ -660,7 +664,71 @@ fn factory(x:i32) -> impl Fn(i32) -> i32 {
 
 ### 3.3. 迭代器
 
+#### 3.3.1. 基本使用
 
+下述是几个迭代器的使用示例，Rust把数组当成一个迭代器，直接去遍历其中的元素，从哪里开始，从哪里结束，都无需操心。
+
+```rust
+fn test_iter() {
+    let arr = [1, 2, 3];
+    // 严格来说，Rust中的for循环是编译器提供的语法糖，最终还是对迭代器中的元素进行遍历。
+    // 数组实现了 IntoIterator 特征，编译器通过for语法糖，自动把实现了该特征的数组类型转换为迭代器
+    for v in arr {
+        println!("{}",v);
+    }
+    // 对数值序列进行迭代
+    for i in 1..10 {
+        println!("{}", i);
+    }
+    // 通过IntoIterator特征的 into_iter 方法，显式转换为迭代器
+    for v in arr.into_iter() {
+        println!("{}", v);
+    }
+    // 显式定义迭代器，并进行迭代
+    let it = arr.iter();
+    for v in it {
+        println!("{}", v);
+    }
+}
+```
+
+在 Rust 中，迭代器是**惰性初始化**的，意味着如果你不使用它，那么它将不会发生任何事。这种惰性初始化的方式确保了创建迭代器不会有任何额外的性能损耗，其中的元素也不会被消耗，只有使用到该迭代器的时候，一切才开始。
+
+3种转换为迭代器的方法：
+
+* `into_iter`：会夺走所有权
+* `iter`：借用
+* `iter_mut`：可变借用
+
+迭代器的`next`方法：用于显式迭代，返回`Option`类型，当迭代器中还有元素时，返回`Some`，否则返回`None`。
+
+```rust
+fn test_next() {
+    let arr = [1, 2, 3];
+    // next 会改变迭代器其中的状态数据，所以迭代器定义时需要使用 mut 关键字
+    let mut arr_iter = arr.into_iter();
+    // 若通过iter_mut定义迭代器，则迭代器中的数据会自动变为可变数据，下面断言比较需调整为 assert_eq!(arr_iter.next(), Some(&mut 1)); 形式
+    // let mut arr_iter = arr.iter_mut();
+    // 通过next方法，显式迭代
+    assert_eq!(arr_iter.next(), Some(1));
+    assert_eq!(arr_iter.next(), Some(2));
+    assert_eq!(arr_iter.next(), Some(3));
+    assert_eq!(arr_iter.next(), None);
+}
+```
+
+#### 3.3.2. 适配器
+
+只有实现了 `Iterator`特征 才叫迭代器。`Iterator`特征有很多不同功能的方法，标准库提供了默认实现。具体可参考：[Rust标准库 -- Iterator trait](https://ggdoc.rust-lang.org/std/iter/trait.Iterator.html#method.sum)
+
+迭代器的方法，分2大类：
+
+* **消费性适配器（`consuming adaptors`）**：只要迭代器上的某个方法(`A`)在其内部调用了`next`方法，那么该方法(`A`)就被称为消费性适配器。
+    * 因为 `next` 方法会消耗掉迭代器上的元素，所以方法`A`的调用也会消耗掉迭代器上的元素
+    * 比如 `Iterator`特征 中的[`sum`方法](https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.sum)，它会拿走迭代器的所有权，然后通过不断调用 `next` 方法对里面的元素进行求和
+* **迭代器适配器**：顾名思义，会返回一个新的迭代器，这是实现链式方法调用的关键，比如：`v.iter().map().filter()...`
+    * 与消费者适配器不同，迭代器适配器是惰性的，意味着你需要一个消费者适配器来收尾，最终将迭代器转换成一个具体的值
+    * 比如：`v1.iter().map(|x| x + 1).collect();`，[`collect`方法](https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.collect)就是一个消费者适配器，它将迭代器转换为一个具体的值
 
 ## 4. 特征：Trait
 
@@ -774,6 +842,14 @@ use std::prelude;
 // xxx
 ```
 
+### 4.7. 特征对象
+
+要先学习理解下智能指针，此处先简单记录，后续再进一步学习：[特征对象](https://course.rs/basic/trait/trait-object.html)。
+
+在 Rust 中，特征对象（trait object）是一种特殊的动态分发机制，它允许你在运行时处理不同类型的值。特征对象通常用于当你需要一个可以引用多种类型值的接口，而这些类型都实现了相同的 trait。
+
+特征对象通过 `Box<dyn Trait>` 或者 `&dyn Trait` 的形式来表示，其中 Trait 是你定义的一个 trait。
+
 ## 5. 小结
 
 梳理学习 生命周期、函数式编程（涉及闭包和迭代器）、特征（trait）等特性。其他特性在另外的篇幅继续学习。
@@ -786,4 +862,6 @@ use std::prelude;
 
 3、[The Rust Programming Language -- Validating References with Lifetimes](https://doc.rust-lang.org/book/ch10-03-lifetime-syntax.html)
 
-4、[特征 Trait](https://course.rs/basic/trait/trait.html)
+4、[Rust语言圣经(Rust Course) -- 特征 Trait](https://course.rs/basic/trait/trait.html)
+
+5、[Rust标准库 -- Iterator trait](https://ggdoc.rust-lang.org/std/iter/trait.Iterator.html#method.sum)
