@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Rust学习实践（三） -- Rust特性进阶学习：生命周期及函数式编程
+title: Rust学习实践（三） -- Rust特性：生命周期及函数式编程
 categories: Rust
 tags: Rust
 ---
@@ -18,7 +18,7 @@ Rust学习实践，进一步学习梳理Rust特性。
 
 相关特性主要包含：生命周期、函数式编程（迭代器和闭包）、智能指针、循环引用、多线程并发编程；异步编程、Macro宏编程、Unsafe等。
 
-限于篇幅，分多篇博客笔记梳理记录，本篇学习梳理：**生命周期** 及 **函数式编程（涉及闭包和迭代器）**。
+限于篇幅，分多篇博客笔记梳理记录，本篇主要涉及：**生命周期** 及 **函数式编程（涉及闭包和迭代器）**。
 
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
@@ -522,7 +522,7 @@ company_type:955, sell product, achieve level:good
 
 闭包捕获变量有三种途径，对应三种`Fn`特征(`trait`)：
 
-1、`FnOnce` 特征：该类型的闭包会拿走被捕获变量的所有权。**只能调用一次**，不能对已失去所有权的闭包变量进行二次调用。
+1、**`FnOnce` 特征**：该类型的闭包会拿走被捕获变量的所有权。**只能调用一次**，不能对已失去所有权的闭包变量进行二次调用。
 
 ```rust
 fn fn_once<F>(func: F)
@@ -549,7 +549,7 @@ fn test_fn_once() {
 }
 ```
 
-2、`FnMut` 特征：以**可变借用**的方式捕获环境中的值，可以修改该值
+2、**`FnMut` 特征**：以**可变借用**的方式捕获环境中的值，可以修改该值
 
 ```rust
 fn test_fn_mut() {
@@ -592,7 +592,7 @@ fn exec_fn_mut<'a, F: FnMut(&'a str)>(mut f: F) {
 
 * 闭包自动实现`Copy`特征(trait)的规则是：只要闭包捕获的类型都实现了`Copy`特征的话，这个闭包就会默认实现`Copy`特征。
 
-3、`Fn` 特征：以**不可变借用**的方式捕获环境中的值
+3、**`Fn` 特征**：以**不可变借用**的方式捕获环境中的值
 
 ```rust
 fn test_fn_trait() {
@@ -660,8 +660,6 @@ fn factory(x:i32) -> impl Fn(i32) -> i32 {
 }
 ```
 
-前面学习Rust基本特性时，特征(`trait`)一带而过，本篇有好几处涉及到trait的一些特性，在稍后也补充学习下这块的模糊留白。
-
 ### 3.3. 迭代器
 
 #### 3.3.1. 基本使用
@@ -725,12 +723,14 @@ fn test_next() {
 
 * **消费性适配器（`consuming adaptors`）**：只要迭代器上的某个方法(`A`)在其内部调用了`next`方法，那么该方法(`A`)就被称为消费性适配器。
     * 因为 `next` 方法会消耗掉迭代器上的元素，所以方法`A`的调用也会消耗掉迭代器上的元素
-    * 比如 `Iterator`特征 中的[`sum`方法](https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.sum)，它会拿走迭代器的所有权，然后通过不断调用 `next` 方法对里面的元素进行求和
+    * 比如 `Iterator`特征 中的 [sum方法](https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.sum)，它会拿走迭代器的所有权，然后通过不断调用 `next` 方法对里面的元素进行求和
 * **迭代器适配器**：顾名思义，会返回一个新的迭代器，这是实现链式方法调用的关键，比如：`v.iter().map().filter()...`
     * 与消费者适配器不同，迭代器适配器是惰性的，意味着你需要一个消费者适配器来收尾，最终将迭代器转换成一个具体的值
-    * 比如：`v1.iter().map(|x| x + 1).collect();`，[`collect`方法](https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.collect)就是一个消费者适配器，它将迭代器转换为一个具体的值
+    * 比如：`v1.iter().map(|x| x + 1).collect();`，[collect方法](https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.collect) 就是一个消费者适配器，它将迭代器转换为一个具体的值
 
 ## 4. 特征：Trait
+
+前面学习Rust基本特性时，特征(`trait`)一带而过，本篇有好几处涉及到trait的一些特性，此处也补充学习下这块的模糊留白。
 
 类似其他语言中的接口（`interface`）和抽象类（`abstract class`），定义了某个类型必须实现的一组方法，用于定义共享的行为。
 
@@ -824,7 +824,7 @@ fn returns_summarizable() -> impl Summary {
 
 ### 4.5. 通过`derive`派生特征
 
-`#[derive(Debug)]`形式，是一种`特征派生`语法，被 `derive` 标记的对象会自动实现对应的默认特征代码，继承相应的功能。（`derive /dɪ'raɪv/`，源于）
+`#[derive(Debug)]`形式，是一种`特征派生`语法，被 `derive` 标记的对象会自动实现对应的默认特征代码，继承相应的功能。（`derive /dɪ'raɪv/`，导出、源于、由来）
 
 * 例如 `Debug` 特征，它有一套自动实现的默认代码，当你给一个结构体标记后，就可以使用 `println!("{:?}", s)` 的形式打印该结构体的对象。
 * 再如 `Copy` 特征，它也有一套自动实现的默认代码，当标记到一个类型上时，可以让这个类型自动实现 `Copy` 特征，进而可以调用 `copy` 方法，进行自我复制。
@@ -835,7 +835,7 @@ fn returns_summarizable() -> impl Summary {
 
 如果你要使用一个特征的方法，那么你需要将该特征引入当前的作用域中。
 
-Rust 提供了一个非常便利的办法，即把**最常用的标准库中的特征**通过 `std::prelude` 模块提前引入到当前作用域中。（`prelude /'preljuːd/`，开端，序幕）
+Rust 提供了一个非常便利的办法，即把**最常用的标准库中的特征**通过 `std::prelude` 模块提前引入到当前作用域中。（`prelude /'preljuːd/`，开端、序幕）
 
 ```rust
 use std::prelude;
@@ -848,11 +848,11 @@ use std::prelude;
 
 在 Rust 中，特征对象（trait object）是一种特殊的动态分发机制，它允许你在运行时处理不同类型的值。特征对象通常用于当你需要一个可以引用多种类型值的接口，而这些类型都实现了相同的 trait。
 
-特征对象通过 `Box<dyn Trait>` 或者 `&dyn Trait` 的形式来表示，其中 Trait 是你定义的一个 trait。
+特征对象通过 `Box<dyn Trait>` 或者 `&dyn Trait` 的形式来表示。
 
 ## 5. 小结
 
-梳理学习 生命周期、函数式编程（涉及闭包和迭代器）、特征（trait）等特性。其他特性在另外的篇幅继续学习。
+梳理学习了 生命周期、函数式编程（涉及闭包和迭代器）、特征（trait）等特性。其他特性在后续的篇幅继续学习。
 
 ## 6. 参考
 

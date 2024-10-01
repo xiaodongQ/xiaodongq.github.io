@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Rust学习实践（三） -- Rust特性进阶学习：生命周期及函数式编程
+title: Rust学习实践（四） -- Rust特性：智能指针
 categories: Rust
 tags: Rust
 ---
@@ -8,7 +8,7 @@ tags: Rust
 * content
 {:toc}
 
-Rust学习实践，进一步学习梳理Rust特性，智能指针。
+Rust学习实践，进一步学习梳理Rust特性：智能指针。
 
 
 
