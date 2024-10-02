@@ -45,7 +45,7 @@ Rust中的智能指针有好几种，此处介绍以下最常用的几种：
 **基本用法：**
 
 ```rust
-fn main() {
+fn test_simple() {
     // 创建一个智能指针指向了存储在堆上的 3，并且 a 持有了该指针
     {
         let a = Box::new(3);
@@ -62,8 +62,33 @@ fn main() {
     // 下面使用会报错：cannot find value `a` in this scope
     // let c = *a + 2;
 }
-```
 
+fn test_array() {
+    // 在栈上创建一个长度为1000的数组
+    let arr = [0;1000];
+    // 将arr所有权转移arr1，由于 `arr` 分配在栈上，因此这里实际上是直接重新深拷贝了一份数据
+    let arr1 = arr;
+
+    // arr 和 arr1 都拥有各自的栈上数组，因此不会报错
+    println!("{:?}", arr.len());
+    println!("{:?}", arr1.len());
+
+    // 在堆上创建一个长度为1000的数组，然后使用一个智能指针指向它
+    let arr = Box::new([0;1000]);
+    // 将堆上数组的所有权转移给 arr1，由于数据在堆上，因此仅仅拷贝了智能指针的结构体，底层数据并没有被拷贝
+    // 所有权顺利转移给 arr1，arr 不再拥有所有权
+    let arr1 = arr;
+    println!("{:?}", arr1.len());
+    // 由于 arr 不再拥有底层数组的所有权，因此下面代码将报错
+    // println!("{:?}", arr.len());
+}
+
+fn test_arr_box() {
+    let arr = vec![Box::new(1), Box::new(2)];
+    let (first, second) = (&arr[0], &arr[1]);
+    let sum = **first + **second;
+}
+```
 
 
 ## 3. 小结
