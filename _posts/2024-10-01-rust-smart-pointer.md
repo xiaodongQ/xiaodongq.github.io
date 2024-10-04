@@ -157,13 +157,43 @@ fn test_deref() {
 }
 ```
 
-### 3.3. 隐式 Deref 转换
+### 3.3. 隐式Deref转换
 
 对于函数和方法的传参，Rust 提供了一个极其有用的隐式转换：`Deref`转换。
 
+若一个类型实现了 `Deref` 特征，那它的引用在传给函数或方法时，会根据参数签名来决定是否进行隐式的 `Deref` 转换。
+
+规则总结：一个类型为 T 的对象 foo，如果 `T: Deref<Target=U>`，那么，相关 foo 的引用 `&foo` 在应用的时候会自动转换为 `&U`。
+
+```rust
+// 隐式 Deref
+fn test_auto_deref() {
+    // String 实现了 Deref 特征，可以在需要时自动被转换为 &str 类型
+    let s = String::from("hello world");
+    // &s 是一个 &String 类型，当它被传给 display 函数时，自动通过 Deref 转换成了 &str
+    display(&s)
+}
+
+fn display(s: &str) {
+    println!("{}", s);
+}
+```
+
+可通过 [标准库手册](https://doc.rust-lang.org/std/index.html) 查询`String`类型（`Struct std::string::String`），及其实现的`Deref`特征：[impl-Deref-for-String](https://doc.rust-lang.org/std/string/struct.String.html#impl-Deref-for-String)。
+
+### 3.4. 三种Deref转换
+
+除了上面的 `Deref` 不可变引用转换，Rust还提供了另外两种 `Deref` 转换，3种转换规则如下：
+
+* 当`T: Deref<Target=U>`，可以将`&T`转换为`&U`
+* 当`T: DerefMut<Target=U>`，可以将`&mut T`转换为`&mut U`
+    * 注意：要实现 `DerefMut` 必须要先实现 `Deref` 特征
+* 当`T: Deref<Target=U>`，可以将`&mut T`转换为`&U`
+    * Rust 可以把可变引用隐式的转换成不可变引用，但反之则不行
+
+### 3.5. Drop特征
 
 
-### 3.4. Drop特征
 
 ## 4. 小结
 
@@ -173,3 +203,5 @@ fn test_deref() {
 1、[Rust语言圣经(Rust Course) -- 智能指针](https://course.rs/advance/smart-pointer/intro.html)
 
 2、[The Rust Programming Language -- Smart Pointers](https://doc.rust-lang.org/book/ch15-00-smart-pointers.html)
+
+3、[标准库手册](https://doc.rust-lang.org/std/index.html)
