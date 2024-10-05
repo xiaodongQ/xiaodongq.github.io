@@ -191,9 +191,61 @@ fn display(s: &str) {
 * 当`T: Deref<Target=U>`，可以将`&mut T`转换为`&U`
     * Rust 可以把可变引用隐式的转换成不可变引用，但反之则不行
 
-### 3.5. Drop特征
+### 3.5. Drop释放资源
 
+在Rust中，可以指定在一个变量超出作用域时，执行一段特定的代码，最终编译器将帮你自动插入这段收尾代码。该段代码就是 `Drop` 特征的 `drop` 方法。（和C++中的析构函数类似）
 
+简单实现示例：
+
+```rust
+struct Foo;
+
+impl Drop for Foo {
+    fn drop(&mut self) {
+        println!("Dropping Foo!")
+    }
+}
+fn test_drop() {
+    let _foo = Foo;
+    println!("Running!");
+}
+```
+
+运行：函数最后会调用到`drop`函数
+
+```shell
+Running!
+Dropping Foo!
+```
+
+**Drop 的顺序：**
+
+* 变量级别，按照逆序的方式，比如：若`_x` 在 `_foo` 之前创建，则 `_x` 在 `_foo` 之后被 `drop`
+* 结构体内部，按照顺序的方式，比如：结构体 `_x` 中的字段按照定义中的顺序依次 `drop`
+
+Rust **自动**为几乎所有类型都实现了 `Drop` 特征，因此就算不手动为结构体实现 `Drop`，它依然会调用默认实现的 `drop` 函数，同时再调用每个字段的 `drop` 方法。
+
+**手动释放：**
+
+针对编译器实现的 `drop` 函数，会拿走变量的所有权，因此，如果想要手动释放资源，可以使用 `std::mem::drop` 函数。
+
+`std::mem::drop` 函数的签名为：`pub fn drop<T>(_x: T)`，可见 [标准库手册：mem drop](https://doc.rust-lang.org/std/mem/fn.drop.html)
+
+示例：
+
+```rust
+fn test_mem_drop() {
+    let mut foo = Foo;
+
+    // 报错：explicit destructor calls not allowed
+    // foo.drop();
+
+    // 调用编译器自动生成的drop函数，释放内存
+    drop(foo);
+    // 以下代码会报错：借用了所有权被转移的值
+    // println!("Running!:{:?}", foo);
+}
+```
 
 ## 4. 小结
 
@@ -205,3 +257,5 @@ fn display(s: &str) {
 2、[The Rust Programming Language -- Smart Pointers](https://doc.rust-lang.org/book/ch15-00-smart-pointers.html)
 
 3、[标准库手册](https://doc.rust-lang.org/std/index.html)
+
+4、[标准库手册：impl-Deref-for-String](https://doc.rust-lang.org/std/string/struct.String.html#impl-Deref-for-String)
