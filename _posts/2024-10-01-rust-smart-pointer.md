@@ -33,8 +33,6 @@ Rust中的智能指针有好几种，此处介绍以下最常用的几种：
 
 ## 3. `Box<T>`智能指针
 
-### 3.1. 基本使用
-
 `Box<T>`是Rust中最常见的智能指针，除了将值存储在堆上外，并没有其它性能上的损耗。
 
 **使用场景：**
@@ -116,7 +114,9 @@ fn gen_static_str() -> &'static str{
 
 Box 背后是调用 `jemalloc` 来做内存管理（glibc默认使用`ptmalloc`），所以堆上的空间无需我们手动管理。
 
-### 3.2. Deref解引用
+## 4. Deref 和 Drop 特征
+
+### 4.1. Deref解引用
 
 当我们对智能指针 Box 进行解引用时，实际上 Rust 为我们调用了以下方法：`*(y.deref())`
 
@@ -157,7 +157,7 @@ fn test_deref() {
 }
 ```
 
-### 3.3. 隐式Deref转换
+### 4.2. 隐式Deref转换
 
 对于函数和方法的传参，Rust 提供了一个极其有用的隐式转换：`Deref`转换。
 
@@ -181,7 +181,7 @@ fn display(s: &str) {
 
 可通过 [标准库手册](https://doc.rust-lang.org/std/index.html) 查询`String`类型（`Struct std::string::String`），及其实现的`Deref`特征：[impl-Deref-for-String](https://doc.rust-lang.org/std/string/struct.String.html#impl-Deref-for-String)。
 
-### 3.4. 三种Deref转换
+### 4.3. 三种Deref转换
 
 除了上面的 `Deref` 不可变引用转换，Rust还提供了另外两种 `Deref` 转换，3种转换规则如下：
 
@@ -191,7 +191,7 @@ fn display(s: &str) {
 * 当`T: Deref<Target=U>`，可以将`&mut T`转换为`&U`
     * Rust 可以把可变引用隐式的转换成不可变引用，但反之则不行
 
-### 3.5. Drop释放资源
+### 4.4. Drop释放资源
 
 在Rust中，可以指定在一个变量超出作用域时，执行一段特定的代码，最终编译器将帮你自动插入这段收尾代码。该段代码就是 `Drop` 特征的 `drop` 方法。（和C++中的析构函数类似）
 
@@ -247,10 +247,71 @@ fn test_mem_drop() {
 }
 ```
 
-## 4. 小结
+使用场景：
+
+* 回收内存资源，比如文件描述符、网络socket 等
+* 执行一些收尾工作
+
+无法为一个类型同时实现`Copy`和`Drop`特征：因为实现了`Copy`的类型会被编译器隐式的复制，因此非常难以预测析构函数执行的时间和频率。因此这些实现了`Copy`的类型无法拥有析构函数。
+
+```rust
+// 编译报错：error[E0184]: the trait `Copy` cannot be implemented for this type; the type has a destructor
+#[derive(Copy)]
+struct Foo;
+
+impl Drop for Foo {
+    fn drop(&mut self) {
+        println!("Dropping Foo!")
+    }
+}
+```
+
+## 5. 引用计数智能指针`Rc<T>`和`Arc<T>`
+
+Rust的所有权机制，只允许一个数据在同一时刻只有一个所有者，但部分场景需要多个所有者，比如：
+
+* 在图数据结构中，多个边可能会拥有同一个节点
+* 在多线程中，多个线程可能会持有同一个数据，但受限于Rust的安全机制，无法同时获取该数据的可变引用
+
+为了解决此类问题，Rust通过引用计数的方式，允许一个数据资源在同一时刻拥有多个所有者。有两种实现机制：
+
+* `Rc<T>`，Rc的全称是`reference counting`，引用计数
+    * 一旦最后一个拥有者消失，则资源会自动被回收，这个生命周期是在**编译期**就确定下来的
+    * `Rc`只能用于同一线程内部，想要用于线程之间的对象共享，需要使用`Arc`
+* `Arc<T>`，Arc的全称是`atomic reference counting`，原子引用计数
+    * `Arc<T>`能保证线程安全，它使用原子操作来保证线程安全，因此它比`Rc<T>`慢
+    * `Arc`和`Rc`并没有定义在同一个模块，前者通过 `use std::sync::Arc` 来引入，后者通过 `use std::rc::Rc`
+
+`Rc<T>`和`Arc<T>`指向的数据都是**不可变引用**。
+
+示例：
+
+```rust
+use std::rc::Rc;
+fn rc_ptr() {
+    let s = String::from("hello, world");
+    // 使用Rc类型，Rc::new 创建一个引用计数类型的智能指针
+    // 智能指针 Rc<T> 在创建时，引用计数会加1，可通过关联函数 Rc::strong_count(&a) 获取引用计数
+    let a = Rc::new(s);
+    println!("a referce count1: {}", Rc::strong_count(&a));
+    
+    // 用 Rc::clone 克隆了一份智能指针，引用计数也会加1
+    // 此处clone不是深拷贝，仅仅复制了智能指针并增加了引用计数，并没有克隆底层数据
+    let b = Rc::clone(&a);
+    println!("a referce count2: {}", Rc::strong_count(&a));
+    println!("b referce count: {}", Rc::strong_count(&b));
+}
+```
+
+## 6. 可变智能指针`Cell<T>`和`RefCell<T>`
+
+上节中的`Rc<T>`和`Arc<T>`是不可变的，Rust提供了 `Cell` 和 `RefCell` 用于内部可变性，即在拥有不可变引用的同时修改目标数据。
 
 
-## 5. 参考
+## 7. 小结
+
+
+## 8. 参考
 
 1、[Rust语言圣经(Rust Course) -- 智能指针](https://course.rs/advance/smart-pointer/intro.html)
 
