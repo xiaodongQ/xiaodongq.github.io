@@ -300,18 +300,122 @@ fn rc_ptr() {
     let b = Rc::clone(&a);
     println!("a referce count2: {}", Rc::strong_count(&a));
     println!("b referce count: {}", Rc::strong_count(&b));
+
+    // 使用 Arc::new 创建智能指针
+    use std::sync::Arc;
+    let s1 = Arc::new(String::from("test arc"));
+    // 可通过 *s1 解引用获取值
+    println!("s1 referce count: {}, *s1:{}", Arc::strong_count(&s1), *s1);
 }
 ```
 
 ## 6. 可变智能指针`Cell<T>`和`RefCell<T>`
 
-上节中的`Rc<T>`和`Arc<T>`是不可变的，Rust提供了 `Cell` 和 `RefCell` 用于内部可变性，即在拥有不可变引用的同时修改目标数据。
+上节中的`Rc<T>`和`Arc<T>`是不可变的，Rust提供了 `Cell` 和 `RefCell` 用于**内部可变性**，即在拥有不可变引用的同时修改目标数据。
 
+内部可变性：内部可变性是Rust中的一种设计模式，它允许在数据存在不可变引用时对数据进行修改（通常情况下，借用规则不允许此操作），底层基于`unsafe`机制修改。
 
-## 7. 小结
+`Cell` 和 `RefCell` 在功能上没有区别，区别在于 `Cell<T>` 适用于 `T` 实现 `Copy` 的情况。比如，下述示例中可以`Cell::new("asdf")`，但不能`Cell::new(String::from("asdf"))`。
 
+Cell示例：
 
-## 8. 参考
+```rust
+use std::cell::Cell;
+fn cell_ptr() {
+    // 此处的"asdf"是&str类型，实现了Copy
+    let c = Cell::new("asdf");
+
+    // String 没有实现 Copy 特征，所以Cell中不能存放String类型
+    // let c2 = Cell::new(String::from("asdf"));
+    // 编译报错：error[E0599]: the method `get` exists for struct `Cell<String>`, but its trait bounds were not satisfied
+        // doesn't satisfy `String: Copy`
+    // println!("c2:{}", c2.get());
+
+    // 获取当前值，不是实时指针，后面修改不影响此处
+    let one = c.get();
+    // 获取值到one里后，通过c还能做修改，修改c不影响one的值
+    c.set("qwer");
+    let two = c.get();
+    // 结果：one:asdf, two:qwer, c.get():qwer
+    println!("one:{}, two:{}, c.get():{}", one, two, c.get());
+    // 不可通过 *c 解引用获取值
+    // println!("*c:{}", *c);
+}
+```
+
+RefCell示例：
+
+```rust
+use std::cell::RefCell;
+fn refcell_ptr() {
+    let s = RefCell::new(String::from("hello, world"));
+    let s1 = s.borrow();
+    // 编译器不会报错，但违背了借用规则，会导致运行期 panic
+    let s2 = s.borrow_mut();
+
+    println!("{},{}", s1, s2);
+}
+```
+
+`Cell`和`RefCell`说明：
+
+* 与 `Cell` 用于可 `Copy` 的值不同，`RefCell` 用于引用
+* `RefCell` 只是将借用规则从编译期推迟到程序运行期，并不能帮你绕过这个规则
+* `RefCell` 适用于编译期误报或者一个引用被在多处代码使用、修改以至于难于管理借用关系时
+* 使用 `RefCell` 时，违背借用规则会导致运行期的 panic
+* `Cell` 没有额外的性能损耗，`RefCell` 有少量运行时开销，因为 `RefCell` 需要维护借用状态
+
+注意：
+
+* `Cell` 和 `RefCell`类型都可以看作是智能指针，但它们并不像 `Box<T>` 或 `Rc<T>` 那样直接实现 `Deref` 和 `DerefMut` traits 来支持解引用操作。这是因为它们的设计目的是为了提供特定的内部可变性机制，而不仅仅是封装所有权和生命周期。
+* 即不能直接通过`*`解引用获取值，需要使用对应的方法进行访问，比如 Cell：`get`/`set`，RefCell：`borrow`/`borrow_mut`，具体见[标准库](https://doc.rust-lang.org/std/cell/struct.RefCell.html)。
+
+**`Rc` 和 `RefCell` 组合使用：**
+
+在 Rust 中，一个常见的组合就是 `Rc` 和 `RefCell` 在一起使用，前者可以实现一个数据拥有多个所有者，后者可以实现数据的可变性。
+
+```rust
+use std::cell::RefCell;
+use std::rc::Rc;
+fn rc_refcell() {
+    // 用 RefCell<String> 包裹一个字符串，并通过 Rc 创建了它的三个所有者
+    let s = Rc::new(RefCell::new("hello world".to_string()));
+
+    let s1 = s.clone();
+    let s2 = s.clone();
+    // 通过其中一个所有者 s2 对字符串内容进行修改
+    s2.borrow_mut().push_str(", xxxxx!");
+
+    // let mut s2 = s.borrow_mut();
+    // s2.push_str("xxxxx");
+
+    // 打印结果如下：三者共享同一个底层数据，都发生了变化
+    // RefCell { value: "hello world, xxxxx!" }
+    // RefCell { value: "hello world, xxxxx!" }
+    // RefCell { value: "hello world, xxxxx!" }
+    println!("{:?}\n{:?}\n{:?}", s, s1, s2);
+}
+```
+
+## 7. 循环引用与自引用
+
+循环引用可能引起**内存泄漏**。一个典型的例子就是同时使用 `Rc<T>` 和 `RefCell<T>` 创建循环引用，最终这些引用的计数都无法被归零，因此 `Rc<T>` 拥有的值也不会被释放清理。
+
+循环引用示例：`a-> b -> a -> b`
+
+可通过`Weak`来解决循环引用问题，通过`use std::rc::Weak`引入。
+
+* `Weak` 非常类似于 `Rc`，但是与 `Rc` 持有所有权不同，`Weak` 不持有所有权，它仅仅保存一份指向数据的弱引用
+    * 弱引用不保证引用关系依然存在，如果不存在，就返回一个 `None`
+* 如果想要访问数据，需要通过 `Weak` 指针的 `upgrade` 方法实现，该方法返回一个类型为 `Option<Rc<T>>` 的值。
+
+此处暂时留个印象，后续再进一步学习，需要再结合更多的实际项目和实践加强体感。
+
+## 8. 小结
+
+学习Rust的几种智能指针。
+
+## 9. 参考
 
 1、[Rust语言圣经(Rust Course) -- 智能指针](https://course.rs/advance/smart-pointer/intro.html)
 
