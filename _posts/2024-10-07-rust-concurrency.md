@@ -38,12 +38,12 @@ Rust中由于语言设计理念、安全、性能的多方面考虑，并不像G
 
 本篇学习涉及到的内容：
 
-* 如何创建线程来同时运行多段代码。
+* 如何创建线程来同时运行多段代码，并说明几种线程控制机制。
 * `消息传递（Message passing）`并发，其中`信道（channel）`被用来在线程间传递消息。
 * `共享状态（Shared state）`并发，其中多个线程可以访问同一片数据。
 * `Sync` 和 `Send` trait，将 Rust 的并发保证扩展到用户定义的以及标准库提供的类型中。
 
-## 3. 创建线程
+## 3. 线程创建
 
 使用`thread::spawn`函数创建线程，并传递一个闭包作为线程执行的代码。（spawn, [spɔn], 产生、产卵、引起）
 
@@ -81,7 +81,7 @@ fn test_spwan() {
 
 ### 4.1. 线程屏障Barrier
 
-可以通过线程屏障（`Barrier`）来让多个线程在某个点同步，即等待所有线程都执行到某个点后，再一起继续执行。
+通过线程屏障（`Barrier`）可以让多个线程在某个点同步，即等待所有线程都执行到某个点后，再一起继续执行。
 
 ```rust
 // use std::thread; // 前面已经引入了
@@ -213,7 +213,16 @@ fn test_call_once() {
 
 ## 5. 线程同步
 
+### 5.1. 消息传递
 
+一个日益流行的确保安全并发的方式是 **消息传递（message passing）**，这里 线程 或 Actor线程模型中的actor 通过发送包含数据的消息来相互沟通。这个思想来源于 Go 编程语言文档中 的口号：“不要通过共享内存来通讯；而是通过通讯来共享内存。”（“Do not communicate by sharing memory; instead, share memory by communicating.”）。
+
+与 Go 语言内置的`chan`不同，Rust 是在标准库里提供了`channel`，消息通道 或称 信道。`channel`消息通道包含`发送者（transmitter）`和`接收者（receiver）`，对于不同的发送者和接收者数量，可使用不同的库。
+
+* 多生产者，单消费者：标准库`std::sync::mpsc`，mpsc是"multiple producer, single consumer"的缩写
+* 如果需要 mpmc(多发送者，多接收者)或者需要更高的性能，可以考虑第三方库
+    * [crossbeam-channel](https://github.com/crossbeam-rs/crossbeam/tree/master/crossbeam-channel), 老牌强库，功能较全，性能较强，之前是独立的库，但是后面合并到了crossbeam主仓库中
+    * [flume](https://github.com/zesterer/flume), 官方给出的性能数据某些场景要比 crossbeam 更好些
 
 ## 6. 小结
 
