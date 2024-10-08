@@ -219,10 +219,47 @@ fn test_call_once() {
 
 与 Go 语言内置的`chan`不同，Rust 是在标准库里提供了`channel`，消息通道 或称 信道。`channel`消息通道包含`发送者（transmitter）`和`接收者（receiver）`，对于不同的发送者和接收者数量，可使用不同的库。
 
-* 多生产者，单消费者：标准库`std::sync::mpsc`，mpsc是"multiple producer, single consumer"的缩写
-* 如果需要 mpmc(多发送者，多接收者)或者需要更高的性能，可以考虑第三方库
-    * [crossbeam-channel](https://github.com/crossbeam-rs/crossbeam/tree/master/crossbeam-channel), 老牌强库，功能较全，性能较强，之前是独立的库，但是后面合并到了crossbeam主仓库中
-    * [flume](https://github.com/zesterer/flume), 官方给出的性能数据某些场景要比 crossbeam 更好些
+* 多生产者，单消费者：标准库`std::sync::mpsc`，`mpsc`是"multiple producer, single consumer"的缩写
+* 如果需要 `mpmc`(多发送者，多接收者)或者需要更高的性能，可以考虑第三方库
+    * [crossbeam-channel](https://github.com/crossbeam-rs/crossbeam/tree/master/crossbeam-channel), 老牌强库，功能较全，性能较强，之前是独立的库，但是后面合并到了`crossbeam`主仓库中
+    * [flume](https://github.com/zesterer/flume), 官方给出的性能数据某些场景要比 `crossbeam` 更好些
+
+`std::sync::mpsc`示例：
+
+```rust
+fn test_mpsc() {
+    // 创建一个消息通道，返回一个元组 (发送者, 接收者)
+    let (tx, rx) = mpsc::channel();
+    // 也可显式指定泛型类型
+    let (tx2, rx2): (mpsc::Sender<String>, mpsc::Receiver<String>) = mpsc::channel();
+
+    thread::spawn(move || {
+        // 发送一个数字1, send方法返回Result<T,E>，通过unwrap进行快速错误处理
+        tx.send(1).unwrap();
+
+        // 传输未实现Copy trait的类型
+        let s = String::from("hello");
+        tx2.send(s).unwrap();
+        // 无法再使用s，因为所有权已经转移，报错：value borrowed here after move
+        // println!("s: {}", s);
+    });
+
+    // 在主线程中接收子线程发送的消息并输出
+    // 若接收不到消息，recv方法会阻塞当前线程，直到读取到值，或者通道被关闭
+    let recv = rx.recv().unwrap();
+    // 使用 try_recv 方法则不会阻塞当前线程，若接收不到消息时，返回一个错误
+    // let recv = rx.try_recv().unwrap();
+    println!("recv: {}", recv);
+
+    let s = rx2.recv().unwrap();
+    println!("s: {}", s);
+}
+```
+
+如上例所示，使用通道来传输数据，一样要遵循 Rust 的所有权规则：
+
+* 若值的类型实现了`Copy`特征，则直接复制一份该值进行传输
+* 若值没有实现`Copy`特征，则其所有权会被转移给接收端，转移后发送端不能再使用该值
 
 ## 6. 小结
 
