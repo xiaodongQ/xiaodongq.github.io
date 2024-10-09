@@ -298,6 +298,8 @@ for received in rx {
 
 互斥锁 `Mutex`，是 "mutual exclusion" 的缩写。
 
+下述示例中，`m.lock()`方法向`m`申请一个锁, 该方法会阻塞当前线程，直到获取到锁
+
 ```rust
 fn test_mutex() {
     // 使用`Mutex`结构体的关联函数创建新的互斥锁实例
@@ -305,7 +307,6 @@ fn test_mutex() {
 
     {
         // 获取锁，然后deref为`m`的引用
-        // m.lock()方法向m申请一个锁, 该方法会阻塞当前线程，直到获取到锁
         // lock返回的是Result
         let mut num = m.lock().unwrap();
         *num = 6;
