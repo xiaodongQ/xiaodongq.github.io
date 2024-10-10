@@ -324,6 +324,91 @@ fn test_mutex() {
 
 **多线程中使用Mutex：**
 
+多线程中对应的智能指针需要用`std::sync:Arc`，若用`std::rc::Rc`则会报错："`Rc<Mutex<i32>>` cannot be sent between threads safely"
+
+* `Mutex<T>`可以支持修改内部数据，当结合`Arc<T>`一起使用时，可以实现多线程的**内部可变性**，这跟上篇说的`Arc`和`Rc`智能指针提供不可变引用是不冲突的。
+* 对于**内部可变性**，上篇中提到的`Rc<T>`和`RefCell<T>`的结合，也可以实现单线程的内部可变性。
+
+下例中，`counter.lock().unwrap()` 获取到 `Mutex` 的锁，并且得到一个 `MutexGuard` 类型的智能指针，该指针实现了 `DerefMut` trait，允许我们在作用域内像处理普通**可变**引用一样处理它。
+
+```rust
+// use std::rc::Rc;
+use std::sync::Arc;
+use std::thread;
+fn test_threads_mutex() {
+    // 创建一个整数0，并包装在Mutex中，然后包装在Arc指针中进行共享，Mutex保证并发安全
+    let counter = Arc::new(Mutex::new(0));
+    let mut handles = vec![];
+
+    for _ in 0..10 {
+        // clone增加引用计数并克隆 Arc 的所有权，这样每个线程都有自己的 Arc 实例指向相同的 Mutex
+        let counter = Arc::clone(&counter);
+        // 创建线程
+        let handle = thread::spawn(move || {
+            let mut num = counter.lock().unwrap();
+            // Deref自动解引用，获得指向Mutex内部数据的引用
+            *num += 1;
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    // 结果为 Result: 10，10个线程都+1
+    println!("Result: {}", *counter.lock().unwrap());
+}
+```
+
+**死锁：**
+
+场景：重复加锁、嵌套加锁
+
+```rust
+fn test_dead_lock() {
+    let data = Mutex::new(0);
+    let d1 = data.lock();
+    let d2 = data.lock();
+}
+```
+
+**`try_lock`：**
+
+`try_lock`会尝试去获取一次锁，如果无法获取会返回一个错误，因此不会发生阻塞。
+
+**读写锁：**
+
+`std::sync::RwLock`
+
+```rust
+fn test_rwlock() {
+    let lock = RwLock::new(5);
+    {
+        // 同时多个读锁
+        let r1 = lock.read().unwrap();
+        let r2 = lock.read().unwrap();
+    }
+    {
+        // 同时仅支持一个写锁
+        let mut w = lock.write().unwrap();
+    }
+}
+```
+
+#### 5.2.2. 条件变量
+
+条件变量`std::sync::Condvar`和`std::sync::Mutex`组合使用，上节中已经提及了。
+
+#### 5.2.3. 信号量
+
+本来Rust在标准库中有提供一个信号量实现，但是由于各种原因这个库现在已经不再推荐使用了，因此推荐使用`tokio`中提供的`Semaphore`实现：`tokio::sync::Semaphore`。
+
+此处先留个印象。
+
+### 5.3. 原子操作和内存顺序
+
+从 Rust1.34 版本后，就正式支持**原子类型**。由于原子操作是通过指令提供的支持，因此它的性能相比`锁`和`消息传递`会好很多，其内部使用`CAS`（ompare and swap）循环。
 
 
 ## 6. 小结
