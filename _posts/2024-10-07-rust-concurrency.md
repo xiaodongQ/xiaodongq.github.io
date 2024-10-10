@@ -410,11 +410,96 @@ fn test_rwlock() {
 
 从 Rust1.34 版本后，就正式支持**原子类型**。由于原子操作是通过指令提供的支持，因此它的性能相比`锁`和`消息传递`会好很多，其内部使用`CAS`（ompare and swap）循环。
 
+用法：原子类型的一个常用场景，就是作为全局变量来使用
 
-## 6. 小结
+* `R.fetch_add(1, Ordering::Relaxed)` 值加1
+* `R.load(Ordering::Relaxed)` 获取原子类型的值
 
+* 和`Mutex`一样，`Atomic`的值具有内部可变性，无需将其声明为`mut`
 
-## 7. 参考
+```rust
+use std::sync::atomic::{AtomicU64, Ordering};
+
+const N_TIMES: u64 = 10000000;
+const N_THREADS: usize = 10;
+
+static R: AtomicU64 = AtomicU64::new(0);
+fn add_n_times(n: u64) -> JoinHandle<()> {
+    thread::spawn(move || {
+        for _ in 0..n {
+            R.fetch_add(1, Ordering::Relaxed);
+        }
+    })
+}
+fn test_atomic() {
+    let mut threads = Vec::with_capacity(N_THREADS);
+
+    for _ in 0..N_THREADS {
+        threads.push(add_n_times(N_TIMES));
+    }
+    for thread in threads {
+        thread.join().unwrap();
+    }
+    print("R:{}", R.load(Ordering::Relaxed));
+}
+```
+
+上面涉及的`Ordering::Relaxed`内存序（`std::sync::atomic`包中），在之前 [leveldb学习笔记（四） -- memtable结构实现](https://xiaodongq.github.io/2024/08/02/leveldb-memtable-skiplist)中也提到过C++中的"内存序说明"。
+
+编译器或处理器为了优化性能，可能会对执行指令重新排序，即`指令重排`，通过指定不同级别的内存序类型，可以进行重排限制和可见性控制。
+
+Rust中提供了`Ordering::Relaxed`用于限定内存顺序，有下面几种：
+
+* Relaxed，这是最宽松的规则，它对编译器和 CPU 不做任何限制，可以乱序
+* Release 释放，设定内存屏障(Memory barrier)，保证它之前的操作永远在它之前，但是它后面的操作可能被重排到它前面
+* Acquire 获取，设定内存屏障，保证在它之后的访问永远在它之后，但是它之前的操作却有可能被重排到它后面，往往和Release在不同线程中联合使用
+* AcqRel，是 Acquire 和 Release 的结合，同时拥有它们俩提供的保证。比如你要对一个 atomic 自增 1，同时希望该操作之前和之后的读取或写入操作不会被重新排序
+* SeqCst 顺序一致性，SeqCst就像是AcqRel的加强版，它不管原子操作是属于读取还是写入的操作，只要某个线程有用到SeqCst的原子操作，线程中该SeqCst操作前的数据操作绝对不会被重新排在该SeqCst操作之后，且该SeqCst操作后的数据操作也绝对不会被重新排在SeqCst操作前。
+
+**`Atomic`并不能替代锁：**
+
+* 对于复杂的场景下，锁的使用简单粗暴，不容易有坑
+* `std::sync::atomic`包中仅提供了数值类型的原子操作：AtomicBool, AtomicIsize, AtomicUsize, AtomicI8, AtomicU16等，而锁可以应用于各种类型
+* 在有些情况下，必须使用锁来配合，例如使用`Mutex`配合`Condvar`
+
+`Atomic`适用场景：
+
+* 无锁(lock free)数据结构
+* 全局变量，例如全局自增 ID
+* 跨线程计数器，例如可以用于统计指标
+
+## 6. Send和Sync特征
+
+`Send`和`Sync`是 Rust 安全并发的重中之重，但是实际上它们只是`标记特征`(marker trait，该特征未定义任何行为，因此非常适合用于标记)，作用：
+
+* 实现`Send`的类型可以在线程间安全的传递其所有权
+* 实现`Sync`的类型可以在线程间安全的共享(通过引用)
+
+`Rc`就无法在线程间安全的转移，和`Arc`实现特征的区别如下：
+
+```rust
+// Rc源码片段
+// Rc<T>的Send和Sync特征被特地移除了实现
+impl<T: ?Sized> !marker::Send for Rc<T> {}
+impl<T: ?Sized> !marker::Sync for Rc<T> {}
+
+// Arc源码片段
+// 实现了Sync + Send
+unsafe impl<T: ?Sized + Sync + Send> Send for Arc<T> {}
+unsafe impl<T: ?Sized + Sync + Send> Sync for Arc<T> {}
+```
+
+在 Rust 中，几乎所有类型都默认实现了Send和Sync，而且由于这两个特征都是可自动派生的特征(通过derive派生)，意味着一个复合类型(例如结构体), 只要它内部的所有成员都实现了Send或者Sync，那么它就自动实现了Send或Sync。
+
+* 裸指针两者都没实现，因为它本身就没有任何安全保证
+* UnsafeCell不是Sync，因此Cell和RefCell也不是
+* Rc两者都没实现(因为内部的引用计数器不是线程安全的)
+
+## 7. 小结
+
+梳理学习了并发编程中的相关机制，在后续实践中进一步理解。
+
+## 8. 参考
 
 1、[Rust语言圣经(Rust Course) -- 多线程并发编程](https://course.rs/advance/concurrency-with-threads/intro.html)
 
