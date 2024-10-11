@@ -39,6 +39,41 @@ Rust学习实践，进一步学习梳理Rust特性：unsafe、异步编程。
 
 可通过`unsafe`关键字来切换到不安全Rust代码块。注意：`unsafe` 并不会关闭借用检查器或禁用任何其他 Rust 安全检查；此外，`unsafe`不意味着块中的代码就一定是危险的或者必然导致内存安全问题：其意图在于作为程序员你将会确保`unsafe` 块中的代码以有效的方式访问内存。
 
+### 2.1. 解引用裸指针
+
+Rust中的`裸指针`（raw pointers）有两个：不可变裸指针（`*const`） 和 可变裸指针（`*mut T`）。这里的星号`*`不是解引用运算符，它是类型名称的一部分。
+
+`裸指针`与`引用`和`智能指针`的区别在于：
+
+* 允许忽略借用规则，可以同时拥有不可变和可变的指针，或多个指向相同位置的可变指针
+* 不保证指向有效的内存
+* 允许为空
+* 不能实现任何自动清理功能
+
+创建裸指针是安全的行为，而解引用裸指针才是不安全的行为，需要`unsafe`标记对应的代码块。示例：
+
+```rust
+fn test_raw_pointer() {
+    let mut num = 5;
+
+    // 将引用 &num / &mut num 强转为相应的裸指针 *const i32 / *mut i32
+    let r1 = &num as *const i32;
+    let r2 = &mut num as *mut i32;
+
+    // 解引用裸指针是不安全的行为，需要放到unsafe语句块中，否则编译报错
+    unsafe {
+        // 报错：`r1` is a `*const` pointer, so the data it refers to cannot be written
+        // *r1 = *r1 + 1;
+        
+        // 执行结果 r1 is: 5
+        println!("r1 is: {}", *r1);
+        *r2 = *r2 + 1;
+        // 执行结果 r1 is: 6
+        println!("r2 is: {}", *r2);
+    }
+}
+```
+
 ## 3. Macro宏编程
 
 ## 4. async异步编程
