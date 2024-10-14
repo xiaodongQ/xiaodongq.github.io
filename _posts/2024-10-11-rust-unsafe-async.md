@@ -300,7 +300,7 @@ fn test_await() {
 }
 ```
 
-### Future特征说明
+### 4.3. Future特征说明
 
 `Future` 特征是 Rust 异步编程的核心，异步函数的返回值就是一个 `Future`。
 
@@ -324,7 +324,7 @@ pub enum Poll<T> {
 
 **Pin 和 Unpin：**
 
-`Pin`可以防止一个类型在内存中被移动。
+`Pin`可以防止一个类型在内存中被移动；`Unpin`表示类型可以在内存中安全地移动。
 
 ## 5. 小结
 
