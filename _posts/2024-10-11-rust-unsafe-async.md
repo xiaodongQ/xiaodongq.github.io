@@ -246,6 +246,60 @@ Rust 经过权衡取舍后，最终选择了同时提供 `多线程编程` 和 `
 * 众多实用的类型、宏和函数，由官方开发的 [`futures`](https://github.com/rust-lang/futures-rs) 包提供（不是标准库），它们可以用在任何`async`应用中
 * `async`代码的执行、IO操作、任务创建和调度等等复杂功能，由社区的`async`运行时提供，例如[`tokio`](https://github.com/tokio-rs/tokio) 和 [`async-std`](https://github.com/async-rs/async-std)
 
+### 4.1. 基本示例
+
+1、使用`async`，需要先引入 `futures` 包，在Cargo.toml中新增：
+
+```toml
+[dependencies]
+futures = "0.3"
+```
+
+2、代码
+
+`block_on`执行器会**阻塞当前线程**直到指定的`Future`执行完成；其它运行时的执行器(executor)会提供更加复杂的行为。
+
+```rust
+use futures::executor::block_on;
+
+// 直接调用async函数，不会输出任何结果，因为 Future 还未被执行
+async fn download_async(file: &str){
+    println!("async download file:[{}]...", file);
+}
+
+// 调用async并发下载网站
+fn get_two_sites_async() {
+    // 异步函数的返回值是一个 Future
+    let future_one = download_async("https://course.rs");
+    let future_two = download_async("https://course.rs");
+    // 使用执行器来使用 Future
+    // `block_on`执行器会阻塞当前线程直到指定的`Future`执行完成；其它运行时的执行器(executor)会提供更加复杂的行为
+    block_on(future_one);
+    block_on(future_two);
+}
+```
+
+### 4.2. `.await`：在async函数中调用其他async函数
+
+使用`.await`可以等待另一个异步调用的完成，但是与`block_on`不同，`.await`并**不会阻塞**当前的线程，而是异步的等待`Future`的完成。
+
+```rust
+async fn hello_world() {
+    // 若不使用 .await，则此处对应 Future 不会执行
+    // hello_cat();
+    hello_cat().await;
+    println!("hello, world!");
+}
+
+async fn hello_cat() {
+    println!("hello, kitty!");
+}
+fn test_await() {
+    let future = hello_world();
+    block_on(future);
+}
+```
+
 ## 5. 小结
 
 梳理学习unsafe、async异步编程、宏编程，在后续实践中进一步理解。
