@@ -241,7 +241,7 @@ Rust 经过权衡取舍后，最终选择了同时提供 `多线程编程` 和 `
 
 通过Rust语言提供了必要的特性支持，再通过社区来提供`async`运行时的支持，要完整使用`async`异步编程，需要依赖：
 
-* 所必须的特征(例如`Futur`)、类型和函数，由标准库提供实现
+* 所必须的特征(例如`Future`)、类型和函数，由标准库提供实现
 * 关键字`async`/`await`，由Rust语言提供，并进行了编译器层面的支持
 * 众多实用的类型、宏和函数，由官方开发的 [`futures`](https://github.com/rust-lang/futures-rs) 包提供（不是标准库），它们可以用在任何`async`应用中
 * `async`代码的执行、IO操作、任务创建和调度等等复杂功能，由社区的`async`运行时提供，例如[`tokio`](https://github.com/tokio-rs/tokio) 和 [`async-std`](https://github.com/async-rs/async-std)
@@ -299,6 +299,32 @@ fn test_await() {
     block_on(future);
 }
 ```
+
+### Future特征说明
+
+`Future` 特征是 Rust 异步编程的核心，异步函数的返回值就是一个 `Future`。
+
+`Future` 的定义：它是一个能产出值的异步计算。代码定义如下：
+
+```rust
+pub trait Future {
+    type Output;
+    // Future 需要被执行器poll(轮询)后才能运行
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output>;
+}
+
+// 返回值是个枚举
+// 若在当前 poll 中， Future 可以被完成，则会返回 Poll::Ready(result)
+// 反之则返回 Poll::Pending，并且安排一个 wake 函数：当未来 Future 准备好进一步执行时， 该函数会被调用，然后管理该 Future 的执行器
+pub enum Poll<T> {
+    Ready(#[stable(feature = "futures_api", since = "1.36.0")] T),
+    Pending,
+}
+```
+
+**Pin 和 Unpin：**
+
+`Pin`可以防止一个类型在内存中被移动。
 
 ## 5. 小结
 
