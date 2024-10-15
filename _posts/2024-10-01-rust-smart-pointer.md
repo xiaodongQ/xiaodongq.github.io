@@ -31,6 +31,8 @@ Rust中的智能指针有好几种，此处介绍以下最常用的几种：
 * `Rc<T>`：引用计数类型，允许多所有权存在
 * `Ref<T>` 和 `RefMut<T>`：允许将借用规则检查从编译期移动到运行期进行（通过`RefCell<T>`实现）。
 
+下述涉及代码，也可见：[test_smart_ptr](https://github.com/xiaodongQ/rust_learning/tree/master/test_smart_ptr)
+
 ## 3. `Box<T>`智能指针
 
 `Box<T>`是Rust中最常见的智能指针，除了将值存储在堆上外，并没有其它性能上的损耗。
