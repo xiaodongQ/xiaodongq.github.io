@@ -52,10 +52,10 @@ use std::io::{BufReader, prelude::*};
 fn handle_client(stream: TcpStream) {
     let buf_reader = BufReader::new(& stream);
     let http_request: Vec<_> = buf_reader
-        .lines()
-        .map(|result| result.unwrap())
-        .take_while(|line| !line.is_empty())
-        .collect();
+        .lines()                              // lines 方法来获取一个迭代器，会按行读取`buf_reader`中的数据
+        .map(|result| result.unwrap())        // `map` 操作将 `Result<String>` 类型的项转换为 `String`
+        .take_while(|line| !line.is_empty())  // 过滤掉所有在空行之前的项。当遇到空行时，停止读取
+        .collect();                           // 剩余的行收集到一个 `Vec<String>`
 
     println!("Request: {:#?}", http_request);
 }
@@ -73,7 +73,6 @@ fn main() -> std::io::Result<()> {
 ```
 
 先编译再运行，并在浏览器访问：`localhost:80`，可看到服务端收到了请求，由于没有应答信息，浏览器会提示异常
-
 
 ```shell
 [MacOS-xd@qxd ➜ test_network git:(master) ✗ ]$ cargo build
@@ -108,11 +107,88 @@ Request: [
 ]
 ```
 
+## 3. 单线程webserver
 
-## 3. 小结
+上述代码补全逻辑后的demo：单线程解析请求，并根据不同请求内容，返回不同页面提示
 
+完整代码可见：[web_single_thread.rs](https://github.com/xiaodongQ/rust_learning/tree/master/test_network/src/bin/web_single_thread.rs)
 
-## 4. 参考
+```rust
+fn handle_client(mut stream: TcpStream) {
+    let buf_reader = BufReader::new(& stream);
+    let http_request: Vec<_> = buf_reader
+        .lines()
+        .map(|result| result.unwrap())
+        .take_while(|line| !line.is_empty())
+        .collect();
+    println!("Request: {:#?}", http_request);
+
+    // 读取请求中的第一行
+    let request_line = &http_request[0];
+    println!("request_line: {:#?}", request_line);
+
+    let (status_line, filename) = if request_line == "GET / HTTP/1.1" {
+        ("HTTP/1.1 200 OK", "hello.html")
+    } else {
+        ("HTTP/1.1 404 NOT FOUND", "404.html")
+    };
+
+    // 应答
+    // hello.html和404.html放到cargo项目的根目录
+    let contents = std::fs::read_to_string(filename).unwrap();
+    let length = contents.len();
+
+    let response =
+        format!("{status_line}\r\nContent-Length: {length}\r\n\r\n\n{contents}");
+
+    // write_all 方法接受 &[u8] 类型作为参数，这里需要用 as_bytes 将字符串转换为字节数组
+    stream.write_all(response.as_bytes()).unwrap();
+}
+```
+
+访问不支持的请求：
+
+```shell
+[MacOS-xd@qxd ➜ test_network git:(master) ✗ ]$ sudo cargo run --bin test_network
+Password:
+   Compiling test_network v0.1.0 (/Users/xd/Documents/workspace/src/rust_path/rust_learning/test_network)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.11s
+     Running `target/debug/test_network`
+Request: [
+    "GET /sd HTTP/1.1",
+    "Host: localhost",
+    "Connection: keep-alive",
+    "Cache-Control: max-age=0",
+    "sec-ch-ua: \"Google Chrome\";v=\"129\", \"Not=A?Brand\";v=\"8\", \"Chromium\";v=\"129\"",
+    "sec-ch-ua-mobile: ?0",
+    "sec-ch-ua-platform: \"macOS\"",
+    "DNT: 1",
+    "Upgrade-Insecure-Requests: 1",
+    "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+    "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "Sec-Fetch-Site: none",
+    "Sec-Fetch-Mode: navigate",
+    "Sec-Fetch-User: ?1",
+    "Sec-Fetch-Dest: document",
+    "Accept-Encoding: gzip, deflate, br, zstd",
+    "Accept-Language: zh-CN,zh;q=0.9,en;q=0.8,zh-TW;q=0.7,ja;q=0.6",
+]
+request_line: "GET /sd HTTP/1.1"
+```
+
+浏览器应答页面：
+
+![简单webserver-404](/images/2024-10-17-web-server-404.png)
+
+## 4. 多线程webserver
+
+稍微有点复杂，暂不展开，具体见 [构建多线程 Web 服务器](https://course.rs/advance-practice1/multi-threads.html)。
+
+## 5. 小结
+
+学习Rust网络模块的基本使用，跟着参考资料中的小demo进行练习。
+
+## 6. 参考
 
 1、[Rust语言圣经(Rust Course) -- 实践应用：多线程Web服务器](https://course.rs/advance-practice1/intro.html)
 
