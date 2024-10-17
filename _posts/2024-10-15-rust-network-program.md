@@ -182,7 +182,47 @@ request_line: "GET /sd HTTP/1.1"
 
 ## 4. 多线程webserver
 
-稍微有点复杂，暂不展开，具体见 [构建多线程 Web 服务器](https://course.rs/advance-practice1/multi-threads.html)。
+基于线程池的多线程webserver稍微有点复杂，暂不展开，具体见：[构建多线程 Web 服务器](https://course.rs/advance-practice1/multi-threads.html)，可以看到设计迭代过程和要考虑的点。
+
+demo练习代码见：[web_multi_thread.rs](https://github.com/xiaodongQ/rust_learning/tree/master/test_network/src/bin/web_multi_thread.rs) 和 [lib.rs](https://github.com/xiaodongQ/rust_learning/tree/master/test_network/src/lib.rs)
+
+线程池实现在lib.rs中，main函数如下：
+
+```rust
+fn main() {
+    let listener = TcpListener::bind("127.0.0.1:80").unwrap();
+    let pool = ThreadPool::new(4);
+
+    for stream in listener.incoming() {
+        let stream = stream.unwrap();
+
+        pool.execute(|| {
+            handle_client(stream);
+        });
+    }
+}
+```
+
+运行，并在浏览器请求多次：`http://localhost/`、`http://localhost/ff`，结果如下：
+
+```shell
+[MacOS-xd@qxd ➜ test_network git:(master) ✗ ]$ sudo cargo run --bin web_multi_thread
+warning: `test_network` (lib) generated 2 warnings
+   Compiling test_network v0.1.0 (/Users/xd/Documents/workspace/src/rust_path/rust_learning/test_network)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.76s
+     Running `target/debug/web_multi_thread`
+
+Worker 1 got a job; executing.
+request_line: "GET / HTTP/1.1"
+Worker 0 got a job; executing.
+request_line: "GET / HTTP/1.1"
+Worker 2 got a job; executing.
+Worker 3 got a job; executing.
+request_line: "GET /ff HTTP/1.1"
+request_line: "GET / HTTP/1.1"
+Worker 1 got a job; executing.
+Worker 0 got a job; executing.
+```
 
 ## 5. 小结
 
