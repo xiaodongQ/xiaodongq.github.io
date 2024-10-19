@@ -50,7 +50,8 @@ nums 的每个元素都将在 [-9999, 9999]之间。
     * 循环条件：`while(left <= right);`，`left == right`是有意义的，所以用`<=`
     * 区间更新：
         * 中间值更大时查找左区间，`right=middle-1`，即`[left, middle-1]`
-        * 中间值更小时查找右区间，`left=middle+1`，因为当前`middle`值肯定不满足`arr[middle] == target`，即`[middle+1, right]`
+        * 中间值更小时查找右区间，`left=middle+1`，即`[middle+1, right]`
+        * 因为当前`middle`值肯定不满足`arr[middle] == target`，所以闭区间时边界需要基于`middle`前后调整
 * 左闭右开区间 `[)`
     * 区间：`left=0; right=size()`
     * 循环条件：`while(left < right)`，由于右开区间时`left == right`没有意义，所以用`<`
@@ -61,6 +62,7 @@ nums 的每个元素都将在 [-9999, 9999]之间。
 左闭右闭区间：
 
 ```cpp
+// 左闭右闭区间，[]
 int search(vector<int>& nums, int target) {
     int left = 0;
     int right = nums.size() - 1;
@@ -82,6 +84,8 @@ int search(vector<int>& nums, int target) {
     return -1;
 }
 ```
+
+左闭右开区间：
 
 ```cpp
 // 左闭右开区间，[)
