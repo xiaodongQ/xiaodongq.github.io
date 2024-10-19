@@ -14,34 +14,9 @@ LeetCode刷题学习记录，数组篇。
 
 ## 1. 704.二分查找
 
-### 1.1. 题目
-
 [LeetCode题目链接：704. 二分查找](https://leetcode.cn/problems/binary-search/)
 
-```
-给定一个 n 个元素有序的（升序）整型数组 nums 和一个目标值 target  ，写一个函数搜索 nums 中的 target，如果目标值存在返回下标，否则返回 -1。
-
-
-示例 1:
-
-输入: nums = [-1,0,3,5,9,12], target = 9
-输出: 4
-解释: 9 出现在 nums 中并且下标为 4
-示例 2:
-
-输入: nums = [-1,0,3,5,9,12], target = 2
-输出: -1
-解释: 2 不存在 nums 中因此返回 -1
- 
-
-提示：
-
-你可以假设 nums 中的所有元素是不重复的。
-n 将在 [1, 10000]之间。
-nums 的每个元素都将在 [-9999, 9999]之间。
-```
-
-### 1.2. 思路和解法
+### 1.1. 思路和解法
 
 二分查找有两种常见写法。循环条件和判断条件容易搞错，记住遵循 `循环不变量规则`（循环过程中每次处理边界时，坚持根据区间的定义来操作）。
 
@@ -110,7 +85,7 @@ int search(vector<int>& nums, int target) {
 }
 ```
 
-### 1.3. glibc中的二分查找
+### 1.2. glibc中的二分查找
 
 一般情况下，默认使用`左闭右开`区间。查看glibc中的二分查找，使用的也是`左闭右开`区间。
 
@@ -150,58 +125,41 @@ bsearch (const void *__key, const void *__base, size_t __nmemb, size_t __size,
 }
 ```
 
+### 1.3. Rust解法
+
+数组`Vec`相关接口，参考 [std::vec::Vec](https://doc.rust-lang.org/std/vec/struct.Vec.html)
+
+* 数组长度`len()`，返回`usize`：`pub fn len(&self) -> usize`
+* 需要注意`i32`和`usize`的转换，两者不会自动转换，不匹配则编译器会报错
+
+```rust
+impl Solution {
+    pub fn search(nums: Vec<i32>, target: i32) -> i32 {
+        let (mut left, mut right) = (0_i32, nums.len() as i32);
+        let mut mid;
+        while left < right {
+            mid = (left+right)/2;
+            if nums[mid as usize] > target {
+                right = mid;
+            } else if nums[mid as usize] < target {
+                left = mid + 1;
+            } else {
+                return mid;
+            }
+        }
+
+        -1
+    }
+}
+```
+
 ## 2. 3.移除元素
 
-[LeetCode题目链接：27. 移除元素](https://leetcode.cn/problems/remove-element/description/)
+VS Code 切换为英文站。
 
-```
-给你一个数组 nums 和一个值 val，你需要 原地 移除所有数值等于 val 的元素。元素的顺序可能发生改变。然后返回 nums 中与 val 不同的元素的数量。
+[LeetCode题目链接：27. Remove Element](https://leetcode.com/problems/remove-element/)
 
-假设 nums 中不等于 val 的元素数量为 k，要通过此题，您需要执行以下操作：
-
-更改 nums 数组，使 nums 的前 k 个元素包含不等于 val 的元素。nums 的其余元素和 nums 的大小并不重要。
-返回 k。
-用户评测：
-
-评测机将使用以下代码测试您的解决方案：
-
-int[] nums = [...]; // 输入数组
-int val = ...; // 要移除的值
-int[] expectedNums = [...]; // 长度正确的预期答案。
-                            // 它以不等于 val 的值排序。
-
-int k = removeElement(nums, val); // 调用你的实现
-
-assert k == expectedNums.length;
-sort(nums, 0, k); // 排序 nums 的前 k 个元素
-for (int i = 0; i < actualLength; i++) {
-    assert nums[i] == expectedNums[i];
-}
-如果所有的断言都通过，你的解决方案将会 通过。
-
- 
-
-示例 1：
-
-输入：nums = [3,2,2,3], val = 3
-输出：2, nums = [2,2,_,_]
-解释：你的函数函数应该返回 k = 2, 并且 nums 中的前两个元素均为 2。
-你在返回的 k 个元素之外留下了什么并不重要（因此它们并不计入评测）。
-示例 2：
-
-输入：nums = [0,1,2,2,3,0,4,2], val = 2
-输出：5, nums = [0,1,4,0,3,_,_,_]
-解释：你的函数应该返回 k = 5，并且 nums 中的前五个元素为 0,0,1,3,4。
-注意这五个元素可以任意顺序返回。
-你在返回的 k 个元素之外留下了什么并不重要（因此它们并不计入评测）。
- 
-
-提示：
-
-0 <= nums.length <= 100
-0 <= nums[i] <= 50
-0 <= val <= 100
-```
+### 2.1. 思路和解法
 
 
 
