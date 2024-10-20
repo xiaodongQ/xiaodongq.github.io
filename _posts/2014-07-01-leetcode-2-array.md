@@ -153,13 +153,37 @@ impl Solution {
 }
 ```
 
-## 2. 3.移除元素
+## 2. 27.移除元素
 
 VS Code 切换为英文站。
 
 [LeetCode题目链接：27. Remove Element](https://leetcode.com/problems/remove-element/)
 
 ### 2.1. 思路和解法
+
+双指针法（快慢指针）：慢指针指向有效成员下标，快指针按顺序迭代；若有元素要删除，则慢指针不步进
+
+```cpp
+class Solution {
+public:
+    int removeElement(vector<int>& nums, int val) {
+        // 双指针法（快慢指针）
+        // 慢指针指向有效成员下标，快指针按顺序迭代；若有元素要删除，则慢指针不步进
+        int left = 0;
+        int right = 0;
+        while (right < nums.size()) {
+            if (nums[right] != val) {
+                nums[left++] = nums[right];
+            }
+            right++;
+        }
+
+        return left;
+    }
+};
+```
+
+### 2.2. Rust解法
 
 
 
