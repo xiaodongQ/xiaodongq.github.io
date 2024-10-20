@@ -185,8 +185,95 @@ public:
 
 ### 2.2. Rust解法
 
+```rust
+impl Solution {
+    pub fn remove_element(nums: &mut Vec<i32>, val: i32) -> i32 {
+        // 变量命名风格按照 snake_case
+        let mut left_idx = 0;
+        for right in 0..nums.len() {
+            if nums[right] != val {
+                nums[left_idx] = nums[right];
+                // Rust中没有 ++自增 和 --自减
+                left_idx += 1;
+            }
+        }
+        // 上述默认类型推导为usize，此处需转换
+        return left_idx as i32;
+    }
+}
+```
 
+## 3. 977.有序数组的平方
 
-## 3. 参考
+[977. Squares of a Sorted Array](https://leetcode.com/problems/squares-of-a-sorted-array/description/)
+
+### 3.1. 思路和解法
+
+双指针法，原数组为非递减序，即递增序或者相等，首尾比较依次可得到每轮最大值。
+
+时间复杂度为`O(n)`。
+
+```cpp
+class Solution {
+public:
+    vector<int> sortedSquares(vector<int>& nums) {
+        // 双指针法，原数组为非递减序，即递增序或者相等，首尾比较依次可得到每轮最大值
+        int left = 0;
+        int right = nums.size() - 1;
+        
+        // 用于返回结果，nums作为引用传入只是减少数据拷贝，不要直接修改nums来返回结果
+        // 构造时指定容量（初始值均为0），优化性能
+        vector<int> result(nums.size(), 0);
+        // 用于记录最大值存储位置，从数组最后开始
+        int k = nums.size() - 1;
+
+        // 循环不变量原则，[]时两侧索引值都是有意义的
+        while (left <= right) {
+            // 右边大或等于，都取右侧，并收缩右边界
+            if (nums[right]*nums[right] >= nums[left]*nums[left]) {
+                result[k--] = nums[right]*nums[right];
+                right--;
+            } else {
+                // 取左侧值，并收缩左边界
+                result[k--] = nums[left]*nums[left];
+                left++;
+            }
+        }
+        return result;
+    }
+};
+```
+
+### 3.2. Rust解法
+
+**特别注意**：`right -= 1;`对应分支中，若取 `>=` ，则`nums`仅有一个成员时，无法通过用例，`right-1`会溢出（默认`usize`）。
+
+（出于Rust实现中碰到的溢出风险，若边界涉及`unsigned`类型`-1`的，尽量放另外的分支）
+
+```rust
+impl Solution {
+    pub fn sorted_squares(nums: Vec<i32>) -> Vec<i32> {
+        let (mut left, mut right) = (0, nums.len()-1);
+        // 用法：vec![1; 3]; 前者为元素值后者为长度
+        let mut result: Vec<i32> = vec![0; nums.len()];
+        let mut k = nums.len() - 1;
+        while left <= right {
+            // 特别注意，若取 >= ，则nums仅有一个成员时，无法通过用例，right-1会溢出（默认usize）
+            // if nums[right]*nums[right] >= nums[left]*nums[left] {
+            if nums[right]*nums[right] > nums[left]*nums[left] {
+                result[k] = nums[right]*nums[right];
+                right -= 1;
+            } else {
+                result[k] = nums[left]*nums[left];
+                left += 1;
+            }
+            k -= 1;
+        }
+        result
+    }
+}
+```
+
+## 4. 参考
 
 1、[代码随想录 -- 数组篇](https://www.programmercarl.com/0704.%E4%BA%8C%E5%88%86%E6%9F%A5%E6%89%BE.html)
