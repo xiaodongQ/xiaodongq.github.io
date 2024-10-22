@@ -276,9 +276,82 @@ impl Solution {
 
 ## 4. 209.长度最小的子数组
 
-### 思路和解法
+### 4.1. 思路和解法
 
-滑动窗口
+滑动窗口（也可理解为双指针）。
+
+* 题目中数组成员是正整数，求和是递增的，扩大`右边界`直到滑动窗口内总和`>=`目标值；
+* 而后依次缩小`左边界`，当窗口内总和不满足`>=`则移动右边界；
+    * 这里的思路是核心。若用左右边界作为循环条件 `while(left<=right)`，并判断求和条件退出循环，不简洁
+* 每轮窗口变动，判断满足`>=`目标条件的窗口长度是否比最小值小
+
+```cpp
+class Solution {
+public:
+    int minSubArrayLen(int target, vector<int>& nums) {
+        int result = INT32_MAX;
+        // 滑动窗口起止
+        int left = 0;
+        int right = 0;
+        // 滑动窗口长度
+        int sub_len = 0;
+        // 窗口内求和，题目中数组成员是正整数
+        int sum = 0;
+        for (int right = 0; right < nums.size(); right++) {
+            sum += nums[right];
+            // 基于窗口求和循环判断来调整左侧（避免下标作为循环，判断多次边界容易出错）
+            while (sum >= target) {
+                sub_len = right - left + 1;
+                if (sub_len < result) {
+                    result = sub_len;
+                }
+                // 尝试收缩左侧
+                sum -= nums[left];
+                left++;
+            }
+        }
+        if (result == INT32_MAX) {
+            result = 0;
+        }
+        return result;
+    }
+};
+```
+
+作为对比，收缩边界的循环条件，上述用总和判断，下面用左右边界判断，可以通过提交，但是更为费劲。
+
+```cpp
+    int minSubArrayLen(int target, vector<int>& nums) {
+        int result = INT32_MAX;
+        // 滑动窗口起止
+        int left = 0;
+        int right = 0;
+        // 滑动窗口长度
+        int sub_len = 0;
+        // 窗口内求和，题目中数组成员是正整数
+        int sum = 0;
+        for (int right = 0; right < nums.size(); right++) {
+            sum += nums[right];
+            if (sum >= target) {
+                while (left <= right) {
+                    sub_len = right - left + 1;
+                    if ( sub_len < result ) {
+                        result = sub_len;
+                    }
+                    sum -= nums[left++];
+                    if (sum < target) {
+                        break;
+                    }
+                }
+            }
+        }
+        if (result == INT32_MAX) {
+            result = 0;
+        }
+        return result;
+    }
+```
+
 
 ## 5. 参考
 
