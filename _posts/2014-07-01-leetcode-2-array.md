@@ -301,6 +301,7 @@ public:
             sum += nums[right];
             // 基于窗口求和循环判断来调整左侧（避免下标作为循环，判断多次边界容易出错）
             while (sum >= target) {
+                // 窗口长度
                 sub_len = right - left + 1;
                 if (sub_len < result) {
                     result = sub_len;
@@ -318,7 +319,12 @@ public:
 };
 ```
 
-作为对比，收缩边界的循环条件，上述用总和判断，下面用左右边界判断，可以通过提交，但是更为费劲。
+时间复杂度：`O(n)`。
+
+* 内存循环只是少量移动（实际只多移动一次），总体操作中，每个元素都是两次操作：进入滑动窗口、移出滑动窗口，即`O(2n)`。
+* 求和都是在右边界延伸、以及左边界收缩时，基于原有的`sum`基础上增量修改的。
+
+作为对比，收缩边界的循环条件，上面用的是总和判断，下面用左右边界判断，该方式可以通过提交，但是没有上面简洁。
 
 ```cpp
     int minSubArrayLen(int target, vector<int>& nums) {
@@ -332,13 +338,16 @@ public:
         int sum = 0;
         for (int right = 0; right < nums.size(); right++) {
             sum += nums[right];
+            // 总和超过目标则开始收缩左边界，直到窗口内总和 < 目标值
             if (sum >= target) {
                 while (left <= right) {
+                    // 窗口长度
                     sub_len = right - left + 1;
                     if ( sub_len < result ) {
                         result = sub_len;
                     }
                     sum -= nums[left++];
+                    // 退出条件
                     if (sum < target) {
                         break;
                     }
@@ -352,6 +361,39 @@ public:
     }
 ```
 
+### Rust解法
+
+```rust
+impl Solution {
+    pub fn min_sub_array_len(target: i32, nums: Vec<i32>) -> i32 {
+        // 推导为 usize
+        let (mut left, mut right) = (0, 0);
+        // 下面有as i32，此处推导为i32，否则默认usize
+        let mut sub_len = 0;
+        // i32
+        let mut result = i32::MAX;
+        let mut sum = 0;
+        while right < nums.len() {
+            sum += nums[right];
+            while sum >= target {
+                // 注意这里的类型转换
+                sub_len = (right - left + 1) as i32;
+                // i32 做比较
+                if sub_len < result {
+                    result = sub_len;
+                }
+                sum -= nums[left];
+                left += 1;
+            }
+            right += 1;
+        }
+        if result == i32::MAX {
+            result = 0;
+        }
+        result as i32
+    }
+}
+```
 
 ## 5. 参考
 
