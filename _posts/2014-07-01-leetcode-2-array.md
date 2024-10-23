@@ -361,7 +361,7 @@ public:
     }
 ```
 
-### Rust解法
+### 4.2. Rust解法
 
 ```rust
 impl Solution {
@@ -395,6 +395,12 @@ impl Solution {
 }
 ```
 
-## 5. 参考
+## 5. 59.螺旋矩阵II
+
+### 思路和解法
+
+核心是保持循环不变量。左闭右开区间，每圈依次按 上->右->下->左 的顺序遍历。
+
+## 6. 参考
 
 1、[代码随想录 -- 数组篇](https://www.programmercarl.com/0704.%E4%BA%8C%E5%88%86%E6%9F%A5%E6%89%BE.html)
