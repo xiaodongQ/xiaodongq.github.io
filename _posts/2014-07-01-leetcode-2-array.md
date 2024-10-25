@@ -276,6 +276,8 @@ impl Solution {
 
 ## 4. 209.长度最小的子数组
 
+[209. Minimum Size Subarray Sum](https://leetcode.com/problems/minimum-size-subarray-sum/description/)
+
 ### 4.1. 思路和解法
 
 滑动窗口（也可理解为双指针）。
@@ -397,32 +399,38 @@ impl Solution {
 
 ## 5. 59.螺旋矩阵II
 
+[59. Spiral Matrix II](https://leetcode.com/problems/spiral-matrix-ii/description/)
+
 ### 5.1. 思路和解法
 
 核心是保持循环不变量。左闭右开区间，每圈依次按 上->右->下->左 的顺序遍历。
 
-`i`和`startx`、`j`和`starty` 需要理解下。`i`是行，应该`i = starty;`？
+理解点：记住每轮开始的起点，`(top, left)` 或 `(startx, starty)`，感觉前者更易理解。可以查看提交代码的对比：[59.spiral-matrix-ii_test](https://github.com/xiaodongQ/LeetCode/blob/master/cpp_exercise/59.spiral-matrix-ii_test.cpp)
 
 ```cpp
 class Solution {
 public:
-    vector<vector<int>> generateMatrix(int n) {
+// 上述的每轮起始坐标(startx, starty) 换成 (top, left) 更易理解
+vector<vector<int>> generateMatrix(int n) {
         // 核心是保持循环不变量。左闭右开区间，每圈依次按 上->右->下->左 的顺序遍历
-        // 每个圈的起始位置
-        int startx = 0;
-        int starty = 0;
-        // 各框取值，从1开始
+        // 每轮开始的行
+        int top = 0;
+        // 每轮开始的列
+        int left = 0;
+        // 各位置取值，从1开始
         int num = 1;
         // 轮次
         int round = n/2;
-        // 每轮右边界 [)每条边的右侧
+        // 每轮到达的右边界偏移（最右n-offset）
+        // 由于是开区间，右边界到倒数第2列（ 即`[0, n-1)` ）
         int offset = 1;
         int i=0, j=0;
-        // 结果
+        // 结果，初始化时就申请好空间，避免push_back
         vector< vector<int> > result(n, vector<int>(n, 0));
         while (round-- > 0) {
-            i = startx;
-            j = starty;
+            // 每轮的起点，行、列
+            i = top;
+            j = left;
 
             // 上边，此处依次获取一行记录 result[0][j]
             for (; j < n-offset; j++) {
@@ -433,15 +441,19 @@ public:
                 result[i][j] = num++;
             }
             // 下边，注意是从右到左，result[上轮的i行][j]
-            for (; j > starty; j--) {
+            for (; j > left; j--) {
                 result[i][j] = num++;
             }
             // 左边，注意是从下到上，result[i][上轮的j列]
-            for (; i > startx; i--) {
+            for (; i > top; i--) {
                 result[i][j] = num++;
             }
-            startx++;
-            starty++;
+
+            // 表示从顶往下一行 
+            top++;
+            // 表示从左往右一列
+            left++;
+            // n-offset 宽度变小
             offset++;
         }
         if (n % 2 == 1) {
@@ -452,6 +464,60 @@ public:
 };
 ```
 
+### 5.2. Rust解法
+
+```rust
+impl Solution {
+    pub fn generate_matrix(n: i32) -> Vec<Vec<i32>> {
+        let mut input_n = n as usize;
+        let mut round = n/2;
+        // 每轮起点
+        let (mut top, mut left): (usize, usize) = (0, 0);
+        // 初始化时就申请空间，vec!的长度需要usize
+        let mut result = vec![ vec![0; input_n]; input_n];
+        let (mut i, mut j) = (0, 0);
+        // 每轮的长度边界
+        let mut offset = 1;
+        let mut count = 1;
+        while round > 0 {
+            i = top;
+            j = left;
+            // 依次画 上->右->下->左，并保持左闭右开的循环不变量
+            while j < input_n - offset {
+                result[i][j] = count;
+                count += 1;
+                j += 1;
+            }
+            while i < input_n - offset {
+                result[i][j] = count;
+                count += 1;
+                i += 1;
+            }
+            while j > left {
+                result[i][j] = count;
+                count += 1;
+                j -= 1;
+            }
+            while i > top {
+                result[i][j] = count;
+                count += 1;
+                i -= 1;
+            }
+            // 下一轮的起始位置移动坐标
+            top += 1;
+            left += 1;
+            offset += 1;
+            // 轮次减1
+            round -= 1;
+        }
+        if n % 2 == 1 {
+            result[input_n/2][input_n/2] = count;
+        }
+        
+        result
+    }
+}
+```
 
 ## 6. 参考
 
