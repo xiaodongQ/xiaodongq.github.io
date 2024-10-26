@@ -519,6 +519,67 @@ impl Solution {
 }
 ```
 
-## 6. 参考
+## 6. 区间和
+
+非LeetCode上的原题，题目链接：[区间和](https://kamacoder.com/problempage.php?pid=1070)
+
+题目：
+
+* 给定一个整数数组 Array，请计算该数组在每个指定区间内元素的总和。
+* 输入描述：第一行输入为整数数组 Array 的长度 `n`，接下来 n 行，每行一个整数，表示数组的元素。随后的输入为需要计算总和的区间下标：`a`，`b` （`b > = a`），直至文件结束。
+* 输出描述：输出每个指定区间内元素的总和。
+* 示例：输入3，而后3行输入3个数字；再指定下标区间 0,1，则表示求`arr[0]+arr[1]`
+
+### 6.1. 思路和题解
+
+1、暴力解法（朴素解法）
+
+* 输入时用`vector`保存各成员，指定求和范围时通过`for`循环遍历求和。
+* 假设数组长度为`n`，要查询`m`次，每次都是`0`到`n-1`的和，总的查询时间复杂度：`O(n) * m`，当查询次数较多时，该方法较慢
+    * 时间复杂度：每个查询 `O(n)`（最坏情况都是遍历整个数组），没有预处理步骤（即预处理`O(1)`）
+    * 空间复杂度：`O(1)`
+
+2、**前缀和** 解法
+
+数组输入时进行预处理，借助额外空间计算保存`前缀和`，空间复杂度：`O(n)`，而后计算区间和时每次只要`O(1)`
+
+区间和为：`sums[right]-sums[left-1]`，`left=0`时，直接取`sums[right]`。
+
+优化：区间和比数组长度多一位，`sums[0]`表示没有元素，则区间和为：`sums[right+1] - sums[left]`，边界处理更为简洁。
+
+```cpp
+#include <iostream>
+#include <vector>
+using namespace std;
+
+int main() {
+    int num = 0;
+    printf("input array size...\n");
+    scanf("%d", &num);
+
+    vector<int> arr(num);
+    // 前缀和数组长度+1，可以简化边界处理，sums[0]表示没有值
+    vector<int> sums(num + 1, 0);
+    for (int i = 0; i < num; i++) {
+        printf("input array member[%d]:", i);
+        scanf("%d", &arr[i]);
+
+        sums[i + 1] = sums[i] + arr[i];
+    }
+
+    int left, right;
+    printf("input range left,right...\n");
+    scanf("%d,%d", &left, &right);
+    if (left < 0 || left > num-1 || right < 0 || right > num - 1 || left > right) {
+        printf("left:%d or right:%d invalid!\n", left, right);
+        return -1;
+    }
+    printf("sum:%d\n", sums[right + 1] - sums[left]);
+
+    return 0;
+}
+```
+
+## 7. 参考
 
 1、[代码随想录 -- 数组篇](https://www.programmercarl.com/0704.%E4%BA%8C%E5%88%86%E6%9F%A5%E6%89%BE.html)
