@@ -580,6 +580,12 @@ int main() {
 }
 ```
 
+### 单元测试
+
+上述代码简单放到了一个`main`函数里，基于 [GTest](https://github.com/google/googletest) 拆分成可单元测试的代码块。
+
+可参考：[GoogleTest Quickstart: Building with CMake](https://google.github.io/googletest/quickstart-cmake.html)
+
 ## 7. 参考
 
 1、[代码随想录 -- 数组篇](https://www.programmercarl.com/0704.%E4%BA%8C%E5%88%86%E6%9F%A5%E6%89%BE.html)
