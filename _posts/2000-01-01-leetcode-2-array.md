@@ -530,7 +530,7 @@ impl Solution {
 * 输出描述：输出每个指定区间内元素的总和。
 * 示例：输入3，而后3行输入3个数字；再指定下标区间 0,1，则表示求`arr[0]+arr[1]`
 
-### 6.1. 思路和题解
+### 6.1. 思路和解法
 
 1、暴力解法（朴素解法）
 
@@ -642,7 +642,7 @@ CMake 3.11版本引入了`FetchContent`模块，提供了一种在配置阶段�
 
 直接在里面引入GTest依赖：
 
-```makefile
+```sh
 cmake_minimum_required(VERSION 3.14)
 project(prefix_sum_test)
 
