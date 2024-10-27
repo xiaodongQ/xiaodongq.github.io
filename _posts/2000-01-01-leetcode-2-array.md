@@ -580,11 +580,149 @@ int main() {
 }
 ```
 
-### 单元测试
+### 6.2. 单元测试
 
 上述代码简单放到了一个`main`函数里，基于 [GTest](https://github.com/google/googletest) 拆分成可单元测试的代码块。
 
 可参考：[GoogleTest Quickstart: Building with CMake](https://google.github.io/googletest/quickstart-cmake.html)
+
+#### 6.2.1. 实现
+
+```cpp
+// prefix_sum.cpp
+// 计算前缀和
+std::vector<int> computePrefixSum(const std::vector<int>& arr) {
+    std::vector<int> sums(arr.size() + 1, 0); // 初始化前缀和数组
+    for (size_t i = 0; i < arr.size(); ++i) {
+        sums[i + 1] = sums[i] + arr[i];
+    }
+    return sums;
+}
+
+// 根据前缀和计算区间和
+int rangeSum(const std::vector<int>& sums, int left, int right) {
+    return sums[right + 1] - sums[left];
+}
+```
+
+#### 6.2.2. 单元测试代码
+
+prefix_sum_test.cpp：
+
+```cpp
+#include <gtest/gtest.h>
+#include "prefix_sum.h"
+
+TEST(PrefixSumTest, ComputePrefixSum) {
+    std::vector<int> arr = {1, 2, 3, 4, 5};
+    std::vector<int> expected_sums = {0, 1, 3, 6, 10, 15};
+    std::vector<int> sums = computePrefixSum(arr);
+    ASSERT_EQ(sums, expected_sums);
+}
+
+TEST(PrefixSumTest, RangeSum) {
+    std::vector<int> arr = {1, 2, 3, 4, 5};
+    std::vector<int> sums = computePrefixSum(arr);
+    EXPECT_EQ(rangeSum(sums, 0, 1), 3); // 从0到1
+    EXPECT_EQ(rangeSum(sums, 1, 3), 9); // 从1到3
+    EXPECT_EQ(rangeSum(sums, 2, 4), 12); // 从2到4
+}
+
+int main(int argc, char **argv) {
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
+}
+```
+
+#### 6.2.3. CMakeLists.txt
+
+CMake 3.11版本引入了`FetchContent`用作包管理，直接在里面引入GTest
+
+```makefile
+cmake_minimum_required(VERSION 3.14)
+project(prefix_sum_test)
+
+# 设置编译器标志
+# GoogleTest requires at least C++14
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# 通过cmake的模块，设置 Google Test
+include(FetchContent)
+FetchContent_Declare(
+  googletest
+  URL https://github.com/google/googletest/archive/refs/tags/v1.15.2.zip
+)
+# For Windows: Prevent overriding the parent project's compiler/linker settings
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+
+# 添加子目录，包含 Google Test
+enable_testing()
+
+# 添加单元测试
+add_executable(
+	prefix_sum_test
+	prefix_sum_test.cpp
+	prefix_sum.cpp
+)
+# 添加依赖关系
+target_link_libraries(prefix_sum_test gtest gtest_main)
+
+include(GoogleTest)
+gtest_discover_tests(prefix_sum_test)
+```
+
+#### 6.2.4. 编译运行
+
+`mkdir build; cd build; cmake ..; make`
+
+CMake是跨平台的，MacOS上编译并运行：
+
+```sh
+[MacOS-xd@qxd ➜ build git:(master) ✗ ]$ ctest
+Test project /Users/xd/Documents/workspace/src/cpp_path/LeetCode/cpp_exercise/range_sum/unit_test/build
+    Start 1: PrefixSumTest.ComputePrefixSum
+1/2 Test #1: PrefixSumTest.ComputePrefixSum ...   Passed    0.01 sec
+    Start 2: PrefixSumTest.RangeSum
+2/2 Test #2: PrefixSumTest.RangeSum ...........   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 2
+
+Total Test time (real) =   0.02 sec
+
+[MacOS-xd@qxd ➜ build git:(master) ✗ ]$ ./prefix_sum_test 
+[==========] Running 2 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 2 tests from PrefixSumTest
+[ RUN      ] PrefixSumTest.ComputePrefixSum
+[       OK ] PrefixSumTest.ComputePrefixSum (0 ms)
+[ RUN      ] PrefixSumTest.RangeSum
+[       OK ] PrefixSumTest.RangeSum (0 ms)
+[----------] 2 tests from PrefixSumTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 2 tests from 1 test suite ran. (0 ms total)
+[  PASSED  ] 2 tests.
+```
+
+CentOS上编译后运行：
+
+```sh
+[CentOS-root@xdlinux ➜ build git:(master) ✗ ]$ ./prefix_sum_test 
+[==========] Running 2 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 2 tests from PrefixSumTest
+[ RUN      ] PrefixSumTest.ComputePrefixSum
+[       OK ] PrefixSumTest.ComputePrefixSum (0 ms)
+[ RUN      ] PrefixSumTest.RangeSum
+[       OK ] PrefixSumTest.RangeSum (0 ms)
+[----------] 2 tests from PrefixSumTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 2 tests from 1 test suite ran. (0 ms total)
+[  PASSED  ] 2 tests.
+```
 
 ## 7. 参考
 
