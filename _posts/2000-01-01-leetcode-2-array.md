@@ -657,8 +657,6 @@ FetchContent_Declare(
   googletest
   URL https://github.com/google/googletest/archive/refs/tags/v1.15.2.zip
 )
-# For Windows: Prevent overriding the parent project's compiler/linker settings
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
 # 添加子目录，包含 Google Test
@@ -728,7 +726,18 @@ CentOS上编译后运行：
 [  PASSED  ] 2 tests.
 ```
 
-## 7. 参考
+## 7. 开发商购买土地
+
+非LeetCode上的原题，题目链接：[开发商购买土地](https://kamacoder.com/problempage.php?pid=1044)
+
+简化：
+
+* `n * m` 的矩阵，按横向或纵向划分成两个子区域，每个区域包含一个或多个值，返回两个子区域总和差异最小值
+
+### 7.1. 思路和解法
+
+
+## 8. 参考
 
 1、[代码随想录 -- 数组篇](https://www.programmercarl.com/0704.%E4%BA%8C%E5%88%86%E6%9F%A5%E6%89%BE.html)
 
@@ -739,5 +748,3 @@ CentOS上编译后运行：
 4、[Rust标准库 -- std::vec::Vec](https://doc.rust-lang.org/std/vec/struct.Vec.html)
 
 5、[GoogleTest Quickstart: Building with CMake](https://google.github.io/googletest/quickstart-cmake.html)
-
-6、GPT
