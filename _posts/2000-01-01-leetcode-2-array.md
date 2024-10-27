@@ -586,6 +586,8 @@ int main() {
 
 可参考：[GoogleTest Quickstart: Building with CMake](https://google.github.io/googletest/quickstart-cmake.html)
 
+下面的完整代码，见：[range_sum/unit_test](https://github.com/xiaodongQ/LeetCode/tree/master/cpp_exercise/range_sum/unit_test)
+
 #### 6.2.1. 实现
 
 ```cpp
@@ -636,7 +638,9 @@ int main(int argc, char **argv) {
 
 #### 6.2.3. CMakeLists.txt
 
-CMake 3.11版本引入了`FetchContent`用作包管理，直接在里面引入GTest
+CMake 3.11版本引入了`FetchContent`模块，提供了一种在配置阶段直接从外部项目下载源代码的能力，而不需要事先将代码下载到本地或作为项目的一部分提交到版本控制系统。
+
+直接在里面引入GTest依赖：
 
 ```makefile
 cmake_minimum_required(VERSION 3.14)
@@ -727,3 +731,13 @@ CentOS上编译后运行：
 ## 7. 参考
 
 1、[代码随想录 -- 数组篇](https://www.programmercarl.com/0704.%E4%BA%8C%E5%88%86%E6%9F%A5%E6%89%BE.html)
+
+2、[LeetCode中文站](https://leetcode.cn/)
+
+3、[LeetCode英文站](https://leetcode.com/)
+
+4、[Rust标准库 -- std::vec::Vec](https://doc.rust-lang.org/std/vec/struct.Vec.html)
+
+5、[GoogleTest Quickstart: Building with CMake](https://google.github.io/googletest/quickstart-cmake.html)
+
+6、GPT
