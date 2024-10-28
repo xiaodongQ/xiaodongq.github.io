@@ -41,15 +41,23 @@ Rust学习实践，几个Demo练习。
 * JSON格式化：[jsonxf](https://github.com/gamache/jsonxf)
 * mime类型处理：[mime](https://github.com/hyperium/mime)
 * 异步处理：[tokio](https://github.com/tokio-rs/tokio)
+* 另外可以用语法高亮库进一步完善：[syntect](https://github.com/trishume/syntect)
 
 ### 2.2. 练习
 
 [代码行数统计工具 tokei](https://github.com/XAMPPRocky/tokei)，可以显示文件行、代码、评论、空格行等。
 
-
 ## 3. 简易图片服务器
 
+### 3.1. 说明
+
+### 3.2. 练习
+
 ## 4. SQL查询小工具
+
+### 4.1. 说明
+
+### 4.2. 练习
 
 ## 5. 小结
 
