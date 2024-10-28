@@ -329,38 +329,38 @@ public:
 作为对比，收缩边界的循环条件，上面用的是总和判断，下面用左右边界判断，该方式可以通过提交，但是没有上面简洁。
 
 ```cpp
-    int minSubArrayLen(int target, vector<int>& nums) {
-        int result = INT32_MAX;
-        // 滑动窗口起止
-        int left = 0;
-        int right = 0;
-        // 滑动窗口长度
-        int sub_len = 0;
-        // 窗口内求和，题目中数组成员是正整数
-        int sum = 0;
-        for (int right = 0; right < nums.size(); right++) {
-            sum += nums[right];
-            // 总和超过目标则开始收缩左边界，直到窗口内总和 < 目标值
-            if (sum >= target) {
-                while (left <= right) {
-                    // 窗口长度
-                    sub_len = right - left + 1;
-                    if ( sub_len < result ) {
-                        result = sub_len;
-                    }
-                    sum -= nums[left++];
-                    // 退出条件
-                    if (sum < target) {
-                        break;
-                    }
+int minSubArrayLen(int target, vector<int>& nums) {
+    int result = INT32_MAX;
+    // 滑动窗口起止
+    int left = 0;
+    int right = 0;
+    // 滑动窗口长度
+    int sub_len = 0;
+    // 窗口内求和，题目中数组成员是正整数
+    int sum = 0;
+    for (int right = 0; right < nums.size(); right++) {
+        sum += nums[right];
+        // 总和超过目标则开始收缩左边界，直到窗口内总和 < 目标值
+        if (sum >= target) {
+            while (left <= right) {
+                // 窗口长度
+                sub_len = right - left + 1;
+                if ( sub_len < result ) {
+                    result = sub_len;
+                }
+                sum -= nums[left++];
+                // 退出条件
+                if (sum < target) {
+                    break;
                 }
             }
         }
-        if (result == INT32_MAX) {
-            result = 0;
-        }
-        return result;
     }
+    if (result == INT32_MAX) {
+        result = 0;
+    }
+    return result;
+}
 ```
 
 ### 4.2. Rust解法
@@ -410,8 +410,8 @@ impl Solution {
 ```cpp
 class Solution {
 public:
-// 上述的每轮起始坐标(startx, starty) 换成 (top, left) 更易理解
-vector<vector<int>> generateMatrix(int n) {
+    // 上述的每轮起始坐标(startx, starty) 换成 (top, left) 更易理解
+    vector<vector<int>> generateMatrix(int n) {
         // 核心是保持循环不变量。左闭右开区间，每圈依次按 上->右->下->左 的顺序遍历
         // 每轮开始的行
         int top = 0;
@@ -736,6 +736,14 @@ CentOS上编译后运行：
 
 ### 7.1. 思路和解法
 
+由于要算两部分差值，先遍历获取总和`sum`，则划分时另一半的就是`sum - 当前和sum1`，求两部分差值最小。
+
+两种方式（前面遍历求`sum`都需要）：
+
+* 1、分别从行和列方向遍历二维数组，计算差值（`abs( sum1, sum-sum1 )`）并同差值最小值`result`对比
+* 2、可参考`前缀和`的思路，分别先算每行和每列的和放在不同数组；再从行和列方向遍历，前缀和即数组项累加，计算比较最小值
+
+复杂度都是`O(n^2)`，此处前缀和只是一个思路，效率并不如第一种。
 
 ## 8. 参考
 
