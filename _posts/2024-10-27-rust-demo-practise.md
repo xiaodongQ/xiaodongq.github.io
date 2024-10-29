@@ -70,9 +70,23 @@ Rust学习实践，几个Demo练习。
 
 实际代码行数，包含test单元测试代码（`cargo test`时生效），也才154行。
 
+里面涉及的库，需要找对应的文档再对照下。
+
 ## 3. 简易图片服务器
 
 ### 3.1. 说明
+
+和上个Demo一样，基于一个已有的开源工具用 Rust 来重写：构建一个类似 [Thumbor](https://github.com/thumbor/thumbor) 的图片服务器。
+
+> Thumbor 是 Python 下的一个非常著名的图片服务器，被广泛应用在各种需要动态调整图片尺寸的场合里。
+>
+> 它可以通过一个很简单的 HTTP 接口，实现图片的动态剪切和大小调整，另外还支持文件存储、替换处理引擎等其他辅助功能。
+
+示例：`http://<thumbor-server>/300x200/smart/thumbor.readthedocs.io/en/latest/_images/logo-thumbor.png`
+
+对最后的URL（即`thumbor.readthedocs.io/en/latest/_images/logo-thumbor.png`）使用 `smart crop` 剪切，并调整大小为 `300x200` 的尺寸输出，用户访问这个 URL 会得到一个 `300x200` 大小的缩略图。
+
+支持多种图片转换和组合方式，使用`protobuf`生成的 base64 字符串，提供可扩展的图片处理参数
 
 ### 3.2. 练习
 
