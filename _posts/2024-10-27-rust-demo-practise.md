@@ -86,7 +86,7 @@ Rust学习实践，几个Demo练习。
 
 对最后的URL（即`thumbor.readthedocs.io/en/latest/_images/logo-thumbor.png`）使用 `smart crop` 剪切，并调整大小为 `300x200` 的尺寸输出，用户访问这个 URL 会得到一个 `300x200` 大小的缩略图。
 
-支持多种图片转换和组合方式，使用`protobuf`生成的 base64 字符串，提供可扩展的图片处理参数
+支持多种图片转换和组合方式，使用`protobuf`生成的 base64 字符串，提供可扩展的图片处理参数。
 
 ### 3.2. 练习
 
