@@ -133,7 +133,15 @@ impl Solution {
 }
 ```
 
-## 3. 参考
+## 3. 设计链表
+
+[707. Design Linked List](https://leetcode.com/problems/design-linked-list/description/)
+
+### 3.1. 思路和解法
+
+
+
+## 4. 参考
 
 1、[代码随想录 -- 链表篇](https://www.programmercarl.com/%E9%93%BE%E8%A1%A8%E7%90%86%E8%AE%BA%E5%9F%BA%E7%A1%80.html)
 
