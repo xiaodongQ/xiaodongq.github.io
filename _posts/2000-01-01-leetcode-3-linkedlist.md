@@ -246,6 +246,14 @@ private:
 };
 ```
 
+## 206.反转链表
+
+[206. Reverse Linked List](https://leetcode.com/problems/reverse-linked-list/description/)
+
+### 思路和解法
+
+
+
 ## 4. 参考
 
 1、[代码随想录 -- 链表篇](https://www.programmercarl.com/%E9%93%BE%E8%A1%A8%E7%90%86%E8%AE%BA%E5%9F%BA%E7%A1%80.html)
