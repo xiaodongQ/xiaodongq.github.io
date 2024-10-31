@@ -139,7 +139,112 @@ impl Solution {
 
 ### 3.1. 思路和解法
 
+注意题目要求中的几个小点和边界：
 
+* `0 <= index, val <= 1000` 范围都是正整数，代码中可以不判断`< 0`的边界
+    * 若在实际开发中，建议还是加上显式校验，弱约束依赖调用方的靠谱程度
+* `int get(int index)`，如果索引无效则返回`-1`
+* `void addAtIndex(int index, int val)`，在`index`节点前插入节点，如果`index`等于链表长度，则在最后插入，否则不插入
+
+插入和删除都需要先找到前一个节点，所以从`虚拟头节点`开始会更方便；而`get`查找，从第一个节点开始即可，更容易理解。
+
+```cpp
+class MyLinkedList {
+public:
+    // 定义链表结构
+    struct LinkedNode {
+        int val;
+        LinkedNode *next;
+        LinkedNode(int val):val(val), next(nullptr){}
+    };
+
+    MyLinkedList() {
+        size = 0;
+        dummyHead = new LinkedNode(0);
+    }
+    
+    int get(int index) {
+        // 题目的约束中限制了`>=0`，实际还是显式判断下不能`<0`
+        if (index > size - 1 || index < 0) {
+            return -1;
+        }
+
+        // 从第一个节点（index下标为0）开始遍历
+        LinkedNode *cur = dummyHead->next;
+
+        // for (int i = 0; i < index; i++) {
+        //     cur = cur->next;
+        // }
+        // while循环更简洁一点，不用临时变量
+        while (index--) {
+            cur = cur->next;
+        }
+        return cur->val;
+    }
+    
+    void addAtHead(int val) {
+        LinkedNode *node = new LinkedNode(val);
+        node->next = dummyHead->next;
+        dummyHead->next = node;
+        size++;
+    }
+    
+    void addAtTail(int val) {
+        LinkedNode *cur = dummyHead;
+        // 遍历到最后节点
+        while (cur->next != nullptr) {
+            cur = cur->next;
+        }
+        LinkedNode *node = new LinkedNode(val);
+        cur->next = node;
+        size++;
+    }
+    
+    // 插入到index前面
+    void addAtIndex(int index, int val) {
+        // 写边界时，可代入一个特殊值，如size=1时，须满足index<=1，两者相等时插入到队尾
+        if (index > size) {
+            return;
+        }
+        // 虽然题目有边界，index<0的边界还是显式处理下
+        if (index < 0) {
+            index = 0;
+        }
+
+        // 遍历到index前一个节点，需要从虚拟头开始
+        LinkedNode *cur = dummyHead;
+        while (index--) {
+            cur = cur->next;
+        }
+        LinkedNode *node = new LinkedNode(val);
+        node->next = cur->next;
+        cur->next = node;
+        size++;
+    }
+    
+    void deleteAtIndex(int index) {
+        // 虽然题目边界index>=0，实际编程中还是硬性判断一下
+        if (index > size - 1) {
+            return;
+        }
+        // 遍历到index前一个节点
+        LinkedNode *cur = dummyHead;
+        while (index--) {
+            cur = cur->next;
+        }
+        LinkedNode *node = cur->next;
+        cur->next = cur->next->next;
+        delete node;
+        size--;
+    }
+
+private:
+    // 链表长度，获取指定索引时需要校验
+    int size;
+    // 虚拟头节点，实际next为链表
+    LinkedNode *dummyHead;
+};
+```
 
 ## 4. 参考
 
