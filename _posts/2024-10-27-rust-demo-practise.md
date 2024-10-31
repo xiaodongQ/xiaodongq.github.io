@@ -90,16 +90,52 @@ Rust学习实践，几个Demo练习。
 
 ### 3.2. 练习
 
+暂时直接用专栏仓库的代码运行体验。
+
+启动服务，并通过生成的URL在浏览器前后2次访问。
+
+debug版本：`http://localhost:3000/image/CgoKCAj0AxCgBiADCgY6BAgUEBQKBDICCAM/https%3A%2F%2Fimages%2Epexels%2Ecom%2Fphotos%2F1562477%2Fpexels%2Dphoto%2D1562477%2Ejpeg%3Fauto%3Dcompress%26cs%3Dtinysrgb%26dpr%3D3%26h%3D750%26w%3D1260`
+
+![rust-thumbor-debug](/images/2024-10-31-rust-thumbor-debug.png)
+
+处理和水印效果（Rust标记）：
+
+![水印效果](/images/2024-10-31-demo-result.png)
+
+处理时长：9s -> 6s
+
+release版本：
+
+![rust-thumbor-release](/images/2024-10-31-rust-thumbor-release.png)
+
+处理时长：1s -> 400ms
+
+release编译版本性能远高于debug版本。
+
 ## 4. SQL查询小工具
 
 ### 4.1. 说明
+
+通过SQL查询小工具，可以用`SQL`来查询 `CSV` 或者 `JSON`，甚至Shell操作。即：设计一个可以对任何数据源使用`SQL`查询，并获得结果的库。
+
+SQL查询小工具转换Shell示例：
+
+![SQL查询小工具转换Shell示例](/images/2024-10-31-rust-sql-case.jpg)
 
 ### 4.2. 练习
 
 ## 5. 小结
 
+体验[陈天 · Rust 编程第一课](https://time.geekbang.org/column/article/408400)专栏中的几个demo，感受Rust的表现力。
+
+看陈天老师的专栏文章和公众号时，讲到他的创业经历，去微信读书上看了下途客圈的创业记录，有所收获。
+
+更新笔记时正值万圣节🎃，记录下小彩蛋：
+
+![github-hallonween](/images/2024-10-31-github-hallonween.png)
+
 ## 6. 参考
 
-1、[陈天 · Rust 编程第一课](https://time.geekbang.org/column/article/408400) 
+1、[陈天 · Rust 编程第一课](https://time.geekbang.org/column/article/408400)
 
 2、GPT
