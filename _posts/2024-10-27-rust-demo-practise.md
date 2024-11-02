@@ -94,11 +94,11 @@ Rust学习实践，几个Demo练习。
 
 启动服务，并通过生成的URL在浏览器前后2次访问。
 
-debug版本：`http://localhost:3000/image/CgoKCAj0AxCgBiADCgY6BAgUEBQKBDICCAM/https%3A%2F%2Fimages%2Epexels%2Ecom%2Fphotos%2F1562477%2Fpexels%2Dphoto%2D1562477%2Ejpeg%3Fauto%3Dcompress%26cs%3Dtinysrgb%26dpr%3D3%26h%3D750%26w%3D1260`
+debug版本：
 
 ![rust-thumbor-debug](/images/2024-10-31-rust-thumbor-debug.png)
 
-处理和水印效果（Rust标记）：
+处理和水印效果（原图来自[pexels](https://www.pexels.com/photo/woman-behind-banana-leaves-1562477/)，添加了Rust水印）：
 
 ![水印效果](/images/2024-10-31-demo-result.png)
 
@@ -123,6 +123,19 @@ SQL查询小工具转换Shell示例：
 ![SQL查询小工具转换Shell示例](/images/2024-10-31-rust-sql-case.jpg)
 
 ### 4.2. 练习
+
+`cargo build`报错，主要是缺少[tauri](https://github.com/tauri-apps/tauri)的系统依赖：[prerequisites](https://v2.tauri.app/start/prerequisites/#linux)
+
+* "error: failed to run custom build command for `openssl-sys v0.9.104`"
+    * yum安装openssl和开发包：`yum install openssl-devel openssl`
+* `yum install webkit2gtk3-devel libappindicator-gtk3 librsvg2-devel`
+    * 参考上面prerequisites中依赖的包，貌似已经没有CentOS了，`yum search`找对应的包，但是缺`libappindicator-gtk3-devel`，只有`libappindicator-gtk3`
+
+报错："error: failed to run custom build command for `app v0.1.0 (/home/workspace/rust_path/rust_learning/demo/sql_queryer/data-viewer/src-tauri)`"
+
+可能跟上述`libappindicator-gtk3-devel`有关，找了个 [RPM包](https://rhel.pkgs.org/8/raven-x86_64/libappindicator-gtk3-devel-12.10.0-30.el8.x86_64.rpm.html) 离线安装，还是未解决。
+
+暂时放一下，不运行测试，对Rust实现的功能有个初步体感。
 
 ## 5. 小结
 
