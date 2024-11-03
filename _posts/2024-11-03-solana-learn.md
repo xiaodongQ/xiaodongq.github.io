@@ -8,17 +8,19 @@ tags: Solana
 * content
 {:toc}
 
-Rust项目学习，Solana。
+Rust项目学习：Solana。
 
 
 
 ## 1. 背景
 
-学习Rust的知名项目：Solana，并学习区块链开发相关内容。
+继续进一步学习Rust开源项目，后面准备先看下`Solana`和`TiKV`。
 
-之前看到的一个资源推荐：[roadmap.sh](https://roadmap.sh/)，推荐了各类开发相关的学习路线。
+本篇开始学习基于Rust开发的知名项目：Solana，并学习区块链开发相关内容。
 
-收集部分资源：
+之前看到的一个资源推荐：[roadmap.sh](https://roadmap.sh/)，其中建议了各类开发相关的学习路线。
+
+先收集部分学习资源：
 
 * [Solana官网-Developers](https://solana.com/developers)
 * [Getting Started with Solana Development](https://solana.com/docs/intro/dev)
@@ -32,3 +34,8 @@ Rust项目学习，Solana。
 
 ## 3. 参考
 
+1、[Solana官网-Developers](https://solana.com/developers)
+
+2、[Rust编程第一课--开悟之坡（上）：Rust的现状、机遇与挑战](https://time.geekbang.org/column/article/408400)
+
+3、[2021 年 Rust 行业调研报告](https://www.infoq.cn/article/umqbighceoa81yij7uyg)
