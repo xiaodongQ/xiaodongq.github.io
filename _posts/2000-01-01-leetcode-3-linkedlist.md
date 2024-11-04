@@ -246,15 +246,46 @@ private:
 };
 ```
 
-## 206.反转链表
+## 4. 206.反转链表
 
 [206. Reverse Linked List](https://leetcode.com/problems/reverse-linked-list/description/)
 
-### 思路和解法
+### 4.1. 思路和解法
 
+利用两个指针，记录后一个节点和前一个节点，依次两两调整指向。
 
+```cpp
+/**
+ * Definition for singly-linked list.
+ * struct ListNode {
+ *     int val;
+ *     ListNode *next;
+ *     ListNode() : val(0), next(nullptr) {}
+ *     ListNode(int x) : val(x), next(nullptr) {}
+ *     ListNode(int x, ListNode *next) : val(x), next(next) {}
+ * };
+ */
+class Solution {
+public:
+    ListNode* reverseList(ListNode* head) {
+        // 不需要虚拟头节点
+        ListNode* prev = nullptr;
+        ListNode* cur = head;
+        ListNode* tmp = nullptr;
+        while (cur != nullptr) {
+            // 先记录下个节点，因为cur下面会改变，导致其next指向也变化
+            ListNode* tmp = cur->next;
+            cur->next = prev;
+            prev = cur;
+            cur = tmp;
+        }
+        // 最后cur是nullptr，链表头应该为prev
+        return prev;
+    }
+};
+```
 
-## 4. 参考
+## 5. 参考
 
 1、[代码随想录 -- 链表篇](https://www.programmercarl.com/%E9%93%BE%E8%A1%A8%E7%90%86%E8%AE%BA%E5%9F%BA%E7%A1%80.html)
 
