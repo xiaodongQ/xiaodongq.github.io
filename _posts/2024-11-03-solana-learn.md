@@ -14,9 +14,9 @@ Rust项目学习：Solana。
 
 ## 1. 背景
 
-继续进一步学习Rust开源项目，后面准备先看下`Solana`和`TiKV`，相关应用和生态发展可了解 [Rust编程第一课--开悟之坡（上）：Rust的现状、机遇与挑战](https://time.geekbang.org/column/article/408400) 和 [2021 年 Rust 行业调研报告](https://www.infoq.cn/article/umqbighceoa81yij7uyg)。
+继续进一步学习Rust开源项目，后面准备先看下`Solana`和`TiKV`，相关应用和生态发展也可了解 [Rust编程第一课--开悟之坡（上）：Rust的现状、机遇与挑战](https://time.geekbang.org/column/article/408400) 和 [2021 年 Rust 行业调研报告](https://www.infoq.cn/article/umqbighceoa81yij7uyg)、[Rust 2022 生态版图调研报告](https://cloud.tencent.com/developer/article/2233690)。
 
-本篇开始学习基于Rust开发的知名项目：Solana，并学习区块链开发相关内容。
+本篇开始学习基于Rust开发的知名项目：[Solana](https://github.com/solana-labs/solana)，并学习区块链开发相关内容。
 
 先收集部分学习资源：
 
@@ -37,14 +37,70 @@ Rust项目学习：Solana。
 
 Solana 的开发分两个主要部分：
 
-* 链上程序开发：创建和部署自定义程序到区块链，可基于 `Rust`、`C` 或 `C++`，`Rust`拥有更好的支持
-* 客户端开发：编写和链上程序通信的软件（`dApp`），可使用任何语言
+* **链上程序开发**：创建和部署自定义程序到区块链，可基于 `Rust`、`C` 或 `C++`，`Rust`拥有更好的支持
+* **客户端开发**：编写和链上程序通信的软件（`dApp`），可使用任何语言
     * 客户端通过`RPC`请求向Solana网络通信。用Solana的 [JSON RPC API](https://solana.com/docs/rpc)，通过HTTP和Websocket直接和Solana节点交互，与前端和后端之间的正常开发非常相似
 
 客户端和Solana区块链通信示意图：
 
 ![客户端和Solana网络通信](/images/solana-developer_flow.png)
 
+### 2.1. 客户端开发
+
+可以使用自己熟悉的语言，通过社区贡献的SDK来进行客户端开发，各类SDK，见：[Client-side Development](https://solana.com/docs/intro/dev#client-side-development)，包含RUST、Typescript、Python、Java、C++、Go等等。
+
+### 2.2. 链上程序开发
+
+说明：
+
+* 基于Rust、C 或 C++开发
+* 机器上需要安装Rust
+* 需要安装`Solana CLI`，用于在本地验证程序，安装后命令工具为 `solana-test-validator`
+    * 具体见 [Install the Solana CLI](https://solana.com/docs/intro/installation#install-the-solana-cli)
+    * 安装命令：`sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"`，在Mac上安装后大概要476MB
+
+开发时，可基于原生Rust（不使用框架）开发，也可基于 [Anchor框架](https://www.anchor-lang.com/)，其提供更高等级的API使得开发更简单（类似于`React`替代原生`Javascript`和`HTML`）
+
+测试框架：[solana-program-test](https://docs.rs/solana-program-test/latest/solana_program_test/)
+
+若不想在本地开发程序，也有一个在线IDE：[online IDE Solana Playground](https://beta.solpg.io/)，使用参考：[Solana Quick Start Guide](https://solana.com/docs/intro/quick-start)。
+
+安装Solana CLI：
+
+```sh
+[MacOS-xd@qxd ➜ repo ]$ sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"
+downloading stable installer
+  ✨ stable commit 7feb24d initialized
+Adding
+...
+export PATH="/Users/xd/.local/share/solana/install/active_release/bin:$PATH"
+
+[MacOS-xd@qxd ➜ repo ]$ cd /Users/xd/.local/share/solana/install/releases/stable-7xxx/solana-release/bin
+[MacOS-xd@qxd ➜ bin ]$ ls
+agave-install         cargo-test-bpf        solana-dos            solana-stake-accounts
+agave-install-init    cargo-test-sbf        solana-faucet         solana-test-validator
+agave-ledger-tool     deps                  solana-genesis        solana-tokens
+agave-validator       rbpf-cli              solana-gossip         solang
+agave-watchtower      sdk                   solana-keygen         spl-token
+cargo-build-bpf       solana                solana-log-analyzer
+cargo-build-sbf       solana-bench-tps      solana-net-shaper
+```
+
+### 2.3. 开发网络环境
+
+Solana上有几种不同的网络环境（也称作集群，`cluster`），注意选择正确环境：
+
+* **主网Beta版（Mainnet Beta）**：生产网络，需要真金白银
+* **开发网（Devnet）**：生产模拟环境，用于部署生产环境前，测试保证程序的质量
+* **本地（Local）**：在本地使用`solana-test-validator`来测试程序，开发时的首选
+
+### 2.4. 示例参考
+
+有几个资源可以帮助提升Solana开发的学习：
+
+* [Solana Cookbook](https://solana.com/developers/cookbook)，提供了一系列参考和程序片段
+* [Solana Program Examples](https://github.com/solana-developers/program-examples)，提供不同操作的程序示例
+* [Guides](https://solana.com/developers/guides)，教程和指南
 
 ## 3. 小结
 
