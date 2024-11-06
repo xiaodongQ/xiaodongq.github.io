@@ -285,7 +285,53 @@ public:
 };
 ```
 
-## 5. 参考
+## 5. 两两交换链表中的节点
+
+[24. Swap Nodes in Pairs](https://leetcode.com/problems/swap-nodes-in-pairs/description/)
+
+### 5.1. 思路和解法
+
+题目中要求两两交换，节点对应值不可修改，即节点交换而不是值交换。
+
+注意：实现时光交换节点可不够，需要检查新节点的next的指向是否更新
+
+```cpp
+class Solution {
+public:
+    ListNode* swapPairs(ListNode* head) {
+        // 由于头节点也涉及交换，还是定义一个虚拟头便于处理
+        ListNode* dummyHead = new ListNode(0);
+        dummyHead->next = head;
+        ListNode* cur = dummyHead;
+        // cur初始值和退出条件是关键
+        while (cur->next != nullptr && cur->next->next != nullptr) {
+            // 记录下用于步进
+            // ListNode* tmp = cur->next;
+            // 错误做法：交换两节点 dummyHead -> a -> b ->，先让a->next指向b的下一个节点，再b->next指向a
+            // cur->next->next = cur->next->next->next;
+            // tmp->next->next = tmp;
+
+            // 上述光交换两节点不够
+            ListNode* tmp = cur->next;
+            // 再定义一个临时节点，记录 dummyHead -> a -> b -> 中的下一个节点
+            ListNode* tmp1 = cur->next->next->next;
+            // 交换两节点，并修改其next指向
+            cur->next = cur->next->next;
+            cur->next->next = tmp;
+            cur->next->next->next = tmp1;
+
+            // 步进cur
+            cur = cur->next->next;
+        }
+        cur = dummyHead->next;
+        delete dummyHead;
+
+        return cur;
+    }
+};
+```
+
+## 6. 参考
 
 1、[代码随想录 -- 链表篇](https://www.programmercarl.com/%E9%93%BE%E8%A1%A8%E7%90%86%E8%AE%BA%E5%9F%BA%E7%A1%80.html)
 
