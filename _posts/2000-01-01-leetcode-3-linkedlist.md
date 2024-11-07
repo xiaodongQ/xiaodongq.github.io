@@ -331,7 +331,59 @@ public:
 };
 ```
 
-## 6. 参考
+## 6. 19.删除链表的倒数第N个节点
+
+有时插件网络不好，还是切中文站，题目以英文显示。
+
+[19. Remove Nth Node From End of List](https://leetcode.cn/problems/remove-nth-node-from-end-of-list/description/)
+
+### 6.1. 思路和解法
+
+双指针法。
+
+题目中`sz`是链表长度，`1 <= sz <= 30`，并限定了 `1 <= n <= sz`，即倒数取值不会超过链表长度。
+
+```cpp
+class Solution {
+public:
+    ListNode* removeNthFromEnd(ListNode* head, int n) {
+        ListNode* result;
+
+        // 头节点可能被移除，定义一个虚拟头
+        ListNode* dummyHead = new ListNode(0);
+        dummyHead->next = head;
+        // 双指针法
+        ListNode* slow = dummyHead;
+        ListNode* fast = dummyHead;
+        
+        // 题目中边界限定了 n 不会超过链表长度，可以不单独考虑n没结束但fast提前到nullptr
+        // 先让快指针走n+1步，这里n+1步是核心，正好让slow在待删的前一个节点
+        while (n-- > 0 && fast != nullptr) {
+            fast = fast->next;
+        }
+        fast = fast->next;
+
+        // 一起步进，fast到底则slow->next就是要移除的节点
+        while (fast != nullptr) {
+            slow = slow->next;
+            fast = fast->next;
+        }
+        ListNode* tmp = slow->next;
+        slow->next = slow->next->next;
+        delete tmp;
+        result = dummyHead->next;
+        delete dummyHead;
+
+        return result;
+    }
+};
+```
+
+题目最好先理清楚，注意边界。跟着示例画一下图示过程，便于加深理解：
+
+![图示](/images/2024-11-07-remove-nth.png)
+
+## 7. 参考
 
 1、[代码随想录 -- 链表篇](https://www.programmercarl.com/%E9%93%BE%E8%A1%A8%E7%90%86%E8%AE%BA%E5%9F%BA%E7%A1%80.html)
 
