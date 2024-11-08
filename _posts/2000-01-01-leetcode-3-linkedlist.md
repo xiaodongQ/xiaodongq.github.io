@@ -383,7 +383,13 @@ public:
 
 ![图示](/images/2024-11-07-remove-nth.png)
 
-## 7. 参考
+## 7. 160.链表相交
+
+[Intersection of Two Linked Lists LCCI](https://leetcode.cn/problems/intersection-of-two-linked-lists-lcci/description/)
+
+### 7.1. 思路和解法
+
+## 8. 参考
 
 1、[代码随想录 -- 链表篇](https://www.programmercarl.com/%E9%93%BE%E8%A1%A8%E7%90%86%E8%AE%BA%E5%9F%BA%E7%A1%80.html)
 
