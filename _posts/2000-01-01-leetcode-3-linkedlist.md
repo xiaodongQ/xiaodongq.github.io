@@ -269,12 +269,12 @@ class Solution {
 public:
     ListNode* reverseList(ListNode* head) {
         // 不需要虚拟头节点
-        ListNode* prev = nullptr;
-        ListNode* cur = head;
-        ListNode* tmp = nullptr;
+        ListNode *prev = nullptr;
+        ListNode *cur = head;
+        ListNode *tmp = nullptr;
         while (cur != nullptr) {
             // 先记录下个节点，因为cur下面会改变，导致其next指向也变化
-            ListNode* tmp = cur->next;
+            ListNode *tmp = cur->next;
             cur->next = prev;
             prev = cur;
             cur = tmp;
@@ -300,9 +300,9 @@ class Solution {
 public:
     ListNode* swapPairs(ListNode* head) {
         // 由于头节点也涉及交换，还是定义一个虚拟头便于处理
-        ListNode* dummyHead = new ListNode(0);
+        ListNode *dummyHead = new ListNode(0);
         dummyHead->next = head;
-        ListNode* cur = dummyHead;
+        ListNode *cur = dummyHead;
         // cur初始值和退出条件是关键
         while (cur->next != nullptr && cur->next->next != nullptr) {
             // 记录下用于步进
@@ -312,9 +312,9 @@ public:
             // tmp->next->next = tmp;
 
             // 上述光交换两节点不够
-            ListNode* tmp = cur->next;
+            ListNode *tmp = cur->next;
             // 再定义一个临时节点，记录 dummyHead -> a -> b -> 中的下一个节点
-            ListNode* tmp1 = cur->next->next->next;
+            ListNode *tmp1 = cur->next->next->next;
             // 交换两节点，并修改其next指向
             cur->next = cur->next->next;
             cur->next->next = tmp;
@@ -354,11 +354,11 @@ public:
         ListNode* result;
 
         // 头节点可能被移除，定义一个虚拟头
-        ListNode* dummyHead = new ListNode(0);
+        ListNode *dummyHead = new ListNode(0);
         dummyHead->next = head;
         // 双指针法
-        ListNode* slow = dummyHead;
-        ListNode* fast = dummyHead;
+        ListNode *slow = dummyHead;
+        ListNode *fast = dummyHead;
         
         // 题目中边界限定了 n 不会超过链表长度，可以不单独考虑n没结束但fast提前到nullptr
         // 先让快指针走n+1步，这里n+1步是核心，正好让slow在待删的前一个节点
@@ -407,8 +407,8 @@ public:
     ListNode *getIntersectionNode(ListNode *headA, ListNode *headB) {
         int lenA = 0;
         int lenB = 0;
-        ListNode* tmpA = headA;
-        ListNode* tmpB = headB;
+        ListNode *tmpA = headA;
+        ListNode *tmpB = headB;
 
         // 计算链表长度
         while (tmpA != nullptr) {
@@ -449,7 +449,47 @@ public:
 };
 ```
 
-## 8. 参考
+## 8. 142.环形链表II
+
+[142. Linked List Cycle II](https://leetcode.cn/problems/linked-list-cycle-ii/)
+
+### 8.1. 思路和解法
+
+快慢指针法，快指针追上慢指针时的交点距离（可能快指针走n圈才追上），对应推导说明可参考：[代码随想录 -- 环形链表II](https://www.programmercarl.com/0142.%E7%8E%AF%E5%BD%A2%E9%93%BE%E8%A1%A8II.html)
+
+此处直接用结论：
+
+* 快指针每次移动2个节点。快指针是一个节点一个节点靠近慢指针的，因此一定会相遇。（注意这里的相遇点并不是指环形入口节点）
+* 环形入口：从`头结点`出发一个指针，从`相遇节点`也出发一个指针，这两个指针每次只走一个节点，那么当这两个指针相遇的时候就是`环形入口的节点`。
+
+```cpp
+class Solution {
+public:
+    ListNode *detectCycle(ListNode *head) {
+        // 快慢指针法
+        ListNode *slow = head;
+        ListNode *fast= head;
+        while (fast != nullptr && fast->next != nullptr) {
+            slow = slow->next;
+            fast = fast->next->next;
+            // 快慢节点相遇，但不是环形入口
+            if (slow == fast) {
+                // 直接用结论：从 链表起点 和 相遇点 各自按一步移动，相遇点即环形入口
+                ListNode *tmp1 = head;
+                ListNode *tmp2= slow;
+                while (tmp1 != tmp2) {
+                    tmp1 = tmp1->next;
+                    tmp2 = tmp2->next;
+                }
+                return tmp1;
+            }
+        }
+        return nullptr;
+    }
+};
+```
+
+## 9. 参考
 
 1、[代码随想录 -- 链表篇](https://www.programmercarl.com/%E9%93%BE%E8%A1%A8%E7%90%86%E8%AE%BA%E5%9F%BA%E7%A1%80.html)
 
