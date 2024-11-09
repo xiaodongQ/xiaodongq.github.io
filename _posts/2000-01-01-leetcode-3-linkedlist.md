@@ -293,7 +293,7 @@ public:
 
 题目中要求两两交换，节点对应值不可修改，即节点交换而不是值交换。
 
-注意：实现时光交换节点可不够，需要检查新节点的next的指向是否更新
+注意：只交换节点不够，需要更新新节点的next的指向
 
 ```cpp
 class Solution {
@@ -330,6 +330,10 @@ public:
     }
 };
 ```
+
+画一下示意图非常有必要：
+
+![示意图](/images/2024-11-09-swap.png)
 
 ## 6. 19.删除链表的倒数第N个节点
 
@@ -385,9 +389,65 @@ public:
 
 ## 7. 160.链表相交
 
-[Intersection of Two Linked Lists LCCI](https://leetcode.cn/problems/intersection-of-two-linked-lists-lcci/description/)
+[160. Intersection of Two Linked Lists](https://leetcode.cn/problems/intersection-of-two-linked-lists/description/)
 
 ### 7.1. 思路和解法
+
+某个节点指针相等时才表示相交，即该节点及之后，两个链表的所有节点都相同。
+
+解法：先计算2个链表长度，让长的链表先移动`长度差值`个节点，而后同时步进两个链表，直到出现有相等节点指针就表示相交
+
+示意图：
+
+![示意图](/images/2024-11-09-intersect.png)
+
+```cpp
+class Solution {
+public:
+    ListNode *getIntersectionNode(ListNode *headA, ListNode *headB) {
+        int lenA = 0;
+        int lenB = 0;
+        ListNode* tmpA = headA;
+        ListNode* tmpB = headB;
+
+        // 计算链表长度
+        while (tmpA != nullptr) {
+            tmpA = tmpA->next;
+            lenA++;
+        }
+        while (tmpB != nullptr) {
+            tmpB = tmpB->next;
+            lenB++;
+        }
+        tmpA = headA;
+        tmpB = headB;
+
+        // 长链表先移动到两者长度相等的节点
+        int sub = lenA >= lenB ? (lenA-lenB) : (lenB-lenA);
+        if (lenA >= lenB) {
+            while (sub--) {
+                tmpA = tmpA->next;
+            }
+        } else {
+            while (sub--) {
+                tmpB = tmpB->next;
+            }
+        }
+
+        // 比较是否相交
+        while (tmpA != nullptr && tmpB != nullptr) {
+            if (tmpA == tmpB) {
+                // 相交
+                return tmpA;
+            }
+            tmpA = tmpA->next;
+            tmpB = tmpB->next;
+        }
+
+        return nullptr;
+    }
+};
+```
 
 ## 8. 参考
 
