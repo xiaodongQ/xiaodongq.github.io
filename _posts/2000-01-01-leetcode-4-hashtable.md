@@ -36,12 +36,12 @@ LeetCode刷题学习记录，哈希表篇。
 
 * 数组：哈希值作为下标索引，`O(1)`查找
 * set：集合
-    * `std::set`，底层实现为`红黑树`，有序、不可重复、数值不可改，增删查均为`O(logN)`
-    * `std::multiset`，底层实现为`红黑树`，有序、可重复、数值不可改，增删查均为`O(logN)`
+    * `std::set`，底层实现为`红黑树`，有序、不可重复、数值不可改，增删查均为`O(logn)`
+    * `std::multiset`，底层实现为`红黑树`，有序、可重复、数值不可改，增删查均为`O(logn)`
     * `std::unordered_set`，底层实现为`哈希表`，无序、不可重复、数值不可改，增删查均为`O(1)`
 * map：映射
-    * `std::map`，底层实现为`红黑树`，有序，key不可重复、key不可改、增删查均为`O(logN)`
-    * `std::multimap`，底层实现为`红黑树`，有序，key可重复、key不可改、增删查均为`O(logN)`
+    * `std::map`，底层实现为`红黑树`，有序，key不可重复、key不可改、增删查均为`O(logn)`
+    * `std::multimap`，底层实现为`红黑树`，有序，key可重复、key不可改、增删查均为`O(logn)`
     * `std::unordered_map`，底层实现为`哈希表`，无序、key不可重复、key不可改、增删查均为`O(1)`
 
 应用场景：
@@ -50,7 +50,69 @@ LeetCode刷题学习记录，哈希表篇。
 * 如果需要集合是有序的，那么就用`set`，如果要求不仅有序还要有重复数据的话，那么就用`multiset`
 * 当要快速判断一个元素是否出现集合里的时候，考虑`哈希法`，用空间换时间
 
-## 2. 参考
+## 2. 242.有效的字母异位词
+
+[242. Valid Anagram](https://leetcode.cn/problems/valid-anagram/description/)
+
+### 2.1. 思路和解法
+
+字母异位词：相同字母，顺序不一定相同
+
+题目约束了两个字符串都是小写的英文字母，通过一个数组`int[26]`，标识`字母-'a'`对应索引的出现次数，两个字符串一加一减最后再对比各索引次数是否恢复为0
+
+```cpp
+class Solution {
+public:
+    bool isAnagram(string s, string t) {
+        int arr[26] = {0};
+        for (int i=0; i < s.length(); i++) {
+            arr[s[i] - 'a']++;
+        }
+        for (int i=0; i < t.length(); i++) {
+            arr[t[i] - 'a']--;
+        }
+        for (int i=0; i < 26; i++) {
+            if (arr[i] != 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+};
+```
+
+时间复杂度：`O(n)`  
+空间复杂度：由于借助常量级长度数组，`O(1)`
+
+## 3. 349.两个数组的交集
+
+[349. Intersection of Two Arrays](https://leetcode.cn/problems/intersection-of-two-arrays/)
+
+### 3.1. 思路和解法
+
+结果中相同元素只需要一次，可借助`unordered_set`记录第一个数组各成员，并遍历第二个数组跟集合匹配，有记录则加入返回集合
+
+```cpp
+class Solution {
+public:
+    vector<int> intersection(vector<int>& nums1, vector<int>& nums2) {
+        // 结果还是利用set来去重
+        unordered_set<int> result_set;
+        // 通过构造函数进行vector到orderend_set的转换(C++11起)
+        unordered_set<int> memb(nums1.begin(), nums1.end());
+        for (int i = 0; i < nums2.size(); i++) {
+            if (memb.end() != memb.find(nums2[i])) {
+                result_set.insert(nums2[i]);
+            }
+        }
+
+        // 迭代器构造进行转换
+        return vector<int>(result_set.begin(), result_set.end());
+    }
+};
+```
+
+## 4. 参考
 
 1、[代码随想录 -- 链表篇](https://www.programmercarl.com/%E9%93%BE%E8%A1%A8%E7%90%86%E8%AE%BA%E5%9F%BA%E7%A1%80.html)
 
