@@ -178,11 +178,30 @@ public:
 
 ### 5.1. 思路和解法
 
+用`unordered_map<int,int>`来记录数组成员需要的配对数字，以及数组成员的下标，继续遍历数组，并从map里找之前是否需要当前数组值。
 
+```cpp
+class Solution {
+public:
+    vector<int> twoSum(vector<int>& nums, int target) {
+        // 由于要返回下标，用unordered_map<int, int>记录<target-值, 下标>
+        unordered_map<int, int> tmp;
+        for (int i = 0; i < nums.size(); i++) {
+            // 看当前成员是否为之前需要的值
+            if (tmp.find(nums[i]) != tmp.end()) {
+                return vector<int>{tmp[ nums[i] ], i};
+            }
+            // 记录当前成员需要哪个值就能凑成target，即 target-num 和 它的下标
+            tmp[ target-nums[i] ] = i;
+        }
+        return vector<int>{};
+    }
+};
+```
 
 ## 6. 参考
 
-1、[代码随想录 -- 链表篇](https://www.programmercarl.com/%E9%93%BE%E8%A1%A8%E7%90%86%E8%AE%BA%E5%9F%BA%E7%A1%80.html)
+1、[代码随想录 -- 哈希表](https://www.programmercarl.com/%E5%93%88%E5%B8%8C%E8%A1%A8%E7%90%86%E8%AE%BA%E5%9F%BA%E7%A1%80.html)
 
 2、[数据结构与算法之美 -- 散列表](https://time.geekbang.org/column/article/64586)
 
