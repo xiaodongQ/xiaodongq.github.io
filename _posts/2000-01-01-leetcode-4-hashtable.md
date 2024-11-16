@@ -172,7 +172,7 @@ public:
         * 随着数字变大，虽然它的位数增加，但平方和的增长速度远远低于数字本身的增长速度。这意味着，即使对于较大的数字，经过几次转换后，平方和也会显著减小。
 * 时间复杂度可以粗略地认为是 `O(k log n)`，其中 k 是迭代次数，而 `log n` 表示每次迭代中的操作复杂度。在实际情况中，k 通常不会非常大，因为非快乐数很快就会陷入已知的循环中。
 
-## 5. 两数之和
+## 5. 1.两数之和
 
 [1. Two Sum](https://leetcode.cn/problems/two-sum/description/)
 
@@ -199,15 +199,95 @@ public:
 };
 ```
 
-## 第454题.四数相加II
+## 6. 454.四数相加II
 
 [454. 4Sum II](https://leetcode.cn/problems/4sum-ii/description/)
 
-### 思路和解法
+给定4个数组，数组各取一个元素组成四元组，满足元组求和为0的元组有多少个
+
+### 6.1. 思路和解法
+
+思路：前2个数组遍历求和sum1并保存在map里`sum1:出现次数`，后2个数组遍历求和sum2并找`-sum2`是否出现在map中，在则value对应次数累加
+
+```cpp
+class Solution {
+public:
+    int fourSumCount(vector<int>& nums1, vector<int>& nums2, vector<int>& nums3, vector<int>& nums4) {
+        int result = 0;
+        // 前2个数组遍历求和并保存
+        unordered_map<int, int> sum1_map;
+        for (int n1 : nums1) {
+            for (int n2 : nums2) {
+                sum1_map[n1+n2]++;
+            }
+        }
+        // 后2个数组遍历求和
+        for (int n3 : nums3) {
+            for (int n4 : nums4) {
+                // 找 -(n3+n4)
+                if (sum1_map.find(-n3-n4) != sum1_map.end()) {
+                    result += sum1_map[-n3-n4];
+                }
+            }
+        }
+        return result;
+    }
+};
+```
+
+## 7. 383.赎金信
+
+[383. Ransom Note](https://leetcode.cn/problems/ransom-note/)
+
+给定一个赎金信 (ransom) 字符串和一个杂志(magazine)字符串，判断第一个字符串 ransom 能不能由第二个字符串 magazines 里面的字符构成。字母都是英文小写。
+
+为了不暴露赎金信字迹，要从杂志上搜索各个需要的字母。杂志字符串中的每个字符只能在赎金信字符串中使用一次。
+
+### 7.1. 思路和解法
+
+由于都是英文字母小写，通过数组将字符缓存起来，作为哈希结构（`map`需要维护红黑树或者哈希表，且需要哈希计算，时间和空间上该场景数组更优）。
+
+`赎金信`的字符要从`杂志(magazine)`字符中查找，所以缓存`杂志(magazine)`
+
+```cpp
+class Solution {
+public:
+    bool canConstruct(string ransomNote, string magazine) {
+        int letters[26] = {0};
+
+        // 小优化，如果ransomNote长度比magazine长度大，则肯定不满足
+        if (ransomNote.size() > magazine.size()) {
+            return false;
+        }
+
+        for (char c : magazine) {
+            letters[c - 'a'] ++;
+        }
+
+        // 检查赎金信ransomNote中字符是否都能在magazine中，每个字符最多一次
+        for (char c : ransomNote) {
+            letters[c - 'a']--;
+            // 如果出现字符为负，则说明magazine里没有足够的字符能覆盖ransomNote
+            if (letters[c - 'a'] < 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+};
+```
+
+## 8. 15.三数之和
+
+[15. 3Sum](https://leetcode.cn/problems/3sum/description/)
+
+给定1个数组nums，返回所有满足`nums[i]+nums[j]+nums[k]==0`的3元组，i、j、k各不相等。
+
+### 8.1. 思路和解法
 
 
 
-## 6. 参考
+## 9. 参考
 
 1、[代码随想录 -- 哈希表](https://www.programmercarl.com/%E5%93%88%E5%B8%8C%E8%A1%A8%E7%90%86%E8%AE%BA%E5%9F%BA%E7%A1%80.html)
 
