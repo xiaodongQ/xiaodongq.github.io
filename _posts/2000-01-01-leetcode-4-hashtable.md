@@ -281,11 +281,11 @@ public:
 
 [15. 3Sum](https://leetcode.cn/problems/3sum/description/)
 
-给定1个数组nums，返回所有满足`nums[i]+nums[j]+nums[k]==0`的3元组，i、j、k各不相等。
+给定1个数组nums，返回所有满足`nums[i]+nums[j]+nums[k]==0`的3元组，i、j、k各不相等，即满足条件且不重复的三元组
 
 ### 8.1. 思路和解法
 
-
+哈希法：类似两数之和，到map里找`-(num1+num2)`
 
 ## 9. 参考
 
