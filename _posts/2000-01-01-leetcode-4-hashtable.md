@@ -281,11 +281,188 @@ public:
 
 [15. 3Sum](https://leetcode.cn/problems/3sum/description/)
 
-给定1个数组nums，返回所有满足`nums[i]+nums[j]+nums[k]==0`的3元组，i、j、k各不相等，即满足条件且不重复的三元组
+给定1个数组nums，返回所有满足`nums[i]+nums[j]+nums[k]==0`的3元组，i、j、k各不相等，且要求**三元组不重复**
 
 ### 8.1. 思路和解法
 
-哈希法：类似两数之和，到map里找`-(num1+num2)`
+#### 8.1.1. 哈希法case1（超时）
+
+哈希法类似两数之和，到map里找`-(num1+num2)`
+
+vector的set集合，借助GPT糊了一个`VecHash`和`VecEqual`，但是超时了：310/313 cases passed (N/A)
+
+```cpp
+// 解法超时
+class Solution {
+public:
+    // 自定义哈希函数
+    struct VecHash {
+        size_t operator()(const std::vector<int>& v) const {
+            std::hash<int> hasher;
+            size_t seed = 0;
+            for (int i : v) {
+                // 0x9e3779b9是一个常数，用于增加哈希值的随机性和分散度
+                seed ^= hasher(i) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+            }
+            return seed;
+        }
+    };
+    // 自定义比较函数，用于确保向量相等时哈希值也相同
+    struct VecEqual {
+        bool operator()(const std::vector<int>& v1, const std::vector<int>& v2) const {
+            return v1 == v2;
+        }
+    };
+
+    vector<vector<int>> threeSum(vector<int>& nums) {
+        vector<vector<int>> result;
+        // 外层遍历，里层在剩下的成员里找2数之和
+        for (int i = 0; i < nums.size(); i++) {
+            int sum = -nums[i];
+            unordered_map<int, int> tmp_map;
+            for (int j = i+1; j < nums.size(); j++) {
+                if (tmp_map.find(nums[j]) != tmp_map.end()) {
+                    // 满足求和为0，记录成员
+                    result.push_back(vector<int>{nums[i], nums[tmp_map[nums[j]]], nums[j]});
+                } else {
+                    tmp_map[sum - nums[j]] = j;
+                }
+            }
+        }
+
+        // 三值排序
+        for (int i = 0; i < result.size(); i++) {
+            sort(result[i].begin(), result[i].end());
+        }
+        // 自定义去重
+        unordered_set<vector<int>, VecHash, VecEqual> tmp_set(result.begin(), result.end());
+        // unordered_set和vector转换
+        vector<vector<int>> result_nums(tmp_set.begin(), tmp_set.end());
+
+        return result_nums;
+    }
+};
+```
+
+#### 8.1.2. 哈希法case2
+
+上面是排序放在后面并遍历了所有记录，这里优化成：先对数组排序，并对第一个数字进行**去重**处理
+
+```cpp
+class Solution {
+public:
+    // 自定义哈希函数
+    struct VecHash {
+        size_t operator()(const std::vector<int>& v) const {
+            std::hash<int> hasher;
+            size_t seed = 0;
+            for (int i : v) {
+                seed ^= hasher(i) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+            }
+            return seed;
+        }
+    };
+    // 自定义比较函数，用于确保向量相等时哈希值也相同
+    struct VecEqual {
+        bool operator()(const std::vector<int>& v1, const std::vector<int>& v2) const {
+            return v1 == v2;
+        }
+    };
+
+    vector<vector<int>> threeSum(vector<int>& nums) {
+        vector<vector<int>> result;
+        // 先对vector排序，便于去重
+        sort(nums.begin(), nums.end());
+        for( int i = 0; i < nums.size() - 2; i++) {
+            // 去重处理，前面已经处理过该值的情况了
+            if (i > 0 && nums[i] == nums[i-1]) {
+                continue;
+            }
+            int sum = -nums[i];
+            // 处理两数之和
+            unordered_map<int, int> tmp_map;
+            for (int j = i+1; j < nums.size(); j++) {
+                if (tmp_map.find(nums[j]) != tmp_map.end()) {
+                    // 满足三数之和为0，按大小顺序添加记录
+                    result.push_back(vector<int>{nums[i], nums[ tmp_map[nums[j]] ], nums[j]});
+                } else {
+                    tmp_map[sum - nums[j]] = j;
+                }
+            }
+        }
+        // 当前结果还需要去重处理
+        unordered_set<vector<int>, VecHash, VecEqual> tmp_set(result.begin(), result.end());
+        // unordered_set再转换为vector
+        vector<vector<int>> result_nums(tmp_set.begin(), tmp_set.end());
+
+        return result_nums;
+    }
+};
+```
+
+这次通过了校验，不过可看到耗时还是较高的，只击败4.99%的提交，而且还借助了STL本身提供的构造转换：
+
+```sh
+313/313 cases passed (2344 ms)
+Your runtime beats 4.99 % of cpp submissions
+Your memory usage beats 5.02 % of cpp submissions (462.7 MB)
+```
+
+#### 8.1.3. 哈希法case3
+
+看了下代码随想录里的哈希法，自己的思路有点粗糙：
+
+1. 处理两数之和时，可不需map来记录下标，直接用set取数值组装结果记录即可。
+2. 同时第2、第3个数需要进一步去重处理：`nums[j]`和`[j-1]`、`[j-2]`相同则跳过，否则结果还是会有重复，需要单独处理
+
+case1和case2里用了自定义`Hash`和`KeyEqual`增加了复杂度：
+
+```cpp
+template<
+    class Key,
+    class Hash = std::hash<Key>,
+    class KeyEqual = std::equal_to<Key>,
+    class Allocator = std::allocator<Key>
+> class unordered_set;
+```
+
+调整：
+
+提交时细节很多，很容易出错：`j > i+2`而不是`j>2`，不能忘记`tmp_set.erase(nums[j])`且不是移除`sum - nums[j]`
+
+```cpp
+vector<vector<int>> threeSum(vector<int>& nums) {
+        vector<vector<int>> result;
+        // 先对vector排序，便于去重
+        sort(nums.begin(), nums.end());
+        for( int i = 0; i < nums.size() - 2; i++) {
+            // 去重处理，前面已经处理过该值的情况了
+            if (i > 0 && nums[i] == nums[i-1]) {
+                continue;
+            }
+            int sum = -nums[i];
+            // 处理两数之和
+            // 只要用set记录需要的配对值即可，获取到之后就可以移除掉
+            unordered_set<int> tmp_set;
+            for (int j = i+1; j < nums.size(); j++) {
+                // 去重
+                if (j > i+2 && nums[j] == nums[j-1] && nums[j] == nums[j-2]) {
+                    continue;
+                }
+
+                if (tmp_set.find(nums[j]) != tmp_set.end()) {
+                    // 满足三数之和为0，直接组装结果，第2个数（a/b/c中的b），用0-a-c即可
+                    result.push_back( vector<int>{nums[i], -nums[i]-nums[j], nums[j]} );
+                    tmp_set.erase(nums[j]);
+                } else {
+                    tmp_set.insert(sum - nums[j]);
+                }
+            }
+        }
+        
+        return result;
+    }
+```
 
 ## 9. 参考
 
