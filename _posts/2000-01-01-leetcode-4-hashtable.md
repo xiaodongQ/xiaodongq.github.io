@@ -464,6 +464,71 @@ vector<vector<int>> threeSum(vector<int>& nums) {
     }
 ```
 
+提交结果如下，还是比较低效的：
+
+```sh
+313/313 cases passed (2571 ms)
+Your runtime beats 5.02 % of cpp submissions
+Your memory usage beats 5.02 % of cpp submissions (461 MB)
+```
+
+#### 8.1.4. 双指针
+
+本题使用双指针法更高效。
+
+思路：从头遍历元素(`i`)，定义双指针，left在`i+1`位置、right在数组尾。若求和`>0`则right左移，`<0`则left右动，若`=0`则做好去重并left和right收缩；
+
+注意点：第一层遍历时，也需要做好去重，后续左右指针移动时再进行第2道去重。
+
+```cpp
+class Solution {
+public:
+    vector<vector<int>> threeSum(vector<int>& nums) {
+        vector<vector<int>> result;
+        // 记住先得排序
+        sort(nums.begin(), nums.end());
+        for (int i = 0; i < nums.size(); i++) {
+            // 这里要做一道去重
+            if (i > 0 && nums[i] == nums[i-1]) {
+                continue;
+            }
+
+            int left = i+1;
+            int right = nums.size() - 1;
+            while (left < right) {
+                if (nums[i] + nums[left] + nums[right] > 0) {
+                    right--;
+                } else if (nums[i] + nums[left] + nums[right] < 0) {
+                    left++;
+                } else {
+                    // 满足求和为0
+                    result.push_back( vector<int>{nums[i], nums[left], nums[right]} );
+                    // 左右都去重处理
+                    while (right > left && nums[left] == nums[left+1]) {
+                        left++;
+                    }
+                    while (right > left && nums[right] == nums[right-1]) {
+                        right--;
+                    }
+                    // 由于求和为0，左右一增一减才可能继续求和为0
+                    left++;
+                    right--;
+                }
+            }
+        }
+        return result;
+    }
+};
+```
+
+可看到现在的速度就很可观了：从`2571 ms`到`47 ms`
+
+```sh
+313/313 cases passed (47 ms)
+Your runtime beats 90.85 % of cpp submissions
+Your memory usage beats 30.56 % of cpp submissions (26.9 MB)
+```
+
 ## 9. 参考
 
 1、[代码随想录 -- 哈希表](https://www.programmercarl.com/%E5%93%88%E5%B8%8C%E8%A1%A8%E7%90%86%E8%AE%BA%E5%9F%BA%E7%A1%80.html)
