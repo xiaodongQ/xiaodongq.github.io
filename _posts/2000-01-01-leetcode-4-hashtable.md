@@ -529,7 +529,89 @@ Your runtime beats 90.85 % of cpp submissions
 Your memory usage beats 30.56 % of cpp submissions (26.9 MB)
 ```
 
-## 9. 参考
+另外可以有个小优化：第一层循环可以提前判断退出，可很有效地避免资源浪费
+
+```cpp
+    // 排序后的第一个元素>0则不可能满足求和=0，可提前退出
+    if (nums[i] > 0) {
+        break;
+    }
+```
+
+## 9. 18.四数之和
+
+[18. 4Sum](https://leetcode.cn/problems/4sum/)
+
+### 9.1. 思路和解法
+
+类似三数之和，还是用双指针，多一层循环。
+
+几个点注意下：
+
+* 第一层循环`i < nums.size()`，没必要`i < nums.size()-2`：会报错，因为要单独处理数组大小<2的情况，否则下标访问会为负
+* 两层减枝操作，可优化性能
+* 假设四数为 a、b、c、d，不用担心后面的数和前面重复被减枝跳过了，比如处理b时，是从a的下标+1开始处理的，只会对a、b各自内部减枝
+    * case：`[2 2 2 2]`，target=8
+
+```cpp
+class Solution {
+public:
+    vector<vector<int>> fourSum(vector<int>& nums, int target) {
+        vector<vector<int>> result;
+        // 先排序
+        sort(nums.begin(), nums.end());
+        // 利用双指针法从从有序数组里找四元组，没必要nums.size()-2，否则要单独处理数组大小<2的情况
+        for (int i = 0; i < nums.size(); i++) {
+            // 减枝优化：提前退出，target可能为负数，所以需要另外加条件
+            if (nums[i] > target && nums[i] >= 0) {
+                break;
+            }
+            // 第一层去重
+            if (i > 0 && nums[i] == nums[i-1]) {
+                continue;
+            }
+
+            for (int j = i+1; j < nums.size(); j++) {
+                // 减枝优化：提前退出
+                if (nums[i] + nums[j] > target && nums[j] >= 0) {
+                    break;
+                }
+                // 第二层去重（这里不用担心和第一个数值重复时被去重了）
+                if (j > i+1 && nums[j] == nums[j-1]) {
+                    continue;
+                }
+
+                // 通过双指针法（而不是哈希法）
+                int left = j + 1;
+                int right = nums.size() - 1;
+                while (left < right) {
+                    if ((long)nums[i] + nums[j] + nums[left] + nums[right] > target) {
+                        right--;
+                    } else if ((long)nums[i] + nums[j] + nums[left] + nums[right] < target) {
+                        left++;
+                    } else {
+                        // 满足条件，组织结果记录
+                        result.push_back(vector<int>{nums[i], nums[j], nums[left], nums[right]});
+                        // 为下一步做好去重
+                        while (left < right && nums[left] == nums[left + 1]) {
+                            left++;
+                        }
+                        while (left < right && nums[right] == nums[right - 1]) {
+                            right--;
+                        }
+                        // 两侧都向内收缩才有可能继续满足求和条件
+                        left++;
+                        right--;
+                    }
+                }
+            }
+        }
+        return result;
+    }
+};
+```
+
+## 10. 参考
 
 1、[代码随想录 -- 哈希表](https://www.programmercarl.com/%E5%93%88%E5%B8%8C%E8%A1%A8%E7%90%86%E8%AE%BA%E5%9F%BA%E7%A1%80.html)
 
