@@ -63,6 +63,21 @@ void reverseString(vector<char>& s) {
 }
 ```
 
+## 541. 反转字符串II
+
+[541. Reverse String II](https://leetcode.cn/problems/reverse-string-ii/description/)
+
+给定整数k，每2k个字符进行处理，只反转每2k中的前k个字符。
+
+如果剩余字符少于 k 个，则将剩余字符全部反转，如：`abcdefgh`，给定3，则变为`cba def hg`
+
+如果剩余字符小于 2k 但大于或等于 k 个，则反转前 k 个字符，其余字符保持原样，如：`abcde`，给定3，则变为`cba de`
+
+### 思路和解法
+
+比 344.反转字符串 复杂一些。
+
+
 ## 2. 参考
 
 1、[代码随想录 -- 字符串](https://www.programmercarl.com/0344.%E5%8F%8D%E8%BD%AC%E5%AD%97%E7%AC%A6%E4%B8%B2.html)

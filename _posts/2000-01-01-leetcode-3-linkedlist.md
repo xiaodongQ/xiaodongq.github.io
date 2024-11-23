@@ -133,7 +133,7 @@ impl Solution {
 }
 ```
 
-## 3. 设计链表
+## 3. 707.设计链表
 
 [707. Design Linked List](https://leetcode.com/problems/design-linked-list/description/)
 
@@ -285,7 +285,7 @@ public:
 };
 ```
 
-## 5. 两两交换链表中的节点
+## 5. 24.两两交换链表中的节点
 
 [24. Swap Nodes in Pairs](https://leetcode.com/problems/swap-nodes-in-pairs/description/)
 
