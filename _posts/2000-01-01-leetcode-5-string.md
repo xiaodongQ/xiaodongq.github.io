@@ -63,7 +63,7 @@ void reverseString(vector<char>& s) {
 }
 ```
 
-## 541. 反转字符串II
+## 541.反转字符串II
 
 [541. Reverse String II](https://leetcode.cn/problems/reverse-string-ii/description/)
 
@@ -77,6 +77,28 @@ void reverseString(vector<char>& s) {
 
 比 344.反转字符串 复杂一些。
 
+思路：每次移动2k，再单独看2k内的区间怎么处理。
+
+```cpp
+class Solution {
+public:
+    string reverseStr(string s, int k) {
+        // 每次移动2k
+        for (int i = 0; i < s.size(); i += 2*k) {
+            // 剩余字符少于 k 个，反转剩下所有字符
+            if (s.size() - i < k) {
+                // 这里用了STL的reverse算法（若不是直接的解题关键，也可以用库函数）
+                reverse(s.begin() + i, s.end());
+            } else {
+                // 每k个进行反转
+                reverse(s.begin() + i, s.begin() + i + k);
+            }
+        }
+
+        return s;
+    }
+};
+```
 
 ## 2. 参考
 
