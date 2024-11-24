@@ -63,7 +63,7 @@ void reverseString(vector<char>& s) {
 }
 ```
 
-## 541.反转字符串II
+## 2. 541.反转字符串II
 
 [541. Reverse String II](https://leetcode.cn/problems/reverse-string-ii/description/)
 
@@ -73,7 +73,7 @@ void reverseString(vector<char>& s) {
 
 如果剩余字符小于 2k 但大于或等于 k 个，则反转前 k 个字符，其余字符保持原样，如：`abcde`，给定3，则变为`cba de`
 
-### 思路和解法
+### 2.1. 思路和解法
 
 比 344.反转字符串 复杂一些。
 
@@ -100,7 +100,21 @@ public:
 };
 ```
 
-## 2. 参考
+概率上还是>=k会概率高一些，可以放前面（不过if...else分支无所谓，如果还有其他情况则可将概率高的放前面以减少判断次数）
+
+```cpp
+if (s.size() - i >= k) {
+    // 每k个进行反转
+    reverse(s.begin() + i, s.begin() + i + k);
+} else {
+    // 反转剩余字符
+    reverse(s.begin() + i, s.end());
+}
+```
+
+`reverse`算法也可调整成自己实现，`void my_reverse(string &s, int start, int end)`，其中实现即"344.反转字符串"对应解法。
+
+## 3. 参考
 
 1、[代码随想录 -- 字符串](https://www.programmercarl.com/0344.%E5%8F%8D%E8%BD%AC%E5%AD%97%E7%AC%A6%E4%B8%B2.html)
 
