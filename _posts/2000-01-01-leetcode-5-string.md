@@ -114,7 +114,19 @@ if (s.size() - i >= k) {
 
 `reverse`算法也可调整成自己实现，`void my_reverse(string &s, int start, int end)`，其中实现即"344.反转字符串"对应解法。
 
-## 3. 参考
+## 3. 替换数字
+
+非原题：[替换数字](https://www.programmercarl.com/kamacoder/0054.%E6%9B%BF%E6%8D%A2%E6%95%B0%E5%AD%97.html)
+
+给定一个字符串 s，它包含小写字母和数字字符，请编写一个函数，将字符串中的字母字符保持不变，而将每个数字字符替换为number。
+
+示例："a1b2c3"，函数应该将其转换为 "anumberbnumbercnumber"
+
+### 3.1. 思路和解法
+
+先遍历数组获取 数字字符 的数量，然后扩容字符串大小，从后往前填充（原位置`idx1--`，新位置`idx2--`）
+
+## 4. 参考
 
 1、[代码随想录 -- 字符串](https://www.programmercarl.com/0344.%E5%8F%8D%E8%BD%AC%E5%AD%97%E7%AC%A6%E4%B8%B2.html)
 
