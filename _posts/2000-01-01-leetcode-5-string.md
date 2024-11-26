@@ -126,8 +126,120 @@ if (s.size() - i >= k) {
 
 先遍历数组获取 数字字符 的数量，然后扩容字符串大小，从后往前填充（原位置`idx1--`，新位置`idx2--`）
 
-## 4. 参考
+## 4. 151.翻转字符串里的单词
+
+[151. Reverse Words in a String](https://leetcode.cn/problems/reverse-words-in-a-string/)
+
+反转字符串句子中的所有单词，反转后的字符串中单词以一个空格分隔。
+
+原字符串中，两个单词间可能有多余的空格、前面或者后面也可能包含多余的空格
+
+### 4.1. 思路和解法
+
+#### 4.1.1. 方式1：借助反转函数
+
+先实现功能，借助语言内置的API，不限制辅助空间使用。
+
+步骤：1）字符串拆分成单词数组 2）数组反转 3）数组拼接
+
+```cpp
+class Solution {
+public:
+    string reverseWords(string s) {
+        // 方式1：先实现功能，借助语言内置的API，不限制辅助空间使用。
+        // 1）字符串拆分成单词数组 2）数组反转 3）数组拼接
+        std::istringstream iss(s);
+        vector<string> words;
+        string word;
+        while (iss >> word) {
+            words.push_back(word);
+        }
+        // 翻转，直接使用<algorithm>库中的std::reverse
+        std::reverse(words.begin(), words.end());
+        // 数组重新拼接
+        std::ostringstream oss;
+        for (auto i=0; i < words.size(); i++) {
+            if (i > 0) {
+                oss << " ";
+            }
+            oss << words[i];
+        }
+        return oss.str();
+    }
+};
+```
+
+* 时间复杂度：`O(n)`
+    * `iss`构造时从`s`读取时需要完整遍历，时间复杂度`O(n)`
+    * `reverse`反转一般基于双指针法实现，复杂度`O(m)`，`m`是单词个数
+    * 重新拼接也是`O(n)`
+    * 由于`m`一般小于等于`n`，总体时间复杂度`O(n)`
+* 空间复杂度：`O(n)`
+    * `words`存储单词需要`O(n)`，`oss`拼接也需要`O(n)`，整体空间复杂度`O(n)`
+
+```sh
+61/61 cases passed (3 ms)
+Your runtime beats 39.11 % of cpp submissions
+Your memory usage beats 10.67 % of cpp submissions (11.7 MB)
+```
+
+#### 4.1.2. 方式2:借助双端队列
+
+借助双端队列实现反转，并使用额外辅助空间
+
+```cpp
+    // 方式2：借助双端队列实现反转
+    string reverseWords(string s) {
+        int left = 0;
+        int right = s.size() - 1;
+        // 去除前面空格，并记录有效起始位置left
+        while (left <= right && s[left] == ' ') {
+            left++;
+        }
+        // 去除后面空格，并记录有效终止位置right
+        while (left <= right && s[right] == ' ') {
+            right--;
+        }
+        // 中间处理，并检查空格
+        deque<string> words;
+        string word;
+        while (left <= right) {
+            char c = s[left];
+            // 新单词
+            if (!word.empty() && c == ' ') {
+                words.push_front(word);
+                word = "";
+            } else if (c != ' ') { // 此处单独区分' '，而不是仅else
+                word += c;
+            }
+            left++;
+        }
+        // 最后一个单词
+        words.push_front(word);
+        
+        // 借助string，拼接新字符串
+        string result;
+        for (auto i = 0; i < words.size(); i++) {
+            if (i > 0) {
+                result += " ";
+            }
+            result += words[i];
+        }
+        return result;
+    }
+```
+
+* 时间复杂度：`O(n)`
+    * 前后空格处理，均为`O(n)`（实际两者加起来最大不会超过n）
+    * 中间处理，要遍历，`O(n)`
+    * 最后拼接 `O(m)`
+* 空间复杂度：`O(n)`
+    * `deque`和最后的`string`辅助，都需要`O(n)`
+
+## 5. 参考
 
 1、[代码随想录 -- 字符串](https://www.programmercarl.com/0344.%E5%8F%8D%E8%BD%AC%E5%AD%97%E7%AC%A6%E4%B8%B2.html)
 
 2、[LeetCode中文站](https://leetcode.cn/)
+
+3、GPT
