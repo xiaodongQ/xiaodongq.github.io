@@ -183,7 +183,7 @@ Your runtime beats 39.11 % of cpp submissions
 Your memory usage beats 10.67 % of cpp submissions (11.7 MB)
 ```
 
-#### 4.1.2. 方式2:借助双端队列
+#### 4.1.2. 方式2：借助双端队列
 
 借助双端队列实现反转，并使用额外辅助空间
 
@@ -235,6 +235,19 @@ Your memory usage beats 10.67 % of cpp submissions (11.7 MB)
     * 最后拼接 `O(m)`
 * 空间复杂度：`O(n)`
     * `deque`和最后的`string`辅助，都需要`O(n)`
+
+```sh
+61/61 cases passed (3 ms)
+Your runtime beats 39.11 % of cpp submissions
+Your memory usage beats 14.82 % of cpp submissions (10.5 MB)
+```
+
+#### 4.1.3. 方式3：自行实现反转和去除空格
+
+思路步骤：1）先去除多余空格 2）反转所有字符 3）反转单词
+
+空间复杂度能做到`O(1)`
+
 
 ## 5. 参考
 
