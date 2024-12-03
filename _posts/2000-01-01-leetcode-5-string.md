@@ -248,6 +248,27 @@ Your memory usage beats 14.82 % of cpp submissions (10.5 MB)
 
 空间复杂度能做到`O(1)`
 
+对于移除多余空格，使用快慢指针的思路处理。容易出错，如下就是第一次的错误实现：
+
+```cpp
+    // 错误：有3个及以上连续空格时，移动和覆盖就会有问题，有多余空格
+    void removeExtraSpace(string &s) {
+        int left = 0;
+        int right = s.size() - 1;
+        while (left <= right) {
+            if (left > 0 && s[left] == ' ' && s[left] == s[left-1]) {
+                s[left-1] = s[left];
+                continue;
+            }
+            left++;
+        }
+        s.resize(left);
+    }
+```
+
+参考链接思路，去除所有空格，并在单词间加空格（相对于单词间多个空格的处理，更简洁明了）
+
+
 
 ## 5. 参考
 
