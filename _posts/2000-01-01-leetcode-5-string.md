@@ -268,7 +268,92 @@ Your memory usage beats 14.82 % of cpp submissions (10.5 MB)
 
 参考链接思路，去除所有空格，并在单词间加空格（相对于单词间多个空格的处理，更简洁明了）
 
+但是处理最后一个字符可能会多加空格，需要单独处理，这个细节也容易出错，下面的最后处理避免遗漏。
 
+```cpp
+void removeExtraSpace(string &s) {
+        int slow = 0;
+        int fast = 0;
+        // 前一个字符是否为空格。此处要初始化为true，否则第一个字符为空格时会保留多余空格
+        bool is_space = true;
+        while (fast < s.size()) {
+            // 非空格前移
+            if (s[fast] != ' ') {
+                s[slow++] = s[fast];
+                is_space = false;
+            } else if (!is_space){
+                // 当前是空格，且则前一个字符是非空格，则说明一个单词结束，添加空格
+                // 特别注意第一个空格不加 slow!=0
+                s[slow++] = ' ';
+                is_space = true;
+            } // else即当前为空格，前一个也为空格，则slow不需要移动
+            
+            fast++;
+        }
+        // 重新调整字符串大小
+        if (slow > 0 && s[slow - 1] == ' ') {
+            slow--; // 如果最后字符是空格，去掉它
+        }
+        s.resize(slow);
+    }
+```
+
+更为简洁的方式：每次处理直到碰到非空字符
+
+```cpp
+    void removeExtraSpace(string &s) {
+        int slow = 0;
+        int fast = 0;
+        while (fast < s.size()) {
+            // 非空格才处理
+            if (s[fast] != ' ') {
+                // 单词间空格
+                if (slow != 0) {
+                    s[slow++] = ' ';
+                }
+                // 每次处理直到空格为止
+                while (fast < s.size() && s[fast] != ' ') {
+                    s[slow++] = s[fast++];
+                }
+                continue;
+            }
+            fast++;
+        }
+        s.resize(slow);
+    }
+```
+
+对应的反转和完整流程如下：
+
+```cpp
+    // 反转函数，反转单词时复用该函数，因此指定反转范围
+    void reverse(string &s, int left, int right) {
+        // 双指针法
+        int tmp;
+        for (int i = left, j = right; i < j; i++, j--) {
+            tmp = s[i];
+            s[i] = s[j];
+            s[j] = tmp;
+        }
+    }
+
+    // 自行实现反转逻辑，辅助空间O(1)
+    string reverseWords(string s) {
+        // 1）先去除多余空格
+        removeExtraSpace(s);
+        // 2）反转所有字符串
+        reverse(s, 0, s.size() - 1);
+        // 3）反转单词
+        int start = 0;
+        for (int i = 0; i <= s.size(); i++) {
+            if (i == s.size() || s[i] == ' ') {
+                reverse(s, start, i - 1);
+                start = i + 1;
+            }
+        }
+        return s;
+    }
+```
 
 ## 5. 参考
 
