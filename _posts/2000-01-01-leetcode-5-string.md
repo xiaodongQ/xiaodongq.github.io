@@ -355,6 +355,17 @@ void removeExtraSpace(string &s) {
     }
 ```
 
+## 右旋字符串
+
+非LeetCode原题：[右旋字符串](https://kamacoder.com/problempage.php?pid=1065)
+
+将字符串中的后面 k 个字符移到字符串的前面，实现字符串的右旋转操作
+
+例如：对于输入字符串 "abcdefg" 和整数 2，函数应该将其转换为 "fgabcde"
+
+### 思路和解法
+
+
 ## 5. 参考
 
 1、[代码随想录 -- 字符串](https://www.programmercarl.com/0344.%E5%8F%8D%E8%BD%AC%E5%AD%97%E7%AC%A6%E4%B8%B2.html)
