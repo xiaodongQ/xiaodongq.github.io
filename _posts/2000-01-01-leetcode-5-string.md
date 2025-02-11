@@ -355,7 +355,7 @@ void removeExtraSpace(string &s) {
     }
 ```
 
-## 右旋字符串
+## 5. 右旋字符串
 
 非LeetCode原题：[右旋字符串](https://kamacoder.com/problempage.php?pid=1065)
 
@@ -363,10 +363,20 @@ void removeExtraSpace(string &s) {
 
 例如：对于输入字符串 "abcdefg" 和整数 2，函数应该将其转换为 "fgabcde"
 
-### 思路和解法
+### 5.1. 思路和解法
 
+1) 借助辅助空间：保存后面k个字符，从后面开始右移所有字符，最后从辅助空间取出k个字符进行补充。
+2) 不借助辅助空间：翻转2次。先整体翻转，再以最后k个字符分隔为两部分字符串各自翻转，即得到要求字符串
 
-## 5. 参考
+## 6. 找出字符串中第一个匹配项的下标
+
+[28. 找出字符串中第一个匹配项的下标](https://leetcode.cn/problems/find-the-index-of-the-first-occurrence-in-a-string/description/)
+
+### 6.1. 思路和解法
+
+KMP算法
+
+## 7. 参考
 
 1、[代码随想录 -- 字符串](https://www.programmercarl.com/0344.%E5%8F%8D%E8%BD%AC%E5%AD%97%E7%AC%A6%E4%B8%B2.html)
 
