@@ -374,7 +374,7 @@ void removeExtraSpace(string &s) {
 
 ### 6.1. 思路和解法
 
-KMP算法
+KMP算法（命名源于3位作者名 Knuth，Morris和Pratt，所以取了三位学者名字的首字母。所以叫做KMP）
 
 ## 7. 参考
 
