@@ -1,6 +1,6 @@
 ---
 layout: post
-title: AI Agent学习和实践
+title: AI Agent学习实践笔记
 categories: 大模型
 tags: 大模型 AI
 ---
@@ -8,17 +8,17 @@ tags: 大模型 AI
 * content
 {:toc}
 
-AI Agent学习实践
+HuggingFace AI Agents Course学习笔记
 
 
 
 ## 1. 背景
 
-当前大模型发展日新月异，功能越来越强大。日常使用基本问答比较多，之前（[ollama搭建本地个人知识库](https://xiaodongq.github.io/2024/06/20/ollama-ai-models/)）也在本地用ollama部署千问简单体验了一下，但其功能远不止如此，对于软件行业从业者来说帮助作用尤其明显。比如火热的cursor编辑器、比如AI Agent（智能体），包括Devin软件工程师智能体。
+当前大模型发展日新月异，功能越来越强大。日常使用基本问答比较多，之前（[ollama搭建本地个人知识库](https://xiaodongq.github.io/2024/06/20/ollama-ai-models/)）也在本地用ollama部署千问简单体验了一下，但其功能不止于此，对于软件行业从业者来说帮助作用更为明显。比如火热的cursor编辑器、比如AI Agent（智能体），包括Devin软件工程师智能体。
 
-看了一些资讯和文章，有提到说大模型经历ChatBot -> Copilot -> Agent几个阶段，另外 关注的 [课代表立正](https://space.bilibili.com/491306902)的 [2025年，AI最大机会是Agents，如何抓住18个月的窗口期？](https://www.bilibili.com/video/BV1YwfrYfE1s/?spm_id_from=333.1007.top_right_bar_window_history.content.click&vd_source=477b80445c7c1a81617bbea3bdf9a3c1) 、[做这三件事，可以舒服跟上AI发展节奏](https://www.bilibili.com/video/BV1xSknYEEtm/?spm_id_from=333.788.top_right_bar_window_history.content.click&vd_source=477b80445c7c1a81617bbea3bdf9a3c1) 这几期视频（酌情忽略卖课）提的观点几个例子，联想到实际工作中确实能有不小的帮助，技术潮流还是得跟上。
+看了一些资讯和文章，有提到说大模型经历ChatBot -> Copilot -> Agent几个阶段，觉得挺贴切。另外 关注的 [课代表立正](https://space.bilibili.com/491306902) 的 [2025年，AI最大机会是Agents，如何抓住18个月的窗口期？](https://www.bilibili.com/video/BV1YwfrYfE1s/?spm_id_from=333.1007.top_right_bar_window_history.content.click&vd_source=477b80445c7c1a81617bbea3bdf9a3c1) 、[做这三件事，可以舒服跟上AI发展节奏](https://www.bilibili.com/video/BV1xSknYEEtm/?spm_id_from=333.788.top_right_bar_window_history.content.click&vd_source=477b80445c7c1a81617bbea3bdf9a3c1) 这几期视频（酌情忽略卖课）提的观点和几个例子，联想结合到日常开发中确实能有不小的帮助，技术潮流还是得跟上。
 
-HuggingFace推出了一个免费的AI Agents课程：[AI Agents Course](https://huggingface.co/learn/agents-course/unit0/introduction)，先学习该课程并进行实践。
+正好了解到近期HuggingFace推出了一个免费的AI Agents课程：[AI Agents Course](https://huggingface.co/learn/agents-course/unit0/introduction)，先学习该课程并进行实践。
 
 * 课程介绍：[AI Agents Course](https://huggingface.co/learn/agents-course/unit0/introduction)
 * GitHub：[huggingface/agents-course](https://github.com/huggingface/agents-course)
@@ -56,5 +56,5 @@ You can access the course here 👉 <a href="https://hf.co/learn/agents-course" 
 
 ## 4. 参考
 
-* [课代表立正](https://www.bilibili.com/video/BV1YwfrYfE1s/?spm_id_from=333.1007.top_right_bar_window_history.content.click&vd_source=477b80445c7c1a81617bbea3bdf9a3c1)
+* [AI Agents Course](https://huggingface.co/learn/agents-course/unit0/introduction)
 
