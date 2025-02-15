@@ -14,7 +14,7 @@ HuggingFace AI Agents Course学习笔记
 
 ## 1. 背景
 
-当前AI发展日新月异，功能越来越强大。日常使用基本问答比较多，之前（[ollama搭建本地个人知识库](https://xiaodongq.github.io/2024/06/20/ollama-ai-models/)）也在本地用ollama部署千问简单体验了一下。近几年AI大模型应用从ChatBot -> Copilot -> Agent，其功能越来越强大，对于软件行业从业者来说帮助作用更为明显。比如火热的cursor编辑器、Devin软件工程师智能体。
+当前AI发展日新月异，功能越来越强大。日常只是使用基本问答比较多，之前（[ollama搭建本地个人知识库](https://xiaodongq.github.io/2024/06/20/ollama-ai-models/)）也在本地用ollama部署千问简单体验了一下。近几年AI大模型应用从ChatBot -> Copilot -> Agent，对于软件行业从业者来说相关辅助更为明显，比如火热的cursor编辑器、Devin软件工程师智能体。
 
 技术潮流还是得跟上，正好了解到近期HuggingFace推出了一个免费的AI Agents课程：[AI Agents Course](https://huggingface.co/learn/agents-course/unit0/introduction)，先学习该课程并进行实践。
 
@@ -106,7 +106,7 @@ Transformer架构中的`注意力`（Attention）机制至关重要。
 
 在预测下一个单词时，句子中的每个单词重要性并不是相同的，注意力机制能够识别出最相关的单词，从而提高预测的准确性。比如`The capital of France is …`中，`capital`和`France`是最重要的。
 
-几个概念：
+**几个概念：**
 
 * `上下文长度`（context length）：指LLM能处理的最大标记数量，也是其注意力的最大跨度
 * `提示词`（prompt）：输入给LLM的序列被称为`提示`（prompt），精心设计提示有助于引导LLM生成期望的输出
