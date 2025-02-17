@@ -154,6 +154,18 @@ LLM在大规模文本数据集上进行训练，在此过程中，它们通过`�
 * `对话（Conversations）`，用户消息和助手消息
     * `对话`由人类（用户）和大语言模型（助手）之间交替的消息组成。
 
+## trae试用
+
+字节发布了[trae](https://www.trae.ai/)（the real ai engine）AI编程工具，类似cursor，试用一下。
+
+让其生成一个测试项目，验证`gcc`的`address sanitizer`内存检查功能：
+
+![trae use case](/images/2025-02-17-trae-use-case.png)
+
+自己的本地环境由于之前MacOS的版本和开发套件有点问题，安装mysql依赖有问题，调整为本地文件操作：
+
+![change to file opt](/images/2025-02-17-trae-usefile.png)
+
 ## 3. 小结
 
 ## 4. 参考
