@@ -8,7 +8,7 @@ tags: 大模型 AI
 * content
 {:toc}
 
-HuggingFace AI Agents Course学习笔记
+HuggingFace AI Agents Course学习笔记（AI智能体）
 
 
 
@@ -109,7 +109,7 @@ Transformer架构中的`注意力`（Attention）机制至关重要。
 **几个概念：**
 
 * `上下文长度`（context length）：指LLM能处理的最大标记数量，也是其注意力的最大跨度
-* `提示词`（prompt）：输入给LLM的序列被称为`提示`（prompt），精心设计提示有助于引导LLM生成期望的输出
+* `提示词`（prompt）：输入给LLM的序列被称为`提示词`（prompt），精心设计提示有助于引导LLM生成期望的输出
     * 考虑到LLM的唯一工作是通过查看每个输入token来预测下一个token，并选择哪个token是 “重要的”，因此输入序列的措辞（即prompt）非常重要
 
 #### 2.2.2. LLM 是如何训练的
@@ -165,7 +165,69 @@ conversation = [
 ]
 ```
 
-## 3. trae试用
+agent总是**连接会话中的所有消息**，将其作为单独的序列提供给LLM，`聊天模板`将所有这些消息转换为一个`提示词（prompt）`，代码表现为将python的list内容转换为一个包含所有信息的string。
+
+**`聊天模板（Chat-Templates）`**：
+
+如上所述，聊天模板对组织 语言模型 和 用户 之间的对话至关重要。
+
+* `基本模型（base model）`与`指令模型（instruct model）`
+    * 基本模型基于原始文本数据进行训练，以预测下一个标记
+    * 指令模型是为了遵循指令和参与对话，对于基本模型进行了特别的`微调（fine-tuned）`
+    * 为了使一个基本模型表现得像指令模型，就需要将prompt提示转换为模型能理解的统一格式，此处就是`聊天模板`要做的事。比如`ChatML`就是一个这样的模板。
+    * **需要注意的是**：`基本模型`可以在不同的"聊天模板"上微调，因此我们在使用一个`指令模型`时需要确保我们使用了正确的聊天模板。
+
+## 3. 什么是工具（Tools）
+
+AI智能体（AI Agents）的一个关键方面是其`采取行动（take actions`）的能力，该能力是通过使用`工具（Tools）`来实现的。
+
+本节将会学习什么是工具，如何有效地设计它们，以及如何通过`系统消息`将它们集成到你的AI智能体里。使用正确的工具能大大提高智能体的能力。
+
+### 3.1. AI工具
+
+**工具（Tools）**：工具是赋予 LLM 的一个函数，具有明确的目标。
+
+下面是AI智能体中常用的一些工具：
+
+|Tool|Description|
+|--|--|
+|Web Search|允许智能体从互联网获取最新信息|
+|Image Generation|根据文本描述创建图像|
+|Retrieval|从外部源检索信息|
+|API Interface|与外部API（如GitHub、YouTube、Spotify等）进行交互|
+
+上面只是一些示例，还可根据实际需求创建工具。一个好的工具应能补充LLM的能力，弥补其在算术运算、获取实时数据（模型仅基于历史训练数据）等方面的不足。
+
+一个工具应该包含：
+
+* 对功能的文本描述（textual description）
+* 可调用对象（A Callable）
+* 带类型的参数（Arguments with typings）
+* （可选）也可包含带类型的输出（Outputs with typings）
+
+### 3.2. 工具是如何工作的
+
+LLM只能接收和生成文本，本身无法调用工具。我们所说的给智能体提供工具，实际是告诉`LLM`关于`工具`的存在，并要求模型在其需要时生成调用工具的文本内容。
+
+LLM会在需要时`生成`调用工具的代码文本，**智能体**负责`解析`该输出的代码，识别并代表LLM`调用`工具，`工具输出`再返回给LLM，由LLM`生成最终回复`给用户。工具调用过程通常对用户不可见。
+
+从用户的角度来看，就好像LLM使用了这个工具，但实际上是应用程序代码 (Agent智能体) 做的。
+
+### 3.3. 如何提供工具给LLM
+
+本质上是使用`系统提示（system prompt）`为模型提供可用工具的文本描述（textual descriptions）。
+
+系统提示示例：
+
+![system prompt example](/images/2025-02-18-agent_system_prompt.png)
+
+工具必须特别准确和精确（precise and accurate）地说明：
+
+* 工具的功能（What the tool does）
+* 期望的具体输入（What exact inputs it expects）
+
+
+## 4. trae试用
 
 近期字节发布了[trae](https://www.trae.ai/)（the real ai engine ?）AI编程工具，类似cursor，试用一下。
 
@@ -183,9 +245,9 @@ conversation = [
 
 试用体验还可以，通过自然语言就完成了基本任务，是个不错的助手。
 
-## 4. 小结
+## 5. 小结
 
-## 5. 参考
+## 6. 参考
 
 * [AI Agents Course](https://huggingface.co/learn/agents-course/unit0/introduction)
 
