@@ -277,4 +277,6 @@ Agent智能体的工作是一个连续的循环： `思考（Thought）` -> `行
 
 * [AI Agents Course](https://huggingface.co/learn/agents-course/unit0/introduction)
 
+* [[译] AI Agent（智能体）技术白皮书（Google，2024）](https://arthurchiao.art/blog/ai-agent-white-paper-zh/)
+
 * GPT
