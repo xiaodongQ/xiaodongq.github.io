@@ -14,7 +14,7 @@ tags: AI C++
 
 ## 1. 背景
 
-基于C++实现的读写服务demo，借此作为场景温习并深入学习io多路复用、性能调试、开源组件。
+基于C++实现的读写服务demo，借此作为场景温习并深入学习io多路复用、性能调试、MySQL/Redis等开源组件。
 
 本篇借助 [trae](https://traeide.com/zh/) 的`Builder`模式快速搭建项目。[cursor](https://www.cursor.com/cn) 之前只是简单试用了一下，没开Pro后面就一直没用起来，看看之后的体验效果对比再做选择。
 
@@ -99,13 +99,16 @@ trae builder模式生成项目：
 * 1）开发基本的工具类，用于日志记录，优化项目里的日志记录；
 * 2）main函数优化一下，逻辑分离到单独线程
 * 3）连接任务处理调整为线程池
+* 4）服务端参数调整为json配置文件，并支持动态加载
+* 5）段错误等原因导致core时，日志里记录退出堆栈
+* 6）makefile里基于c+14编译
 
-2、项目里用到的mysql和redis依赖，自动生成的无法使用，但是提供了思路。手动调整：
+2、项目里用到的mysql和redis依赖，自动生成的无法使用。手动调整：
 
 ```
 安装 yum install mysql-devel
-下载hiredis（https://github.com/redis/hiredis）
-makefile基于c+14编译
+下载hiredis（https://github.com/redis/hiredis），手动编译并安装make install
+调整pkg-config对应路径，过程中梳理查看ldd脚本流程
 ```
 
 3、编译问题，复制编译报错，让IDE（下面或称AI）自己去调整
@@ -114,11 +117,17 @@ makefile基于c+14编译
 
 4、AI提供学习思路
 
-项目里有mysql、redis，还要跑server和client，环境最好做隔离，AI建议`Docker Compose`进行组织，之前没用过只是简单用docker，学习一下。
+项目里有mysql、redis，还要编译及运行server和client，环境做隔离，AI建议`Docker Compose`进行组织，之前没用过只是简单用docker，学习一下。
 
-### 3.3. 项目代码
+### 3.3. 项目代码及构建
 
-项目代码在：[ioserver_demo](https://github.com/xiaodongQ/prog-playground/ioserver_demo)
+项目代码在：[ioserver_demo](https://github.com/xiaodongQ/prog-playground/tree/main/ioserver_demo)
+
+* 本地编译方式
+    * 调整hiredis库的`.pc`配置后，make编译正常
+* docker构建方式
+    - 到docker目录，开始构建 `docker compose up --build`。
+    - 问题记录：CentOS已停止维护，yum源部分项失败。跟AI来回捣腾几次，调整为本地下载yum源配置文件，dockerfile里集成
 
 ## 4. 小结
 
