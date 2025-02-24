@@ -18,6 +18,8 @@ tags: AI C++
 
 本篇借助 [trae](https://traeide.com/zh/) 的`Builder`模式快速搭建项目。[cursor](https://www.cursor.com/cn) 之前只是简单试用了一下，没开Pro后面就一直没用起来，看看之后的体验效果对比再做选择。
 
+trae当前默认使用模型：Claude-3.5-Sonnet
+
 ## 2. demo项目思路
 
 demo实验准备涉及的一些技术点，思路：
@@ -34,7 +36,7 @@ demo实验准备涉及的一些技术点，思路：
     - 内存使用
     - 磁盘io使用率，带宽
     - 服务端的连接数
-    * 考虑如何结合`ebpf`进行监测，如何设计指标
+    * 考虑如何结合`ebpf`进行监测，如何设计指标，可以用USDT手动往程序里埋一些
 
 2、阶段二：改造分布式服务
 
@@ -96,12 +98,14 @@ trae builder模式生成项目：
 
 1、有些内容由于没有给出提示词做限定，比如都是终端打印、逻辑都在main里等，依次进行调整：
 
-* 1）开发基本的工具类，用于日志记录，优化项目里的日志记录；
+* 1）开发基本的工具类，用于日志记录，优化项目里的日志记录
+    * 可使用开源的 spdlog header-only C++日志库
 * 2）main函数优化一下，逻辑分离到单独线程
 * 3）连接任务处理调整为线程池
 * 4）服务端参数调整为json配置文件，并支持动态加载
 * 5）段错误等原因导致core时，日志里记录退出堆栈
 * 6）makefile里基于c+14编译
+* 7）提供MySQL初始化脚本，init.sql
 
 2、项目里用到的mysql和redis依赖，自动生成的无法使用。手动调整：
 
@@ -124,10 +128,20 @@ trae builder模式生成项目：
 项目代码在：[ioserver_demo](https://github.com/xiaodongQ/prog-playground/tree/main/ioserver_demo)
 
 * 本地编译方式
-    * 调整hiredis库的`.pc`配置后，make编译正常
-* docker构建方式
+    * 直接make，调整hiredis库的`.pc`配置路径后，make编译正常
+* docker构建方式（TODO）
     - 到docker目录，开始构建 `docker compose up --build`。
-    - 问题记录：CentOS已停止维护，yum源部分项失败。跟AI来回捣腾几次，调整为本地下载yum源配置文件，dockerfile里集成
+    - 问题记录：
+        - CentOS已停止维护，yum源部分项失败。跟AI来回捣腾几次，调整为本地下载yum源配置文件，dockerfile里集成，还是失败了
+        - 按意见在docker-compose.yml里新增dns、在dockerfile里修改resolv.conf但是只读，均失败，先基于宿主机调试了
+
+### 3.4. 运行
+
+准备：安装redis并启动、初始化MySQL数据：`mysql -uroot -ptest < docker/init.sql`
+
+运行：
+
+![run demo](/images/2025-02-25-run-demo.png)
 
 ## 4. 小结
 
