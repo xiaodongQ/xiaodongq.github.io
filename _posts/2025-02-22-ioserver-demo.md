@@ -100,7 +100,7 @@ trae builder模式生成项目：
 
 * 1）开发基本的工具类，用于日志记录，优化项目里的日志记录
     * 可使用开源的 spdlog header-only C++日志库
-* 2）main函数优化一下，逻辑分离到单独线程
+* 2）main函数优化一下，逻辑分离到单独线程，支持优雅退出
 * 3）连接任务处理调整为线程池
 * 4）服务端参数调整为json配置文件，并支持动态加载
 * 5）段错误等原因导致core时，日志里记录退出堆栈
@@ -139,12 +139,51 @@ trae builder模式生成项目：
 
 准备：安装redis并启动、初始化MySQL数据：`mysql -uroot -ptest < docker/init.sql`
 
-运行：
+1、基本运行
 
 ![run demo](/images/2025-02-25-run-demo.png)
 
+2、进一步优化和问题修改：调整新增日志、空数据处理、主键冲突调整
+
+结果：
+
+![run demo2](/images/2025-02-25-ioserver-result.png)
+
+3、发送信号动态调整日志等级为info，`kill -HUP 97807`
+
+[CentOS-root@xdlinux ➜ bin git:(main) ✗ ]$ cat ../config/server_config.json
+
+```json
+{
+    "server": {
+        "port": 8080,
+        "num_threads": 4
+    },
+    "database": {
+        "mysql": {
+            "host": "localhost",
+            "user": "root",
+            "password": "test",
+            "database": "ioserver"
+        },
+        "redis": {
+            "host": "localhost",
+            "port": 6379
+        }
+    },
+    "logging": {
+        "log_file": "server.log",
+        "log_level": "info",
+        "console_output": true
+    }
+}
+```
+
+4、客户端上并发就容易出问题，不过简单流程是跑起来了
+
 ## 4. 小结
 
+基于AI工具生成项目框架和逻辑，从其中实现可以学习不少东西。**先理解整体代码逻辑后**，再结合手动调整和指示AI优化，效率提升明显。
 
 ## 5. 参考
 
