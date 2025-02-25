@@ -123,9 +123,96 @@ trae builder模式生成项目：
 
 项目里有mysql、redis，还要编译及运行server和client，环境做隔离，AI建议`Docker Compose`进行组织，之前没用过只是简单用docker，学习一下。
 
-## 4. 代码构建
+### 3.3. 代码简要说明
 
 项目代码在：[ioserver_demo](https://github.com/xiaodongQ/prog-playground/tree/main/ioserver_demo)
+
+项目虽小，但包含的小模块也不少：线程池、io多路复用包装、json解析、spdlog日志库，集成MySQL、Redis客户端api，配置文件解析和动态加载、优雅关闭等等。
+
+其中的一些实现可作为学习参考。
+
+#### 3.3.1. 线程池
+
+可以学习其中的lambda和future、move等用法。
+
+```cpp
+class ThreadPool {
+public:
+    // 构造函数，创建指定数量的工作线程
+    explicit ThreadPool(size_t numThreads);
+
+    // 析构函数，确保所有任务完成并停止所有线程
+    ~ThreadPool();
+
+    // 禁用拷贝构造和赋值操作
+    ThreadPool(const ThreadPool&) = delete;
+    ThreadPool& operator=(const ThreadPool&) = delete;
+
+    // 调整线程池大小
+    void resize(size_t numThreads);
+
+    // 提交任务到线程池
+    // 返回一个future对象，可以用来获取任务的执行结果
+    template<class F, class... Args>
+    auto enqueue(F&& f, Args&&... args) 
+        -> std::future<typename std::result_of<F(Args...)>::type>;
+
+    // 停止线程池
+    void stop();
+
+private:
+    // 工作线程向量
+    std::vector<std::thread> workers;
+    // 任务队列
+    std::queue<std::function<void()>> tasks;
+    
+    // 同步相关成员
+    std::mutex queue_mutex;
+    std::condition_variable condition;
+    bool stop_;
+};
+```
+
+#### 3.3.2. io多路复用
+
+抽象了select、poll、epoll多路复用
+
+```cpp
+// IO多路复用接口抽象类
+class IOMultiplexing {
+public:
+    virtual ~IOMultiplexing() = default;
+    
+    // 添加监听事件
+    virtual bool addEvent(int fd, EventType type) = 0;
+    
+    // 移除监听事件
+    virtual bool removeEvent(int fd, EventType type) = 0;
+    
+    // 修改监听事件
+    virtual bool modifyEvent(int fd, EventType type) = 0;
+    
+    // 等待事件发生
+    virtual int wait(std::vector<Event>& events, int timeout = -1) = 0;
+};
+
+// Select实现
+class SelectIO : public IOMultiplexing {
+    // xxx
+};
+
+// Poll实现
+class PollIO : public IOMultiplexing {
+    // xxx
+}
+
+// Epoll实现
+class EpollIO : public IOMultiplexing {
+    // xxx
+}
+```
+
+## 4. 代码构建
 
 * 本地编译方式
     * 直接make，调整hiredis库的`.pc`配置路径后，make编译正常
@@ -187,10 +274,11 @@ redis和MySQL结果：
 
 ## 6. 小结
 
-基于AI工具生成项目框架和逻辑，从其中实现可以学习不少东西。**先理解整体代码逻辑后**，再结合手动调整和指示AI优化，效率提升明显。
+基于AI工具生成项目框架和逻辑，从其中实现可以学习不少东西，虽然不能完全即拿即用。**先理解整体代码逻辑后**，再结合手动调整和指示AI优化，效率提升明显。
 
 下一步定位并发问题，并基于当前项目扩展深入。
 
 ## 7. 参考
 
-* GPT
+* trae + Claude-3.5-Sonnet
+
