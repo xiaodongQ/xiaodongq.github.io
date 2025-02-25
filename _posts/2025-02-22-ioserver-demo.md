@@ -123,7 +123,7 @@ trae builder模式生成项目：
 
 项目里有mysql、redis，还要编译及运行server和client，环境做隔离，AI建议`Docker Compose`进行组织，之前没用过只是简单用docker，学习一下。
 
-### 3.3. 项目代码及构建
+## 4. 代码构建
 
 项目代码在：[ioserver_demo](https://github.com/xiaodongQ/prog-playground/tree/main/ioserver_demo)
 
@@ -135,7 +135,7 @@ trae builder模式生成项目：
         - CentOS已停止维护，yum源部分项失败。跟AI来回捣腾几次，调整为本地下载yum源配置文件，dockerfile里集成，还是失败了
         - 按意见在docker-compose.yml里新增dns、在dockerfile里修改resolv.conf但是只读，均失败，先基于宿主机调试了
 
-### 3.4. 运行
+## 5. 运行调试
 
 准备：安装redis并启动、初始化MySQL数据：`mysql -uroot -ptest < docker/init.sql`
 
@@ -149,7 +149,11 @@ trae builder模式生成项目：
 
 ![run demo2](/images/2025-02-25-ioserver-result.png)
 
-3、发送信号动态调整日志等级为info，`kill -HUP 97807`
+redis和MySQL结果：
+
+![redis-mysql-ret](/images/2025-02-25-mysql-redis-ret.png)
+
+3、发送信号动态调整日志等级为info，`kill -HUP 97807`，调整正常
 
 [CentOS-root@xdlinux ➜ bin git:(main) ✗ ]$ cat ../config/server_config.json
 
@@ -179,14 +183,14 @@ trae builder模式生成项目：
 }
 ```
 
-4、客户端上并发就容易出问题，不过简单流程是跑起来了
+4、客户端上并发就出问题了，不过简单流程是跑起来了
 
-## 4. 小结
+## 6. 小结
 
 基于AI工具生成项目框架和逻辑，从其中实现可以学习不少东西。**先理解整体代码逻辑后**，再结合手动调整和指示AI优化，效率提升明显。
 
-## 5. 参考
+下一步定位并发问题，并基于当前项目扩展深入。
 
-* [AI Agents Course](https://huggingface.co/learn/agents-course/unit0/introduction)
+## 7. 参考
 
 * GPT
