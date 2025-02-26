@@ -16,7 +16,7 @@ tags: C++ 网络
 
 基于C++实现的读写服务demo，借此作为场景温习并深入学习io多路复用、性能调试、MySQL/Redis等开源组件。
 
-本篇先看理论，后续再进行运行调试。梳理demo里面的几个io多路复用实现，并比较 [muduo](https://github.com/chenshuo/muduo)网络库 中的实现进行学习。
+本篇先看理论，后续再进行运行调试。梳理demo里面的几个io多路复用实现，并比较 [muduo](https://github.com/chenshuo/muduo)网络库、nginx 中的epoll使用进行学习，而后了解内核中的的epoll实现。
 
 参考：
 
@@ -269,12 +269,12 @@ int EpollIO::wait(std::vector<Event>& events, int timeout) {
 
 ## 4. muduo网络库中的epoll
 
+## 5. nginx中的epoll
+
+## 6. 小结
 
 
-## 5. 小结
-
-
-## 6. 参考
+## 7. 参考
 
 * [深入揭秘 epoll 是如何实现 IO 多路复用的](https://mp.weixin.qq.com/s/OmRdUgO1guMX76EdZn11UQ)
 * [muduo源码](https://github.com/chenshuo/muduo)
