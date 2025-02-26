@@ -16,7 +16,7 @@ tags: C++ 网络
 
 基于C++实现的读写服务demo，借此作为场景温习并深入学习io多路复用、性能调试、MySQL/Redis等开源组件。
 
-本篇先看理论，后续再进行运行调试。梳理demo里面的几个io多路复用实现，并比较 [muduo](https://github.com/chenshuo/muduo) 中的实现进行学习。
+本篇先看理论，后续再进行运行调试。梳理demo里面的几个io多路复用实现，并比较 [muduo](https://github.com/chenshuo/muduo)网络库 中的实现进行学习。
 
 参考：
 
@@ -25,11 +25,7 @@ tags: C++ 网络
 
 结合之前 [TCP半连接全连接（一） -- 全连接队列相关过程](https://xiaodongq.github.io/2024/05/18/tcp_connect/#6-%E6%BA%90%E7%A0%81%E4%B8%AD%E5%90%84%E9%98%B6%E6%AE%B5%E7%AE%80%E8%A6%81%E6%B5%81%E7%A8%8B) 里梳理走读的[内核](https://github.com/xiaodongQ/linux-5.10.10)相关结构定义和流程，加深印象和理解。
 
-## 2. demo中的io多路复用
-
-项目代码：[ioserver_demo](https://github.com/xiaodongQ/prog-playground/tree/main/ioserver_demo)
-
-### 2.1. epoll一般使用流程
+## 2. epoll一般使用流程
 
 `epoll` api的一般使用流程：
 
@@ -80,9 +76,13 @@ close(epoll_fd);
 close(listenfd);
 ```
 
-### 2.2. demo中epoll使用流程走读
+## 3. demo中epoll使用流程走读
+
+项目代码：[ioserver_demo](https://github.com/xiaodongQ/prog-playground/tree/main/ioserver_demo)
 
 再来看下demo里的实现。
+
+### 3.1. 抽象类定义
 
 1、抽象类定义，还是比较优雅的：
 
@@ -135,43 +135,48 @@ EpollIO::EpollIO(int max_events) : events_(max_events) {
 }
 ```
 
-2、基本`socket` api使用，实例化`EpollIO`类：`io_ = std::make_unique<io::EpollIO>();`
+### 3.2. epoll api调用
+
+1、基本`socket` api创建socket并监听，实例化`EpollIO`类：`io_ = std::make_unique<io::EpollIO>();`
 
 ```cpp
 // src/server/server.cpp
-bool init(const std::string& config_path) {
+class Server {
+    bool init(const std::string& config_path) {
+        ...
+        // 创建服务器socket
+        serverfd_ = socket(AF_INET, SOCK_STREAM, 0);
+        if (serverfd_ < 0) {xxx}
+        
+        // 设置socket选项
+        int opt = 1;
+        if (setsockopt(serverfd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {xxx}
+
+        // 绑定地址
+        struct sockaddr_in addr{};
+        addr.sin_family = AF_INET;
+        addr.sin_addr.s_addr = INADDR_ANY;
+        addr.sin_port = htons(port_);
+        if (bind(serverfd_, (struct sockaddr*)&addr, sizeof(addr)) < 0) {xxx}
+
+        // 监听连接
+        if (listen(serverfd_, SOMAXCONN) < 0) {xxx}
+
+        // 设置为非阻塞模式
+        if (!setNonBlocking(serverfd_)) {xxx}
+        ...
+
+        // 创建IO多路复用对象
+        io_ = std::make_unique<io::EpollIO>();
+        // 添加 listen fd 到监控列表
+        io_->addEvent(serverfd_, io::EventType::READ);
+        ...
+    }
     ...
-    // 创建服务器socket
-    serverfd_ = socket(AF_INET, SOCK_STREAM, 0);
-    if (serverfd_ < 0) {xxx}
-    
-    // 设置socket选项
-    int opt = 1;
-    if (setsockopt(serverfd_, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {xxx}
-
-    // 绑定地址
-    struct sockaddr_in addr{};
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY;
-    addr.sin_port = htons(port_);
-    if (bind(serverfd_, (struct sockaddr*)&addr, sizeof(addr)) < 0) {xxx}
-
-    // 监听连接
-    if (listen(serverfd_, SOMAXCONN) < 0) {xxx}
-
-    // 设置为非阻塞模式
-    if (!setNonBlocking(serverfd_)) {xxx}
-    ...
-
-    // 创建IO多路复用对象
-    io_ = std::make_unique<io::EpollIO>();
-    // 添加 listen fd 到监控列表
-    io_->addEvent(serverfd_, io::EventType::READ);
-    ...
-}
+};
 ```
 
-`epoll_ctl`包装接口：
+上述`addEvent`中封装了`epoll_ctl`接口：
 
 ```cpp
 // src/server/io_multiplexing.cpp
@@ -193,10 +198,83 @@ bool EpollIO::addEvent(int fd, EventType type) {
 }
 ```
 
-## 3. 小结
+2、主循环中，`int nfds = io_->wait(events, 1000);`进行`epoll_wait`等待
+
+1）如果是监听句柄，则调用`handleNewConnection`处理新连接。
+
+* 其中会`accept`接收新连接 -> 设置非阻塞 -> 调用`io_->addEvent`将新连接句柄加入监控列表
+
+2）如果是客户端句柄，则将请求加入线程池处理。此处捕获当前对象指针并传入客户端fd
+
+* `handleClient`处理中，进行`recv`接收数据、解析json、Redis和MySQL操作，并发送响应、关闭连接
+* 此处：客户端句柄的`close`关闭和是否`epoll_ctl`移除，还需要进一步考虑
+
+```cpp
+class Server {
+    void run() {
+        logger_->info("Server started on port " + std::to_string(port_));
+
+        // 主事件循环
+        while (running) {
+            std::vector<io::Event> events;
+            int nfds = io_->wait(events, 1000); // 1秒超时
+
+            if (nfds < 0) {
+                if (errno == EINTR) continue;
+                logger_->error("IO wait error");
+                break;
+            }
+
+            for (const auto& event : events) {
+                if (event.fd == serverfd_) {
+                    handleNewConnection();
+                } else {
+                    // 将客户端请求加入线程池
+                    threadPool_.enqueue([this, fd = event.fd] {
+                        handleClient(fd);
+                    });
+                }
+            }
+        }
+
+        cleanup();
+    }
+}
+```
+
+`io_->wait`中对应的epoll override实现：
+
+```cpp
+// src/server/io_multiplexing.cpp
+int EpollIO::wait(std::vector<Event>& events, int timeout) {
+    int ret = epoll_wait(epollfd_, events_.data(), events_.size(), timeout);
+    if (ret < 0) return -1;
+    
+    events.clear();
+    for (int i = 0; i < ret; ++i) {
+        // 初始化暂时用读事件，下面根据实际调整，如果仅是写事件触发，不会多出读？
+        Event event{events_[i].data.fd, EventType::READ, nullptr};
+        if (events_[i].events & EPOLLIN)
+            event.type = EventType::READ;
+        else if (events_[i].events & EPOLLOUT)
+            event.type = EventType::WRITE;
+        else if (events_[i].events & EPOLLERR)
+            event.type = EventType::ERROR;
+        events.push_back(event);
+    }
+    
+    return ret;
+}
+```
+
+## 4. muduo网络库中的epoll
 
 
-## 4. 参考
+
+## 5. 小结
+
+
+## 6. 参考
 
 * [深入揭秘 epoll 是如何实现 IO 多路复用的](https://mp.weixin.qq.com/s/OmRdUgO1guMX76EdZn11UQ)
 * [muduo源码](https://github.com/chenshuo/muduo)
