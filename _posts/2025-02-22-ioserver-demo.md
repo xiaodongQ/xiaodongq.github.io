@@ -127,7 +127,7 @@ trae builder模式生成项目：
 
 项目代码在：[ioserver_demo](https://github.com/xiaodongQ/prog-playground/tree/main/ioserver_demo)
 
-项目虽小，但包含的小模块也不少：线程池、io多路复用包装、json解析、spdlog日志库，集成MySQL、Redis客户端api，配置文件解析和动态加载、优雅关闭等等。
+项目虽小，但包含的小模块也不少：线程池、io多路复用包装、json解析、spdlog日志库，集成MySQL、Redis客户端api，配置文件解析和动态加载、优雅关闭、docker构建等等。
 
 其中的一些实现可作为学习参考。
 
@@ -276,7 +276,13 @@ redis和MySQL结果：
 
 基于AI工具生成项目框架和逻辑，从其中实现可以学习不少东西，虽然不能完全即拿即用。**先理解整体代码逻辑后**，再结合手动调整和指示AI优化，效率提升明显。
 
-下一步定位并发问题，并基于当前项目扩展深入。
+当前阶段TODO问题：
+
+* 客户端并发问题
+* docker构建问题
+* 数据库连接池问题
+
+下一步定位问题并优化，并基于当前项目扩展深入。
 
 ## 7. 参考
 
