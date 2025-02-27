@@ -412,7 +412,7 @@ Timestamp EPollPoller::poll(int timeoutMs, ChannelList* activeChannels)
 
 ### 4.3. ping-pong demo
 
-查看`examples/pingpong`的代码，使用`TcpServer`作为服务端，其中`Poller`、`EPollPoller`负责`EventLoop`事件循环类中的轮询处理。
+查看`examples/pingpong`的代码（完整代码见：[github](https://github.com/chenshuo/muduo/tree/master/examples/pingpong)），使用`TcpServer`作为服务端，其中`Poller`、`EPollPoller`负责`EventLoop`事件循环类中的轮询处理。
 
 下面是pingpong demo的服务端：
 
@@ -628,18 +628,18 @@ out_free_ep:
 // linux-5.10.10/fs/eventpoll.c
 // 其中`struct rb_root_cached rbr`是红黑树
 struct eventpoll {
-	struct mutex mtx;
-	/* Wait queue used by sys_epoll_wait() */
-	wait_queue_head_t wq;
-	/* Wait queue used by file->poll() */
-	wait_queue_head_t poll_wait;
-	/* List of ready file descriptors */
-	struct list_head rdllist;
-	
+  struct mutex mtx;
+  /* Wait queue used by sys_epoll_wait() */
+  wait_queue_head_t wq;
+  /* Wait queue used by file->poll() */
+  wait_queue_head_t poll_wait;
+  /* List of ready file descriptors */
+  struct list_head rdllist;
+  
   /* Lock which protects rdllist and ovflist */
-	rwlock_t lock;
-	/* RB tree root used to store monitored fd structs */
-	struct rb_root_cached rbr;
+  rwlock_t lock;
+  /* RB tree root used to store monitored fd structs */
+  struct rb_root_cached rbr;
   ...
 };
 ```
@@ -647,9 +647,9 @@ struct eventpoll {
 可以看到`struct file`和`struct eventpoll`之间有关联关系，贴一下参考链接的内核数据结构图，比较直观：
 
 ![epoll内核数据结构](/images/epoll_kernel_datastruct.jpg)  
-（[出处](https://mp.weixin.qq.com/s/OmRdUgO1guMX76EdZn11UQ)）
+[出处](https://mp.weixin.qq.com/s/OmRdUgO1guMX76EdZn11UQ)
 
-图中是基于3.10内核，结构体定义有所差别，不过整体流程一致，此处作为参考。
+图中是基于3.10内核，结构体定义有所差别，不过整体流程一致，此处可作为参考。
 
 epoll工作流程示意图：
 
