@@ -16,7 +16,7 @@ tags: C++ 网络
 
 基于C++实现的读写服务demo，借此作为场景温习并深入学习io多路复用、性能调试、MySQL/Redis等开源组件。
 
-本篇先看理论，后续再进行运行调试。梳理demo里面的几个io多路复用实现，并比较 [muduo](https://github.com/chenshuo/muduo)网络库、nginx 中的epoll使用进行学习，而后了解内核中的的epoll实现。
+本篇先看理论，后续再进行运行调试。梳理demo里面的几个io多路复用实现，并比较 [muduo](https://github.com/chenshuo/muduo)网络库 中的epoll使用进行学习，而后了解内核中的的epoll实现。
 
 参考：
 
@@ -80,11 +80,11 @@ close(listenfd);
 
 项目代码：[ioserver_demo](https://github.com/xiaodongQ/prog-playground/tree/main/ioserver_demo)
 
-再来看下demo里的实现。
+来看下demo里的实现，作为基准以便和优秀的开源项目对比，识别坏味道和值得借鉴学习的部分。
 
 ### 3.1. 抽象类定义
 
-1、抽象类定义，还是比较优雅的：
+1、抽象类定义，还是比较清晰的：
 
 ```cpp
 // include/io_multiplexing.h
@@ -135,7 +135,7 @@ EpollIO::EpollIO(int max_events) : events_(max_events) {
 }
 ```
 
-### 3.2. epoll api调用
+### 3.2. epoll api封装
 
 1、基本`socket` api创建socket并监听，实例化`EpollIO`类：`io_ = std::make_unique<io::EpollIO>();`
 
@@ -269,10 +269,397 @@ int EpollIO::wait(std::vector<Event>& events, int timeout) {
 
 ## 4. muduo网络库中的epoll
 
-## 5. nginx中的epoll
+### 4.1. 抽象类定义
+
+1、抽象类定义为`class Poller`，并通过静态函数`Poller::newDefaultPoller`返回具体的实例，环境变量里没指定`MUDUO_USE_POLL`则默认epoll。
+
+```cpp
+// muduo/net/Poller.h
+class Poller : boost::noncopyable
+{
+ public:
+  typedef std::vector<Channel*> ChannelList;
+
+  Poller(EventLoop* loop);
+  virtual ~Poller();
+
+  /// Polls the I/O events.
+  /// Must be called in the loop thread.
+  virtual Timestamp poll(int timeoutMs, ChannelList* activeChannels) = 0;
+
+  /// Changes the interested I/O events.
+  /// Must be called in the loop thread.
+  virtual void updateChannel(Channel* channel) = 0;
+
+  /// Remove the channel, when it destructs.
+  /// Must be called in the loop thread.
+  virtual void removeChannel(Channel* channel) = 0;
+
+  virtual bool hasChannel(Channel* channel) const;
+
+  static Poller* newDefaultPoller(EventLoop* loop);
+
+  void assertInLoopThread() const
+  {
+    ownerLoop_->assertInLoopThread();
+  }
+
+ protected:
+  typedef std::map<int, Channel*> ChannelMap;
+  // 此处是加到监控中的句柄 和 其对应数据，组成的一个map
+  // 对于epoll，对应的是epoll_event结构中的data.ptr信息
+  ChannelMap channels_;
+
+ private:
+  EventLoop* ownerLoop_;
+};
+
+// muduo/net/poller/DefaultPoller.cc
+Poller* Poller::newDefaultPoller(EventLoop* loop)
+{
+  if (::getenv("MUDUO_USE_POLL"))
+  {
+    return new PollPoller(loop);
+  }
+  else
+  {
+    return new EPollPoller(loop);
+  }
+}
+```
+
+2、实现封装了`poll`（PollPoller类）和`epoll`（EPollPoller类）两种io复用机制，此处仅看`epoll`
+
+```cpp
+// muduo/net/poller/EPollPoller.h
+class EPollPoller : public Poller
+{
+ public:
+  EPollPoller(EventLoop* loop);
+  virtual ~EPollPoller();
+
+  // 其中进行 ::epoll_wait 等待
+  virtual Timestamp poll(int timeoutMs, ChannelList* activeChannels);
+  virtual void updateChannel(Channel* channel);
+  virtual void removeChannel(Channel* channel);
+
+ private:
+  static const int kInitEventListSize = 16;
+
+  static const char* operationToString(int op);
+
+  void fillActiveChannels(int numEvents,
+                          ChannelList* activeChannels) const;
+  void update(int operation, Channel* channel);
+
+  typedef std::vector<struct epoll_event> EventList;
+
+  // epoll实例句柄
+  int epollfd_;
+  EventList events_;
+};
+```
+
+### 4.2. epoll api封装
+
+1、`EPollPoller::poll`中封装了`epoll_wait`接口
+
+```cpp
+Timestamp EPollPoller::poll(int timeoutMs, ChannelList* activeChannels)
+{
+  // 当前有哪些监控句柄
+  LOG_TRACE << "fd total count " << channels_.size();
+  int numEvents = ::epoll_wait(epollfd_,
+                               &*events_.begin(),
+                               static_cast<int>(events_.size()),
+                               timeoutMs);
+  int savedErrno = errno;
+  Timestamp now(Timestamp::now());
+  if (numEvents > 0)
+  {
+    LOG_TRACE << numEvents << " events happended";
+    // 有事件发生，并填充到 activeChannels 里对外提供
+    fillActiveChannels(numEvents, activeChannels);
+    // 由于events_对应的vector初始化容量为16（kInitEventListSize），此处考虑扩容
+    // 相比于demo里直接默认1024，此处细节值得学习
+    if (implicit_cast<size_t>(numEvents) == events_.size())
+    {
+      events_.resize(events_.size()*2);
+    }
+  }
+  else if (numEvents == 0)
+  {
+    LOG_TRACE << "nothing happended";
+  }
+  else
+  {
+    // error happens, log uncommon ones
+    if (savedErrno != EINTR)
+    {
+      errno = savedErrno;
+      LOG_SYSERR << "EPollPoller::poll()";
+    }
+  }
+  return now;
+}
+```
+
+2、`epoll_ctl`则在`EPollPoller::updateChannel`和`EPollPoller::removeChannel`中使用
+
+具体用法，需要结合使用`EPollPoller`类的demo来跟踪。
+
+从muduo仓库的`examples`中找个简单的例子：`examples/pingpong`。
+
+### 4.3. ping-pong demo
+
+查看`examples/pingpong`的代码，使用`TcpServer`作为服务端，其中`Poller`、`EPollPoller`负责`EventLoop`事件循环类中的轮询处理。
+
+下面是pingpong demo的服务端：
+
+```cpp
+// examples/pingpong/server.cc
+int main(int argc, char* argv[])
+{
+  if (argc < 4)
+  {
+    fprintf(stderr, "Usage: server <address> <port> <threads>\n");
+  }
+  else
+  {
+    LOG_INFO << "pid = " << getpid() << ", tid = " << CurrentThread::tid();
+    Logger::setLogLevel(Logger::WARN);
+
+    const char* ip = argv[1];
+    uint16_t port = static_cast<uint16_t>(atoi(argv[2]));
+    InetAddress listenAddr(ip, port);
+    int threadCount = atoi(argv[3]);
+
+    EventLoop loop;
+
+    TcpServer server(&loop, listenAddr, "PingPong");
+
+    server.setConnectionCallback(onConnection);
+    server.setMessageCallback(onMessage);
+
+    if (threadCount > 1)
+    {
+      server.setThreadNum(threadCount);
+    }
+
+    server.start();
+
+    loop.loop();
+  }
+}
+
+void onMessage(const TcpConnectionPtr& conn, Buffer* buf, Timestamp)
+{
+  conn->send(buf);
+}
+```
+
+有挺大一部分逻辑是在tcp服务端、线程池的处理上，内容挺多，梳理学习了一下其中的逻辑，此处不做展开，几个关键类：
+
+* `TcpServer` TCP服务端抽象，实现中需要涉及下述功能类
+    * `Acceptor` 负责监听和accept，作为`TcpServer`类的一个成员`acceptor_`
+    * 重点关注向`acceptor_`设置的回调函数：`TcpServer::newConnection`，负责在有新的客户端连接时的处理
+    * `Socket`包装
+* `EventLoop` 事件循环，epoll负责事件的轮询通知
+    * `Channel`状态流转处理
+* `EventLoopThreadPool` 线程池
+    * 单个线程类是 `EventLoopThread`
+    * 除了实例化TcpServer时的`EventLoop`，在每个线程类中还各有一个`EventLoop`实例
+* `Channel` 作为自定义数据传给epoll_event的指针，其中包含epoll控制的很多信息
+    * fd、监控的事件类型、有什么类型的事件发生、回调处理函数、事件信息打印之类的辅助类
+
+demo启动流程：`server.start()` -> `loop_->runInLoop` -> 调用到`Acceptor::listen` -> `acceptChannel_.enableReading();`
+
+```cpp
+// muduo/net/Channel.h
+void enableReading() { events_ |= kReadEvent; update(); }
+
+// muduo/net/Channel.cc
+const int Channel::kNoneEvent = 0;
+const int Channel::kReadEvent = POLLIN | POLLPRI;
+const int Channel::kWriteEvent = POLLOUT;
+```
+
+上面`update()`对应`Channel::update()` -> 接着调用`EventLoop::updateChannel` -> `poller_->updateChannel(channel)` -> `EPollPoller::update`，里面负责关注句柄事件的状态流转和控制
+
+```cpp
+// muduo/net/Channel.cc
+void Channel::update()
+{
+  addedToLoop_ = true;
+  loop_->updateChannel(this);
+}
+```
+
+```cpp
+// muduo/net/EventLoop.cc
+void EventLoop::updateChannel(Channel* channel)
+{
+  assert(channel->ownerLoop() == this);
+  assertInLoopThread();
+  poller_->updateChannel(channel);
+}
+```
+
+有新连接建立时，设置相应的处理回调，并会调用`TcpConnection::connectEstablished`，其中还是关注读事件：`channel_->enableReading();`
+
+```cpp
+// muduo/net/TcpServer.cc
+void TcpServer::newConnection(int sockfd, const InetAddress& peerAddr)
+{
+  loop_->assertInLoopThread();
+  EventLoop* ioLoop = threadPool_->getNextLoop();
+  char buf[64];
+  snprintf(buf, sizeof buf, "-%s#%d", ipPort_.c_str(), nextConnId_);
+  ++nextConnId_;
+  string connName = name_ + buf;
+
+  LOG_INFO << "TcpServer::newConnection [" << name_
+           << "] - new connection [" << connName
+           << "] from " << peerAddr.toIpPort();
+  InetAddress localAddr(sockets::getLocalAddr(sockfd));
+  // FIXME poll with zero timeout to double confirm the new connection
+  // FIXME use make_shared if necessary
+  TcpConnectionPtr conn(new TcpConnection(ioLoop,
+                                          connName,
+                                          sockfd,
+                                          localAddr,
+                                          peerAddr));
+  connections_[connName] = conn;
+  conn->setConnectionCallback(connectionCallback_);
+  conn->setMessageCallback(messageCallback_);
+  conn->setWriteCompleteCallback(writeCompleteCallback_);
+  conn->setCloseCallback(
+      boost::bind(&TcpServer::removeConnection, this, _1)); // FIXME: unsafe
+  ioLoop->runInLoop(boost::bind(&TcpConnection::connectEstablished, conn));
+}
+```
+
+### 4.4. 用法小结
+
+通过上面梳理学习`ping-pong demo`的流程，可看到epoll的关注事件变化：
+
+* 服务监听时，关注读事件，`POLLIN | POLLPRI`
+* 新连接建立，关注读事件
+* 向客户端发送数据没发完时，叠加关注写事件，`POLLOUT`
+    * 调用链比较长，起始于main函数设置回调：
+    * `onMessage` -> `conn->send(buf)` ->
+    * `TcpConnection::send(Buffer* buf)` ->
+    * `TcpConnection::sendInLoop(const void* data, size_t len)` -> `channel_->enableWriting();`
+* 连接关闭时，
+    * 先执行`TcpServer::removeConnection`
+    * 而后是回调处理：`TcpServer::removeConnectionInLoop`
+    * `TcpConnection::connectDestroyed` -> `channel_->disableAll();`
+    * 其实现为：`void disableAll() { events_ = kNoneEvent; update(); }`
+    * `kNoneEvent`状态即没有关注任何事件类型，会在`EPollPoller::updateChannel`中将该类型`EPOLL_CTL_DEL`处理
+
+```cpp
+// muduo/net/poller/EPollPoller.cc
+void EPollPoller::updateChannel(Channel* channel)
+{
+  if (index == kNew || index == kDeleted)
+  {
+    ...
+  }
+  else
+  {
+    ...
+    assert(index == kAdded);
+    // 此处处理 kNoneEvent 状态的句柄
+    if (channel->isNoneEvent())
+    {
+      // 其中使用 epoll_ctl 将句柄从epoll中移除
+      update(EPOLL_CTL_DEL, channel);
+      channel->set_index(kDeleted);
+    }
+    else
+    {
+      update(EPOLL_CTL_MOD, channel);
+    }
+  }
+}
+```
+
+## 5. 内核中的epoll实现
+
+先简单过了一下参考链接中的流程：[深入揭秘 epoll 是如何实现 IO 多路复用的](https://mp.weixin.qq.com/s/OmRdUgO1guMX76EdZn11UQ)
+
+5.10内核中`epoll`的实现，后续再跟踪，此处只简单看一下`epoll`的实例创建，其中`eventpoll`里的`struct rb_root_cached rbr`结构是红黑树：
+
+```cpp
+// linux-5.10.10/fs/eventpoll.c
+SYSCALL_DEFINE1(epoll_create1, int, flags)
+{
+  return do_epoll_create(flags);
+}
+
+static int do_epoll_create(int flags)
+{
+  int error, fd;
+  struct eventpoll *ep = NULL;
+  struct file *file;
+  ...
+  // 创建内部数据结构：`struct eventpoll`
+  error = ep_alloc(&ep);
+  if (error < 0)
+    return error;
+
+  fd = get_unused_fd_flags(O_RDWR | (flags & O_CLOEXEC));
+  if (fd < 0) {
+    error = fd;
+    goto out_free_ep;
+  }
+  file = anon_inode_getfile("[eventpoll]", &eventpoll_fops, ep,
+         O_RDWR | (flags & O_CLOEXEC));
+  ...
+  ep->file = file;
+  fd_install(fd, file);
+  return fd;
+  ...
+out_free_ep:
+  ep_free(ep);
+  return error;
+}
+
+// linux-5.10.10/fs/eventpoll.c
+// 其中`struct rb_root_cached rbr`是红黑树
+struct eventpoll {
+	struct mutex mtx;
+	/* Wait queue used by sys_epoll_wait() */
+	wait_queue_head_t wq;
+	/* Wait queue used by file->poll() */
+	wait_queue_head_t poll_wait;
+	/* List of ready file descriptors */
+	struct list_head rdllist;
+	
+  /* Lock which protects rdllist and ovflist */
+	rwlock_t lock;
+	/* RB tree root used to store monitored fd structs */
+	struct rb_root_cached rbr;
+  ...
+};
+```
+
+可以看到`struct file`和`struct eventpoll`之间有关联关系，贴一下参考链接的内核数据结构图，比较直观：
+
+![epoll内核数据结构](/images/epoll_kernel_datastruct.jpg)  
+（[出处](https://mp.weixin.qq.com/s/OmRdUgO1guMX76EdZn11UQ)）
+
+图中是基于3.10内核，结构体定义有所差别，不过整体流程一致，此处作为参考。
+
+epoll工作流程示意图：
+
+![epoll工作流程示意图](/images/epoll_process_overview.jpg)
 
 ## 6. 小结
 
+梳理了demo和muduo库中的epoll使用，顺便学习了一下muduo库的整体流程。简单基于参考链接看了下epoll在内核中的基本流程，后续再深入学习。
+
+对比muduo库里的epoll使用，ioserver demo里用法还比较粗糙，后续调整为集成muduo库进行实验，另一方面，数据库操作等也需逐步改造优化。
 
 ## 7. 参考
 
