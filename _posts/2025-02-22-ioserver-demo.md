@@ -173,7 +173,7 @@ private:
 };
 ```
 
-### 3.4. io多路复用
+### 3.4. io多路复用说明
 
 抽象了select、poll、epoll多路复用。
 
