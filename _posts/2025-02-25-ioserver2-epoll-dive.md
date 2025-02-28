@@ -1,6 +1,6 @@
 ---
 layout: post
-title: ioserver服务实验（二） -- 深入学习epoll原理
+title: ioserver服务实验（二） -- epoll梳理学习
 categories: 网络
 tags: C++ 网络
 ---
