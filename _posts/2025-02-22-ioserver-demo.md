@@ -173,9 +173,11 @@ private:
 };
 ```
 
-#### 3.3.2. io多路复用
+### 3.4. io多路复用
 
-抽象了select、poll、epoll多路复用
+抽象了select、poll、epoll多路复用。
+
+其中`sys/select.h`、`sys/poll.h`、`sys/epoll.h`等文件，位于glibc中（而不是linux内核），可以到`/usr/include`下去找对应文件内容。
 
 ```cpp
 // IO多路复用接口抽象类
@@ -198,19 +200,110 @@ public:
 
 // Select实现
 class SelectIO : public IOMultiplexing {
-    // xxx
+private:
+    // 要监听的fd集合，按事件类型分： 读、写、错误
+    // fd_set 是一个描述符位图，glibc中定义最大长度为 1024，所以select能处理的数量受限于1024
+        // glibc/misc/sys/select.h
+        // #define  FD_SETSIZE      __FD_SETSIZE
+        // #define  __FD_SETSIZE    1024
+    fd_set readfds_, writefds_, errorfds_;
+    int maxfd_;
+public:
+    // 构造时通过 `FD_ZERO(&readfds_)` 方式，将上述fd_set初始化为空
+    SelectIO();
+    ~SelectIO() override;
+    // `FD_SET(fd, &readfds_)` 方式添加要关注的fd到对应的fd_set中，并更新最大的fd：maxfd_
+    bool addEvent(int fd, EventType type) override;
+    // 使用 `FD_CLR(fd, &readfds_)` 方式，从对应的fd_set中移除fd
+    bool removeEvent(int fd, EventType type) override;
+    // 移除再添加到新fd_set，相当于修改
+    bool modifyEvent(int fd, EventType type) override;
+    /*
+     使用 `select(maxfd_+1, &readfds_, &writefds_, &errorfds_, timeout)` 进行阻塞等待，直到有事件发生（或超时）
+        不需要关注某事件类型则可传NULL，如 select(maxfd_+1, &readfds_, NULL, NULL, timeout)
+        且每次调用 select 时，都要将文件描述符集合从用户空间复制到内核空间
+        且内核要遍历所有fd，性能较差
+     select返回后，需要遍历fd：[0, maxfd_]，通过 `FD_ISSET(fd, &readfds_)` 方式检查是否触发了对应事件，比如：
+        for (int fd = 0; fd < maxfd_ + 1; ++fd) { 
+            if (FD_ISSET(fd, &rfds)){xxx} 
+            else if (FD_ISSET(fd, &wfds)){xxx}
+            xxx
+        }
+     */
+    int wait(std::vector<Event>& events, int timeout = -1) override;
 };
 
 // Poll实现
 class PollIO : public IOMultiplexing {
-    // xxx
+private:
+    // poll 使用 struct pollfd 数组来管理文件描述符，没有固定的文件描述符数量限制
+    // 或者该形式：struct pollfd fds[MAXNUMFDS]，MAXNUMFDS自定义
+    std::vector<pollfd> pollfds_;
+public:
+    /* 
+        创建 struct pollfd，如`pollfd pfd;`；并注册感兴趣事件，如`pfd.events |= POLLIN;`；然后添加到pollfds_数组中
+        对应的定义在 glibc/io/sys/poll.h 中：
+        struct pollfd
+        {
+            int fd;            // poll fd
+            short int events;  // 关注的事件
+            short int revents; // 实际发生的事件
+        };
+    */
+    bool addEvent(int fd, EventType type) override;
+    // 从pollfds_数组中移除
+    bool removeEvent(int fd, EventType type) override;
+    // 从pollfds_数组中移除再添加，相当于修改
+    bool modifyEvent(int fd, EventType type) override;
+    /*
+     使用 poll(pollfds_.data(), pollfds_.size(), timeout) 进行阻塞等待，直到有事件发生（或超时）
+        和select一样，还是会有用户空间和内核空间的数据复制
+        且内核要遍历所有pollfd
+     poll返回后，需要遍历所有的 pollfds_，检查其 revents 字段，看是否有事件发生，比如：
+        for (const auto& pfd : pollfds_) {
+            if (pfd.revents & POLLIN) {xxx}
+            else if (pfd.revents & POLLOUT) {xxx}
+            xxx
+        }
+    */ 
+    int wait(std::vector<Event>& events, int timeout = -1) override;
 }
 
 // Epoll实现
 class EpollIO : public IOMultiplexing {
-    // xxx
+private:
+    int epollfd_;
+    std::vector<epoll_event> events_;
+public:
+    // 构造时就会创建epollfd：`epollfd_ = epoll_create1(0);`
+    EpollIO(int max_events = 1024); // 此处可优化，参考下篇muduo实现
+    ~EpollIO() override;
+    // epoll_ctl向epoll注册事件，如：`epoll_ctl(epollfd_, EPOLL_CTL_ADD, fd, &ev)`
+    bool addEvent(int fd, EventType type) override;
+    // epoll_ctl从epoll移除，如：`epoll_ctl(epollfd_, EPOLL_CTL_DEL, fd, nullptr)`
+    bool removeEvent(int fd, EventType type) override;
+    // epoll_ctl进行修改，如：epoll_ctl(epollfd_, EPOLL_CTL_MOD, fd, &ev)
+    bool modifyEvent(int fd, EventType type) override;
+    /*
+     使用 int ret = epoll_wait(epollfd_, events_.data(), events_.size(), timeout) 进行阻塞等待，直到有事件发生（或超时）
+        这里的返回值ret表示就绪的fd数量，即 events_ 中就绪事件的个数
+        使用红黑树管理文件描述符，没有固定的文件描述符数量限制，链表来管理就绪的文件描述符
+        通过 epoll_ctl 系统调用将文件描述符的注册和修改操作在内核中完成，不需要像select和poll那样复制
+        支持 边缘触发（Edge Triggered，ET） 和 水平触发（Level Triggered，LT），默认水平触发。边缘触发模式可进一步提升性能（但更复杂）
+     循环处理 ret 个事件即可，如
+        for (int i = 0; i < ret; ++i) {
+            if (events_[i].events & EPOLLIN) {xxx}
+            else if (events_[i].events & EPOLLOUT) {xxx}
+            xxx
+        }
+    */
+    int wait(std::vector<Event>& events, int timeout = -1) override;
 }
 ```
+
+PS：当前GitHub Copilot也可以直接用了，不用绑定银行卡
+
+![GitHub Copilot插件](/images/2025-02-28-copilot.png)
 
 ## 4. 代码构建
 

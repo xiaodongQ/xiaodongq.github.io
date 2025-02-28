@@ -2,13 +2,13 @@
 layout: post
 title: ioserver服务实验（二） -- epoll梳理学习
 categories: 网络
-tags: C++ 网络
+tags: 网络 epoll
 ---
 
 * content
 {:toc}
 
-基于ioserver demo项目，梳理学习epoll原理。
+基于ioserver demo项目，梳理学习epoll的使用。
 
 
 
@@ -53,15 +53,11 @@ if (num_events == -1) {
     for (int i = 0; i < num_events; i++) {
         int fd = events[i].data.fd;
         if (fd == listenfd) {
-            // 处理新的连接请求
-            // 然后通过epoll_ctl把新的连接文件描述符fd也添加到epoll实例中，进行 EPOLLIN | EPOLLOUT 监听
+            // accept处理新的连接请求
+            // 然后通过epoll_ctl把新的连接文件描述符fd也添加到epoll实例中，进行 EPOLLIN 监听
         } else {
             if (events[i].events & EPOLLIN) {
-                // 读事件发生
-            } else if (events[i].events & EPOLLOUT) {
-                // 写事件发生
-            } else {
-                // 其他事件发生
+                // 读事件发生，进行read和业务处理
             }
             // 关闭之前添加到epoll中的文件描述符fd
             close(fd);
@@ -69,11 +65,11 @@ if (num_events == -1) {
     }
 }
 
-// 4、使用完epoll实例后，关闭epoll实例和之前添加到epoll中的文件描述符fd
-// 关闭epoll实例
-close(epoll_fd);
+// 4、使用完epoll实例后，关闭之前添加到epoll中的文件描述符fd 和 epoll实例
 // 关闭之前添加到epoll中的文件描述符
 close(listenfd);
+// 关闭epoll实例
+close(epoll_fd);
 ```
 
 ## 3. demo中epoll使用流程走读
@@ -543,9 +539,9 @@ void TcpServer::newConnection(int sockfd, const InetAddress& peerAddr)
 
 通过上面梳理学习`ping-pong demo`的流程，可看到epoll的关注事件变化：
 
-* 服务监听时，关注读事件，`POLLIN | POLLPRI`
-* 新连接建立，关注读事件
-* 向客户端发送数据没发完时，叠加关注写事件，`POLLOUT`
+* 服务监听时，注册读事件，`POLLIN | POLLPRI`（`poll`和`epoll`的事件类型定义的值相同）
+* accept到新连接请求，注册读事件
+* 向客户端发送数据没发完时，注册写事件，`POLLOUT`
     * 调用链比较长，起始于main函数设置回调：
     * `onMessage` -> `conn->send(buf)` ->
     * `TcpConnection::send(Buffer* buf)` ->
@@ -556,6 +552,7 @@ void TcpServer::newConnection(int sockfd, const InetAddress& peerAddr)
     * `TcpConnection::connectDestroyed` -> `channel_->disableAll();`
     * 其实现为：`void disableAll() { events_ = kNoneEvent; update(); }`
     * `kNoneEvent`状态即没有关注任何事件类型，会在`EPollPoller::updateChannel`中将该类型`EPOLL_CTL_DEL`处理
+* 均基于默认的`水平触发`模式，若有数据则会一直触发
 
 ```cpp
 // muduo/net/poller/EPollPoller.cc
