@@ -2,13 +2,13 @@
 layout: post
 title: 如何关闭一个TCP连接？
 categories: 网络
-tags: 网络 tcpkill
+tags: 网络 tcpkill hping3
 ---
 
 * content
 {:toc}
 
-介绍如何利用`tcpkill`和`killcx`关闭一个TCP连接，以及基本原理。
+介绍如何利用`tcpkill`和`hping3`关闭一个TCP连接，以及基本原理。
 
 
 
@@ -22,7 +22,7 @@ tags: 网络 tcpkill
 
 2、另外上周有人问有什么工具可以关闭一个TCP连接，查了下试试tcpkill（位于dsniff包），但环境网络限制和操作系统限制下依赖没解决，GitHub找了个单独实现：[tcpkill](https://github.com/chartbeat/tcpkill)，编译简单用了一下就推过去了。
 
-本篇介绍下关闭连接的基本原理 和 `tcpkill`、`killcx`工具。
+本篇介绍下关闭连接的基本原理 和 `tcpkill`、`killcx`、`hping3`工具。
 
 ## 2. Challenge Ack
 
