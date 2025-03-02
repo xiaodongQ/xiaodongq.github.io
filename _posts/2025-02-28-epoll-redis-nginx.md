@@ -1,14 +1,14 @@
 ---
 layout: post
-title: 梳理Redis和Nginx中的epoll机制
+title: 梳理Redis中的epoll机制
 categories: 网络
-tags: 网络 epoll Redis Nginx
+tags: 网络 epoll Redis
 ---
 
 * content
 {:toc}
 
-梳理学习 Redis 和 Nginx 中的epoll机制。
+梳理学习 Redis ~~和 Nginx~~ 中的epoll机制。
 
 
 
@@ -163,7 +163,6 @@ typedef struct aeApiState {
 
 // 静态函数，使用的 aeApiState 是本.c文件定义的，对应epoll的数据结构（其他c文件里也有同名的 aeApiState 结构）
 static int aeApiCreate(aeEventLoop *eventLoop) {
-    // 
     aeApiState *state = zmalloc(sizeof(aeApiState));
 
     if (!state) return -1;
@@ -233,25 +232,222 @@ LISTEN 0      128        127.0.0.1:6379       0.0.0.0:*     users:(("redis-serve
 net.core.somaxconn = 128
 ```
 
-### 2.4. 3、事件注册
+### 2.4. 事件注册
 
 继续看`initServer(void)`：
 
+监听端口的读事件，注册处理函数为：`acceptTcpHandler`
+
 ```c
+// redis-5.0.3/src/server.c
 // 3、注册 accept事件处理器 到epoll事件循环中
-    for (j = 0; j < server.ipfd_count; j++) {
-        if (aeCreateFileEvent(server.el, server.ipfd[j], AE_READABLE,
-            acceptTcpHandler,NULL) == AE_ERR)
-            {
-                serverPanic("Unrecoverable error creating server.ipfd file event.");
-            }
-    }
+for (j = 0; j < server.ipfd_count; j++) {
+    if (aeCreateFileEvent(server.el, server.ipfd[j], AE_READABLE,
+        acceptTcpHandler,NULL) == AE_ERR)
+        {
+            serverPanic("Unrecoverable error creating server.ipfd file event.");
+        }
+}
 ```
 
-## 3. nginx中的epoll流程
+```c
+// redis-5.0.3/src/ae.c
+int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
+        aeFileProc *proc, void *clientData)
+{
+    ...
+    // aeEventLoop结构中的 aeFileEvent *events，对应的 aeFileEvent 结构包含了回调函数和自定义数据
+    aeFileEvent *fe = &eventLoop->events[fd];
+    ...
+    // 按实际的事件处理器分别处理，epoll 对应 ae_epoll.c
+    // 其中使用 epoll_ctl 注册事件，事件类型由 mask 指定
+    if (aeApiAddEvent(eventLoop, fd, mask) == -1)
+        return AE_ERR;
+    fe->mask |= mask;
+    // 根据传入的事件类型，设置对应的回调函数，设置到`aeFileEvent`结构中
+    if (mask & AE_READABLE) fe->rfileProc = proc;
+    if (mask & AE_WRITABLE) fe->wfileProc = proc;
+    fe->clientData = clientData;
+    ...
+}
+```
+
+`aeFileEvent`结构定义如下：
+
+```c
+// redis-5.0.3/src/ae.h
+typedef struct aeFileEvent {
+    int mask; /* one of AE_(READABLE|WRITABLE|BARRIER) */
+    aeFileProc *rfileProc; // 读事件回调
+    aeFileProc *wfileProc; // 写事件回调
+    void *clientData;      // 一些额外扩展数据
+} aeFileEvent;
+```
+
+### 2.5. 事件循环处理
+
+上述`initServer()`里进行完事件循环初始化创建、服务监听、事件注册后，`aeMain`中进行事件循环处理。
+
+```c
+// redis-5.0.3/src/server.c
+int main(int argc, char **argv) {
+    ...
+    initServer();
+    ...
+    aeMain(server.el);
+    ...
+}
+
+// redis-5.0.3/src/ae.c
+void aeMain(aeEventLoop *eventLoop) {
+    eventLoop->stop = 0;
+    while (!eventLoop->stop) {
+        // 如果有需要在事件处理前执行的函数，则执行
+        if (eventLoop->beforesleep != NULL)
+            eventLoop->beforesleep(eventLoop);
+        // 循环处理所有事件（包含fd和定时器）
+        aeProcessEvents(eventLoop, AE_ALL_EVENTS|AE_CALL_AFTER_SLEEP);
+    }
+}
+```
+
+主要看 `aeProcessEvents` 的事件处理流程：
+
+```c
+// redis-5.0.3/src/ae.c
+int aeProcessEvents(aeEventLoop *eventLoop, int flags)
+{
+    ...
+    // 其中进行 epoll_wait
+    numevents = aeApiPoll(eventLoop, tvp);
+    for (j = 0; j < numevents; j++) {
+        // 事件信息
+        aeFileEvent *fe = &eventLoop->events[eventLoop->fired[j].fd];
+        ...
+        // 读事件，回调处理
+        if (!invert && fe->mask & mask & AE_READABLE) {
+            fe->rfileProc(eventLoop,fd,fe->clientData,mask);
+            fired++;
+        }
+        // 写事件，回调处理
+        if (fe->mask & mask & AE_WRITABLE) {
+            if (!fired || fe->wfileProc != fe->rfileProc) {
+                fe->wfileProc(eventLoop,fd,fe->clientData,mask);
+                fired++;
+            }
+        }
+        ...
+        processed++;
+    }
+    ...
+}
+```
+
+前面`initServer`里初始化时，读事件回调注册为了`acceptTcpHandler`，看下具体处理流程。
+
+```c
+// redis-5.0.3/src/networking.c
+void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
+    ...
+    while(max--) {
+        // 里面循环accept，接收到就break并返回客户端fd
+        cfd = anetTcpAccept(server.neterr, fd, cip, sizeof(cip), &cport);
+        if (cfd == ANET_ERR) {
+            if (errno != EWOULDBLOCK)
+                serverLog(LL_WARNING,
+                    "Accepting client connection: %s", server.neterr);
+            return;
+        }
+        serverLog(LL_VERBOSE,"Accepted %s:%d", cip, cport);
+        // 处理客户端请求，传入客户端fd，客户端ip
+        acceptCommonHandler(cfd,0,cip);
+    }
+}
+```
+
+**处理客户端请求**：
+
+```c
+// redis-5.0.3/src/networking.c
+static void acceptCommonHandler(int fd, int flags, char *ip) {
+    client *c;
+    // 创建 client 对象
+    // 里面设置fd为 O_NONBLOCK、设置TCP_NODELAY，禁用Nagle算法
+    // 根据redis.conf配置开关，若开启则设置SO_KEEPALIVE，启用TCP keepalive机制
+    // 并为该fd注册读事件到epoll，回调函数为 `readQueryFromClient`
+    if ((c = createClient(fd)) == NULL) {
+        ...
+    }
+    ...
+}
+
+client *createClient(int fd) {
+    client *c = zmalloc(sizeof(client));
+    if (fd != -1) {
+        // 设置套接字为非阻塞
+        anetNonBlock(NULL,fd);
+        // 设置 TCP_NODELAY，禁用 Nagle 算法
+        anetEnableTcpNoDelay(NULL,fd);
+        if (server.tcpkeepalive)
+            anetKeepAlive(NULL,fd,server.tcpkeepalive);
+        if (aeCreateFileEvent(server.el,fd,AE_READABLE,
+            readQueryFromClient, c) == AE_ERR)
+        {
+            close(fd);
+            zfree(c);
+            return NULL;
+        }
+    }
+    ...
+}
+```
+
+`readQueryFromClient`负责：
+
+* 解析并查找命令
+* 调用命令处理
+* 添加写任务到队列
+* 将输出写到缓存等待发送
+
+调用链为：`readQueryFromClient` -> `processInputBufferAndReplicate` -> `processInputBuffer` -> `processCommand` -> `call`
+
+```c
+// redis-5.0.3/src/server.c
+void call(client *c, int flags) {
+    ...
+    struct redisCommand *real_cmd = c->cmd;
+    // 调用命令处理函数
+    c->cmd->proc(c);
+}
+```
+
+Redis里`redisCommand redisCommandTable[]`定义le每个命令对应的处理函数：
+
+```c
+// redis-5.0.3/src/server.c
+struct redisCommand redisCommandTable[] = {
+    {"module",moduleCommand,-2,"as",0,NULL,0,0,0,0,0},
+    {"get",getCommand,2,"rF",0,NULL,1,1,1,0,0},
+    {"set",setCommand,-3,"wm",0,NULL,1,1,1,0,0},
+    {"setnx",setnxCommand,3,"wmF",0,NULL,1,1,1,0,0},
+    {"setex",setexCommand,4,"wm",0,NULL,1,1,1,0,0},
+    ...
+};
+```
+
+要跟踪命令则找对应处理函数即可，比如`get`之于`getCommand`。
+
+整体事件循环流程如下图所示：
+
+![事件循环示意图](/images/redis_eventloop.png)
+
+## 3. Nginx中的epoll流程
+
+TODO
 
 ## 4. 小结
 
+梳理Redis中的epoll事件循环，具体逻辑细节暂未展开。Nginx相关epoll使用流程续再梳理。
 
 ## 5. 参考
 
