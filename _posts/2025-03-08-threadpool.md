@@ -22,7 +22,7 @@ tags: CPU 线程池 C++
 
 一点想法：
 
-* 现在AI工具已经很强大了，cursor/trae 这类智能体和copilot可以直接把 很多优质资源和质量不错的实践经验 直接传授给你，但接不接受得了、能接受多少，内化多少到自己的技能和思维当中，关键还是实践。用十几年、几十年的工作经验积累起来的东西，借助AI已经可以大大拉低护城墙了，自己的经验何尝不是如此。“技术无用论”/大龄危机？拿出行动力，让技术飞轮滚动起来，不一定有多好的结果，但是祛魅、以及不后悔。
+* 现在AI工具已经很强大了，cursor/trae 这类智能体和copilot可以直接把 很多优质资源和质量不错的实践经验 传授给你，但接不接受得了、能接受多少，内化多少到自己的技能和思维当中，关键还是要靠实践。用十几年、几十年的工作经验积累起来的东西，借助AI已经可以大大拉低护城墙了，自己的经验何尝不是如此。“技术无用论”/大龄危机？拿出行动力，让技术飞轮滚动起来，不一定有多好的结果，但是祛魅、以及不后悔。
 * “纸上得来终觉浅，绝知此事要躬行”
 * "Stay hungry, Stay foolish"
 * 自勉。
@@ -35,7 +35,14 @@ tags: CPU 线程池 C++
 
 编译：`g++ thread_pool.cpp -pthread`
 
+**-pthread说明**：
+
+* g++编译多线程代码建议`-pthread`，不仅会链接pthread库，还会定义一些宏来启用线程安全的代码路径，比如`_REENTRANT`、`_GNU_SOURCE`
+* 而`-lpthread`仅仅是链接pthead库
+
 `std::function`函数包装器，可以存储、复制和调用任何可调用对象，包括普通函数、成员函数、函数指针、lambda 表达式和仿函数（函数对象）等。组合lambda函数使用很方便。
+
+要点：工作线程、任务队列、同步机制、结果通知
 
 ```cpp
 #include <iostream>
@@ -63,6 +70,7 @@ public:
     ThreadPool(int num) {
         stop_ = false;
         while (num-- > 0) {
+            // 这里 thread_proc 也可以调整为 lambda表达式，并捕获this：[this]{ xxx }，实现中建议this->引用成员变量
             threads.emplace_back([this]() { thread_proc(); });
         }
     }
@@ -79,7 +87,8 @@ public:
     void enqueue_task(std::function<void()> &&task) {
         {
             unique_lock<mutex> lk(task_mtx);
-            tasks.emplace_back(task);
+            // 使用移动语义以调用移动构造
+            tasks.emplace_back(std::move(task));
         }
         // 条件变量通知，既可以放在锁内，也可以放在锁外，各有优劣
         // 持锁内通知：确保其他唤醒线程是最新的共享状态；性能方面，释放锁其他线程才能被唤醒
@@ -210,40 +219,259 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
     // __gthread_cond_t 是 GNU C++ 库（libstdc++）中用于线程同步的底层条件变量类型，
     // 它是对 POSIX 线程库（pthread）中条件变量的封装，为 C++ 标准库中的 std::condition_variable 提供了底层实现支持。
     typedef __gthread_cond_t    __native_type;
-
-#ifdef __GTHREAD_COND_INIT
-    __native_type       _M_cond = __GTHREAD_COND_INIT;
-#else
-    __native_type       _M_cond;
-#endif
-
+    ...
   public:
     typedef __native_type*  native_handle_type;
-
-    condition_variable() noexcept;
-    ~condition_variable() noexcept;
-
-    condition_variable(const condition_variable&) = delete;
-    condition_variable& operator=(const condition_variable&) = delete;
-
-    void
-    notify_one() noexcept;
     ...
+  }
 ```
 
-## 4. 利用优先级队列支持 任务优先级
+通过copilot（GitHub Copilot 或者 其他平替如CodeGeeX）辅助读源码助力很大：
 
+![copilot-read-source-code](/images/2025-03-09-copilot-read-source-code.png)
 
+### 3.1. emplace_back 原位构造
+
+C++11起`vector`、`deque`/`queue`/`priority_queue`、`list` 等就支持通过`emplace_back`方法在容器尾部原位（`in-place`）构造元素，避免`push_back`要构造临时对象再进行复制或者移动。
+
+声明如下，通过参数而不是类对象来构造新对象，参数列表则通过`std::forward`完美转发给`emplace_back`方法：
+
+```c
+template< class... Args >
+void emplace_back( Args&&... args );
+```
+
+> The element is constructed through `std::allocator_traits::construct`, which typically uses `placement-new` to construct the element **in-place** at the location provided by the container. The arguments `args...` are forwarded to the constructor as `std::forward<Args>(args)`...  
+> 参见 [cppreference vector emplace_back](https://en.cppreference.com/w/cpp/container/vector/emplace_back)）
+
+可以看下`vector`对应实现代码进行印证：
+
+```cpp
+    // libstdc++-v3/include/bits/vector.tcc
+      vector<_Tp, _Alloc>::
+      emplace_back(_Args&&... __args)
+      {
+    if (this->_M_impl._M_finish != this->_M_impl._M_end_of_storage)
+      {
+        _GLIBCXX_ASAN_ANNOTATE_GROW(1);
+        _Alloc_traits::construct(this->_M_impl, this->_M_impl._M_finish,
+                     std::forward<_Args>(__args)...);
+        ++this->_M_impl._M_finish;
+        _GLIBCXX_ASAN_ANNOTATE_GREW(1);
+      }
+    else
+      _M_realloc_insert(end(), std::forward<_Args>(__args)...);
+#if __cplusplus > 201402L
+    return back();
+#endif
+      }
+#endif
+```
+
+### 3.2. vector push_back/emplace_back 扩容规则
+
+跟踪下`vector`的扩容规则，可以看到C++11后，`push_back`右值的话，自动就使用`emplace_back`了。
+
+说明：libstdc++代码里缩进有的是空格，有的是tab，影响阅读体验。tab是8位空格，自己本地可以tab转8空格，阅读起来舒服很多。
+
+```cpp
+// libstdc++-v3/include/bits/stl_vector.h
+      void
+      push_back(const value_type& __x)
+      {
+        if (this->_M_impl._M_finish != this->_M_impl._M_end_of_storage)
+          {
+            _GLIBCXX_ASAN_ANNOTATE_GROW(1);
+            _Alloc_traits::construct(this->_M_impl, this->_M_impl._M_finish,
+                                     __x);
+            ++this->_M_impl._M_finish;
+            _GLIBCXX_ASAN_ANNOTATE_GREW(1);
+          }
+        else
+          _M_realloc_insert(end(), __x);
+      }
+
+#if __cplusplus >= 201103L
+      void
+      push_back(value_type&& __x)
+      { emplace_back(std::move(__x)); }
+
+      template<typename... _Args>
+// 这里的条件编译，确定emplace_back返回值类型，C++14的声明为：reference emplace_back( Args&&... args );
+#if __cplusplus > 201402L
+        reference
+#else
+        void
+#endif
+        emplace_back(_Args&&... __args);
+#endif
+```
+
+跟踪下`emplace_back`逻辑，简化如下：
+
+```cpp
+// libstdc++-v3/include/bits/vector.tcc
+template<typename _Tp, typename _Alloc>
+  template<typename... _Args>
+void vector<_Tp, _Alloc>::emplace_back(_Args&&... __args)
+{
+    if vector里空间足够预分配新成员 {
+        _Alloc_traits::construct 进行构造
+    } else {
+        通过 _M_realloc_insert 进行扩容，并构造插入新元素
+    }
+}
+
+// libstdc++-v3/include/bits/vector.tcc
+template<typename _Tp, typename _Alloc>
+void vector<_Tp, _Alloc>::_M_realloc_insert(iterator __position, const _Tp& __x)
+{
+    // 通过 _M_check_len 计算新的容量大小
+    // 声明为： size_type _M_check_len(size_type __n, const char* __s) const;
+    // n 为要插入元素的个数，s 为错误信息，即此处要插入1个元素
+    const size_type __len =
+    _M_check_len(size_type(1), "vector::_M_realloc_insert");
+    ...
+}
+```
+
+扩容后的长度计算在 `_M_check_len` 中：
+
+```cpp
+// libstdc++-v3/include/bits/stl_vector.h
+size_type _M_check_len(size_type __n, const char* __s) const
+{
+  if (max_size() - size() < __n)
+    __throw_length_error(__N(__s));
+
+  // size() 是vector当前大小（注意是元素个数而不是指容量）
+  // 即 新的容量至少是当前大小的两倍，或者是当前大小加上需要插入的元素数量，以较大者为准。
+  const size_type __len = size() + (std::max)(size(), __n);
+  return (__len < size() || __len > max_size()) ? max_size() : __len;
+}
+```
+
+**结论**：向`vector`插入元素时若空间不足触发扩容时，新的容量至少是当前大小的两倍，或者是当前大小加上需要插入的元素数量，以较大者为准。（当前大小指的是`size()`而不是`capacity()`）
+
+## 4. 利用优先级队列支持任务优先级
+
+### 4.1. std::priority_queue 说明
+
+[std::priority_queue](https://en.cppreference.com/w/cpp/container/priority_queue) 和 `std::queue` 一样，都是STL里的容器适配器。
+
+`std::priority_queue`提供了优先级队列，支持按优先级出队。
+
+* 默认使用**最大堆**实现，最大元素优先级最高
+* 底层容器是 `std::vector<T>`
+* 比较函数默认是 `std::less<value_type>`，要最小优先级则可用`std::greater`
+* 操作：
+    * `push(const value_type& __x)`，复杂度`O(logn)`
+    * `pop()`，复杂度`O(logn)`
+    * `top()`，复杂度`O(1)`
+* 使用自定义类时，需要重载 比较运算符(比如：`bool operator<(const T &t)`) 或者 仿函数(比如：`bool operator()(const T &a, const T &b)`)
+
+其声明也在 stl_queue.h 头文件里，所以使用时要包含`#include <queue>`：
+
+```cpp
+// libstdc++-v3/include/bits/stl_queue.h
+template<typename _Tp, typename _Sequence = vector<_Tp>,
+        typename _Compare  = less<typename _Sequence::value_type> >
+class priority_queue
+{
+    ...
+};
+```
+
+### 4.2. 线程池任务支持优先级
+
+基于上面普通`deque`队列的线程池任务改造，可以用 元组（`std::tuple`） 或者 自定义一个任务类/结构体。
+
+结构体相对来说后续调整会更灵活，`tuple`实现更简洁，此处用`struct`来定义任务，并重载`operator<`。
+
+完整代码见：[thread_pool_priority.cpp](https://github.com/xiaodongQ/prog-playground/blob/main/thread_pool/thread_pool_priority.cpp)
+
+任务由`std::function<void()>`修改为：在`struct Task`中组合`std::function`并加上优先级字段：
+
+```cpp
+// 任务支持优先级处理
+struct Task {
+    std::function<void()> task;
+    int priority;
+    Task():priority(0) {}
+    Task(int pri, std::function<void()> &&f) {
+        priority = pri;
+        task = std::move(f);
+    }
+    // const函数
+    bool operator<(const Task &other) const {
+        return priority < other.priority;
+    }
+};
+```
+
+线程池的任务队列则调整为`priority_queue<Task>`，且出队入队相应调整为`pop`、`push`：
+
+```cpp
+class ThreadPool {
+private:
+    vector<thread> threads;
+    priority_queue<Task> tasks;
+    ...
+}
+// 任务加入线程池
+void enqueue_task(int priority, std::function<void()> &&task) {
+    { 
+        unique_lock<mutex> lk(task_mtx);
+        // 使用移动语义以调用移动构造
+        tasks.push({priority, std::move(task)});
+    } 
+
+    task_cond.notify_one();
+}
+```
+
+为了避免线程池同时取任务，把线程数改为1，同时避免任务太快任务处理中sleep 1秒。
+
+下面结果可比较直观地看到优先顺序，先后取了2->1->0等级的任务
+
+```sh
+[CentOS-root@xdlinux ➜ thread_pool git:(main) ✗ ]$ ./a.out                              
+tasks size:1, priority:0
+start:0, end:1250000, chunk sum:2500000, total:2500000, done count:1, task:8
+tasks size:7, priority:2
+start:1250000, end:2500000, chunk sum:2500000, total:5000000, done count:2, task:8
+tasks size:6, priority:2
+start:8750000, end:10000000, chunk sum:2500000, total:7500000, done count:3, task:8
+tasks size:5, priority:2
+start:5000000, end:6250000, chunk sum:2500000, total:10000000, done count:4, task:8
+tasks size:4, priority:1
+start:6250000, end:7500000, chunk sum:2500000, total:12500000, done count:5, task:8
+tasks size:3, priority:1
+start:2500000, end:3750000, chunk sum:2500000, total:15000000, done count:6, task:8
+tasks size:2, priority:0
+start:3750000, end:5000000, chunk sum:2500000, total:17500000, done count:7, task:8
+tasks size:1, priority:0
+start:7500000, end:8750000, chunk sum:2500000, total:20000000, done count:8, task:8
+result: 20000000
+```
+
+### 4.3. 异步编程
+
+TODO
 
 ## 5. 小结
 
+练习实现了基本的C++线程池和优先级队列，简单跟踪了一下libstdc++里的相关实现。
+
 现代C++一直在迭代演进，跟其他的现代语言相比，基本都有类似特性和用法，比如之前看的Rust，可以借助C++17、20等新特性学习，进一步理解Rust的特性原理和使用。
 
-最近DeepSeek开源的 [3FS](https://github.com/deepseek-ai/3FS) 存储系统，里面就用到很多C++新特性，比如协程（参考：[DeepSeek 3FS 源码解读——协程&RDMA篇](https://zhuanlan.zhihu.com/p/27331176252)）。
+最近DeepSeek开源的 [3FS](https://github.com/deepseek-ai/3FS) 存储系统，里面就用到很多C++新特性，比如协程（参考：[DeepSeek 3FS 源码解读——协程&RDMA篇](https://zhuanlan.zhihu.com/p/27331176252)）。需要多接受新变化并利用好它们。
 
 ## 6. 参考
 
 * [C++ 实现线程池详解：从零到一个高性能线程池](https://mp.weixin.qq.com/s/DuPWHTIw3WrhPRhYWCSOxQ)
 * [libstdc++ 源码](https://github.com/xiaodongQ/gcc-10.3.0-libstdcpp-v3)
 * [DeepSeek 3FS 源码解读——协程&RDMA篇](https://zhuanlan.zhihu.com/p/27331176252)
+* [cppreference emplace_back](https://en.cppreference.com/w/cpp/container/vector/emplace_back)
+* [std::priority_queue](https://en.cppreference.com/w/cpp/container/priority_queue)
 * GPT

@@ -439,7 +439,8 @@ struct redisCommand redisCommandTable[] = {
 
 整体事件循环流程如下图所示：
 
-![事件循环示意图](/images/redis_eventloop.png)
+![事件循环示意图](/images/redis_eventloop.png)  
+[出处](https://mp.weixin.qq.com/s/2y60cxUjaaE2pWSdCBX1lA)
 
 ## 3. Nginx中的epoll流程
 
