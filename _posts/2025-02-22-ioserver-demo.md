@@ -1,7 +1,7 @@
 ---
 layout: post
 title: ioserver服务实验（一） -- 借助trae搭建项目
-categories: C++
+categories: C/C++
 tags: AI C++
 ---
 
