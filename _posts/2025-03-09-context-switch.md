@@ -18,7 +18,7 @@ CPU学习实践系列开篇，并基于线程池的demo，观察上下文切换�
 
 参考博客系列：
 
-* [开发内功修炼之CPU篇](https://mp.weixin.qq.com/mp/appmsgalbum?__biz=MjM5Njg5NDgwNA==&action=getalbum&album_id=1372643250460540932&scene=126&uin=&key=&devicetype=iMac+MacBookPro12%2C1+OSX+OSX+12.6.4+build(21G526)&version=13080911&lang=zh_CN&nettype=WIFI&ascene=78&fontScale=100)
+* [开发内功修炼之CPU篇](https://mp.weixin.qq.com/mp/appmsgalbum?__biz=MjM5Njg5NDgwNA==&action=getalbum&album_id=1372643250460540932&scene=126&uin=&key=&devicetype=iMac+MacBookPro12%2C1+OSX+OSX+12.6.4+build(21G526)&version=13080911&lang=zh_CN&nettype=WIFI&ascene=0&fontScale=100)
 * [plantegg CPU系列](https://plantegg.github.io/categories/CPU/)
 * [Linux 服务器功耗与性能管理（一）：CPU 硬件基础（2024）](https://arthurchiao.art/blog/linux-cpu-1-zh/)
 * 以及早前“**看过**”的[极客时间：系统性能调优必知必会](https://time.geekbang.org/column/intro/308)
@@ -153,3 +153,6 @@ perf命令查看事件：`perf stat -e dTLB-loads,dTLB-load-misses,iTLB-loads,iT
 
 ## 4. 参考
 
+* [听说你只知内存，而不知缓存？CPU表示很伤心！](https://mp.weixin.qq.com/s/PQTuFZO51an6OAe3WX4BVw)
+* [TLB缓存是个神马鬼，如何查看TLB miss？](https://mp.weixin.qq.com/s/mssTS3NN7-w2df1vhYSuYw)
+* [为什么HugePage能让Oracle数据库如虎添翼？](https://mp.weixin.qq.com/s/3Lb7-KuAlN6NnfFPL5RDdQ)
