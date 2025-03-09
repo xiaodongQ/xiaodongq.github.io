@@ -455,11 +455,11 @@ start:7500000, end:8750000, chunk sum:2500000, total:20000000, done count:8, tas
 result: 20000000
 ```
 
-### 4.3. 异步编程
+## 5. 异步编程
 
 TODO
 
-## 5. 小结
+## 6. 小结
 
 练习实现了基本的C++线程池和优先级队列，简单跟踪了一下libstdc++里的相关实现。
 
@@ -467,7 +467,7 @@ TODO
 
 最近DeepSeek开源的 [3FS](https://github.com/deepseek-ai/3FS) 存储系统，里面就用到很多C++新特性，比如协程（参考：[DeepSeek 3FS 源码解读——协程&RDMA篇](https://zhuanlan.zhihu.com/p/27331176252)）。需要多接受新变化并利用好它们。
 
-## 6. 参考
+## 7. 参考
 
 * [C++ 实现线程池详解：从零到一个高性能线程池](https://mp.weixin.qq.com/s/DuPWHTIw3WrhPRhYWCSOxQ)
 * [libstdc++ 源码](https://github.com/xiaodongQ/gcc-10.3.0-libstdcpp-v3)
