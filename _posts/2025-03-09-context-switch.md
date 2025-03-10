@@ -1,6 +1,6 @@
 ---
 layout: post
-title: CPU学习实践系列（一） -- 线程上下文切换
+title: CPU学习实践系列（一） -- 进程、线程、系统调用、协程上下文切换
 categories: CPU
 tags: CPU 线程
 ---
@@ -8,7 +8,7 @@ tags: CPU 线程
 * content
 {:toc}
 
-CPU学习实践系列开篇，并基于线程池的demo，观察上下文切换。
+CPU学习实践系列开篇，学习进程、线程、系统调用、协程上下文切换。
 
 
 
@@ -168,11 +168,25 @@ perf命令查看事件：`perf stat -e dTLB-loads,dTLB-load-misses,iTLB-loads,iT
 
 3、切换开销
 
-测试方法：1）[lmbench](https://lmbench.sourceforge.net/) 2）写demo，使用进程间通信：管道
+测试方法：1）[lmbench](https://lmbench.sourceforge.net/) 2）写demo，使用`管道`进行父子进程间通信，触发上下文切换
 
-结论（参考结论）：lmbench显示的进程上下文切换耗时从`2.7us到5.48之间`
+**结论（参考结论）**：lmbench显示的进程上下文切换耗时从`2.7us到5.48us之间`
 
-间接开销：切换后由于各种缓存并不热，速度运行会慢一些。如果跨CPU的话，之前热起来的TLB、L1、L2、L3因为运行的进程已经变了，所以局部性原理cache起来的代码、数据也都没有用了，导致新进程穿透到内存的IO会变多。
+另外还有`间接开销`：切换后由于各种缓存并不热，速度运行会慢一些。如果跨CPU的话，之前热起来的TLB、L1、L2、L3因为运行的进程已经变了，所以局部性原理cache起来的代码、数据也都没有用了，导致新进程穿透到内存的IO会变多。
+
+4、实验
+
+1）上面测试进程上下文切换的代码，可见：[process_ctxswitch.c](https://github.com/xiaodongQ/prog-playground/blob/main/cpu/cswch_demo/process_ctxswch.c)，以及同级目录的统计平均脚本
+
+2）lmbench 要手动编译
+
+```sh
+bench.h:39:10: fatal error: rpc/rpc.h: No such file or directory
+    yum install libtirpc-devel
+    cp -rf /usr/include/tirpc/rpc/* /usr/include/rpc/
+```
+
+详情见：[进程/线程切换究竟需要多少开销？](https://mp.weixin.qq.com/s/uq5s5vwk5vtPOZ30sfNsOg) （或者[这里](https://zhuanlan.zhihu.com/p/79772089)，有demo代码链接）
 
 ### 3.2. 线程上下文切换
 
@@ -193,7 +207,7 @@ perf命令查看事件：`perf stat -e dTLB-loads,dTLB-load-misses,iTLB-loads,iT
 
 测试方法：demo
 
-参考结论：和进程差不多
+**参考结论**：`3.8us`左右，切换耗时和进程差不多
 
 观察：
 
@@ -246,6 +260,10 @@ nonvoluntary_ctxt_switches:	0
 * 进程描述符指针：指向当前进程的进程描述符，其中包含了进程的各种信息，如进程 ID、进程状态等
 * 此外：用户态和内核态切换时，还会切换权限到特权指令，可以访问一些受保护的资源或执行特权操作
 
+参考开销：`200ns`
+
+详情见：[一次系统调用开销到底有多大？](https://mp.weixin.qq.com/s/2nIDLeMR984_Sdgh01BHIQ)
+
 ### 3.4. 协程切换开销
 
 1、切换时机
@@ -260,15 +278,66 @@ nonvoluntary_ctxt_switches:	0
 * 寄存器状态
 * 程序计数器
 
-## 4. 小结
+参考开销：`120ns`
 
+详情见：[协程究竟比线程牛在什么地方？](https://mp.weixin.qq.com/s/N4W0-0cP1wlxtLILx3oXpg)
 
+## 4. 线程池demo开销
 
-## 5. 参考
+```sh
+[CentOS-root@xdlinux ➜ thread_pool git:(main) ✗ ]$ perf stat ./thread_pool
+start:0, end:1250000, chunk sum:2500000, total:2500000, done count:1, task:8
+start:1250000, end:2500000, chunk sum:2500000, total:5000000, done count:2, task:8
+start:2500000, end:3750000, chunk sum:2500000, total:7500000, done count:3, task:8
+start:3750000, end:5000000, chunk sum:2500000, total:10000000, done count:4, task:8
+start:5000000, end:6250000, chunk sum:2500000, total:12500000, done count:5, task:8
+start:6250000, end:7500000, chunk sum:2500000, total:15000000, done count:6, task:8
+start:7500000, end:8750000, chunk sum:2500000, total:17500000, done count:7, task:8
+start:8750000, end:10000000, chunk sum:2500000, total:20000000, done count:8, task:8
+result: 20000000
+
+ Performance counter stats for './thread_pool':
+
+             73.52 msec task-clock                #    1.335 CPUs utilized          
+                22      context-switches          #    0.299 K/sec                  
+                 0      cpu-migrations            #    0.000 K/sec                  
+             5,243      page-faults               #    0.071 M/sec                  
+       331,064,675      cycles                    #    4.503 GHz                      (82.47%)
+         1,873,975      stalled-cycles-frontend   #    0.57% frontend cycles idle     (82.32%)
+         2,876,154      stalled-cycles-backend    #    0.87% backend cycles idle      (80.14%)
+       393,566,861      instructions              #    1.19  insn per cycle         
+                                                  #    0.01  stalled cycles per insn  (82.84%)
+        68,372,865      branches                  #  929.930 M/sec                    (84.75%)
+            49,859      branch-misses             #    0.07% of all branches          (87.48%)
+
+       0.055079000 seconds time elapsed
+
+       0.056267000 seconds user
+       0.017682000 seconds sys
+```
+
+## 5. 内核代码跟踪：Linux进程是如何创建出来的？
+
+TODO
+
+跟着下文跟踪内核代码：
+
+* [Linux进程是如何创建出来的？](https://mp.weixin.qq.com/s/ftrSkVvOr6s5t0h4oq4I2w)
+* [进程和线程之间有什么根本性的区别？](https://mp.weixin.qq.com/s/--S94B3RswMdBKBh6uxt0w)
+
+## 6. 小结
+
+梳理学习进程、线程、系统调用、协程上下文切换相关开销，建立体感。
+
+TODO项：内核跟踪、工具实验。
+
+## 7. 参考
 
 * [开发内功修炼之CPU篇](https://mp.weixin.qq.com/mp/appmsgalbum?__biz=MjM5Njg5NDgwNA==&action=getalbum&album_id=1372643250460540932&scene=126&uin=&key=&devicetype=iMac+MacBookPro12%2C1+OSX+OSX+12.6.4+build(21G526)&version=13080911&lang=zh_CN&nettype=WIFI&ascene=0&fontScale=100)
 * [听说你只知内存，而不知缓存？CPU表示很伤心！](https://mp.weixin.qq.com/s/PQTuFZO51an6OAe3WX4BVw)
 * [TLB缓存是个神马鬼，如何查看TLB miss？](https://mp.weixin.qq.com/s/mssTS3NN7-w2df1vhYSuYw)
 * [为什么HugePage能让Oracle数据库如虎添翼？](https://mp.weixin.qq.com/s/3Lb7-KuAlN6NnfFPL5RDdQ)
-* [进程/线程切换究竟需要多少开销？](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247483804&idx=1&sn=f2d64fc244d381157bb0c16ff26a33bd&chksm=a6e300a7919489b1b3590369c2ff739d3e97a7191c792f43da3b361c357c2daec7e20fa1f45f&scene=178&cur_album_id=1372643250460540932#rd)
-* 
+* [进程/线程切换究竟需要多少开销？](https://mp.weixin.qq.com/s/uq5s5vwk5vtPOZ30sfNsOg)
+* [协程究竟比线程牛在什么地方？](https://mp.weixin.qq.com/s/N4W0-0cP1wlxtLILx3oXpg)
+* [Linux进程是如何创建出来的？](https://mp.weixin.qq.com/s/ftrSkVvOr6s5t0h4oq4I2w)
+* [进程和线程之间有什么根本性的区别？](https://mp.weixin.qq.com/s/--S94B3RswMdBKBh6uxt0w)
