@@ -146,13 +146,129 @@ perf命令查看事件：`perf stat -e dTLB-loads,dTLB-load-misses,iTLB-loads,iT
 
 若TLB miss率比较高，可考虑开启 `内存大页（Huge Page`，大大减少页表项来增加命中率。页大小一般为4KB，而常见的大页大小有`2MB`、`1GB`。比如：[为什么HugePage能让Oracle数据库如虎添翼？](https://mp.weixin.qq.com/s/3Lb7-KuAlN6NnfFPL5RDdQ)。
 
+## 3. 上下文切换的开销
 
-## 3. 小结
+[开发内功修炼之CPU篇](https://mp.weixin.qq.com/mp/appmsgalbum?__biz=MjM5Njg5NDgwNA==&action=getalbum&album_id=1372643250460540932&scene=126&uin=&key=&devicetype=iMac+MacBookPro12%2C1+OSX+OSX+12.6.4+build(21G526)&version=13080911&lang=zh_CN&nettype=WIFI&ascene=0&fontScale=100) 里面对下面几种情况都做了实验对比，此处暂只说明结论。
+
+### 3.1. 进程上下文切换
+
+1、切换时机
+
+* 进程CPU时间片用完
+* 有更高优先级的进程出现
+* 进程执行 I/O 操作：比如从磁盘读取数据
+
+2、保存内容
+
+* 通用寄存器：保存CPU中通用寄存器的值，临时存储数据和操作数，以便在进程恢复执行时能够继续使用之前的数据
+* 程序计数器（PC）：保存当前进程下一条要执行的指令地址
+* 进程状态字（PSW）：记录进程的状态信息，如进程的优先级、是否处于中断允许状态等
+* 内存管理信息：包括进程的`页表指针`、`内存段`信息等，如切换页表全局目录、刷新TLB
+* 打开文件表指针：记录进程打开的文件信息
+
+3、切换开销
+
+测试方法：1）[lmbench](https://lmbench.sourceforge.net/) 2）写demo，使用进程间通信：管道
+
+结论（参考结论）：lmbench显示的进程上下文切换耗时从`2.7us到5.48之间`
+
+间接开销：切换后由于各种缓存并不热，速度运行会慢一些。如果跨CPU的话，之前热起来的TLB、L1、L2、L3因为运行的进程已经变了，所以局部性原理cache起来的代码、数据也都没有用了，导致新进程穿透到内存的IO会变多。
+
+### 3.2. 线程上下文切换
+
+1、切换时机
+
+* 线程时间片用完：类似进程，线程也有自己的时间片
+* 线程阻塞：如等待锁、等待 I/O 完成
+* 线程优先级变化：线程的优先级发生了变化，或者系统中出现了更高优先级的线程
+
+2、保存内容
+
+* 通用寄存器
+* 程序计数器
+* 线程栈指针：线程有自己的栈空间，用于存储线程的局部变量、函数调用栈等信息
+* 线程私有数据指针：如果线程有自己的私有数据，需要保存指向这些私有数据的指针
+
+3、切换开销
+
+测试方法：demo
+
+参考结论：和进程差不多
+
+观察：
+
+```sh
+# vmstat
+[CentOS-root@xdlinux ➜ ~ ]$ vmstat 1
+procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
+ 1  0      0 29978184   3728 1088056    0    0     0     0    8    3  0  0 100  0  0
+ 0  0      0 29978012   3728 1088056    0    0     0     0  210  254  0  0 100  0  0
+^C
+
+# sar -w
+[CentOS-root@xdlinux ➜ ~ ]$ sar -w 1
+Linux 4.18.0-348.7.1.el8_5.x86_64 (xdlinux) 	03/10/2025 	_x86_64_	(16 CPU)
+
+06:53:53 AM    proc/s   cswch/s
+06:53:54 AM      0.00    214.00
+06:53:55 AM      0.00    228.00
+
+# pidstat -w
+[CentOS-root@xdlinux ➜ ~ ]$ pidstat -w 1
+Linux 4.18.0-348.7.1.el8_5.x86_64 (xdlinux) 	03/10/2025 	_x86_64_	(16 CPU)
+
+06:54:43 AM   UID       PID   cswch/s nvcswch/s  Command
+06:54:44 AM     0        11      5.94      0.00  rcu_sched
+06:54:44 AM     0        13      0.99      0.00  watchdog/0
+06:54:44 AM     0        16      0.99      0.00  watchdog/1
+
+# proc中观察总的切换，自愿切换和非自愿切换
+[CentOS-root@xdlinux ➜ ~ ]$ grep ctxt /proc/305/status
+voluntary_ctxt_switches:	2
+nonvoluntary_ctxt_switches:	0
+```
+
+### 3.3. 系统调用开销
+
+系统调用的用户态和内核态切换也属于上下文切换范畴。
+
+1、切换时机
+
+* 系统调用：从用户态切换到内核态来执行系统调用函数，完成后再从内核态切换回用户态
+* 中断处理：当硬件设备产生中断时（硬中断和伴随的软中断），CPU需要暂停当前正在执行的任务，切换到内核态来处理中断
+
+2、保存内容
+
+* 内核栈指针：用于保存内核函数调用的参数、局部变量等信息
+* 通用寄存器
+* 程序计数器
+* 进程描述符指针：指向当前进程的进程描述符，其中包含了进程的各种信息，如进程 ID、进程状态等
+* 此外：用户态和内核态切换时，还会切换权限到特权指令，可以访问一些受保护的资源或执行特权操作
+
+### 3.4. 协程切换开销
+
+1、切换时机
+
+* 主动让出执行权
+* 协程执行完成
+* 调度策略触发
+
+2、保存内容
+
+* 局部变量和栈状态
+* 寄存器状态
+* 程序计数器
+
+## 4. 小结
 
 
 
-## 4. 参考
+## 5. 参考
 
+* [开发内功修炼之CPU篇](https://mp.weixin.qq.com/mp/appmsgalbum?__biz=MjM5Njg5NDgwNA==&action=getalbum&album_id=1372643250460540932&scene=126&uin=&key=&devicetype=iMac+MacBookPro12%2C1+OSX+OSX+12.6.4+build(21G526)&version=13080911&lang=zh_CN&nettype=WIFI&ascene=0&fontScale=100)
 * [听说你只知内存，而不知缓存？CPU表示很伤心！](https://mp.weixin.qq.com/s/PQTuFZO51an6OAe3WX4BVw)
 * [TLB缓存是个神马鬼，如何查看TLB miss？](https://mp.weixin.qq.com/s/mssTS3NN7-w2df1vhYSuYw)
 * [为什么HugePage能让Oracle数据库如虎添翼？](https://mp.weixin.qq.com/s/3Lb7-KuAlN6NnfFPL5RDdQ)
+* [进程/线程切换究竟需要多少开销？](https://mp.weixin.qq.com/s?__biz=MjM5Njg5NDgwNA==&mid=2247483804&idx=1&sn=f2d64fc244d381157bb0c16ff26a33bd&chksm=a6e300a7919489b1b3590369c2ff739d3e97a7191c792f43da3b361c357c2daec7e20fa1f45f&scene=178&cur_album_id=1372643250460540932#rd)
+* 
