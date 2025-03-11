@@ -25,7 +25,7 @@ CPU学习实践系列开篇，学习进程、线程、系统调用、协程上�
 
 又一点想法（最近感慨稍微多一点）：
 
-当时池老师他们的极客时间APP刚出来时，很多课程刚出来就买得看，笔记记了一堆，比如 [Linux性能优化实践.md](https://github.com/xiaodongQ/devNoteBackup/blob/master/%E5%90%84%E5%88%86%E7%B1%BB%E8%AE%B0%E5%BD%95/Linux%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E5%AE%9E%E8%B7%B5.md)，却是低效学习，时间越长，内化越少。去年走通了一点：看书、学英语、写博客、软考和E类，而且基本都在工作之余，跟以往有所不同，虽然也有内耗但多了一点渴望和热情。
+当时池老师他们的极客时间APP刚出来时，很多课程刚出来就买得看，笔记记了一堆，比如 [Linux性能优化实践.md](https://github.com/xiaodongQ/devNoteBackup/blob/master/%E5%90%84%E5%88%86%E7%B1%BB%E8%AE%B0%E5%BD%95/Linux%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E5%AE%9E%E8%B7%B5.md)，却是低效学习，时间越长，内化越少。去年走通了一点：看书、学英语、写博客、软考，而且基本都在工作之余，跟以往有所不同，虽然也有内耗但多了一点渴望和热情。
 
 分享几篇时常会拎出来出来看的文章，受益匪浅：
 
@@ -122,7 +122,7 @@ NUMA node0 CPU(s):   0-15
 
 #### 2.2.1. 查看TLB缓存命中率
 
-perf命令查看事件：`perf stat -e dTLB-loads,dTLB-load-misses,iTLB-loads,iTLB-load-misses -p $PID`
+perf命令查看事件（不用去记，`perf list`查看）：`perf stat -e dTLB-loads,dTLB-load-misses,iTLB-loads,iTLB-load-misses -p $PID`
 
 * `dTLB-loads`：`数据TLB（Data Translation Lookaside Buffer）`加载次数，即CPU尝试从`数据TLB`中获取`虚拟地址`到`物理地址`映射的次数
 * `dTLB-load-misses`：数据TLB 加载未命中次数，也就是在 数据TLB 中没有找到所需映射，需要进行额外查找（如访问页表）的次数。
@@ -181,6 +181,7 @@ perf命令查看事件：`perf stat -e dTLB-loads,dTLB-load-misses,iTLB-loads,iT
 2）lmbench 要手动编译
 
 ```sh
+# 一些依赖问题
 bench.h:39:10: fatal error: rpc/rpc.h: No such file or directory
     yum install libtirpc-devel
     cp -rf /usr/include/tirpc/rpc/* /usr/include/rpc/
