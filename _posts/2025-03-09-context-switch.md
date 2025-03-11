@@ -14,7 +14,7 @@ CPU学习实践系列开篇，学习进程、线程、系统调用、协程上�
 
 ## 1. 背景
 
-之前投入 [网络](https://xiaodongq.github.io/category/#%E7%BD%91%E7%BB%9C) 相关的学习实践更多一点，虽然还有很多TODO项，以及存储方面待深入梳理，但最近碰到的问题有不少还是跟内存和CPU相关。本篇开始梳理CPU、内存方面的学习记录，并基于上篇 [【实践系列】实现一个简单线程池](https://xiaodongq.github.io/2025/03/08/threadpool/) 进行观察。
+之前投入 [网络](https://xiaodongq.github.io/category/#%E7%BD%91%E7%BB%9C) 相关的学习实践更多一点，虽然还有很多TODO项，以及存储方面待深入梳理，但最近碰到的问题有不少还是跟内存和CPU相关。本篇开始梳理CPU、内存方面的学习记录，并基于上篇 [【实践系列】实现一个简单线程池](https://xiaodongq.github.io/2025/03/08/threadpool/) 进行观察。线程、进程、CPU、内存等关联比较大，暂都归到CPU博客分类。
 
 参考博客系列：
 
@@ -122,11 +122,12 @@ NUMA node0 CPU(s):   0-15
 
 #### 2.2.1. 查看TLB缓存命中率
 
-perf命令查看事件（不用去记，`perf list`查看）：`perf stat -e dTLB-loads,dTLB-load-misses,iTLB-loads,iTLB-load-misses -p $PID`
+perf命令查看事件：`perf stat -e dTLB-loads,dTLB-load-misses,iTLB-loads,iTLB-load-misses -p $PID`  
+（不用去记，`perf list`可查看事件列表）
 
-* `dTLB-loads`：`数据TLB（Data Translation Lookaside Buffer）`加载次数，即CPU尝试从`数据TLB`中获取`虚拟地址`到`物理地址`映射的次数
+* `dTLB-loads`：`数据TLB（Data Translation Lookaside Buffer）`加载次数，即CPU尝试从 `数据TLB` 中获取`虚拟地址`到`物理地址`映射的次数
 * `dTLB-load-misses`：数据TLB 加载未命中次数，也就是在 数据TLB 中没有找到所需映射，需要进行额外查找（如访问页表）的次数。
-* `iTLB-loads`：`指令TLB（Instruction Translation Lookaside Buffer）`加载次数，即CPU尝试从`指令TLB`中获取虚拟地址到物理地址映射的次数，主要用于指令的取指操作。
+* `iTLB-loads`：`指令TLB（Instruction Translation Lookaside Buffer）`加载次数，即CPU尝试从 `指令TLB` 中获取虚拟地址到物理地址映射的次数，主要用于指令的取指操作。
 * `iTLB-load-misses`：指令TLB 加载未命中次数，即 指令TLB 中未找到所需映射的次数。
 
 ```sh
@@ -144,13 +145,13 @@ perf命令查看事件（不用去记，`perf list`查看）：`perf stat -e dTL
 
 > 因为TLB并不是很大，只有`4KB`，而且现在逻辑核又造成会有两个进程来共享。所以可能会有cache miss的情况出现。而且一旦TLB miss造成的后果可比物理地址cache miss后果要严重一些，最多可能需要进行5次内存IO才行。
 
-若TLB miss率比较高，可考虑开启 `内存大页（Huge Page`，大大减少页表项来增加命中率。页大小一般为4KB，而常见的大页大小有`2MB`、`1GB`。比如：[为什么HugePage能让Oracle数据库如虎添翼？](https://mp.weixin.qq.com/s/3Lb7-KuAlN6NnfFPL5RDdQ)。
+若TLB miss率比较高，可考虑开启 `内存大页（Huge Page）`，大大减少页表项来增加命中率。页大小一般为4KB，而常见的大页大小有`2MB`、`1GB`。比如：[为什么HugePage能让Oracle数据库如虎添翼？](https://mp.weixin.qq.com/s/3Lb7-KuAlN6NnfFPL5RDdQ)。
 
 ## 3. 上下文切换的开销
 
 [开发内功修炼之CPU篇](https://mp.weixin.qq.com/mp/appmsgalbum?__biz=MjM5Njg5NDgwNA==&action=getalbum&album_id=1372643250460540932&scene=126&uin=&key=&devicetype=iMac+MacBookPro12%2C1+OSX+OSX+12.6.4+build(21G526)&version=13080911&lang=zh_CN&nettype=WIFI&ascene=0&fontScale=100) 里面对下面几种情况都做了实验对比，此处暂只说明结论。
 
-开销实验的结论放一起便于对比参考（数量级）：
+开销实验的结论放一起便于对比参考（实验数据限于具体硬件，参考数量级即可）：
 
 * 进程上下文切换：`2.7us到5.48us之间`
 * 线程上下文切换：`3.8us`左右（TODO 数据和进程差不多，但实际应该更小？）

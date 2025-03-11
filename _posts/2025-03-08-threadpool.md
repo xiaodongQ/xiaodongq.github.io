@@ -223,7 +223,26 @@ while(!flag)
 }
 ```
 
-所以上面线程池实现里面，虚假唤醒已经通过 lambda 传入的判别式解决了
+所以上面线程池实现里面，虚假唤醒已经通过 lambda 传入的判别式（谓词，`Predicate`）解决了
+
+```cpp
+void thread_proc() {
+    while(!stop_) {
+        // 从任务队列获取任务
+        std::function<void()> t;
+        {
+            unique_lock<mutex> lk(task_mtx);
+            task_cond.wait(lk, [this]() { return stop_ || !tasks.empty(); });
+            // 外部停止线程池
+            if(stop_ && tasks.empty()) {
+                return;
+            }
+            ...
+        }
+        ...
+    }
+}
+```
 
 ### 3.3. 唤醒丢失
 
