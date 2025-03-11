@@ -1,7 +1,7 @@
 ---
 layout: post
 title: 【实践系列】实现一个简单线程池
-categories: CPU
+categories: 并发与异步编程
 tags: CPU 线程池 C++
 ---
 
@@ -167,6 +167,8 @@ int main(int argc, char *argv[])
     {
         // 等待执行完成，通过信号量通知
         unique_lock<mutex> lock(result.mtx);
+        // 补充：这里应该增加一个 谓词 来避免虚假唤醒
+        // 比如：result.cond.wait(lock, [&result]() { return result.task_done_count == result.task_count; });
         result.cond.wait(lock);
         cout << "result: " << result.sum << endl;
     }
@@ -191,7 +193,107 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 
 3、条件变量：`pthread_cond_t`，等待`pthread_cond_wait`，通知 `pthread_cond_signal`/`pthread_cond_broadcast`
 
-## 3. libstdc++ 说明
+## 3. 补充：条件变量的虚假唤醒和唤醒丢失问题
+
+针对上述条件变量的 通知（`notify_one()`/`notify_all()`） 和 等待（`wait()`），可能会存在的 **虚假唤醒** 和 **唤醒丢失** 问题，做一个说明。
+
+详情可参考：[条件变量的虚假唤醒和唤醒丢失问题](https://zgjsxx.github.io/posts/Program_language/cpp/cpp11_condition_var_issue.html)
+
+### 3.1. 虚假唤醒
+
+**虚假唤醒**：对线程进行唤醒时，不希望被唤醒的线程 也被唤醒的现象
+
+虚假唤醒 既可能是操作系统层面导致，也可能是应用层代码导致：
+
+* 内核层面：当调用`notify_one`/`signal_one`等方法时，操作系统并**不保证只唤醒一个线程**（至少一个）
+* 应用层导致的虚假唤醒：不正确的代码，比如生产者只生产了一个元素，却`notify_all`通知所有消费者线程
+
+### 3.2. 如何避免虚假唤醒？
+
+通过添加 **测试循环** 进行避免：
+
+```cpp
+// 方式1
+cv.wait(mtx, []{return flag})
+
+// 方式2
+while(!flag)
+{
+    cv.wait(mtx);
+}
+```
+
+所以上面线程池实现里面，虚假唤醒已经通过 lambda 传入的判别式解决了
+
+### 3.3. 唤醒丢失
+
+唤醒丢失：进行了唤醒，但是对方没收到
+
+具体来说，是指：某个线程在调用notify时，另一个线程还没有进行wait，那么这个线程后面wait时将陷入无限的等待中
+
+### 3.4. 如何避免唤醒丢失?
+
+也是通过新增标记。同上面避免虚假唤醒的方式1
+
+上面的线程池中，`enqueue_task()`任务入队后`notify_one()`没在锁里通知，`~ThreadPool()`析构也只是通知并不等待，不会有唤醒丢失导致阻塞的情况。
+
+```cpp
+    ~ThreadPool() {
+        stop_ = true;
+        task_cond.notify_all();
+        for(auto &t : threads) {
+            t.join();
+        }
+    }
+```
+
+### 3.5. condition_variable的实现说明
+
+下面小节里查看`condition_variable`在libstdc++中的定义可以看到其类型为：`typedef __gthread_cond_t    __native_type;`，继续跟踪libgcc可看到，实际是pthread对应的条件变量类型：`pthread_cond_t` （仅考虑Linux上面）
+
+```cpp
+// gcc-10.3.0-libstdcpp-v3/libgcc/gthr-posix.h
+typedef pthread_cond_t __gthread_cond_t;
+```
+
+看下`condition_variable`对应`notify_one`的实现，实际也只是包装了一层`pthread_cond_signal`，所以不要报希望stdc++做了什么其他手段。
+
+```cpp
+// gcc-10.3.0-libstdcpp-v3/libstdc++-v3/src/c++11/condition_variable.cc
+void
+condition_variable::notify_one() noexcept
+{
+int __e = __gthread_cond_signal(&_M_cond);
+
+// XXX not in spec
+// EINVAL
+if (__e)
+    __throw_system_error(__e);
+}
+
+// gcc-10.3.0-libstdcpp-v3/libgcc/gthr-posix.h
+static inline int
+__gthread_cond_signal (__gthread_cond_t *__cond)
+{
+  return __gthrw_(pthread_cond_signal) (__cond);
+}
+
+static inline int
+__gthread_cond_wait (__gthread_cond_t *__cond, __gthread_mutex_t *__mutex)
+{
+  return __gthrw_(pthread_cond_wait) (__cond, __mutex);
+}
+```
+
+### 3.6. man pthread_cond_broadcast 说明
+
+既然`condition_variable`在linux实际只是包装了`pthread_cond_t`，看下pthread_cond_broadcast的说明，里面有唤醒相关的说明。
+
+`man pthread_cond_broadcast`，也可见：[man 3 pthread_cond_signal](https://linux.die.net/man/3/pthread_cond_signal)
+
+> pthread库之所以允许虚假唤醒，是为了性能上的考虑。pthread库希望应用程序某些时候在进入内核态之前就被唤醒，这样就可以避免进入内核态的开销。
+
+## 4. libstdc++ 说明
 
 [gcc-mirror](https://github.com/gcc-mirror/gcc) 仓库是 GCC（GNU Compiler Collection）编译器套件的代码库，涵盖了 GCC 编译器套件的多个方面。
 
@@ -230,7 +332,7 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 
 ![copilot-read-source-code](/images/2025-03-09-copilot-read-source-code.png)
 
-### 3.1. emplace_back 原位构造
+### 4.1. emplace_back 原位构造
 
 C++11起`vector`、`deque`/`queue`/`priority_queue`、`list` 等就支持通过`emplace_back`方法在容器尾部原位（`in-place`）构造元素，避免`push_back`要构造临时对象再进行复制或者移动。
 
@@ -268,7 +370,7 @@ void emplace_back( Args&&... args );
 #endif
 ```
 
-### 3.2. vector push_back/emplace_back 扩容规则
+### 4.2. vector push_back/emplace_back 扩容规则
 
 跟踪下`vector`的扩容规则，可以看到C++11后，`push_back`右值的话，自动就使用`emplace_back`了。
 
@@ -353,9 +455,9 @@ size_type _M_check_len(size_type __n, const char* __s) const
 
 **结论**：向`vector`插入元素时若空间不足触发扩容时，新的容量至少是当前大小的两倍，或者是当前大小加上需要插入的元素数量，以较大者为准。（当前大小指的是`size()`而不是`capacity()`）
 
-## 4. 利用优先级队列支持任务优先级
+## 5. 利用优先级队列支持任务优先级
 
-### 4.1. std::priority_queue 说明
+### 5.1. std::priority_queue 说明
 
 [std::priority_queue](https://en.cppreference.com/w/cpp/container/priority_queue) 和 `std::queue` 一样，都是STL里的容器适配器。
 
@@ -382,7 +484,7 @@ class priority_queue
 };
 ```
 
-### 4.2. 线程池任务支持优先级
+### 5.2. 线程池任务支持优先级
 
 基于上面普通`deque`队列的线程池任务改造，可以用 元组（`std::tuple`） 或者 自定义一个任务类/结构体。
 
@@ -455,11 +557,11 @@ start:7500000, end:8750000, chunk sum:2500000, total:20000000, done count:8, tas
 result: 20000000
 ```
 
-## 5. 异步编程
+## 6. 异步编程
 
 TODO
 
-## 6. 小结
+## 7. 小结
 
 练习实现了基本的C++线程池和优先级队列，简单跟踪了一下libstdc++里的相关实现。
 
@@ -467,11 +569,12 @@ TODO
 
 最近DeepSeek开源的 [3FS](https://github.com/deepseek-ai/3FS) 存储系统，里面就用到很多C++新特性，比如协程（参考：[DeepSeek 3FS 源码解读——协程&RDMA篇](https://zhuanlan.zhihu.com/p/27331176252)）。需要多接受新变化并利用好它们。
 
-## 7. 参考
+## 8. 参考
 
 * [C++ 实现线程池详解：从零到一个高性能线程池](https://mp.weixin.qq.com/s/DuPWHTIw3WrhPRhYWCSOxQ)
 * [libstdc++ 源码](https://github.com/xiaodongQ/gcc-10.3.0-libstdcpp-v3)
 * [DeepSeek 3FS 源码解读——协程&RDMA篇](https://zhuanlan.zhihu.com/p/27331176252)
 * [cppreference emplace_back](https://en.cppreference.com/w/cpp/container/vector/emplace_back)
 * [std::priority_queue](https://en.cppreference.com/w/cpp/container/priority_queue)
+* [条件变量的虚假唤醒和唤醒丢失问题](https://zgjsxx.github.io/posts/Program_language/cpp/cpp11_condition_var_issue.html)
 * GPT
