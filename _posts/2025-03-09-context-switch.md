@@ -1,6 +1,6 @@
 ---
 layout: post
-title: CPU学习实践系列（一） -- 进程、线程、系统调用、协程上下文切换
+title: CPU学习实践（一） -- 进程、线程、系统调用、协程上下文切换
 categories: CPU
 tags: CPU 线程
 ---
@@ -14,7 +14,7 @@ CPU学习实践系列开篇，学习进程、线程、系统调用、协程上�
 
 ## 1. 背景
 
-之前投入 [网络](https://xiaodongq.github.io/category/#%E7%BD%91%E7%BB%9C) 相关的学习实践更多一点，虽然还有很多TODO项，以及存储方面待深入梳理，但最近碰到的问题有不少还是跟内存和CPU相关。本篇开始梳理CPU、内存方面的学习记录，并基于上篇 [线程池](https://xiaodongq.github.io/2025/03/08/threadpool/) 进行实验。
+之前投入 [网络](https://xiaodongq.github.io/category/#%E7%BD%91%E7%BB%9C) 相关的学习实践更多一点，虽然还有很多TODO项，以及存储方面待深入梳理，但最近碰到的问题有不少还是跟内存和CPU相关。本篇开始梳理CPU、内存方面的学习记录，并基于上篇 [【实践系列】实现一个简单线程池](https://xiaodongq.github.io/2025/03/08/threadpool/) 进行观察。
 
 参考博客系列：
 
@@ -150,6 +150,13 @@ perf命令查看事件（不用去记，`perf list`查看）：`perf stat -e dTL
 
 [开发内功修炼之CPU篇](https://mp.weixin.qq.com/mp/appmsgalbum?__biz=MjM5Njg5NDgwNA==&action=getalbum&album_id=1372643250460540932&scene=126&uin=&key=&devicetype=iMac+MacBookPro12%2C1+OSX+OSX+12.6.4+build(21G526)&version=13080911&lang=zh_CN&nettype=WIFI&ascene=0&fontScale=100) 里面对下面几种情况都做了实验对比，此处暂只说明结论。
 
+开销实验的结论放一起便于对比参考（数量级）：
+
+* 进程上下文切换：`2.7us到5.48us之间`
+* 线程上下文切换：`3.8us`左右（TODO 数据和进程差不多，但实际应该更小？）
+* 系统调用：`200ns`
+* 协程切换：`120ns`（用户态）
+
 ### 3.1. 进程上下文切换
 
 1、切换时机
@@ -177,6 +184,8 @@ perf命令查看事件（不用去记，`perf list`查看）：`perf stat -e dTL
 4、实验
 
 1）上面测试进程上下文切换的代码，可见：[process_ctxswitch.c](https://github.com/xiaodongQ/prog-playground/blob/main/cpu/cswch_demo/process_ctxswch.c)，以及同级目录的统计平均脚本
+
+TODO：自己运行demo统计的耗时基本都在 `0.8 us`左右
 
 2）lmbench 要手动编译
 
@@ -285,6 +294,8 @@ nonvoluntary_ctxt_switches:	0
 
 ## 4. 线程池demo开销
 
+上篇的demo代码：[thread_pool.cpp](https://github.com/xiaodongQ/prog-playground/blob/main/thread_pool/thread_pool.cpp)
+
 ```sh
 [CentOS-root@xdlinux ➜ thread_pool git:(main) ✗ ]$ perf stat ./thread_pool
 start:0, end:1250000, chunk sum:2500000, total:2500000, done count:1, task:8
@@ -299,25 +310,42 @@ result: 20000000
 
  Performance counter stats for './thread_pool':
 
+            # CPU利用率
              73.52 msec task-clock                #    1.335 CPUs utilized          
+            # 上下文切换，频率为 0.299 K/sec
                 22      context-switches          #    0.299 K/sec                  
                  0      cpu-migrations            #    0.000 K/sec                  
+            # 缺页中断
              5,243      page-faults               #    0.071 M/sec                  
+            # 时钟周期数，且对应的 CPU频率 4.503 GHz
        331,064,675      cycles                    #    4.503 GHz                      (82.47%)
          1,873,975      stalled-cycles-frontend   #    0.57% frontend cycles idle     (82.32%)
          2,876,154      stalled-cycles-backend    #    0.87% backend cycles idle      (80.14%)
+            # 指令数，且每周期指令数 1.19
        393,566,861      instructions              #    1.19  insn per cycle         
                                                   #    0.01  stalled cycles per insn  (82.84%)
         68,372,865      branches                  #  929.930 M/sec                    (84.75%)
+            # 分支预测错误次数，及占比
             49,859      branch-misses             #    0.07% of all branches          (87.48%)
-
+            # 程序从开始到结束的实际经过时间
        0.055079000 seconds time elapsed
-
+            # 程序在用户空间执行所花费的时间
        0.056267000 seconds user
+            # 程序在内核空间执行系统调用等操作所花费的时间
        0.017682000 seconds sys
 ```
 
-## 5. 内核代码跟踪：Linux进程是如何创建出来的？
+说下3个时间指标的关系：
+
+* 一般情况下，`time elapsed`等于`user time`与`sys time`之和再加上可能存在的其他开销时间，在不考虑其他因素的理想情况下，有`time elapsed ≈ user time + sys time`。
+    * time elapsed：也叫墙上时间（Wall Clock Time），是指从程序开始运行到结束所经过的实际时间，包括用户、内核、等待调度等方面的时间
+    * user time：程序代码本身在CPU上运行所消耗的时间，不包括系统调用和等待其他资源的时间
+    * sys time：程序在内核空间执行系统调用等操作所花费的时间
+* 上面的`time elapsed`小于两者之和，这可能是因为在多线程或多进程环境下，程序在运行过程中有部分时间处于等待状态，或者存在多个线程 / 进程并行执行，使得实际经过的时间小于用户时间和系统时间的简单累加。
+    * user time和sys time是将每个线程或进程在用户空间和内核空间执行的时间分别进行累加，所以会出现user time与sys time之和大于time elapsed的情况
+    * 比如：一个程序有两个线程，线程 A 在用户空间执行了 `0.03` 秒，线程 B 在用户空间执行了 `0.04` 秒，它们是并行执行的，那么`user time`就是 `0.07` 秒，但实际从程序开始到结束的`time elapsed`可能只需要 `0.04` 秒，因为两个线程是同时进行的。
+
+## 5. 源码跟踪：Linux进程是如何创建出来的？
 
 TODO
 
@@ -330,7 +358,7 @@ TODO
 
 梳理学习进程、线程、系统调用、协程上下文切换相关开销，建立体感。
 
-TODO项：内核跟踪、工具实验。
+TODO项：内核代码跟踪、工具实验。
 
 ## 7. 参考
 
