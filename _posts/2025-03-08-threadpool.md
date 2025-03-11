@@ -368,7 +368,7 @@ size_type _M_check_len(size_type __n, const char* __s) const
     * `push(const value_type& __x)`，复杂度`O(logn)`
     * `pop()`，复杂度`O(logn)`
     * `top()`，复杂度`O(1)`
-* 使用自定义类时，需要重载 比较运算符(比如：`bool operator<(const T &t)`) 或者 仿函数(比如：`bool operator()(const T &a, const T &b)`)
+* 使用自定义类时，需要重载 比较运算符(如：`bool operator<(const T &t)`) 或 实现仿函数(如：`bool operator()(const T &a, const T &b)`)
 
 其声明也在 stl_queue.h 头文件里，所以使用时要包含`#include <queue>`：
 
