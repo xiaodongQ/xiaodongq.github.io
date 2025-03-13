@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 【实践系列】实现一个简单线程池
+title: 并发与异步编程（一） -- 实现一个简单线程池
 categories: 并发与异步编程
 tags: CPU 线程池 C++
 ---
@@ -16,7 +16,7 @@ tags: CPU 线程池 C++
 
 最近在梳理基础，有些东西平时都在用，但是要是让自己手撸一个简单demo，却发现缺这缺那，比如线程池、内存池、事件通知框架等等。
 
-有时“看了”，觉得“会了”，动手时却发现并不是这样。究其原因，还是理解不到位，要“做会”而不是“看会”。于是开启 **【实践系列】**，倒推输出。
+有时“看了”，觉得“会了”，动手时却发现并不是这样。究其原因，还是理解不到位，要“做会”而不是“看会”。多实践碰到问题后梳理总结，倒推输出。
 
 本篇基于C++实现线程池，并结合 [libstdc++](https://github.com/gcc-mirror/gcc/tree/releases/gcc-10.3.0/libstdc%2B%2B-v3) 代码，理解C++中的一些特性功能使用。
 
@@ -312,7 +312,7 @@ __gthread_cond_wait (__gthread_cond_t *__cond, __gthread_mutex_t *__mutex)
 
 > pthread库之所以允许虚假唤醒，是为了性能上的考虑。pthread库希望应用程序某些时候在进入内核态之前就被唤醒，这样就可以避免进入内核态的开销。
 
-## 4. libstdc++ 说明
+## 4. 扩展：libstdc++ 说明
 
 [gcc-mirror](https://github.com/gcc-mirror/gcc) 仓库是 GCC（GNU Compiler Collection）编译器套件的代码库，涵盖了 GCC 编译器套件的多个方面。
 
