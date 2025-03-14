@@ -75,20 +75,20 @@ eBPF（Extended Berkeley Packet Filter）是一个在Linux内核中实现的强�
 ![linux_kernel_event_bpf](/images/linux_kernel_event_bpf.png)  
 [参考](https://www.ebpf.top/post/ebpf_intro/)
 
-**bcc tools：**
+#### 2.2.1. **bcc tools：**
 
 性能分析大师 Brendan Gregg 等编写了**诸多的 BCC 或 BPFTrace 的工具集**可以拿来直接使用，可以满足很多我们日常问题分析和排查。
 
 CentOS安装：`yum install bcc`，而后在`/usr/share/bcc/tools/`可查看。bcc中工具集示意图如下：
 
 ![bcc tools 2019](/images/bcc-tools-2019.png)  
-[参考](https://www.ebpf.top/post/ebpf_intro/)
+[出处](https://github.com/iovisor/bcc/blob/master/images/bcc_tracing_tools_2019.png)
 
 起一个ECS实例，安装bcc，可看到bcc-tools等依赖及大小(单独安装bcc-tools大概也要300多M)，安装后可看到上述工具(里面内容为`python`)
 
 ![安装bcc](/images/2024-06-07-yum_install_bcc.png)
 
-**perf-tools：**
+#### 2.2.2. **perf-tools：**
 
 说到Brendan Gregg，这里也提一下他创建的[perf-tools](https://github.com/brendangregg/perf-tools)，这是一个基于`ftrace`和`perf`的Linux性能分析工具集(上面的bcc tools是基于eBPF)，提供如下工具(里面内容为`shell`)：
 
