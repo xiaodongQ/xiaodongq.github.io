@@ -90,30 +90,30 @@ On-CPU火焰图使用场景最常见，就不多说了，关注大平顶（即�
 Option h is ambiguous (hash, height, help)
 USAGE: ./flamegraph.pl [options] infile > outfile.svg
 
-	--title TEXT     # change title text
-	--subtitle TEXT  # second level title (optional)
-	--width NUM      # width of image (default 1200)
-	--height NUM     # height of each frame (default 16)
-	--minwidth NUM   # omit smaller functions. In pixels or use "%" for
-	                 # percentage of time (default 0.1 pixels)
-	--fonttype FONT  # font type (default "Verdana")
-	--fontsize NUM   # font size (default 12)
-	--countname TEXT # count type label (default "samples")
-	--nametype TEXT  # name type label (default "Function:")
-	--colors PALETTE # set color palette. choices are: hot (default), mem,
-	                 # io, wakeup, chain, java, js, perl, red, green, blue,
-	                 # aqua, yellow, purple, orange
-	--bgcolors COLOR # set background colors. gradient choices are yellow
-	                 # (default), blue, green, grey; flat colors use "#rrggbb"
-	--hash           # colors are keyed by function name hash
-	--random         # colors are randomly generated
-	--cp             # use consistent palette (palette.map)
-	--reverse        # generate stack-reversed flame graph
-	--inverted       # icicle graph
-	--flamechart     # produce a flame chart (sort by time, do not merge stacks)
-	--negate         # switch differential hues (blue<->red)
-	--notes TEXT     # add notes comment in SVG (for debugging)
-	--help           # this message
+    --title TEXT     # change title text
+    --subtitle TEXT  # second level title (optional)
+    --width NUM      # width of image (default 1200)
+    --height NUM     # height of each frame (default 16)
+    --minwidth NUM   # omit smaller functions. In pixels or use "%" for
+                     # percentage of time (default 0.1 pixels)
+    --fonttype FONT  # font type (default "Verdana")
+    --fontsize NUM   # font size (default 12)
+    --countname TEXT # count type label (default "samples")
+    --nametype TEXT  # name type label (default "Function:")
+    --colors PALETTE # set color palette. choices are: hot (default), mem,
+                     # io, wakeup, chain, java, js, perl, red, green, blue,
+                     # aqua, yellow, purple, orange
+    --bgcolors COLOR # set background colors. gradient choices are yellow
+                     # (default), blue, green, grey; flat colors use "#rrggbb"
+    --hash           # colors are keyed by function name hash
+    --random         # colors are randomly generated
+    --cp             # use consistent palette (palette.map)
+    --reverse        # generate stack-reversed flame graph
+    --inverted       # icicle graph
+    --flamechart     # produce a flame chart (sort by time, do not merge stacks)
+    --negate         # switch differential hues (blue<->red)
+    --notes TEXT     # add notes comment in SVG (for debugging)
+    --help           # this message
 ```
 
 用stress模拟CPU、sync落盘、内存、write磁盘的压力：
@@ -139,11 +139,20 @@ perf script -i perf.data| stackcollapse-perf.pl | flamegraph.pl --reverse --inve
 
 ## 4. Off-CPU火焰图
 
-这里重点说下**Off-CPU火焰图**，对于非CPU操作，它提供了很实用的采集观测工具，比如`Off-CPU`、`文件IO`、`block IO`、还有`线程唤醒`的链路追踪。具体见：[Off-CPU Flame Graphs](https://www.brendangregg.com/FlameGraphs/offcpuflamegraphs.html)。
+这里重点说下**Off-CPU火焰图**，对于非CPU操作，它提供了很实用的采集观测工具，比如`Off-CPU`、`文件IO`、`block IO`、还有`线程唤醒`的链路追踪，和On-CPU是个很好的互补。具体见：[Off-CPU Flame Graphs](https://www.brendangregg.com/FlameGraphs/offcpuflamegraphs.html)。
 
-Off-CPU 能够识别类型包含：阻塞在 I/O、锁、定时器、缺页、swap等 事件上的时间消耗。具体可了解：[Off-CPU Analysis](https://www.brendangregg.com/offcpuanalysis.html)
+Off-CPU 能够识别的类型包含：阻塞在 I/O、锁、定时器、缺页、swap等 事件上的时间消耗。
 
-### 4.1. bcc eBPF工具集
+**注意**：
+
+* 使用Off-CPU进行追踪和采样分析时，调度事件会特别频繁，这也是eBPF这种内核态追踪为何如此重要，如果用户态和内核态频繁切换，追踪工具本身会带来很大的性能开销（采集信息很多且写到磁盘文件带来进一步的CPU和IO相关消耗）。
+* 作者做了**perf和eBPF的 MySQL高压力实验对比**：各自进行10s的采集，查看吞吐量（throughput）的下降情况
+    * perf需要额外35s时间处理数据（处理时13%下降；10s采集了224MB追踪数据），追踪过程9%下降。即 **10s引起了持续45s的9-13%性能下降**
+    * eBPF则要额外6s左右处理数据（13%下降），且需要1s初始化eBPF（13%下降），追踪过程6%下降。即 **10s引起了持续17s的6-13%性能下降**
+    * 且随着采集时间拉长，比如采集60s：eBPF处理还是只要6-7s时间，**perf处理则从35s上升到212s！**
+* 具体可了解：[Off-CPU Analysis](https://www.brendangregg.com/offcpuanalysis.html)
+
+### 4.1. bcc eBPF工具集说明
 
 由于Off-CPU相关指标很多都涉及内核层面，perf采样比较耗性能，且perf自身造成的上下文切换会比较影响结果，上面几个工具的指标一般都是基于`eBPF`采集。
 
@@ -171,31 +180,246 @@ Off-CPU 能够识别类型包含：阻塞在 I/O、锁、定时器、缺页、sw
 * bpftrace 用来从上到下来跟踪到指定函数，即只能看到谁调用到指定追踪点
 * funcgraph 用来从指定函数往下追踪调用栈
 
-可以回顾之前追踪存储栈实践用法：[学习Linux存储IO栈（二） -- Linux内核存储栈流程和接口](https://xiaodongq.github.io/2024/08/13/linux-kernel-fs/)、[学习Linux存储IO栈（三） -- eBPF和ftrace跟踪IO写流程](https://xiaodongq.github.io/2024/08/15/linux-write-io-stack/)
+可以回顾之前用bpftrace和funcgraph追踪存储栈实践用法：[学习Linux存储IO栈（二） -- Linux内核存储栈流程和接口](https://xiaodongq.github.io/2024/08/13/linux-kernel-fs/)、[学习Linux存储IO栈（三） -- eBPF和ftrace跟踪IO写流程](https://xiaodongq.github.io/2024/08/15/linux-write-io-stack/)
+
+### 4.2. 工具归档说明
+
+以下面的offcputime工具为例，有两个方式获取：
+
+* bcc tools工具集：`/usr/share/bcc/tools/offcputime`，基于python写的eBPF工具
+* bcc libbpf-tools（见上面的 [bcc eBPF工具集说明](#41-bcc-ebpf工具集说明)，基于libpf，自行编译
+    * bcc工具中的libbpf-tools一直在更新，可以自行编译
+    * `git clone --recurse-submodules https://github.com/iovisor/bcc.git`
+        * 其中：src/cc/libbpf、libbpf-tools/blazesym、libbpf-tools/bpftool 都是子模块
+
+自己在 [bcc_libbpf-tools_bin_db5b63f](https://github.com/xiaodongQ/prog-playground/tree/main/tools) 也归档了一份基于bcc编译的libbpf-tools工具进行备用（x86_64，gcc8.5.0），基于bcc commitid：db5b63ff876d3346021871e2189a354bfc6d510e，20250315才提交的，如上所述项目一直在更新，后续按需编译。
 
 ## 5. Off-CPU采集实验
 
-如果机器上的内核没开启eBPF对应特性支持（比如未开启`CONFIG_BPF_SYSCALL`），那需要重新编译下内核。简要步骤：
+如果机器上的内核没开启eBPF对应特性支持（比如未开启`CONFIG_DEBUG_INFO_BTF`），那需要重新编译下内核。简要步骤：
 
-* `make menuconfig`，搜索`CONFIG_BPF_SYSCALL`并设置`y`保存到`.config`
+* `make menuconfig`，搜索`CONFIG_DEBUG_INFO_BTF`并设置`y`保存到`.config`
 * `make -j8`，得到 bzImage，拷贝到`/boot/vmlinuzxxx`替换，或者grub里新增一个menuentry项
 
-下面的实验结果，归档在：[flamegraph_sample](https://github.com/xiaodongQ/prog-playground/tree/main/flamegraph_sample)
+下面的实验结果，也归档在：[flamegraph_sample](https://github.com/xiaodongQ/prog-playground/tree/main/flamegraph_sample)
 
-### 5.1. Off-CPU采集
+### 5.1. Off-CPU采集和分析
 
-offcputime工具说明：
+1、bcc tools中的新工具支持了相关堆栈折叠选项，所以不用stackcollapse-xxx.pl脚本进行折叠了。
 
-* bcc tools工具集：/usr/share/bcc/tools/offcputime
-* bcc libbpf
-    * bcc工具一直在更新，可以自行编译：`git clone --recurse-submodules https://github.com/iovisor/bcc.git`
-    * `libbpf-tools`
+/usr/share/bcc/tools/offcputime参数，具体`-h`查看：
 
-### 5.2. Wakeup
+* `-d`, --delimited  在内核栈和用户栈之间插入分隔符
+* `-f`, --folded     输出折叠格式
+* `-p`指定进程、`-t`指定线程、`-U`只看用户态堆栈、`-K`只看内核态堆栈
+* 后面接数字表示持续时间，秒数，比如`offcputime 5`
+* `--state` 可以指定线程状态（位掩码bitmask）
+    * 0（`TASK_RUNNING`）可执行状态
+        * 进程要么正在执行，要么准备执行，涵盖了操作系统层面“运行”和“就绪”两种状态。
+        * 处于该状态（比如一个进程被创建并准备好执行）的进程会被放置在 CPU 的运行队列（runqueue）中，等待调度器分配CPU时间片
+    * 1（`TASK_INTERRUPTIBLE`）可中断睡眠状态，可被信号唤醒
+        * 进程正在等待某个特定的事件发生（如 I/O 完成、信号到来等），这期间会放弃CPU资源进入睡眠状态
+        * 内核中，当进程调用某些会导致睡眠的系统调用（如 read、write 等）时，如果所需的资源暂时不可用，进程会将自己的状态设置为 TASK_INTERRUPTIBLE 并加入相应的等待队列
+    * 2（`TASK_UNINTERRUPTIBLE`）不可中断睡眠状态，不可被信号唤醒
+        * 等待某个特定事件，期间不会响应任何信号，只能等待事件本身发生后才能被唤醒
+        * 通常用于一些对系统稳定性要求较高的场景，比如与硬件设备交互，例如进程正在`等待磁盘 I/O 操作完成`
+    * 4（`__TASK_STOPPED`）停止状态
+        * 进程由于接收到特定的信号（如 SIGSTOP、SIGTSTP 等）而被暂停执行，该状态不会调度到CPU上运行，直到它接收到继续执行的信号（如 SIGCONT）
+        * 当内核接收到停止进程的信号时，会将进程的状态设置为 TASK_STOPPED，并将其从运行队列中移除
+    * 还有很多状态，可见：linux-5.10.10/include/linux/sched.h
 
-### 5.3. Chain Graphs
+配色选择：`--color=io`
+
+```sh
+# stress模拟压力
+stress --cpu 2 --io 2 --vm 2 --hdd 2 --timeout 5s
+
+# bcc tools 采集堆栈
+/usr/share/bcc/tools/offcputime -df > out.stacks
+# 生成火焰图
+flamegraph.pl --color=io --title="Off-CPU Time Flame Graph" --countname=us < out.stacks > offcpu_stress_2cpu_2io_2vm_2hdd.svg
+# 冰柱型、反转堆栈
+flamegraph.pl --color=io --title="Off-CPU Time Flame Graph" --countname=us --reverse --inverted < out.stacks > offcpu_stress_2cpu_2io_2vm_2hdd_icicle.svg
+```
+
+![offcpu_stress_2cpu_2io_2vm_2hdd](/images/offcpu_stress_2cpu_2io_2vm_2hdd.svg)
+
+**分析**：
+
+* 上述Off-CPU图中，灰色的"`-`"行，对应`offcputime -d`参数指定的，向内核态和用户态之间插入的分隔符
+* 虽然执行了stress，但火焰图中最宽的还是mysqld进程
+    * 这里mysqld时间占了**165秒**，原因如 [之前](https://xiaodongq.github.io/2025/03/09/context-switch/) 用`perf stat`分析线程池开销时所说的，`time elapse`（也叫墙上时间，Wall Clock Time）是程序开始到结束的时间（此处即这5s左右），是可能比用户时间（`user time`）和系统时间（`sys time`）小的，主要是多线程中这些时间是分别累加的。比如两个线程各自sys time是0.03s和0.04s，总的sys time就是0.07s，而time elapse是0.07再加累加的user time
+    * 几个多线程服务就会出现这个尴尬的情况，Off-CPU火焰图中，总被这些大宽列影响整体查看。
+    * **一个解决方式**是：过滤感兴趣线程的状态，比如不可中断睡眠状态，`offcputime -df --state 2`
+
+冰柱型如下，各调用分支相同的调用进行了合并，可明显看到热点是上下文切换中的`finish_task_switch`：
+
+![offcpu_stress_icicle](/images/offcpu_stress_2cpu_2io_2vm_2hdd_icicle.svg)
+
+2、libbpf-tools里，offcputime则没有这类选项，用`stackcollapse.pl`折叠一下（之前perf采集时则用stackcollapse-perf.pl）
+
+```sh
+# bcc libbpf-tools
+# /home/workspace/bcc/libbpf-tools/offcputime
+offcputime > out.stacks
+stackcollapse.pl < out.stacks | flamegraph.pl --color=io --title="Off-CPU Time Flame Graph" --countname=us > offcpu_stress2.svg
+# 冰柱型、反转堆栈
+stackcollapse.pl < out.stacks | flamegraph.pl --color=io --title="Off-CPU Time Flame Graph" --countname=us --reverse --inverted > offcpu_stress2_icicle.svg
+```
+
+用冰柱型查看，和上面有点出入，没直接找到上下文切换接口。不确定是否为 采集的东西太多、且采集时miss了一些堆栈 的影响。
+
+![offcpu_icicle_libbpf-tool](/images/offcpu_stress2_icicle.svg)
+
+结论：火焰图场景，还是暂用原来bcc tools的工具比较合适，比如 /usr/share/bcc/tools/offcputime。
+
+### 5.2. 线程唤醒者栈追踪（Wakeup）
+
+**用途**：线程处于睡眠等待时（off-CPU sleeping），CPU会切换到其他线程，后续该线程再被调度唤醒。Wakeup火焰图可以看到睡眠线程在等待什么、为什么等如此之久。相对于只查看Off-CPU火焰图，唤醒信息（wakeup information）可以解释阻塞（block）的真正原因，对于**锁竞争**的场景很有帮助。**唤醒路径可以揭示是谁持有并最终释放了锁**，从而导致了线程的唤醒。（追踪唤醒者的堆栈）
+
+颜色方案：`--color=wakeup`
+
+```sh
+/usr/share/bcc/tools/wakeuptime -f > out.stacks
+flamegraph.pl --color=wakeup --title="Wakeup Time Flame Graph" --countname=us < out.stacks > wakeup_stress_out.svg
+# 冰柱型、反转堆栈
+flamegraph.pl --color=wakeup --title="Wakeup Time Flame Graph" --countname=us --reverse --inverted < out.stacks > wakeup_stress_out_icicle.svg
+```
+
+虽然用`stress --cpu 4 --timeout 5s`模拟了压力（会起4个进程不停`sqrt()`），但看到的系统等待的大头还是mysqld，还是其多线程导致sys time累加很大，从冰柱型中，可看到mysqld占了150s。（这让只跑了5s的采集怎么看？）
+
+![wakeup_stress_4cpu_out](/images/wakeup_stress_4cpu_out.svg)
+
+分析火焰图之前说下`wakeuptime`追踪结果当中的含义：
+
+* 每个堆栈都是**自底向上**查看的，数字（最下面的`6006204`）表示唤醒路径花费的时间，单位是微秒（us）
+* 而后是`waker`，对应的是哪个进程（`swapper/9`）进行的本次唤醒
+* 中间是唤醒者堆栈（waker stack），堆栈方向自下向上
+* 所以此处表示：内核线程`swapper/9` 由于定时器中断(hrtimer_interrupt) 唤醒了 `mysqld`，中间是`swapper/9`的堆栈而不是mysqld阻塞前的堆栈
+
+```sh
+Tracing blocked time (us) by kernel stack
+    
+    # 被唤醒者
+    target:          mysqld                       
+    ffffffffc03c1d55 __this_module+0x3c55
+    ffffffff97c0fe0e bpf_get_stackid_raw_tp+0x4e
+    ffffffffc03c1d55 __this_module+0x3c55
+    ffffffff97c0dde2 bpf_trace_run1+0x32
+    ffffffff97b1c106 ttwu_do_wakeup+0x106
+    # 内核中尝试唤醒指定进程（线程）的核心函数
+    ffffffff97b1d186 try_to_wake_up+0x1a6
+    # 高精度定时器相关的唤醒函数，当定时器到期时会触发这个函数
+    ffffffff97b7d6ee hrtimer_wakeup+0x1e
+    ffffffff97b7d920 __hrtimer_run_queues+0x100
+    ffffffff97b7e0f0 hrtimer_interrupt+0x100
+    ffffffff984026ba smp_apic_timer_interrupt+0x6a
+    # 定时器中断函数被触发（经过一系列调用，最终调到上面的 try_to_wake_up ）
+    ffffffff98401c4f apic_timer_interrupt+0xf
+    ffffffff981435fb cpuidle_enter_state+0xdb
+    ffffffff9814393c cpuidle_enter+0x2c
+    ffffffff97b22a84 do_idle+0x234
+    ffffffff97b22c7f cpu_startup_entry+0x6f
+    ffffffff97a5929b start_secondary+0x19b
+    # 接下来是 waker stack
+    ffffffff97a00107 secondary_startup_64_no_verify+0xc2
+              # swapper/9进程将 mysqld 唤醒的
+              waker: swapper/9
+    # 自底向上查看，唤醒者唤醒路径要花费的时间，us
+    6006204   
+```
+
+**分析**：
+
+* 查看方法同上述堆栈说明的一样
+    * wakeup火焰图中按列去看，最上面的进程由它最底部的进程唤醒
+    * 中间自底向上是唤醒过程中内核经过的堆栈 （**存疑？调用栈好像反了，TODO**）
+
+![2025-03-16-wakeup](/images/2025-03-16-wakeup.png)
+
+冰柱型（貌似此处不大需要，反而增加理解）：
+
+![wakeup_stress_4cpu_out_icicle](/images/wakeup_stress_4cpu_out_icicle.svg)
+
+用libbpf-tools里编译的`wakeuptime`工具也对比下，追踪的堆栈结果里有地址，stackcollapse.pl里没去掉，bcc tools里面的`-f`是做了处理的。  
+所以也还是先用bcc tools吧，和火焰图的验证配套更全面一些。
+
+```sh
+# bcc libbpf-tools
+# /home/workspace/bcc/libbpf-tools/wakeuptime
+wakeuptime > out.stacks
+stackcollapse.pl < out.stacks | flamegraph.pl --color=wakeup --title="Wakeup Time Flame Graph" --countname=us > wakeuptime_libpf_stress.svg
+```
+
+### 5.3. Off-Wake火焰图（Off-Wake Flame Graphs）
+
+用途：可完整追踪 唤醒者 以及 被唤醒者 的Off-CPU堆栈。
+
+会导致性能开销变大，好处是不用简化了 Off-CPU 唤醒链理解的复杂性。
+
+工具使用：/usr/share/bcc/tools/offwaketime，libbpf-tools里还没移植这个工具
+
+```sh
+/usr/share/bcc/tools/offwaketime -f 20 > out.stacks
+flamegraph.pl --color=chain --title="Off-Wake Time Flame Graph" --countname=us < out.stacks > offwaketime_out.svg
+```
+
+![flamegraph_offwaketime_out](/images/flamegraph_offwaketime_out.svg)
+
+同样先来看下`offwaketime`采集的信息：
+
+* 查看方法（注意和上面不同）：
+    * **从中间的`--`分隔符开始**，分隔符上方是唤醒者的堆栈（Waker Stack）
+    * 分隔符下方是被唤醒堆栈（Target Stack），被唤醒之前到达阻塞的堆栈
+
+```sh
+[CentOS-root@xdlinux ➜ chain git:(main) ✗ ]$ cat not_folded_out.stacks 
+Tracing blocked time (us) by user + kernel off-CPU and waker stack... Hit Ctrl-C to end.
+
+    # 唤醒者
+    waker:           swapper/5 0
+    b'secondary_startup_64_no_verify'
+    b'start_secondary'
+    b'cpu_startup_entry'
+    b'do_idle'
+    b'cpuidle_enter'
+    b'cpuidle_enter_state'
+    # 定时器中断触发
+    b'apic_timer_interrupt'
+    b'smp_apic_timer_interrupt'
+    # 定时器到期会触发这些函数。高精度定时器（hrtimer）相关函数
+    b'hrtimer_interrupt'
+    b'__hrtimer_run_queues'
+    # 最终通过 hrtimer_wakeup 完成唤醒操作
+    b'hrtimer_wakeup'
+    --               --
+    b'finish_task_switch'
+    b'__sched_text_start'
+    # schedule里往上调用__sched_text_start
+    b'schedule'
+    # I/O 操作等待
+    b'read_events'
+    b'do_io_getevents'
+    b'__x64_sys_io_getevents'
+    b'do_syscall_64'
+    b'entry_SYSCALL_64_after_hwframe'
+    # mysqld进行系统调用，然后一次往上执行堆栈，即体现的是被唤醒之前的堆栈/如何进入到阻塞状态的堆栈
+    b'syscall'
+    # 被唤醒者
+    target:          mysqld 1543
+        500247
+```
+
+上述offwaketime火焰图的解释/查看方法：唤醒者（顶部）通过什么调用栈唤醒、被唤醒者（底部）之前由于什么堆栈进入阻塞状态
+
+见下图的说明：
+![offwaketime-interpret](/images/2025-03-15-offwaketime-interpret.png)
+
+另外试了下提到的Chain Graphs：[chaintest.py](https://gist.github.com/brendangregg/c67039252268ec5e66ba)，暂时还不可用。
 
 ### 5.4. 文件IO和块设备IO
+
+（此处的实验其实先做，但有点问题，放到最后）
 
 fileiostacks.py不在bcc里，而是在 [BPF-tools](https://github.com/brendangregg/BPF-tools) 老的工具集里：[fileiostacks.py](https://github.com/brendangregg/BPF-tools/blob/master/old/2017-12-23/fileiostacks.py)
 
@@ -234,11 +458,11 @@ sysbench /usr/share/sysbench/oltp_read_write.lua \
 
 ![io-mysql](/images/io-mysql.svg)
 
-### 5.5. 
-
 ## 6. 小结
 
-异步编程学习实践系列，demo实验，使用 gperftools 和 火焰图 进行性能分析。本篇先介绍工具。
+准备异步demo实验，并进行性能分析，本篇先介绍了 gperftools 和 火焰图。实验了各类火焰图的生成简要分析，回顾了bcc/perf-tools等之前涉及的工具。
+
+下一步进行异步编程并使用本篇工具分析。
 
 ## 7. 参考
 
