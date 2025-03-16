@@ -290,14 +290,9 @@ flamegraph.pl --color=wakeup --title="Wakeup Time Flame Graph" --countname=us --
 
 ![wakeup_stress_4cpu_out](/images/wakeup_stress_4cpu_out.svg)
 
-分析火焰图之前说下`wakeuptime`追踪结果当中的含义：
+分析火焰图之前说下`wakeuptime`追踪的堆栈结果：
 
-* 每个堆栈都是**自底向上**查看的，数字（最下面的`6006204`）表示唤醒路径花费的时间，单位是微秒（us）
-* 而后是`waker`，对应的是哪个进程（`swapper/9`）进行的本次唤醒
-* 中间是唤醒者堆栈（waker stack），堆栈方向自下向上
-* 所以此处表示：内核线程`swapper/9` 由于定时器中断(hrtimer_interrupt) 唤醒了 `mysqld`，中间是`swapper/9`的堆栈而不是mysqld阻塞前的堆栈
-
-**特别注意：用 `/usr/share/bcc/tools/wakeuptime` 和 `bcc_libbpf-tools/wakeuptime` 采集的堆栈方向不一样！**（可以通过首行的提示快速区分）
+**特别注意：用 `/usr/share/bcc/tools/wakeuptime` 和 `bcc_libbpf-tools/wakeuptime` 采集的堆栈方向不一样！**（可以通过首行的提示快速区分，火焰图以bcc tools为准）
 
 bcc tools采集结果（不`-f`折叠）：
 
@@ -336,6 +331,7 @@ Tracing blocked time (us) by kernel stack... Hit Ctrl-C to end.
     ffffffff97c0fe0e bpf_get_stackid_raw_tp
     # 唤醒者，即 swapper/1 唤醒了 mysqld
     waker:           swapper/1
+    # waker 调用栈经过的时间，微秒（us）
         67523756
 ```
 
