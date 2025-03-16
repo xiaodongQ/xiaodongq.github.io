@@ -459,7 +459,7 @@ int main(int argc, char *argv[]) {
 
 #### 4.1.1. perf stat结果
 
-由于只跑了一次，下面结果仅作参考。比较明显的是`page-faults`缺页中断触发少一些。
+由于只跑了一次，下面结果仅作参考。比较明显的是`page-faults`缺页中断触发少很多。
 
 ```sh
  Performance counter stats for process id '75661':
@@ -499,13 +499,43 @@ offwaketime：差别不大
 
 ![case2_stdasync_offwaketime_out](/images/case2_stdasync_offwaketime_out.svg)
 
-## 5. io_uring
+## 5. io_uring（不完全）
 
+io_uring需要内核 >= 5.1，自己本地只有4.18，用不了。
 
+起一个阿里云ECS，内核版本：5.10.134
 
+```sh
+[root@iZ2ze0gmmk36e8oc4ff2woZ std_async]# uname -a
+Linux iZ2ze0gmmk36e8oc4ff2woZ 5.10.134-18.al8.x86_64 #1 SMP Fri Dec 13 16:56:53 CST 2024 x86_64 x86_64 x86_64 GNU/Linux
+```
+
+下载编译：[liburing](https://github.com/axboe/liburing)，并试用examples下的bin程序。有些程序要求更高的版本如6.1，暂时先只看`io_uring-cp`了。。。（手动修改io_uring-cp.c，添加一个回车后才继续的逻辑，便于根据进程号采集）
+
+```sh
+# liburing/examples
+...
+-rwxr-xr-x 1 root root   72K Mar 16 22:49 io_uring-close-test
+-rwxr-xr-x 1 root root   80K Mar 16 22:49 link-cp
+-rwxr-xr-x 1 root root   89K Mar 16 22:49 io_uring-udp
+-rwxr-xr-x 1 root root  106K Mar 16 22:49 send-zerocopy
+-rwxr-xr-x 1 root root   95K Mar 16 22:49 ucontext-cp
+-rwxr-xr-x 1 root root   88K Mar 16 22:54 io_uring-cp
+```
+
+有点费劲，只收集到部分数据。
+
+wakeup火焰图：
+
+![case3_io_uring_wakeup](/images/case3_io_uring_wakeup.svg)
+
+offwaketime火焰图：
+
+![case3_io_uring_offwaketime](/images/case3_io_uring_offwaketime.svg)
 
 ## 6. 小结
 
+进行demo实验，并使用 gperftools 和 火焰图 进行性能采集和简单分析。
 
 ## 7. 参考
 
