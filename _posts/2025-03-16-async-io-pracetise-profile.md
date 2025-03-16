@@ -264,15 +264,122 @@ class ThreadPool {
 };
 ```
 
-#### 3.2.4. Off-CPU火焰图
+#### 3.2.4. Wakeup火焰图
 
-wakeup火焰图：
+生成的wakeup火焰图如下：
+
+* 火焰图里上面是target（即被唤醒者），下面是waker（唤醒者）
+* 图中是waker的堆栈，方向是**从上到下**（和直接eBPF工具抓取的堆栈反了一下，所以上篇容易造成困扰）
 
 ![case-wakeup](/images/20250316-case-wakeup.svg)
 
-offwaketime火焰图：
+##### 3.2.4.1. 调用栈方向问题梳理
+
+调度那块的内核逻辑还没去梳理，对调用栈方向还有些模糊。看wakeup火焰图里面，`ttwu_do_wakeup`开始看起来跟CPU唤醒有关系，先`bpftrace`跟踪个堆栈看下。
+
+```sh
+# 看了下有现成的插桩点 kprobe:ttwu_do_wakeup
+[CentOS-root@xdlinux ➜ tools ]$ bpftrace -l|grep ttwu_do_wakeup
+kfunc:ttwu_do_wakeup
+kprobe:ttwu_do_wakeup
+
+# 随便找个进程，此处选mysqld，跟踪下堆栈
+[CentOS-root@xdlinux ➜ tools ]$ bpftrace -p $(pidof mysqld) -e 'kprobe:ttwu_do_wakeup  { printf("%s, stack:%s\n", comm, kstack); }'
+Attaching 1 probe...
+swapper/3, stack:
+        # 最终被探测的函数，负责实际的唤醒工作，是这次堆栈跟踪的触发点
+        ttwu_do_wakeup+1
+        # 尝试唤醒一个进程的函数，是唤醒操作的上层逻辑
+        try_to_wake_up+422
+        # 带有锁机制的唤醒操作函数，确保唤醒过程的线程安全性
+        swake_up_locked.part.3+19
+        # 唤醒单个进程的函数，在调度器中用于唤醒等待的进程
+        swake_up_one+39
+        # 与 RCU 报告相关的函数，用于报告 RCU 相关的状态
+        rcu_report_qs_rdp+195
+        # RCU（Read-Copy-Update）内核机制的核心函数，RCU用于多处理器环境下实现高效的读操作
+        rcu_core+102
+        # 与软中断相关的函数
+        __softirqentry_text_start+215
+        # 中断处理完成后退出中断上下文的函数，负责一些清理和状态恢复操作
+        irq_exit+247
+        # 对称多处理（SMP）环境下的 APIC 定时器中断处理函数
+        smp_apic_timer_interrupt+116
+        # 处理定时器中断，APIC 用于管理多处理器系统中的中断
+        apic_timer_interrupt+15
+        # 进一步处理进入特定 CPU 空闲状态的函数
+        cpuidle_enter_state+219
+        # 进入 CPU 空闲状态的函数
+        cpuidle_enter+44
+        # 当 CPU 处于空闲状态时执行的函数，用于处理 CPU 空闲时的逻辑
+        do_idle+564
+        # CPU 启动时进入的入口函数，负责一些初始化相关的工作
+        cpu_startup_entry+111
+        # 启动辅助 CPU 的相关操作
+        start_secondary+411
+        # 依次往上调用
+        secondary_startup_64_no_verify+194
+```
+
+可以看到，eBPF工具直接抓出来的堆栈，是从下往上的，即对应堆栈为：`secondary_startup_64_no_verify` -> `start_secondary` -> ... -> `try_to_wake_up` -> `ttwu_do_wakeup`
+
+贴张对比图就很直观了，eBPF直接采集的堆栈，和bcc tools里面方向不同，bcc tools的python脚本里做了不同处理：
+
+![stack-bcctools-libbpftools](/images/2025-03-16-stack-bcctools-libbpftools.png)
+
+到这里，上篇：[并发与异步编程（三） -- 性能分析工具：gperftools和火焰图](https://xiaodongq.github.io/2025/03/14/async-io-example-profile) 中的TODO疑问就解决了。
+
+---
+
+上面采集了`ttwu_do_wakeup`的堆栈，追踪到了调用该函数之前的调用关系，若还想看`ttwu_do_wakeup`中进行了什么调用，可使用ftrace跟踪，使用perf-tools中的`funcgraph`工具：
+
+```sh
+[CentOS-root@xdlinux ➜ bin git:(main) ]$ ./funcgraph -p $(pidof mysqld) -H ttwu_do_wakeup
+Tracing "ttwu_do_wakeup" for PID 1308... Ctrl-C to end.
+# tracer: function_graph
+#
+# CPU  DURATION                  FUNCTION CALLS
+# |     |   |                     |   |   |   |
+  4)               |  ttwu_do_wakeup() {
+  8)               |  ttwu_do_wakeup() {
+  8)               |    check_preempt_curr() {
+  8)               |      check_preempt_wakeup() {
+  8)   0.060 us    |        update_curr();
+  4)               |    check_preempt_curr() {
+  8)   0.041 us    |        wakeup_preempt_entity.isra.72();
+  4)               |      check_preempt_wakeup() {
+  8)   1.192 us    |      }
+  4)   0.060 us    |        update_curr();
+  8)   1.613 us    |    }
+  4)   0.030 us    |        wakeup_preempt_entity.isra.72();
+  4)   0.811 us    |      }
+  4)   1.163 us    |    }
+  8)   3.537 us    |  }
+  4)   2.254 us    |  }
+  4)               |  ttwu_do_wakeup() {
+  4)               |    check_preempt_curr() {
+  4)               |      resched_curr() {
+  4)               |        native_smp_send_reschedule() {
+  4)               |          default_send_IPI_single_phys() {
+  4)   0.050 us    |            __default_send_IPI_dest_field();
+  4)   0.791 us    |          }
+  4)   1.042 us    |        }
+  4)   1.342 us    |      }
+  4)   1.603 us    |    }
+  4)   1.894 us    |  }
+  ...
+```
+
+#### 3.2.5. offwaketime火焰图
 
 ![case-offwaketime_out](/images/20250316-case-offwaketime_out.svg)
+
+分析：
+
+* 唤醒者（**顶部**）和被唤醒者（**底部**）堆栈差不多，因为主要是线程池中的线程间轮换。
+* 被唤醒者（target）进入阻塞等待的原因，是因为等锁：`futex_wait_queue_me`
+    * mutex一般基于`futex（Fast Userspace Mutex，快速用户空间互斥锁）`实现
+* 唤醒者（waker），通过`futex_wake`->`wake_up_q`进行唤醒
 
 ## 4. std::async
 
