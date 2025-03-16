@@ -297,11 +297,57 @@ flamegraph.pl --color=wakeup --title="Wakeup Time Flame Graph" --countname=us --
 * 中间是唤醒者堆栈（waker stack），堆栈方向自下向上
 * 所以此处表示：内核线程`swapper/9` 由于定时器中断(hrtimer_interrupt) 唤醒了 `mysqld`，中间是`swapper/9`的堆栈而不是mysqld阻塞前的堆栈
 
+**特别注意：用 `/usr/share/bcc/tools/wakeuptime` 和 `bcc_libbpf-tools/wakeuptime` 采集的堆栈方向不一样！**（可以通过首行的提示快速区分）
+
+bcc tools采集结果（不`-f`折叠）：
+
 ```sh
+# bcc tools采集，/usr/share/bcc/tools/wakeuptime
+[CentOS-root@xdlinux ➜ bin git:(main) ]$ /usr/share/bcc/tools/wakeuptime 
+Tracing blocked time (us) by kernel stack... Hit Ctrl-C to end.
+^C
+    # 被唤醒者
+    target:          mysqld
+    # 从上往下，是waker（即swapper/1）经过的堆栈
+    # 辅助 CPU 启动的函数
+    ffffffff97a00107 secondary_startup_64_no_verify
+    # 进一步的 CPU 启动函数，负责启动辅助 CPU 的后续步骤
+    ffffffff97a5929b start_secondary
+    # CPU 启动的入口函数，进行一些初始化工作
+    ffffffff97b22c7f cpu_startup_entry
+    ffffffff97b22a84 do_idle
+    ffffffff9814393c cpuidle_enter
+    ffffffff981435fb cpuidle_enter_state
+    # 处理APIC定时器中断的函数
+    ffffffff98401c4f apic_timer_interrupt
+    # 对称多处理（SMP）环境下的定时器中断处理
+    ffffffff984026ba smp_apic_timer_interrupt
+    ffffffff97b7e0f0 hrtimer_interrupt
+    ffffffff97b7d920 __hrtimer_run_queues
+    ffffffff97b7d6ee hrtimer_wakeup
+    # 尝试唤醒一个进程的函数，是唤醒操作的上层逻辑
+    ffffffff97b1d186 try_to_wake_up
+    # 最终负责实际唤醒工作的函数
+    ffffffff97b1c106 ttwu_do_wakeup
+    # wakeuptime 工具基于 eBPF 技术实现，这是其中跟踪相关的函数
+    ffffffff97c0dde2 bpf_trace_run1
+    ffffffffc03a4aa6 exit_misc_binfmt
+    # 获取 eBPF 堆栈 ID 的函数，用于获取当前堆栈的标识信息，以便进行跟踪和分析
+    ffffffff97c0fe0e bpf_get_stackid_raw_tp
+    # 唤醒者，即 swapper/1 唤醒了 mysqld
+    waker:           swapper/1
+        67523756
+```
+
+libbpf-tools工具采集：
+
+```sh
+# 注意这里的堆栈是用bcc libbpf-tools工具采集的，libbpf-tools/wakeuptime
 Tracing blocked time (us) by kernel stack
     
     # 被唤醒者
-    target:          mysqld                       
+    target:          mysqld
+    # 从下往上，是waker（即swapper/9）经过的堆栈。堆栈方向和bcc tools处理后的相反。
     ffffffffc03c1d55 __this_module+0x3c55
     ffffffff97c0fe0e bpf_get_stackid_raw_tp+0x4e
     ffffffffc03c1d55 __this_module+0x3c55
@@ -321,7 +367,8 @@ Tracing blocked time (us) by kernel stack
     ffffffff97b22a84 do_idle+0x234
     ffffffff97b22c7f cpu_startup_entry+0x6f
     ffffffff97a5929b start_secondary+0x19b
-    # 接下来是 waker stack
+    # 辅助 CPU 启动的函数
+    # 堆栈自底向上
     ffffffff97a00107 secondary_startup_64_no_verify+0xc2
               # swapper/9进程将 mysqld 唤醒的
               waker: swapper/9
@@ -331,9 +378,10 @@ Tracing blocked time (us) by kernel stack
 
 **分析**：
 
-* 查看方法同上述堆栈说明的一样
-    * wakeup火焰图中按列去看，最上面的进程由它最底部的进程唤醒
-    * 中间自底向上是唤醒过程中内核经过的堆栈 （**存疑？按经过的函数看图里的调用栈好像反了，TODO**）
+* 查看火焰图时，需要跟bcc tools采集的堆栈结果保持一致
+    * 火焰图中，最上面是**target（被唤醒者）**，最下面是**waker（唤醒者）**，从上往下是waker的堆栈，经过这些堆栈唤醒了target
+* 对于bcc **libbpf-tools**采集的堆栈，中间自底向上是唤醒过程中内核经过的堆栈 （~~**存疑？按经过的函数看图里的调用栈好像反了，TODO**~~）
+    * 下面图中的疑问，是对照`libbpf-tools`堆栈结果看的，所以以为相反。换成bcc tools堆栈结果，就一一对应了。
 
 ![2025-03-16-wakeup](/images/2025-03-16-wakeup.png)
 
@@ -375,6 +423,7 @@ flamegraph.pl --color=chain --title="Off-Wake Time Flame Graph" --countname=us <
     * 分隔符下方是被唤醒堆栈（Target Stack），被唤醒之前到达阻塞的堆栈，从下到上看
 
 ```sh
+# bcc tools采集的未折叠堆栈
 [CentOS-root@xdlinux ➜ chain git:(main) ✗ ]$ cat not_folded_out.stacks 
 Tracing blocked time (us) by user + kernel off-CPU and waker stack... Hit Ctrl-C to end.
 
@@ -464,7 +513,9 @@ sysbench /usr/share/sysbench/oltp_read_write.lua \
 
 准备异步demo实验，并进行性能分析，本篇先介绍了 gperftools 和 火焰图。实验了各类火焰图的生成简要分析，回顾了bcc/perf-tools等之前涉及的工具。
 
-留了一个TODO：wakeup火焰图中，关于唤醒者调用方向的问题，后续跟踪梳理CPU进程/线程调度时再打开。
+~~留了一个TODO：wakeup火焰图中，关于唤醒者调用方向的问题，后续跟踪梳理CPU进程/线程调度时再打开。~~ （下篇实践时梳理清楚了，是bcc tools和bcc libbpf-tools采集时结果方向不同，bcc tools里面处理过了。上文已更新。）
+
+经验：火焰图场景，后续保持bcc tools和火焰图一致，不要用自己编译的bcc libbpf-tools，统一方式避免额外的理解成本。
 
 下一步进行异步编程并使用本篇工具分析。
 
