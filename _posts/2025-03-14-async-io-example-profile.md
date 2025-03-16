@@ -14,7 +14,7 @@ tags: CPU 存储 异步编程
 
 ## 1. 背景
 
-[上一篇](https://xiaodongq.github.io/2025/03/11/async-io/) 介绍了几种异步编程框架，现在来完成 [并发与异步编程（一） -- 实现一个简单线程池](https://xiaodongq.github.io/2025/03/08/threadpool/) 中的TODO，进行异步编程实验，并简单进行分析性能。
+[并发与异步编程（二） -- 异步编程框架了解](https://xiaodongq.github.io/2025/03/11/async-io/) 介绍了几种异步编程框架，现在来完成 [并发与异步编程（一） -- 实现一个简单线程池](https://xiaodongq.github.io/2025/03/08/threadpool/) 中的TODO，进行异步编程实验，并简单进行分析性能。
 
 * 1、通过 [gperftools](https://github.com/gperftools/gperftools) 采集分析资源消耗情况
 * 2、基于 [Brendan Gregg](https://www.brendangregg.com/index.html) 大佬的火焰图（[Flame Graphs](https://www.brendangregg.com/flamegraphs.html)）采集信息进行可视化展示，包括 On-CPU火焰图、Off-CPU火焰图
