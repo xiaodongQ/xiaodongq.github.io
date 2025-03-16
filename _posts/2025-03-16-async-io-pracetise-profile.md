@@ -383,10 +383,128 @@ Tracing "ttwu_do_wakeup" for PID 1308... Ctrl-C to end.
 
 ## 4. std::async
 
+前面也简单介绍`std::async`了，`async`的返回值是一个未来对象：`std::future<V>`。
+
+* `std::future`代表异步操作结果，有3种获取状态的方式：`get`、`wait`、`wait_for`
+    * 状态为`std::future_status`，枚举值有 `std::future_status::ready`、`timeout`、`deferred`
+* `std::promise`用于在某一线程中设置某个值或异常，std::future则用于在另一线程中获取这个值或异常
+    * `std::promise<int> prom;`，promise中使用get_future获取future：`auto fut = prom.get_future();`，
+    * 使用promise时要注意一点，如果promise被释放了，而其他的线程还未使用与promise关联的future，当其使用这个future时会报错
+* `std::packaged_task`包装了一个可调用的任务，可以存储在`std::future`中
+    * 其`get_future()`方法返回一个和任务关联的`std::future`对象
+    * 调用std::packaged_task对象的`operator()`，可以开始执行任务
+    * 对比：std::promise包装的是一个值，std::packaged_task包装的是一个可调用对象
+
+异步改造，完整代码见：[]()。主要是任务入队时，`std::packaged_task`将其包装成异步任务，并通过其`std::future`用来获取结果：
+
+```cpp
+class ThreadPool {
+    ...
+    // 将任务加入线程池，并返回一个 std::future 对象用于获取任务结果
+    template <class F, class... Args>
+    auto enqueue_task(F&& f, Args&&... args) 
+        -> std::future<typename std::result_of<F(Args...)>::type> {
+        using return_type = typename std::result_of<F(Args...)>::type;
+     
+        // std::packaged_task 包装一个可调用对象
+        // 将一个可调用对象包装成一个异步任务，并提供一个 std::future 对象来获取任务的返回值。
+        auto task = std::make_shared< std::packaged_task<return_type()> >(
+            // std::bind 将任务函数和参数绑定在一起，
+            // 然后将封装好的 std::packaged_task 包装成一个无参数的 std::function<void()> 并加入任务队列
+            std::bind(std::forward<F>(f), std::forward<Args>(args)...)
+        );
+        
+        // 返回std::packaged_task的 std::future对象，调用者可以通过该对象异步地获取任务的执行结果
+        std::future<return_type> res = task->get_future();
+        {
+            unique_lock<mutex> lk(task_mtx);
+            if (stop_)
+                throw std::runtime_error("enqueue on stopped ThreadPool");
+            tasks.emplace_back([task]() { (*task)(); });
+        }
+        task_cond.notify_one();                                                                                                                               
+        return res;
+    }
+    ...
+};
+```
+
+入队调用和结果处理：
+
+```cpp
+int main(int argc, char *argv[]) {
+    ...
+    // 存储所有任务的 future 对象
+    std::vector<std::future<long long>> futures;
+    // 信号触发后开始逻辑
+    for (std::vector<int>::size_type i = 0; i < data.size(); i += chunk) {
+        int end = std::min(i + chunk, data.size());
+        // 将任务加入线程池并获取 future 对象
+        futures.emplace_back(pool.enqueue_task(task_run, std::ref(data), i, end));
+    }
+    // 等待所有任务完成并累加结果
+    for (auto& future : futures) {
+        total_sum += future.get();                                                                                                                            
+    }
+    // 输出最终结果
+    cout << "result: " << total_sum << endl;
+}
+```
+
+### 4.1. 结果
+
+结果文件可见：[std_async/results](https://github.com/xiaodongQ/prog-playground/tree/main/concurrent/std_async/results)
+
+简单贴一下。
+
+#### 4.1.1. perf stat结果
+
+由于只跑了一次，下面结果仅作参考。比较明显的是`page-faults`缺页中断触发少一些。
+
+```sh
+ Performance counter stats for process id '75661':
+
+             21.21 msec task-clock                #    0.003 CPUs utilized          
+                18      context-switches          #    0.849 K/sec                  
+                 1      cpu-migrations            #    0.047 K/sec                  
+                35      page-faults               #    0.002 M/sec                  
+        84,273,658      cycles                    #    3.973 GHz                      (47.25%)
+           476,389      stalled-cycles-frontend   #    0.57% frontend cycles idle     (49.56%)
+         1,167,560      stalled-cycles-backend    #    1.39% backend cycles idle      (72.10%)
+       255,376,401      instructions              #    3.03  insn per cycle         
+                                                  #    0.00  stalled cycles per insn  (89.48%)
+        41,081,130      branches                  # 1936.921 M/sec                    (98.48%)
+            22,809      branch-misses             #    0.06% of all branches          (82.16%)
+
+       8.010221802 seconds time elapsed
+```
+
+#### 4.1.2. gperftools结果
+
+样本只采集到2个，貌似参考性不大：
+
+![stdasync-gperftools](/images/2025-03-16-stdasync.png)
+
+#### 4.1.3. 火焰图
+
+On-CPU火焰图：
+
+![case2_stdasync_oncpu](/images/case2_stdasync_oncpu.svg)
+
+wakeup：差别不大
+
+![case2_stdasync_wakeup](/images/case2_stdasync_wakeup.svg)
+
+offwaketime：差别不大
+
+![case2_stdasync_offwaketime_out](/images/case2_stdasync_offwaketime_out.svg)
+
 ## 5. io_uring
 
-## 6. 小结
 
+
+
+## 6. 小结
 
 
 ## 7. 参考
@@ -394,4 +512,4 @@ Tracing "ttwu_do_wakeup" for PID 1308... Ctrl-C to end.
 * [并发与异步编程（一） -- 实现一个简单线程池](https://xiaodongq.github.io/2025/03/08/threadpool/)
 * [并发与异步编程（二） -- 异步编程框架了解](https://xiaodongq.github.io/2025/03/11/async-io/)
 * [并发与异步编程（三） -- 性能分析工具：gperftools和火焰图](https://xiaodongq.github.io/2025/03/14/async-io-example-profile/) 
-
+* [C++ 并发三剑客future, promise和async](https://gitbookcpp.llfc.club/sections/cpp/concurrent/concpp07.html)
