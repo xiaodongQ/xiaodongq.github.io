@@ -379,7 +379,7 @@ Tracing "ttwu_do_wakeup" for PID 1308... Ctrl-C to end.
 * 唤醒者（**顶部**）和被唤醒者（**底部**）堆栈差不多，因为主要是线程池中的线程间轮换。
 * 被唤醒者（target）进入阻塞等待的原因，是因为等锁：`futex_wait_queue_me`
     * mutex一般基于`futex（Fast Userspace Mutex，快速用户空间互斥锁）`实现
-* 唤醒者（waker），通过`futex_wake`->`wake_up_q`进行唤醒
+* 唤醒者（waker），通过 `futex_wake` -> `wake_up_q` 进行唤醒
 
 ## 4. std::async
 

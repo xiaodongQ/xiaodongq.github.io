@@ -381,7 +381,7 @@ Tracing blocked time (us) by kernel stack
 
 ![2025-03-16-wakeup](/images/2025-03-16-wakeup.png)
 
-冰柱型（貌似此处不大需要，反而增加理解）：
+冰柱型（貌似此处不大需要，反而增加理解成本）：
 
 ![wakeup_stress_4cpu_out_icicle](/images/wakeup_stress_4cpu_out_icicle.svg)
 
