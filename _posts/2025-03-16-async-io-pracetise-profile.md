@@ -395,7 +395,7 @@ Tracing "ttwu_do_wakeup" for PID 1308... Ctrl-C to end.
     * 调用std::packaged_task对象的`operator()`，可以开始执行任务
     * 对比：std::promise包装的是一个值，std::packaged_task包装的是一个可调用对象
 
-异步改造，完整代码见：[]()。主要是任务入队时，`std::packaged_task`将其包装成异步任务，并通过其`std::future`用来获取结果：
+异步改造，完整代码见：[GitHub链接](https://github.com/xiaodongQ/prog-playground/tree/main/concurrent/std_async)。主要是任务入队时，`std::packaged_task`将其包装成异步任务，并通过其`std::future`用来获取结果：
 
 ```cpp
 class ThreadPool {
@@ -543,3 +543,4 @@ offwaketime火焰图：
 * [并发与异步编程（二） -- 异步编程框架了解](https://xiaodongq.github.io/2025/03/11/async-io/)
 * [并发与异步编程（三） -- 性能分析工具：gperftools和火焰图](https://xiaodongq.github.io/2025/03/14/async-io-example-profile/) 
 * [C++ 并发三剑客future, promise和async](https://gitbookcpp.llfc.club/sections/cpp/concurrent/concpp07.html)
+* LLM

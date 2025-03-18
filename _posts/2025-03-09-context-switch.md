@@ -1,6 +1,6 @@
 ---
 layout: post
-title: CPU及内存调度学习（一） -- 进程、线程、系统调用、协程上下文切换
+title: CPU及内存调度（一） -- 进程、线程、系统调用、协程上下文切换
 categories: CPU
 tags: CPU 线程
 ---
