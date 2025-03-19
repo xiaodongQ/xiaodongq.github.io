@@ -247,6 +247,8 @@ flamegraph.pl --color=io --title="Off-CPU Time Flame Graph" --countname=us --rev
 **分析**：
 
 * 上述Off-CPU图中，灰色的"`-`"行，对应`offcputime -d`参数指定的，向内核态和用户态之间插入的分隔符
+* **堆栈方向**：从下到上，下面是用户态，上面是内核态堆栈。从中可看到**用户态程序真正被什么阻塞了**
+    * 比如图中mysqld的`__pthread_cond_timedwait`系统调用，依次堆栈是进入内核态调用 -> `__x64_sys_futex` -> `do_futex` -> ... -> `finish_task_switch`
 * 虽然执行了stress，但火焰图中最宽的还是mysqld进程
     * 这里mysqld时间占了**165秒**，原因如 [之前](https://xiaodongq.github.io/2025/03/09/context-switch/) 用`perf stat`分析线程池开销时所说的，`time elapse`（也叫墙上时间，Wall Clock Time）是程序开始到结束的时间（此处即这5s左右），是可能比用户时间（`user time`）和系统时间（`sys time`）小的，主要是多线程中这些时间是分别累加的。比如两个线程各自sys time是0.03s和0.04s，总的sys time就是0.07s，而time elapse可能只是`max(0.03, 0.04, usr time)`
     * 几个多线程服务就会出现这个尴尬的情况，Off-CPU火焰图中，总被这些大宽列影响整体查看。
@@ -272,6 +274,8 @@ stackcollapse.pl < out.stacks | flamegraph.pl --color=io --title="Off-CPU Time F
 ![offcpu_icicle_libbpf-tool](/images/offcpu_stress2_icicle.svg)
 
 结论：火焰图场景，还是暂用原来bcc tools的工具比较合适，比如 /usr/share/bcc/tools/offcputime。
+
+Off-CPU的问题是，只能看到程序在等待某个IO或者锁，但是无法知道等待这么长时间时CPU具体在做什么处理，若知晓的话就可以辅助分析这个等待是否合理。于是下面的wekeup火焰图就上场了。
 
 ### 5.2. 线程唤醒者栈追踪（Wakeup）
 
