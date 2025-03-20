@@ -85,12 +85,82 @@ Linux为每个进程分配独立的虚拟内存，各进程间有独立的虚拟
 
 结合 [Linux进程是如何创建出来的？](https://mp.weixin.qq.com/s/ftrSkVvOr6s5t0h4oq4I2w) 和 [进程和线程之间有什么根本性的区别？](https://mp.weixin.qq.com/s/--S94B3RswMdBKBh6uxt0w) 一起梳理。
 
-进程的核心结构：`task_struct`
+进程/线程的核心结构：`task_struct`，定义在`include/linux/sched.h`，自己本地5.10.10的内核代码：linux-5.10.10/include/linux/sched.h。
+
+`struct task_struct`中的内容特别多，算上注释和一些空格、条件编译，5.10.10版本里有`700`多行。
+
+对比了一下参考链接（基于3.10.0内核）中的字段，在5.10.10中基本都一样，只是顺序略有不同，所以此处还是贴一下参考链接的结构体定义，便于和后续流程说明保持一致。
 
 ```cpp
+// include/linux/sched.h
+struct task_struct {
+    //2.1 进程状态 （标号对应于参考链接中的小章节）
+    volatile long state;
 
+    //2.2 进程线程的pid
+    pid_t pid;
+    pid_t tgid;
+
+    //2.3 进程树关系：父进程、子进程、兄弟进程
+    struct task_struct __rcu *parent;
+    struct list_head children; 
+    struct list_head sibling;
+    struct task_struct *group_leader; 
+
+    //2.4 进程调度优先级
+    int prio, static_prio, normal_prio;
+    unsigned int rt_priority;
+
+    //2.5 进程地址空间
+    struct mm_struct *mm, *active_mm;
+
+    //2.6 进程文件系统信息（当前目录等）
+    struct fs_struct *fs;
+
+    //2.7 进程打开的文件信息
+    struct files_struct *files;
+
+    //2.8 namespaces
+    // 命名空间，用于隔离内核资源
+    struct nsproxy *nsproxy;
+}
 ```
 
+示意图如下：
+
+![task_struct](/images/task_struct.png)  
+[出处](https://mp.weixin.qq.com/s/ftrSkVvOr6s5t0h4oq4I2w)
+
+说明：
+
+* **进程/线程状态** 对应的定义也在 include/linux/sched.h 中
+    * 在 [并发与异步编程（三） -- 性能分析工具：gperftools和火焰图](https://xiaodongq.github.io/2025/03/14/async-io-example-profile/) 的介绍中，bcc中的`offcputime`工具就可以通过`--state`来指定过滤线程状态，以避免多线程时部分等待线程影响整体火焰图的展示
+    * 常见状态：
+        * 0（`TASK_RUNNING`）可执行状态
+            * 进程要么正在执行，要么准备执行，涵盖了操作系统层面“运行”和“就绪”两种状态。
+            * 处于该状态（比如一个进程被创建并准备好执行）的进程会被放置在 CPU 的运行队列（runqueue）中，等待调度器分配CPU时间片
+        * 1（`TASK_INTERRUPTIBLE`）可中断睡眠状态，可被信号唤醒
+            * 进程正在等待某个特定的事件发生（如 I/O 完成、信号到来等），这期间会放弃CPU资源进入睡眠状态
+            * 内核中，当进程调用某些会导致睡眠的系统调用（如 read、write 等）时，如果所需的资源暂时不可用，进程会将自己的状态设置为 TASK_INTERRUPTIBLE 并加入相应的等待队列
+        * 2（`TASK_UNINTERRUPTIBLE`）不可中断睡眠状态，不可被信号唤醒
+            * 等待某个特定事件，期间不会响应任何信号，只能等待事件本身发生后才能被唤醒
+            * 通常用于一些对系统稳定性要求较高的场景，比如与硬件设备交互，例如进程正在`等待磁盘 I/O 操作完成`
+        * 4（`__TASK_STOPPED`）停止状态
+            * 进程由于接收到特定的信号（如 SIGSTOP、SIGTSTP 等）而被暂停执行，该状态不会调度到CPU上运行，直到它接收到继续执行的信号（如 SIGCONT）
+            * 当内核接收到停止进程的信号时，会将进程的状态设置为 TASK_STOPPED，并将其从运行队列中移除
+    * 还有很多状态，可见：linux-5.10.10/include/linux/sched.h
+* **进程ID**：有`pid`和`tgid` 2个定义
+    * 对于没有创建线程的进程(**只包含一个主线程**)来说，这个 pid 就是进程的 PID，**tgid 和 pid 是相同的**
+* 进程树关系，可以通过 `pstree` 命令查看
+* **进程地址空间**：`struct mm_struct *mm, *active_mm;`，内存描述符，是**下述章节的重点**，暂时不做展开。
+* fs_struct：进程文件系统信息
+    * 描述进程的文件位置等信息
+* files_struct：进程打开的文件信息
+    * 每个进程用一个 files_struct 结构来记录文件描述符的使用情况， 这个 files_struct 结构称为用户打开文件表。
+    * 其中核心结构：`struct file __rcu * fd_array[NR_OPEN_DEFAULT];`，在数组元素中记录了当前进程打开的每一个文件的指针。这个文件是 Linux 中抽象的文件，可能是真的磁盘上的文件，也可能是一个 socket。
+    * 定义位于：`linux-5.10.10/include/linux/fdtable.h`
+
+### 3.2. 内存管理结构
 
 ## 4. 小结
 
