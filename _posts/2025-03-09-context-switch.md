@@ -1,7 +1,7 @@
 ---
 layout: post
 title: CPU及内存调度（一） -- 进程、线程、系统调用、协程上下文切换
-categories: CPU
+categories: CPU及内存调度
 tags: CPU 线程
 ---
 
