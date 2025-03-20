@@ -8,15 +8,15 @@ tags: 网络 epoll Redis
 * content
 {:toc}
 
-梳理学习 Redis ~~和 Nginx~~ 中的epoll机制。
+梳理 Redis ~~和 Nginx~~ 中的epoll机制。
 
 
 
 ## 1. 背景
 
-[前面](https://xiaodongq.github.io/2025/02/25/ioserver2-epoll-dive/)的ioserver demo中进行了基本的epoll机制使用和学习，并梳理了开源网络库 muduo 的epoll使用和线程池实现。
+[前面](https://xiaodongq.github.io/2025/02/25/ioserver2-epoll-dive/)的ioserver demo中进行了基本的epoll机制使用，并梳理了开源网络库 muduo 的epoll使用和线程池实现。
 
-本篇继续学习epoll在Redis和Nginx中的使用，进一步加深理解。跟踪的源码分支保持和本地CentOS8环境安装的服务版本一致：Redis版本：`5.0.3`（单线程版本）、Nginx版本：`1.14`。
+本篇继续epoll在Redis和Nginx中的使用，进一步加深理解。跟踪的源码分支保持和本地CentOS8环境安装的服务版本一致：Redis版本：`5.0.3`（单线程版本）、Nginx版本：`1.14`。
 
 参考：
 
