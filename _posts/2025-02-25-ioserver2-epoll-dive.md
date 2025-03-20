@@ -1,6 +1,6 @@
 ---
 layout: post
-title: ioserver服务实验（二） -- epoll梳理学习
+title: ioserver服务实验（二） -- epoll使用梳理
 categories: 网络
 tags: 网络 epoll
 ---
@@ -8,7 +8,7 @@ tags: 网络 epoll
 * content
 {:toc}
 
-基于ioserver demo项目，梳理学习epoll的使用。
+基于ioserver demo项目，梳理epoll的使用。
 
 
 
