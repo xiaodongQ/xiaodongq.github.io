@@ -14,7 +14,7 @@ CPU和内存调度相关学习实践系列，本篇梳理Linux内存管理及相
 
 ## 1. 背景
 
-在[CPU及内存调度（一） -- 进程、线程、系统调用、协程上下文切换](https://xiaodongq.github.io/2025/03/09/context-switch)中已经介绍过Linux通过页表机制进行内存映射管理，涉及TLB、MMU、缺页中断等，并发与异步编程系列梳理学习中，也涉及内存序和CPU缓存等问题，本篇开始梳理学习Linux内存管理，以及相关的进程、线程创建过程。
+在 [CPU及内存调度（一） -- 进程、线程、系统调用、协程上下文切换](https://xiaodongq.github.io/2025/03/09/context-switch) 中已经介绍过Linux通过页表机制进行内存映射管理，涉及TLB、MMU、缺页中断等，并发与异步编程系列梳理学习中，也涉及内存序和CPU缓存等问题，本篇开始梳理学习Linux内存管理，以及相关的进程、线程创建过程。
 
 主要参考：
 
@@ -51,13 +51,13 @@ Linux为每个进程分配独立的虚拟内存，各进程间有独立的虚拟
 * 32位系统上，指针寻址范围`2^32`，对应虚拟内存空间`4GB`，其中用户态`3GB`，内核态`1GB`
 * **保留区**：0x0000 0000 到 `0x0804 8000` 这段虚拟内存地址是一段不可访问的保留区
 * 编译期确定：
-    * **代码段**存储二进制文件中的机器码、**数据段**存储指定了初始值的 全局变量和静态变量、**BSS段**存储未指定初始值的全局变量和静态变量
+    * **代码段**：存储二进制文件中的机器码、**数据段**：存储指定了初始值的 全局变量和静态变量、**BSS段**：存储未指定初始值的全局变量和静态变量
 * 运行期确定：
-    * **堆**存储动态的申请内存
+    * **堆**：存储动态的申请内存
     * **文件映射与匿名映射区**，用于存储：
-        * 1）程序运行依赖的动态链接库，这些动态链接库也有自己的对应的代码段，数据段，BSS 段，加载到内存需要的空间
-        * 2）内存文件映射的系统调用`mmap`，映射的内存空间
-    * **栈**，存储程序运行期间，函数调用过程中用到的局部变量和参数
+        * 1）内存文件映射的系统调用`mmap`，映射的内存空间
+        * 2）程序运行依赖的动态链接库，这些动态链接库也有自己的对应的代码段，数据段，BSS 段，加载到内存需要的空间（匿名映射区）
+    * **栈**：存储程序运行期间，函数调用过程中用到的局部变量和参数
 * 注意几个分段的**地址增长方向**
     * 堆：从低地址到高地址增长
     * 文件映射与匿名映射区：从高地址到低地址增长
@@ -81,7 +81,7 @@ Linux为每个进程分配独立的虚拟内存，各进程间有独立的虚拟
 
 既然说进程的虚拟内存空间管理，那就离不开进程的创建。下面先看下内核中创建进程的简要流程，再跟进其中涉及的内存管理相关结构和机制。
 
-### 3.1. 内核创建进程
+### 3.1. 进程的核心数据结构
 
 结合 [Linux进程是如何创建出来的？](https://mp.weixin.qq.com/s/ftrSkVvOr6s5t0h4oq4I2w) 和 [进程和线程之间有什么根本性的区别？](https://mp.weixin.qq.com/s/--S94B3RswMdBKBh6uxt0w) 一起梳理。
 
@@ -160,7 +160,144 @@ struct task_struct {
     * 其中核心结构：`struct file __rcu * fd_array[NR_OPEN_DEFAULT];`，在数组元素中记录了当前进程打开的每一个文件的指针。这个文件是 Linux 中抽象的文件，可能是真的磁盘上的文件，也可能是一个 socket。
     * 定义位于：`linux-5.10.10/include/linux/fdtable.h`
 
-### 3.2. 内存管理结构
+### 3.2. 进程创建流程
+
+在应用代码里面，我们一般会用`fork`及`clone`系统调用创建子进程，这里来跟踪梳理下`fork`的简要流程。
+
+系统调用一般是 `SYSCALL_DEFINEx` 形式，`x`则为参数个数，比如`fork`没有传入参数，其定义为`SYSCALL_DEFINE0(fork)`，位于`kernel/fork.c`。
+
+如下，可见不管是`fork`、`vfork`还是`clone`，设置参数后，都是调用`kernel_clone`函数（3.10内核的调用层次略有不同）。
+
+```cpp
+// linux-5.10.10/kernel/fork.c
+// fork和vfork定义，省略了部分条件编译相关判断分支
+#ifdef __ARCH_WANT_SYS_FORK
+SYSCALL_DEFINE0(fork)
+{
+    struct kernel_clone_args args = {
+        .exit_signal = SIGCHLD,
+    };
+    return kernel_clone(&args);
+}
+#endif
+
+#ifdef __ARCH_WANT_SYS_VFORK
+SYSCALL_DEFINE0(vfork)
+{
+    struct kernel_clone_args args = {
+        .flags		= CLONE_VFORK | CLONE_VM,
+        .exit_signal	= SIGCHLD,
+    };
+
+    return kernel_clone(&args);
+}
+#endif
+
+// clone系统调用定义节选
+SYSCALL_DEFINE5(clone, unsigned long, clone_flags, unsigned long, newsp,
+         int __user *, parent_tidptr,
+         int __user *, child_tidptr,
+         unsigned long, tls)
+{
+    struct kernel_clone_args args = {
+        .flags		= (lower_32_bits(clone_flags) & ~CSIGNAL),
+        .pidfd		= parent_tidptr,
+        .child_tid	= child_tidptr,
+        .parent_tid	= parent_tidptr,
+        .exit_signal	= (lower_32_bits(clone_flags) & CSIGNAL),
+        .stack		= newsp,
+        .tls		= tls,
+    };
+
+    return kernel_clone(&args);
+}
+```
+
+继续跟踪调用流程，`kernel_clone`的核心是一个`copy_process`函数：
+
+```cpp
+// linux-5.10.10/kernel/fork.c
+pid_t kernel_clone(struct kernel_clone_args *args)
+{
+    struct task_struct *p;
+    ...
+    // 核心是一个 copy_process 函数
+    // 复制一个 task_struct 出来
+    p = copy_process(NULL, trace, NUMA_NO_NODE, args);
+    ...
+    pid = get_task_pid(p, PIDTYPE_PID);
+    nr = pid_vnr(pid);
+    ...
+    // 子任务加入到就绪队列中去，等待调度器调度
+    wake_up_new_task(p);
+    ...
+    put_pid(pid);
+    return nr;
+}
+```
+
+`copy_process`函数逻辑很长（5.10.10中500多行），截取部分核心流程，看下具体复制什么内容，其中`args`就是上述传入的参数结构：
+
+```cpp
+// linux-5.10.10/kernel/fork.c
+// 说明：基于5.10.10代码，保留了参考链接对应的标号，便于对照查看
+static __latent_entropy struct task_struct *copy_process(
+                    struct pid *pid,
+                    int trace,
+                    int node,
+                    struct kernel_clone_args *args)
+{
+    int pidfd = -1, retval;
+    // 用于复制进程 task_struct 结构体
+    struct task_struct *p;
+    ...
+
+    //3.1 复制进程 task_struct 结构体
+    p = dup_task_struct(current, node);
+    ...
+
+    //3.2 拷贝 files_struct
+    retval = copy_files(clone_flags, p);
+
+    //3.3 拷贝 fs_struct
+    retval = copy_fs(clone_flags, p);
+
+    // 拷贝信号处理结构
+    retval = copy_sighand(clone_flags, p);
+    // 拷贝信号
+    retval = copy_signal(clone_flags, p);
+
+    //3.4 拷贝 mm_struct
+    retval = copy_mm(clone_flags, p);
+
+    //3.5 拷贝进程的命名空间 nsproxy
+    retval = copy_namespaces(clone_flags, p);
+
+    // 拷贝io上下文：io_context
+    retval = copy_io(clone_flags, p);
+    // 拷贝线程相关信息
+    retval = copy_thread(clone_flags, args->stack, args->stack_size, p, args->tls);
+
+    //3.6 申请 pid && 设置进程号
+    if (pid != &init_struct_pid) {
+        pid = alloc_pid(p->nsproxy->pid_ns_for_children, args->set_tid,
+                args->set_tid_size);
+    }
+    ...
+    p->pid = pid_nr(pid);
+    if (clone_flags & CLONE_THREAD) {
+        p->group_leader = current->group_leader;
+        p->tgid = current->tgid;
+    } else {
+        p->group_leader = p;
+        // 如果不是创建线程，则设置 tgid 为pid
+        p->tgid = p->pid;
+    }
+    ...
+}
+```
+
+### 3.3. 内存管理结构
 
 ## 4. 小结
 
