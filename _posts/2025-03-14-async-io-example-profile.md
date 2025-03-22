@@ -180,7 +180,7 @@ Off-CPU 能够识别的类型包含：阻塞在 I/O、锁、定时器、缺页�
 * bpftrace 用来从上到下来跟踪到指定函数，即只能看到谁调用到指定追踪点
 * funcgraph 用来从指定函数往下追踪调用栈
 
-可以回顾之前用bpftrace和funcgraph追踪存储栈实践用法：[学习Linux存储IO栈（二） -- Linux内核存储栈流程和接口](https://xiaodongq.github.io/2024/08/13/linux-kernel-fs/)、[学习Linux存储IO栈（三） -- eBPF和ftrace跟踪IO写流程](https://xiaodongq.github.io/2024/08/15/linux-write-io-stack/)
+可以回顾之前用bpftrace和funcgraph追踪存储栈实践用法：[Linux存储IO栈梳理（二） -- Linux内核存储栈流程和接口](https://xiaodongq.github.io/2024/08/13/linux-kernel-fs/)、[Linux存储IO栈梳理（三） -- eBPF和ftrace跟踪IO写流程](https://xiaodongq.github.io/2024/08/15/linux-write-io-stack/)
 
 ### 4.2. 工具归档说明
 

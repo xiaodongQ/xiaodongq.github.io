@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 学习Linux存储IO栈（四） -- 通用块层
+title: Linux存储IO栈梳理（四） -- 通用块层
 categories: 存储
 tags: 存储 IO
 ---
@@ -14,7 +14,7 @@ tags: 存储 IO
 
 ## 1. 背景
 
-[学习Linux存储IO栈（二） -- Linux内核存储栈流程和接口](https://xiaodongq.github.io/2024/08/13/linux-kernel-fs/) 中简单带过了一下通用块层，并在 [学习Linux存储IO栈（三） -- eBPF和ftrace跟踪IO写流程](https://xiaodongq.github.io/2024/08/15/linux-write-io-stack) 中追踪IO写流程时追踪到对应的io调度处理相关堆栈，本篇来具体看下通用块层的对应流程。
+[Linux存储IO栈梳理（二） -- Linux内核存储栈流程和接口](https://xiaodongq.github.io/2024/08/13/linux-kernel-fs/) 中简单带过了一下通用块层，并在 [Linux存储IO栈梳理（三） -- eBPF和ftrace跟踪IO写流程](https://xiaodongq.github.io/2024/08/15/linux-write-io-stack) 中追踪IO写流程时追踪到对应的io调度处理相关堆栈，本篇来具体看下通用块层的对应流程。
 
 另外，想起来之前看过的极客时间课程，回头看了下存储模块相关的系列文章：[基础篇：Linux 磁盘I/O是怎么工作的（上）](https://time.geekbang.org/column/article/77010)，发现作为概述和索引用来查漏补缺挺好的。之前更多的是对CPU/内存/存储/网络等对应有哪些观测工具和指标有个总览的了解，浮于“知道”（且容易忘）的层面，深入去看则发现有很多东西需要自己另外花心思去啃。这时再看文章有了不同的角度，收获到一些新的东西。
 
@@ -227,7 +227,7 @@ struct scsi_cmnd {
 
 block层提供了`submit_bio`的接口，上层可以调用这个接口来提交请求。
 
-在 [学习Linux存储IO栈（三） -- eBPF和ftrace跟踪IO写流程](https://xiaodongq.github.io/2024/08/15/linux-write-io-stack) 中，通过`funcgraph`追踪到了block层的调用栈，不过层数太多，完整没贴在文章中，完整内容见：[O_DIRECT写入调用栈](/images/srcfiles/funcgragh_write_direct_stack.txt)。
+在 [Linux存储IO栈梳理（三） -- eBPF和ftrace跟踪IO写流程](https://xiaodongq.github.io/2024/08/15/linux-write-io-stack) 中，通过`funcgraph`追踪到了block层的调用栈，不过层数太多，完整没贴在文章中，完整内容见：[O_DIRECT写入调用栈](/images/srcfiles/funcgragh_write_direct_stack.txt)。
 
 这里贴一下block层相关的调用栈（去除了一些细节和其他调用，可通过括号匹配层级）：
 

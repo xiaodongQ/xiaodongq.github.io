@@ -1,6 +1,6 @@
 ---
 layout: post
-title: 学习Linux存储IO栈（一） -- 存储栈全貌图
+title: Linux存储IO栈梳理（一） -- 存储栈全貌图
 categories: 存储
 tags: 存储 IO
 ---
@@ -8,7 +8,7 @@ tags: 存储 IO
 * content
 {:toc}
 
-学习Linux存储IO栈
+Linux存储IO栈梳理学习
 
 
 
