@@ -679,6 +679,10 @@ Key to Flags:
 
 梳理进程管理以及内存管理相关流程，涉及进程和线程的差异，虚拟内存空间结构以及内核中的简要流程。
 
+Linux物理内存管理的相关内容暂未展开（TODO），可参考：[一步一图带你深入理解 Linux 物理内存管理](https://mp.weixin.qq.com/s/Cn-oX0W5DrI2PivaWLDpPw)。
+
+几篇参考链接值得多回头翻看。
+
 ## 6. 参考
 
 * [一步一图带你深入理解 Linux 虚拟内存管理](https://mp.weixin.qq.com/s/uWadcBxEgctnrgyu32T8sQ)
