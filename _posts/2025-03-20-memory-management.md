@@ -384,7 +384,7 @@ const int clone_flags = (CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SYSVSEM
 
 ### 4.1. 拷贝虚拟内存空间
 
-每个进程都有唯一的`mm_struct`结构体，也就是前边提到的每个进程的虚拟地址空间都是**独立，互不干扰**的。线程则是和其父进程共享虚拟地址空间。
+每个进程都有唯一的`mm_struct`结构体（可称作内存描述符），也就是前边提到的每个进程的虚拟地址空间都是**独立，互不干扰**的。线程则是和其父进程共享虚拟地址空间。
 
 展开跟踪一下上面的`copy_mm`：
 
@@ -441,6 +441,7 @@ struct mm_struct {
         ...
         unsigned long mmap_base;  /* base of mmap area */
         ...
+        // 通过 task_size 将进程虚拟内存空间和内核虚拟内存空间分割开
         unsigned long task_size;    /* size of task vm space */
         ...
         // total_vm 表示在进程虚拟内存空间中总共与物理内存映射的页 的总数
@@ -462,7 +463,7 @@ struct mm_struct {
         // start_data 和 end_data 定义数据段的起始和结束位置，初始化的全局变量和静态变量被加载进内存中就存放在这里
         unsigned long start_code, end_code, start_data, end_data;
         // start_brk 定义堆的起始位置，brk 定义堆当前的结束位置
-        // start_stack 是栈的起始位置在 RBP 寄存器中存储
+        // start_stack 是栈的起始位置（栈基地址）在 RBP 寄存器中存储，栈的结束位置也就是栈顶指针 stack pointer 在 RSP 寄存器中存储。
         // end_data 和 start_brk 之间是 BSS段，所以不用单独定义BSS段相关边界字段
         unsigned long start_brk, brk, start_stack;
         // arg_start 和 arg_end 是参数列表的位置
@@ -475,6 +476,8 @@ struct mm_struct {
 ```
 
 结构和内存空间结构各段的示意图如下：
+
+* 通过 `task_size` 将 进程虚拟内存空间 和 内核虚拟内存空间 分割开
 
 ![mm_struct_overview](/images/mm_struct_overview.png)
 
@@ -505,6 +508,7 @@ struct vm_area_struct {
     struct mm_struct *vm_mm;	/* The address space we belong to. */
 
     pgprot_t vm_page_prot;
+    // 当前虚拟内存区域的访问权限 VM_READ/VM_WRITE/VM_EXEC/VM_SHARD/VM_IO等等
     unsigned long vm_flags;
 
     struct {
@@ -514,7 +518,10 @@ struct vm_area_struct {
 
     struct list_head anon_vma_chain;
     struct anon_vma *anon_vma;
+
+    // 针对虚拟内存区域的操作，定义了各种函数指针，比如open/close/fault/huge_fault/pagesize等等
     const struct vm_operations_struct *vm_ops;
+
     unsigned long vm_pgoff;
     struct file * vm_file;
     void * vm_private_data;
@@ -534,25 +541,143 @@ struct vm_area_struct {
 
 `vm_area_struct`和`mm_struct`结构组织示意图，具体描述见参考链接：
 
+* `vm_flags`定义虚拟内存区域的访问权限和行为规范
+
 ![mm_struct_vma_overview](/images/mm_struct_vma_overview.png)
 
-### 4.4. 二进制文件如何映射到虚拟内存空间
+### 4.4. 虚拟内存区域的操作函数
+
+针对上面`vm_area_struct`中的 `const struct vm_operations_struct *vm_ops;`，单独列出来说下，其中定义的都是对虚拟内存区域 VMA 的相关操作函数指针。
+
+```cpp
+// linux-5.10.10/include/linux/mm.h
+struct vm_operations_struct {
+    // 当指定的虚拟内存区域被加入到进程虚拟内存空间中时，open 函数会被调用
+    void (*open)(struct vm_area_struct * area);
+    // 当虚拟内存区域 VMA 从进程虚拟内存空间中被删除时，close 函数会被调用
+    void (*close)(struct vm_area_struct * area);
+    int (*split)(struct vm_area_struct * area, unsigned long addr);
+    int (*mremap)(struct vm_area_struct * area);
+    // 当进程访问虚拟内存时，访问的页面不在物理内存中，这时就会产生缺页异常，fault 函数就会被调用
+    // 可能是未分配物理内存也可能是被置换到磁盘中
+    vm_fault_t (*fault)(struct vm_fault *vmf);
+    ...
+};
+```
+
+**内核中这种类似的用法其实有很多，在内核中每个特定领域的描述符都会定义相关的操作。**（`void *private_data`中定义特定类型的各自结构）
+
+参考链接（[一步一图带你深入理解 Linux 虚拟内存管理](https://mp.weixin.qq.com/s/uWadcBxEgctnrgyu32T8sQ)）中的**图画得太好**了，之前看的网络和磁盘，对应的file结构以及对应操作，通过这些图示就很直观了。这里也贴一下，建议参考博主历史文章。该**梳理学习后画图的方法值得后续实践参考**，通过结构图后续还能方便地串联起知识点。
+
+1）针对 Socket 文件类型，这里的`file_operations`指向的是`socket_file_ops`：
+
+![file_socket_operation](/images/file_socket_operation.png)
+
+2）针对`ext4`文件系统，`file_operations`指向`ext4_file_operations`，其中`file`的`struct address_space *f_mapping`字段中定义了针对 page cache 页高速缓存相关操作，其中的`const struct address_space_operations *a_ops;` 即定义了各类函数指针
+
+![file_ext4_operation](/images/file_ext4_operation.png)
+
+3）上述socket更进一步的相关操作。对socket发起IO操作，内核中会调用`private_data`对应的`struct socket`结构中的操作指针（ops对应的`inet_stream_ops`），最终调用到`struct sock`中`sk_prot`指针指向的 `tcp_prot` 内核协议栈操作函数接口集合
+
+![file_tcp_operation](/images/file_tcp_operation.png)
+
+### 4.5. 二进制文件如何映射到虚拟内存空间
 
 > 内核中完成这个映射过程的函数是 `load_elf_binary` ，这个函数的作用很大，加载内核的是它，启动第一个用户态进程 init 的是它，fork 完了以后，调用 exec 运行一个二进制程序的也是它。当 exec 运行一个二进制程序的时候，除了解析 ELF 的格式之外，另外一个重要的事情就是建立上述提到的内存映射。
 
-暂做标记，后续再深入梳理。
+暂做标记，后续再深入梳理（TODO）。
 
 ```cpp
 // linux-5.10.10/fs/binfmt_elf.c
+// 逻辑也不少，500多行
 static int load_elf_binary(struct linux_binprm *bprm)
 {
     ...
 }
 ```
 
+可以看个一个简单的小程序，`readelf -a`的结果却也很长，有800多行，完整结果可见：[readelf_test_result](/images/srcfiles/readelf_test_result.txt)。当然也可以指定选项单独查看某一部分。
+
+```c
+#include <iostream>
+
+int add(int a, int b) {
+    return a + b;
+}
+
+int main() {
+    int num1 = 5;
+    int num2 = 3;
+    int result = add(num1, num2);
+    std::cout << "两数之和为: " << result << std::endl;
+    return 0;
+}
+```
+
+这里只`-S`（或`--section-headers`）过滤各部分（Section）的头信息：
+
+* 从中可以看到`.text`代码段、`.data`、`.bss`等，以及对应的权限，程序运行时这些会被映射到虚拟内存对应的段（Segment）中
+
+```sh
+[CentOS-root@xdlinux ➜ cpp_test ]$ readelf -S add_test 
+There are 30 section headers, starting at offset 0x3fe8:
+
+Section Headers:
+  [Nr] Name              Type             Address           Offset
+       Size              EntSize          Flags  Link  Info  Align
+  [ 0]                   NULL             0000000000000000  00000000
+       0000000000000000  0000000000000000           0     0     0
+  [ 1] .interp           PROGBITS         0000000000400238  00000238
+       000000000000001c  0000000000000000   A       0     0     1
+  [ 2] .note.ABI-tag     NOTE             0000000000400254  00000254
+       0000000000000020  0000000000000000   A       0     0     4
+  ...
+  [11] .init             PROGBITS         00000000004006f0  000006f0
+       000000000000001b  0000000000000000  AX       0     0     4
+  [12] .plt              PROGBITS         0000000000400710  00000710
+       0000000000000080  0000000000000010  AX       0     0     16
+  [13] .text             PROGBITS         0000000000400790  00000790
+       0000000000000225  0000000000000000  AX       0     0     16
+  [14] .fini             PROGBITS         00000000004009b8  000009b8
+       000000000000000d  0000000000000000  AX       0     0     4
+  [15] .rodata           PROGBITS         00000000004009c8  000009c8
+       0000000000000023  0000000000000000   A       0     0     8
+  [16] .eh_frame_hdr     PROGBITS         00000000004009ec  000009ec
+       0000000000000054  0000000000000000   A       0     0     4
+  ...
+  [23] .data             PROGBITS         0000000000601050  00001050
+       0000000000000004  0000000000000000  WA       0     0     1
+  [24] .bss              NOBITS           0000000000601060  00001054
+       0000000000000118  0000000000000000  WA       0     0     32
+  [25] .comment          PROGBITS         0000000000000000  00001054
+       0000000000000058  0000000000000001  MS       0     0     1
+  ...
+Key to Flags:
+  W (write), A (alloc), X (execute), M (merge), S (strings), I (info),
+  L (link order), O (extra OS processing required), G (group), T (TLS),
+  C (compressed), x (unknown), o (OS specific), E (exclude),
+  l (large), p (processor specific)
+```
+
+### 4.6. 内核态虚拟内存空间
+
+上述介绍了进程虚拟内存空间在内核中的布局及管理，**不同进程之间**的虚拟内存空间是**相互隔离、相互独立**的。
+
+而**内核态虚拟内存空间是所有进程共享的**，不同进程进入内核态之后看到的虚拟内存空间全部是一样的。
+
+内核虚拟内存空间的布局情况，本篇也暂时不做展开。贴一下 [一步一图带你深入理解 Linux 虚拟内存管理](https://mp.weixin.qq.com/s/uWadcBxEgctnrgyu32T8sQ) 中的示意图，后续深入。
+
+32位：
+
+![linux_virtual_memory_32bit_overview](/images/linux_virtual_memory_32bit_overview.png)
+
+64位：
+
+![linux_virtual_memory_64bit_overview](/images/linux_virtual_memory_64bit_overview.png)
+
 ## 5. 小结
 
-梳理进程管理以及内存管理相关流程。
+梳理进程管理以及内存管理相关流程，涉及进程和线程的差异，虚拟内存空间结构以及内核中的简要流程。
 
 ## 6. 参考
 
