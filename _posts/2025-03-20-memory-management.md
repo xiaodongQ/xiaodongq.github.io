@@ -596,7 +596,7 @@ static int load_elf_binary(struct linux_binprm *bprm)
 }
 ```
 
-可以看个一个简单的小程序，`readelf -a`的结果却也很长，有800多行，完整结果可见：[readelf_test_result](/images/srcfiles/readelf_test_result.txt)。当然也可以指定选项单独查看某一部分。
+可以看下面一个简单的程序，`readelf -a`的结果却也很长，有800多行，完整结果可见：[readelf_test_result](/images/srcfiles/readelf_test_result.txt)。当然也可以指定选项单独查看某一部分。
 
 ```c
 #include <iostream>
