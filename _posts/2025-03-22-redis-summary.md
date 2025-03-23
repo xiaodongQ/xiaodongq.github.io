@@ -32,7 +32,7 @@ Redis（`Remote Dictionary Server`）是一个使用ANSI C编写的支持网络�
 * [Redis 源码剖析与实战](https://time.geekbang.org/column/intro/100084301)
 * [图解Redis](https://www.xiaolincoding.com/redis/)
 
-Redis应用场景很多，比如缓存系统、消息队列、分布式锁等，比如下述缓存系统简单示图：
+Redis应用场景很多，比如缓存系统、消息队列、分布式锁等，比如下述缓存系统简单示例图（主要为了试下`Follow Animation`动态效果）：
 
 ![example_redis_mysql_case](/images/example_redis_mysql_case.svg)
 
