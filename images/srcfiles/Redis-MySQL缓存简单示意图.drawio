@@ -1,0 +1,69 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36" version="26.1.1">
+  <diagram name="第 1 页" id="9VJWPwz0f7SbtjrPV7s9">
+    <mxGraphModel dx="794" dy="423" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="7YgAe8dNIz29mKLiqWVZ-11" value="&lt;span&gt;应用程序&lt;/span&gt;" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Comic Sans MS;fontSize=13;labelBackgroundColor=none;fillColor=#dae8fc;strokeColor=#6c8ebf;fillStyle=auto;" vertex="1" parent="1">
+          <mxGeometry x="294" y="720" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="7YgAe8dNIz29mKLiqWVZ-12" value="" style="image;sketch=0;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/mscae/Cache_Redis_Product.svg;fontFamily=Helvetica;fontColor=default;labelBackgroundColor=default;" vertex="1" parent="1">
+          <mxGeometry x="310" y="830" width="81" height="68.04" as="geometry" />
+        </mxCell>
+        <mxCell id="7YgAe8dNIz29mKLiqWVZ-13" value="" style="image;sketch=0;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/mscae/Azure_Database_for_MySQL_servers.svg;fontFamily=Helvetica;fontColor=default;labelBackgroundColor=default;" vertex="1" parent="1">
+          <mxGeometry x="320.5" y="940" width="60" height="78.95" as="geometry" />
+        </mxCell>
+        <mxCell id="7YgAe8dNIz29mKLiqWVZ-15" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.173;entryY=-0.037;entryDx=0;entryDy=0;entryPerimeter=0;shadow=0;dashed=1;strokeColor=#FF5517;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;flowAnimation=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="315" y="780" as="sourcePoint" />
+            <mxPoint x="315.0129999999999" y="827.48252" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="7YgAe8dNIz29mKLiqWVZ-16" value="缓存应用为例：" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="194" y="728" width="100" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="7YgAe8dNIz29mKLiqWVZ-18" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.108;entryY=0.044;entryDx=0;entryDy=0;entryPerimeter=0;shadow=0;dashed=1;strokeColor=#00FF00;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;flowAnimation=1;exitX=0.21;exitY=0.977;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1" source="7YgAe8dNIz29mKLiqWVZ-12" target="7YgAe8dNIz29mKLiqWVZ-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="7YgAe8dNIz29mKLiqWVZ-19" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.7;entryY=1.042;entryDx=0;entryDy=0;entryPerimeter=0;shadow=0;dashed=1;strokeColor=#00FF00;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;flowAnimation=1;strokeWidth=1;exitX=1;exitY=-0.037;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1" source="7YgAe8dNIz29mKLiqWVZ-12">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="400" y="830" as="sourcePoint" />
+            <mxPoint x="400" y="782.52" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="400" y="828" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="7YgAe8dNIz29mKLiqWVZ-20" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;shadow=0;dashed=1;strokeColor=#00FF00;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;flowAnimation=1;entryX=0.802;entryY=0.992;entryDx=0;entryDy=0;entryPerimeter=0;exitX=0.908;exitY=0.044;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1" source="7YgAe8dNIz29mKLiqWVZ-13" target="7YgAe8dNIz29mKLiqWVZ-12">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="375" y="938" as="sourcePoint" />
+            <mxPoint x="374" y="896" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="7YgAe8dNIz29mKLiqWVZ-22" value="1.读请求" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;" vertex="1" parent="1">
+          <mxGeometry x="259" y="790" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="7YgAe8dNIz29mKLiqWVZ-23" value="4.从缓存返回" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;" vertex="1" parent="1">
+          <mxGeometry x="393.5" y="790" width="90" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="7YgAe8dNIz29mKLiqWVZ-24" value="2.2.缓存不存在，查数据库" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;" vertex="1" parent="1">
+          <mxGeometry x="190" y="898.04" width="150" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="7YgAe8dNIz29mKLiqWVZ-26" value="3.数据库返回结果，并更新缓存" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;" vertex="1" parent="1">
+          <mxGeometry x="365" y="900" width="180" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="7YgAe8dNIz29mKLiqWVZ-31" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.408;entryY=0.992;entryDx=0;entryDy=0;entryPerimeter=0;shadow=0;dashed=1;strokeColor=#FF5517;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;flowAnimation=1;exitX=0.407;exitY=-0.051;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="353.9670000000001" y="826.5299600000001" as="sourcePoint" />
+            <mxPoint x="353.96000000000004" y="779.52" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="7YgAe8dNIz29mKLiqWVZ-32" value="2.1.缓存存在，&lt;div&gt;返回结果&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;" vertex="1" connectable="0" parent="7YgAe8dNIz29mKLiqWVZ-31">
+          <mxGeometry x="0.0649" y="-3" relative="1" as="geometry">
+            <mxPoint x="-3" y="3" as="offset" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
