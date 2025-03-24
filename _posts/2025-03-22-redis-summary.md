@@ -45,12 +45,29 @@ Redis应用场景很多，比如缓存系统、消息队列、分布式锁等，
 
 ## 3. 支持的数据类型
 
-### 3.1. 数据类型
+### 3.1. 数据类型和底层数据结构
 
 5种最常用数据类型：`String`、`List`、`Hash`、`Set`、`Zset`
 
 * `String`
+    * 最基本的key-value结构，value最大容纳`512MB`
+    * 底层数据结构：SDS，可保存文本以及二进制数据、长度获取复杂度`O(1)`、字符串操作安全（因为有了头中的长度）
+    * 基本命令：GET、SET、EXIST、STRLEN、DEL；MGET、MSET；SETEX、EXPIRE、TTL；INCR、INCRBY、DECR、DECRBY；SETNX等
+    * 应用场景
+        * 缓存对象：1）直接缓存json 2）按k-v分离，通过MSET存储、MGET获取
+        * 常规计数：如访问次数、点赞、转发、库存。`SET aritcle:readcount:1001 0`初始化，而后`INCR aritcle:readcount:1001`
+        * 分布式锁：SET有个`NX`参数可以实现“key不存在才插入”，可以用它来实现分布式锁。
+            * `SET lock_key unique_value NX PX 10000`，若不存在则设置，表示加锁成功；
+            * 删除key则表示解锁，需要保证删除者是加锁客户端，需要 Lua脚本 保证原子性
+        * 共享Session信息：分布式系统中同用户多次请求可能分配到不同服务器，通过Redis共享统一的会话状态可避免重复登录
 * `List`
+    * 字符串列表
+    * 底层数据结构
+        * 3.2版本前：双向链表 或 压缩列表（ziplist），当 (列表元素<512 && 元素大小<64字节)时，会用ziplist作底层数据结构，否则用双向链表
+        * 3.2之后：只用`quicklist`，替代了双向链表和压缩列表
+    * 基本命令：LPUSH、RPUSH、LPOP、RPOP、LRANGE、BLPOP、BRPOP、LLEN、LSET等
+    * 应用场景：
+        * 消息队列：LPUSH+RPOP 或者 RPUSH+LPOP 实现先进先出，为了避免没有数据时的循环POP判断，Redis提供了`BRPOP`方式
 * `Hash`
 * `Set`
 * `Zset`
@@ -62,7 +79,7 @@ Redis应用场景很多，比如缓存系统、消息队列、分布式锁等，
 * `GEO`
 * `Stream`
 
-### 3.2. 数据结构
+### 3.2. 数据结构实现说明
 
 上述“数据类型”用到的“数据结构”
 
@@ -73,15 +90,19 @@ Redis应用场景很多，比如缓存系统、消息队列、分布式锁等，
 * 整数集合（intset）
 * 跳表（skiplist）
 
-### 3.3. 底层实现
-
-1、String
-
 ## 4. 关键特性
 
 ### 4.1. 事件循环和多线程
 
-主线程基于epoll进行IO多路复用处理，前面 [梳理Redis中的epoll机制](https://xiaodongq.github.io/2025/02/28/epoll-redis-nginx/) 中已经梳理过，此处不做展开。
+主线程基于epoll进行IO多路复用判断处理，前面 [梳理Redis中的epoll机制](https://xiaodongq.github.io/2025/02/28/epoll-redis-nginx/) 中已经梳理过，此处不做展开。
+
+
+
+### 4.2. RDB和AOF
+
+### 4.3. 主从和哨兵
+
+
 
 ## 5. 小结
 
