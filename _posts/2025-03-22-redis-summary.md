@@ -45,12 +45,26 @@ Redis应用场景很多，比如缓存系统、消息队列、分布式锁等，
 
 ## 3. 支持的数据类型
 
-数据类型：
+### 3.1. 数据类型
 
-* 5种最常用数据类型：`String`、`List`、`Hash`、`Set`、`Zset`
-* 其他4种数据类型：`BitMap`、`HyperLogLog`、`GEO`、`Stream`
+5种最常用数据类型：`String`、`List`、`Hash`、`Set`、`Zset`
 
-数据结构：上述“数据类型”用到的“数据结构”
+* `String`
+* `List`
+* `Hash`
+* `Set`
+* `Zset`
+
+其他4种数据类型：`BitMap`、`HyperLogLog`、`GEO`、`Stream`
+
+* `BitMap`
+* `HyperLogLog`
+* `GEO`
+* `Stream`
+
+### 3.2. 数据结构
+
+上述“数据类型”用到的“数据结构”
 
 * SDS
 * 双向链表
@@ -59,11 +73,20 @@ Redis应用场景很多，比如缓存系统、消息队列、分布式锁等，
 * 整数集合（intset）
 * 跳表（skiplist）
 
-## 4. 小结
+### 3.3. 底层实现
+
+1、String
+
+## 4. 关键特性
+
+### 4.1. 事件循环和多线程
+
+主线程基于epoll进行IO多路复用处理，前面 [梳理Redis中的epoll机制](https://xiaodongq.github.io/2025/02/28/epoll-redis-nginx/) 中已经梳理过，此处不做展开。
+
+## 5. 小结
 
 
-
-## 5. 参考
+## 6. 参考
 
 * [Redis 核心技术与实战](https://time.geekbang.org/column/intro/100056701)
 * [Redis 源码剖析与实战](https://time.geekbang.org/column/intro/100084301)
