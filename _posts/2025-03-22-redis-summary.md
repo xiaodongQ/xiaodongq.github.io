@@ -212,7 +212,8 @@ unsigned char *ziplistNext(unsigned char *zl, unsigned char *p);
 
 ziplist结构如下：
 
-![redis_ziplist_struct](/images/redis_ziplist_struct.jpg)
+![redis_ziplist_struct](/images/redis_ziplist_struct.jpg)  
+[出处](https://time.geekbang.org/column/intro/100084301)
 
 通过ziplist的创建来理解其结构：
 
