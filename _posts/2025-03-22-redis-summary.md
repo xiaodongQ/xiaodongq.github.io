@@ -580,6 +580,10 @@ void *IOThreadMain(void *myid) {
 }
 ```
 
+待处理客户端分配给IO线程示意图：
+
+![redis-event-loop](/images/2025-03-27-redis-loop.png)
+
 ### 4.2. RDB和AOF
 
 
