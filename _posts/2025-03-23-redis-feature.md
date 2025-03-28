@@ -14,25 +14,11 @@ Redis学习实践系列，本篇梳理支持的关键特性和机制。
 
 ## 1. 背景
 
-继续梳理Redis支持的关键特性和机制，RDB、AOF，主从复制、哨兵等。
+继续梳理Redis支持的关键特性和相关机制，如 RDB、AOF，主从复制、哨兵等。
 
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
-
-
-## 2. 支持的数据类型
-
-### 2.1. 数据类型和底层数据结构
-
-5种最常用数据类型：`String`、`List`、`Hash`、`Set`、`Zset`
-
-1、`String`
-
-* 最大容纳`512MB`
-* 底层数据结构：`SDS`，可保存文本以及二进制数据、长度获取复杂度`O(1)`、字符串操作安全（因为有了头中的长度）
-* 基本命令：GET、SET、EXIST、STRLEN、
-
-## 3. 事件循环和多线程
+## 2. 事件循环和多线程
 
 主线程基于epoll进行IO多路复用判断处理，前面 [梳理Redis中的epoll机制](https://xiaodongq.github.io/2025/02/28/epoll-redis-nginx/) 中已经梳理过，此处不做展开。
 
@@ -172,23 +158,25 @@ void *IOThreadMain(void *myid) {
 }
 ```
 
+`io_threads_list`数组中，每个成员都是一个客户端队列，表示待处理的客户端。事件循环中会将延迟读（待读）和延迟写（待写）的客户端分配给上述IO线程，而后线程中进行处理。
+
 待处理客户端分配给IO线程示意图：
 
 ![redis-event-loop](/images/2025-03-27-redis-loop.png)
 
-## 4. RDB和AOF
+## 3. RDB和AOF
 
 
 
-## 5. 主从复制
+## 4. 主从复制
 
-## 6. 哨兵机制和Raft选举
-
-
-## 7. 小结
+## 5. 哨兵机制和Raft选举
 
 
-## 8. 参考
+## 6. 小结
+
+
+## 7. 参考
 
 * [Redis 核心技术与实战](https://time.geekbang.org/column/intro/100056701)
 * [Redis 源码剖析与实战](https://time.geekbang.org/column/intro/100084301)
