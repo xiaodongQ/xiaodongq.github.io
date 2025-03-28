@@ -433,7 +433,7 @@ REDIS0009?	redis-ver6.0.20?
 除了`bgrewriteaof`（1、）手动触发，`rewriteAppendOnlyFileBackground`还有**另外几个触发调用时机**：
 
 * 2、`startAppendOnly` 函数，会被下面两个场景调用
-    * 1）`configSetCommand`，对应了在Redis中执行 `config` 命令启用AOF功能：`config set appendonly yes`，启用是调一次
+    * 1）`configSetCommand`，对应了在Redis中执行 `config` 命令启用AOF功能：`config set appendonly yes`，启用时调一次
     * 2）`restartAOFAfterSYNC`，在**主从节点的复制过程**中被调用
 * 3、`serverCron` 函数，周期性执行
     * 为了避免 AOF 文件过大导致占用过多的磁盘空间，可通过下述参数控制自动rewrite AOF的触发条件：
