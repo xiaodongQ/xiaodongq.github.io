@@ -436,7 +436,7 @@ int zsetAdd(robj *zobj, double score, sds ele, int *flags, double *newscore) {
 }
 ```
 
-### quicklist
+### 4.7. quicklist
 
 ziplist通过**紧凑的内存布局**来保存数据，节省了空间。但存在如下限制：
 
@@ -495,7 +495,7 @@ void quicklistPush(quicklist *quicklist, void *value, const size_t sz, int where
 
 当插入一个新的元素时，`quicklist`首先会检查插入位置的 `ziplist` 是否能容纳该元素，通过控制每个`quicklistNode`中`ziplist`的大小或是元素个数，有效减少了在 ziplist 中新增或修改元素后发生*连锁更新*的情况，从而提供了更好的访问性能。
 
-### listpack
+### 4.8. listpack
 
 Redis除了设计`quicklist`结构来应对`ziplist`的问题以外，还在 5.0 版本中新增了 `listpack` 数据结构，用来彻底避免连锁更新。
 
