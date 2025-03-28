@@ -495,15 +495,11 @@ int rewriteAppendOnlyFileBackground(void) {
 }
 ```
 
-## 6. 主从复制
-
-## 7. 哨兵机制和Raft选举
-
-## 8. 小结
+## 6. 小结
 
 梳理Redis中的多线程、RDB、AOF等特性。
 
-## 9. 参考
+## 7. 参考
 
 * [Redis 核心技术与实战](https://time.geekbang.org/column/intro/100056701)
 * [Redis 源码剖析与实战](https://time.geekbang.org/column/intro/100084301)
