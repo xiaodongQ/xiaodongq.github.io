@@ -436,6 +436,101 @@ int zsetAdd(robj *zobj, double score, sds ele, int *flags, double *newscore) {
 }
 ```
 
+### quicklist
+
+ziplist通过**紧凑的内存布局**来保存数据，节省了空间。但存在如下限制：
+
+* 查找复杂度高：若要查找中间元素，需要从列表头或者尾部开始遍历
+    * 一般会限制元素个数，比如hash和zset使用压缩列表做底层数据结构时，就通过配置项限制：
+    * `hash-max-ziplist-entries`（默认512） 和 `zset-max-ziplist-entries`（默认128）
+* 插入元素时，若内存空间不足则需重新分配一块新的连续内存空间，还可能引发**连锁更新问题**
+
+为了解决上述问题，Redis中设计了`quicklist`和`listpack`数据结构，本小节说明`quicklist`。
+
+`quicklist`结合了链表和ziplist各自的优势，定义如下，可看到`quicklist`本身是一个链表，每个链表节点又是一个ziplist（或者说包含一个ziplist）
+
+```c
+// redis/src/quicklist.h
+// quicklist定义
+typedef struct quicklist {
+    quicklistNode *head;
+    quicklistNode *tail;
+    // 所有ziplist中的总元素个数
+    unsigned long count;        /* total count of all entries in all ziplists */
+    // quicklistNodes的个数
+    unsigned long len;          /* number of quicklistNodes */
+    int fill : QL_FILL_BITS;              /* fill factor for individual nodes */
+    unsigned int compress : QL_COMP_BITS; /* depth of end nodes not to compress;0=off */
+    unsigned int bookmark_count: QL_BM_BITS;
+    quicklistBookmark bookmarks[];
+} quicklist;
+
+// quicklist中的节点定义
+typedef struct quicklistNode {
+    struct quicklistNode *prev;
+    struct quicklistNode *next;
+    // quicklistNode指向的ziplist
+    unsigned char *zl;
+    // ziplist的字节大小
+    unsigned int sz;             /* ziplist size in bytes */
+    // ziplist中的元素个数
+    unsigned int count : 16;     /* count of items in ziplist */
+    // 编码格式，原生字节数组或压缩存储
+    unsigned int encoding : 2;   /* RAW==1 or LZF==2 */
+    unsigned int container : 2;  /* NONE==1 or ZIPLIST==2 */
+    unsigned int recompress : 1; /* was this node previous compressed? */
+    unsigned int attempted_compress : 1; /* node can't compress; too small */
+    unsigned int extra : 10; /* more bits to steal for future usage */
+} quicklistNode;
+
+// 操作
+quicklist *quicklistCreate(void);
+quicklist *quicklistNew(int fill, int compress);
+...
+int quicklistPushHead(quicklist *quicklist, void *value, const size_t sz);
+int quicklistPushTail(quicklist *quicklist, void *value, const size_t sz);
+void quicklistPush(quicklist *quicklist, void *value, const size_t sz, int where);
+...
+```
+
+当插入一个新的元素时，`quicklist`首先会检查插入位置的 `ziplist` 是否能容纳该元素，通过控制每个`quicklistNode`中`ziplist`的大小或是元素个数，有效减少了在 ziplist 中新增或修改元素后发生*连锁更新*的情况，从而提供了更好的访问性能。
+
+### listpack
+
+Redis除了设计`quicklist`结构来应对`ziplist`的问题以外，还在 5.0 版本中新增了 `listpack` 数据结构，用来彻底避免连锁更新。
+
+listpack 也叫紧凑列表，它的特点就是**用一块连续的内存空间来紧凑地保存数据**，同时为了节省内存空间，listpack列表项（entry）**使用了多种编码方式，来表示不同长度的数据**，这些数据包括整数和字符串。
+
+listpack没有专门的新数据结构定义，通过创建函数`lpNew`了解下其组织结构：
+
+```c
+// redis/src/listpack.c
+unsigned char *lpNew(void) {
+    // 分配LP_HRD_SIZE+1
+    unsigned char *lp = lp_malloc(LP_HDR_SIZE+1);
+    if (lp == NULL) return NULL;
+    // 设置listpack的大小
+    lpSetTotalBytes(lp,LP_HDR_SIZE+1);
+    lpSetNumElements(lp,0);
+    lp[LP_HDR_SIZE] = LP_EOF;
+    return lp;
+}
+```
+
+操作：
+
+```c
+// redis/src/listpack.h
+unsigned char *lpNew(void);
+void lpFree(unsigned char *lp);
+unsigned char *lpInsert(unsigned char *lp, unsigned char *ele, uint32_t size, unsigned char *p, int where, unsigned char **newp);
+unsigned char *lpAppend(unsigned char *lp, unsigned char *ele, uint32_t size);
+unsigned char *lpDelete(unsigned char *lp, unsigned char *p, unsigned char **newp);
+uint32_t lpLength(unsigned char *lp);
+unsigned char *lpGet(unsigned char *p, int64_t *count, unsigned char *intbuf);
+...
+```
+
 ## 5. 小结
 
 梳理说明了Redis支持的数据类型，以及对应的底层数据结构。限于篇幅，相关特性和机制下一篇中进行梳理。
