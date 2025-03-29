@@ -8,7 +8,7 @@ tags: Redis 存储
 * content
 {:toc}
 
-Redis学习实践系列，本篇梳理支持的关键特性和机制：多线程、RDB、AOF。
+本篇梳理Redis支持的关键特性和机制：多线程、RDB、AOF。
 
 
 

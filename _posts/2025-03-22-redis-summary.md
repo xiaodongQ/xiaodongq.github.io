@@ -8,7 +8,7 @@ tags: Redis 存储
 * content
 {:toc}
 
-Redis学习实践系列，本篇说明数据类型和对应的底层数据结构。
+本篇说明Redis数据类型和对应的底层数据结构。
 
 
 
