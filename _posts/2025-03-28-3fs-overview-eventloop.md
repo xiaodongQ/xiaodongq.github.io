@@ -8,7 +8,7 @@ tags: 3FS 存储
 * content
 {:toc}
 
-DeepSeek 3FS学习实践，本篇梳理其中的事件循环实现流程。
+本篇梳理3FS中的事件循环实现流程。
 
 
 

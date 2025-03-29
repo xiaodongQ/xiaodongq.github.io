@@ -8,7 +8,7 @@ tags: CPU 存储 异步编程
 * content
 {:toc}
 
-异步编程学习实践系列，demo实验，使用 gperftools 和 火焰图 进行性能分析。本篇开始进行实验。
+异步编程实验，使用 gperftools 和 火焰图 进行性能分析。本篇开始进行实验。
 
 
 
