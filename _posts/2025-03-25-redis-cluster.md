@@ -14,7 +14,7 @@ tags: Redis 存储
 
 ## 1. 背景
 
-继续梳理Redis支持的关键特性和相关机制，主从复制 和 集群。
+继续梳理Redis支持的关键特性和相关机制，主从复制、哨兵集群、切片集群。
 
 Redis的知识点提纲：
 
@@ -29,10 +29,12 @@ Redis的知识点提纲：
 
 ## 3. 哨兵机制和Raft选举
 
-## 4. 小结
+## 4. 切片集群
+
+## 5. 小结
 
 
-## 5. 参考
+## 6. 参考
 
 * [Redis 核心技术与实战](https://time.geekbang.org/column/intro/100056701)
 * [Redis 源码剖析与实战](https://time.geekbang.org/column/intro/100084301)
