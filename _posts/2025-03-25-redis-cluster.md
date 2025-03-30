@@ -28,7 +28,7 @@ Redis的知识点提纲：
 Redis利用`RDB`和`AOF`能够提升单机系统上历史数据的可靠性，但单机异常时，新数据就无法写入了，也无法对外提供服务。该场景下，**主从集群**能够提升的服务可用性。
 
 * 主从集群通过增加`副本冗余`、使用**主从库模式**并进行`读写分离`：只有主节点（或者称主库）负责**写**操作，主节点和从节点（或者称从库）均可进行**读**操作；
-* 主节点和从节点间通过**主从复制**进行集群数据的同步，主机异常时其中一个从节点能成为新的主节点并提供读写服务；
+* 主节点和从节点间通过**主从复制**进行集群数据的同步，主机异常时其中一个从节点能成为新的主节点（哨兵机制）并提供读写服务；
 * `主-从-从`模式：从节点也可以有自己的从节点并建立主从**级联关系**，由该节点而不是主节点负责其从节点的写操作同步，来分担主节点上的全量复制压力
     * 主节点`fork`子进程进行`bgsave`的RDB文件异步处理，但是数据量多的话`fork`操作会阻塞主线程
     * 全量复制RDB文件，也会给主节点造成网络压力
@@ -69,6 +69,7 @@ Redis基于`状态机`实现主从复制，包含**四大阶段**：
 
 * 等到主从库之间的握手完成后，从库就会给主库发送 `PSYNC` 命令，有2个参数：`主库id（runID）` 和 `复制进度（offset）`
     * 发送的命令是：`psync ? -1`，第一次不知道主库id，设置为`?`，`-1`则表示第一次复制（逻辑在`slaveTryPartialResynchronization`中）
+    * `psync（Partial Synchronization）`，表示部分同步
 * 紧接着，主库会根据从库发送的命令参数作出相应的三种回复，分别是`执行全量复制`、`执行增量复制`、`发生错误`
     * 主库收到 `psync` 命令后，会用 `FULLRESYNC` 响应命令带上两个参数：主库runID 和主库目前的复制进度 offset，返回给从库
         * `FULLRESYNC`响应表示第一次复制采用的全量复制
@@ -168,7 +169,7 @@ struct redisCommand redisCommandTable[] = {
 
 试了下很好用，有点像用户态的`bpftrace`+`funcgraph`，可以通过mode：0还是1控制查看的调用栈方向。自己也归档了一下并贴了使用结果：[cpp-calltree](https://github.com/xiaodongQ/prog-playground/tree/main/tools/cpp-calltree)。
 
-上述`slaveTryPartialResynchronization`函数中，从库发送`psync`命令并根据应答
+上述`slaveTryPartialResynchronization`函数中，从库发送`psync`命令并根据应答判断处理
 
 ```c
 // redis/src/replication.c
@@ -232,7 +233,7 @@ int replicationSetupSlaveForFullResync(client *slave, long long offset) {
 }
 ```
 
-调用链，展开看一下比较直观，后续再跟踪流程：
+调用链如下，展开看一下比较直观，后续再跟踪流程：
 
 ![reply-FULLRESYNC](/images/2025-03-30-reply-FULLRESYNC.png)
 
@@ -265,6 +266,37 @@ int replicationSetupSlaveForFullResync(client *slave, long long offset) {
 ```
 
 ## 3. 哨兵机制和Raft选举
+
+在Redis主从集群中，**哨兵机制**是实现主从库`自动切换`的关键机制，它有效地解决了主从复制模式下故障转移的问题。
+
+**哨兵**其实就是一个运行在特殊模式下的 Redis 进程，主从库实例运行的同时，它也在运行。哨兵主要负责的就是三个任务：`监控`、`选主（选择主库）`和`通知`。
+
+* `监控`：是指哨兵进程在运行时，周期性地给**所有的**主从库发送 PING 命令，检测它们是否仍然在线运行
+    * 如果主库没有在规定时间内响应哨兵的 PING 命令，哨兵就会判定主库下线，然后开始自动切换主库的流程
+    * 哨兵对主库的下线判断有 **“主观下线”** 和 **“客观下线”** 两种
+        * 哨兵发现主库或从库对 PING 命令的响应超时了，那么，哨兵就会先把它标记为`主观下线`
+        * `客观下线`：**半数以上（N/2+1）**哨兵判断主库为`主观下线`，避免误判
+* `选主`：主库挂了以后，哨兵就需要从很多个从库里，按照一定的规则选择一个从库实例，把它作为新的主库
+    * 选主时，需要对从库进行`筛选过滤`和`打分`，除了要检查从库的**当前在线状态**，还要判断它**之前**的网络连接状态
+    * **打分规则**：从库优先级、从库复制进度 以及 从库ID号
+        * 可以通过`replica-priority`（`slave-priority`是它的别名，“政治正确”原因，slave相关配置都改了），给不同的从库设置不同优先级，优先级高的得分高
+        * 跟主库同步程度数据最接近的从库得分高
+        * 若前两者都相同，则ID号最小的从库得分最高
+* `通知`：在执行通知任务时，哨兵会把新主库的连接信息发给其他从库，让它们执行 `replicaof` 命令，和新主库建立连接，并进行数据复制。同时，哨兵会把新主库的连接信息通知给客户端，让它们把请求操作发到新主库上。
+
+```c
+// redis/src/server.h
+struct redisServer {
+    ...
+    /* Replication (master) */
+    char replid[CONFIG_RUN_ID_SIZE+1];  /* My current replication ID. */
+    char replid2[CONFIG_RUN_ID_SIZE+1]; /* replid inherited from master*/
+    // 记录当前的最新写操作在 repl_backlog_buffer 中的位置
+    long long master_repl_offset;   /* My current replication offset */
+    long long second_replid_offset; /* Accept offsets up to this for replid2. */
+    ...
+};
+```
 
 ## 4. 切片集群
 
