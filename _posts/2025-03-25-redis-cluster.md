@@ -47,30 +47,37 @@ Redis的主从复制主要包括了：`全量复制`、`增量复制`和`长连�
 
 Redis基于`状态机`实现主从复制，包含**四大阶段**：
 
-* 1、初始化阶段
-    * 当Redis实例 A 设置为另一个实例 B 的从库时，实例 A 会完成初始化操作，主要是获得了主库的 IP 和端口号
-    * 该阶段有3种方式设置：
-        * 1）在从节点上（此处即A）执行 `replicaof 主库ip 主库port` 的主从复制命令
-        * 2）在从节点的redis.conf配置文件中设置 `replicaof 主库ip 主库port`
-        * 3）从节点启动时，设置启动参数：`--replicaof [主库ip] [主库port]`
-* 2、建立连接阶段
-    * 一旦从库 获得了主库 IP 和端口号，该实例就会尝试和主库建立 TCP 网络连接，并且会在建立好的网络连接上，监听是否有主库发送的命令
-* 3、主从握手阶段
-    * 当从库（此处的实例A） 和主库建立好连接之后，从库就开始和主库进行握手
-    * 握手过程就是主从库间相互发送 `PING-PONG` 消息，同时从库根据配置信息向主库进行验证
-    * 最后，从库把自己的 IP、端口号，以及对`无盘复制`和 `PSYNC 2` 协议的支持情况发给主库
-* 4、复制类型判断与执行阶段
-    * 等到主从库之间的握手完成后，从库就会给主库发送 `PSYNC` 命令，有2个参数：`主库id（runID）` 和 `复制进度（offset）`
-        * 发送的命令是：`psync ? -1`，第一次不知道主库id，设置为`?`，`-1`则表示第一次复制（逻辑在`slaveTryPartialResynchronization`中）
-    * 紧接着，主库会根据从库发送的命令参数作出相应的三种回复，分别是`执行全量复制`、`执行增量复制`、`发生错误`
-        * 主库收到 `psync` 命令后，会用 `FULLRESYNC` 响应命令带上两个参数：主库runID 和主库目前的复制进度 offset，返回给从库
-            * `FULLRESYNC`响应表示第一次复制采用的全量复制
-    * 从库在收到上述回复后，就会根据回复的复制类型，开始执行具体的复制操作
-        * 从库收到响应后，会记录下主库runID和offset
-        * 主库将所有数据同步给从库：主库执行`bgsave`命令，生成**RDB文件**，接着将文件发给从库。从库接收到RDB文件后，会先清空当前数据库，然后加载RDB文件。
-    * 最后，主库会把主从同步执行过程中新收到的写命令，再发送给从库
-        * 对于主从同步过程中的实时请求数据，为了保证主从库的数据一致性，主库会在内存中用专门的`replication buffer`，记录RDB文件生成后收到的所有写操作
-        * 具体操作：当主库完成RDB文件发送后，就会把此时 `replication buffer` 中的修改操作发给从库，从库再重新执行这些操作
+1、初始化阶段
+
+* 当Redis实例 A 设置为另一个实例 B 的从库时，实例 A 会完成初始化操作，主要是获得了主库的 IP 和端口号
+* 该阶段有3种方式设置：
+    * 1）在从节点上（此处即A）执行 `replicaof 主库ip 主库port` 的主从复制命令
+    * 2）在从节点的redis.conf配置文件中设置 `replicaof 主库ip 主库port`
+    * 3）从节点启动时，设置启动参数：`--replicaof [主库ip] [主库port]`
+
+2、建立连接阶段
+
+* 一旦从库 获得了主库 IP 和端口号，该实例就会尝试和主库建立 TCP 网络连接，并且会在建立好的网络连接上，监听是否有主库发送的命令
+
+3、主从握手阶段
+
+* 当从库（此处的实例A） 和主库建立好连接之后，从库就开始和主库进行握手
+* 握手过程就是主从库间相互发送 `PING-PONG` 消息，同时从库根据配置信息向主库进行验证
+* 最后，从库把自己的 IP、端口号，以及对`无盘复制`和 `PSYNC 2` 协议的支持情况发给主库
+
+4、复制类型判断与执行阶段
+
+* 等到主从库之间的握手完成后，从库就会给主库发送 `PSYNC` 命令，有2个参数：`主库id（runID）` 和 `复制进度（offset）`
+    * 发送的命令是：`psync ? -1`，第一次不知道主库id，设置为`?`，`-1`则表示第一次复制（逻辑在`slaveTryPartialResynchronization`中）
+* 紧接着，主库会根据从库发送的命令参数作出相应的三种回复，分别是`执行全量复制`、`执行增量复制`、`发生错误`
+    * 主库收到 `psync` 命令后，会用 `FULLRESYNC` 响应命令带上两个参数：主库runID 和主库目前的复制进度 offset，返回给从库
+        * `FULLRESYNC`响应表示第一次复制采用的全量复制
+* 从库在收到上述回复后，就会根据回复的复制类型，开始执行具体的复制操作
+    * 从库收到响应后，会记录下主库runID和offset
+    * 主库将所有数据同步给从库：主库执行`bgsave`命令，生成**RDB文件**，接着将文件发给从库。从库接收到RDB文件后，会先清空当前数据库，然后加载RDB文件。
+* 最后，主库会把主从同步执行过程中新收到的写命令，再发送给从库
+    * 对于主从同步过程中的实时请求数据，为了保证主从库的数据一致性，主库会在内存中用专门的`replication buffer`，记录RDB文件生成后收到的所有写操作
+    * 具体操作：当主库完成RDB文件发送后，就会把此时 `replication buffer` 中的修改操作发给从库，从库再重新执行这些操作
 
 上述流程示意图：
 
@@ -105,24 +112,31 @@ struct redisServer {
 
 **从库**状态机变化，对照上述4个阶段：
 
-* 1、初始化阶段
-    * 1）`initServerConfig`中，初始化为 **REPL_STATE_NONE**状态：`server.repl_state = REPL_STATE_NONE;`
-    * 2）从库执行`replicaof ip port`命令后，执行`replicaofCommand`处理函数 -> `replicationSetMaster`，其中设置为 **REPL_STATE_CONNECT**状态
-* 2、建立连接阶段
-    * 建立连接是在 周期性任务`serverCron` 中进行的， -> `run_with_period(1000) replicationCron();`，1s执行一次，用于重连主库
-    * 上面从库初始化后状态机已经是`REPL_STATE_CONNECT`状态了，还未连接，在`replicationCron()`中会进入`connectWithMaster`对应语句块，进行主库连接，连接成功后设置状态机为 **REPL_STATE_CONNECTING**状态，建立连接的阶段就完成了
-        * `connectWithMaster`函数会设置连接成功后的回调函数：`syncWithMaster`
-* 3、主从握手阶段
-    * 连接成功时`syncWithMaster`回调函数被调用，其中判断状态机为`REPL_STATE_CONNECTING`的话，会设置状态为 **REPL_STATE_RECEIVE_PONG**，并通过`sendSynchronousCommand`函数发送`PING`消息
-    * 后面的状态机流转处理，也都在`syncWithMaster`函数中，依次会经过 **REPL_STATE_SEND_AUTH** -> **REPL_STATE_SEND_PORT** -> **REPL_STATE_RECEIVE_PORT** -> **REPL_STATE_SEND_IP** -> **REPL_STATE_SEND_CAPA** -> **REPL_STATE_RECEIVE_CAPA**
-* 4、复制类型判断与执行阶段
-    * 从库和主库完成握手后，从库会读取主库返回的 CAPA 消息响应，状态机为：`REPL_STATE_RECEIVE_CAPA`
-    * 紧接着，从库的状态变为 **REPL_STATE_SEND_PSYNC**，表明要开始向主库发送 `PSYNC` 命令，开始实际的数据同步了。此处的处理还是在`syncWithMaster`函数中。
-        * 接着通过`slaveTryPartialResynchronization`函数向主库发送`psync`，并将状态机设置为：**REPL_STATE_RECEIVE_PSYNC**
-        * 接下来还是一个`slaveTryPartialResynchronization`处理，里面逻辑也很长，负责根据主库的回复消息分别处理（里面也会接收应答），分别对应了全量复制、增量复制，或是不支持 `PSYNC`
-    * 最后是将状态机设置为：**REPL_STATE_TRANSFER**
+1、初始化阶段
 
-大概跟了下代码，流程还是挺长的，上述状态机变化示意图如下：
+* 1）`initServerConfig`中，初始化为 **REPL_STATE_NONE**状态：`server.repl_state = REPL_STATE_NONE;`
+* 2）从库执行`replicaof ip port`命令后，执行`replicaofCommand`处理函数 -> `replicationSetMaster`，其中设置为 **REPL_STATE_CONNECT**状态
+
+2、建立连接阶段
+
+* 建立连接是在 周期性任务`serverCron` 中进行的， -> `run_with_period(1000) replicationCron();`，1s执行一次，用于重连主库
+* 上面从库初始化后状态机已经是`REPL_STATE_CONNECT`状态了，还未连接，在`replicationCron()`中会进入`connectWithMaster`对应语句块，进行主库连接，连接成功后设置状态机为 **REPL_STATE_CONNECTING**状态，建立连接的阶段就完成了
+    * `connectWithMaster`函数会设置连接成功后的回调函数：`syncWithMaster`
+
+3、主从握手阶段
+
+* 连接成功时`syncWithMaster`回调函数被调用，其中判断状态机为`REPL_STATE_CONNECTING`的话，会设置状态为 **REPL_STATE_RECEIVE_PONG**，并通过`sendSynchronousCommand`函数发送`PING`消息
+* 后面的状态机流转处理，也都在`syncWithMaster`函数中，依次会经过 **REPL_STATE_SEND_AUTH** -> **REPL_STATE_SEND_PORT** -> **REPL_STATE_RECEIVE_PORT** -> **REPL_STATE_SEND_IP** -> **REPL_STATE_SEND_CAPA** -> **REPL_STATE_RECEIVE_CAPA**
+
+4、复制类型判断与执行阶段
+
+* 从库和主库完成握手后，从库会读取主库返回的 CAPA 消息响应，状态机为：`REPL_STATE_RECEIVE_CAPA`
+* 紧接着，从库的状态变为 **REPL_STATE_SEND_PSYNC**，表明要开始向主库发送 `PSYNC` 命令，开始实际的数据同步了。此处的处理还是在`syncWithMaster`函数中。
+    * 接着通过`slaveTryPartialResynchronization`函数向主库发送`psync`，并将状态机设置为：**REPL_STATE_RECEIVE_PSYNC**
+    * 接下来还是一个`slaveTryPartialResynchronization`处理，里面逻辑也很长，负责根据主库的回复消息分别处理（里面也会接收应答），分别对应了全量复制、增量复制，或是不支持 `PSYNC`
+* 最后是将状态机设置为：**REPL_STATE_TRANSFER**
+
+跟了下代码，流程还是挺长的，上述状态机变化示意图如下：
 
 ![sync-state-machine](/images/redis-slave-sync-state-machine.jpg)  
 [出处](https://time.geekbang.org/column/intro/100084301)
@@ -193,7 +207,7 @@ int slaveTryPartialResynchronization(connection *conn, int read_reply) {
 }
 ```
 
-### 主库应答处理
+### 2.3. 主库应答处理
 
 来看下主库（主节点）应答`FULLRESYNC`（告知从库类型为全量复制）的处理逻辑，可以搜索看到处理函数为`replicationSetupSlaveForFullResync`
 
