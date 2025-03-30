@@ -61,7 +61,7 @@ Redis基于`状态机`实现主从复制，包含**四大阶段**：
     * 最后，从库把自己的 IP、端口号，以及对`无盘复制`和 `PSYNC 2` 协议的支持情况发给主库
 * 4、复制类型判断与执行阶段
     * 等到主从库之间的握手完成后，从库就会给主库发送 `PSYNC` 命令，有2个参数：`主库id（runID）` 和 `复制进度（offset）`
-        * `psync ? -1`，第一次不知道主库id，设置为`?`，`-1`则表示第一次复制
+        * 发送的命令是：`psync ? -1`，第一次不知道主库id，设置为`?`，`-1`则表示第一次复制（逻辑在`slaveTryPartialResynchronization`中）
     * 紧接着，主库会根据从库发送的命令参数作出相应的三种回复，分别是`执行全量复制`、`执行增量复制`、`发生错误`
         * 主库收到 `psync` 命令后，会用 `FULLRESYNC` 响应命令带上两个参数：主库runID 和主库目前的复制进度 offset，返回给从库
             * `FULLRESYNC`响应表示第一次复制采用的全量复制
@@ -119,7 +119,7 @@ struct redisServer {
     * 从库和主库完成握手后，从库会读取主库返回的 CAPA 消息响应，状态机为：`REPL_STATE_RECEIVE_CAPA`
     * 紧接着，从库的状态变为 **REPL_STATE_SEND_PSYNC**，表明要开始向主库发送 `PSYNC` 命令，开始实际的数据同步了。此处的处理还是在`syncWithMaster`函数中。
         * 接着通过`slaveTryPartialResynchronization`函数向主库发送`psync`，并将状态机设置为：**REPL_STATE_RECEIVE_PSYNC**
-        * 接下来还是一个`slaveTryPartialResynchronization`处理，里面逻辑也很长，负责根据主库的回复消息分别处理，分别对应了全量复制、增量复制，或是不支持 PSYNC
+        * 接下来还是一个`slaveTryPartialResynchronization`处理，里面逻辑也很长，负责根据主库的回复消息分别处理（里面也会接收应答），分别对应了全量复制、增量复制，或是不支持 `PSYNC`
     * 最后是将状态机设置为：**REPL_STATE_TRANSFER**
 
 大概跟了下代码，流程还是挺长的，上述状态机变化示意图如下：
@@ -153,6 +153,102 @@ struct redisCommand redisCommandTable[] = {
 这里推荐下 [calltree.pl](https://zhuanlan.zhihu.com/p/339910341) 工具，作者在该文章中做了介绍。
 
 试了下很好用，有点像用户态的`bpftrace`+`funcgraph`，可以通过mode：0还是1控制查看的调用栈方向。自己也归档了一下并贴了使用结果：[cpp-calltree](https://github.com/xiaodongQ/prog-playground/tree/main/tools/cpp-calltree)。
+
+上述`slaveTryPartialResynchronization`函数中，从库发送`psync`命令并根据应答
+
+```c
+// redis/src/replication.c
+int slaveTryPartialResynchronization(connection *conn, int read_reply) {
+    ...
+    // 写部分
+    if (!read_reply) {
+        server.master_initial_offset = -1;
+        if (server.cached_master) {
+            psync_replid = server.cached_master->replid;
+            snprintf(psync_offset,sizeof(psync_offset),"%lld", server.cached_master->reploff+1);
+            serverLog(LL_NOTICE,"Trying a partial resynchronization (request %s:%s).", psync_replid, psync_offset);
+        } else {
+            serverLog(LL_NOTICE,"Partial resynchronization not possible (no cached master)");
+            // 第一次发送psync，命令为：`psync ? -1`
+            psync_replid = "?";
+            memcpy(psync_offset,"-1",3);
+        }
+        reply = sendSynchronousCommand(SYNC_CMD_WRITE,conn,"PSYNC",psync_replid,psync_offset,NULL);
+        ...
+        return PSYNC_WAIT_REPLY;
+    }
+    // 读部分
+    // 接收应答
+    reply = sendSynchronousCommand(SYNC_CMD_READ,conn,NULL);
+    ...
+    // 对应答进行判断处理
+    // FULLRESYNC 表示主库响应类型为 全量复制
+    if (!strncmp(reply,"+FULLRESYNC",11)) {
+        ...
+    }
+    if (!strncmp(reply,"+CONTINUE",9)) {
+        ...
+    }
+    ...
+}
+```
+
+### 主库应答处理
+
+来看下主库（主节点）应答`FULLRESYNC`（告知从库类型为全量复制）的处理逻辑，可以搜索看到处理函数为`replicationSetupSlaveForFullResync`
+
+```c
+// redis/src/replication.c
+int replicationSetupSlaveForFullResync(client *slave, long long offset) {
+    char buf[128];
+    int buflen;
+
+    slave->psync_initial_offset = offset;
+    slave->replstate = SLAVE_STATE_WAIT_BGSAVE_END;
+    server.slaveseldb = -1;
+    if (!(slave->flags & CLIENT_PRE_PSYNC)) {
+        buflen = snprintf(buf,sizeof(buf),"+FULLRESYNC %s %lld\r\n",
+                          server.replid,offset);
+        if (connWrite(slave->conn,buf,buflen) != buflen) {
+            freeClientAsync(slave);
+            return C_ERR;
+        }
+    }
+    return C_OK;
+}
+```
+
+调用链，展开看一下比较直观，后续再跟踪流程：
+
+![reply-FULLRESYNC](/images/2025-03-30-reply-FULLRESYNC.png)
+
+文本也贴一下，便于检索：
+
+```sh
+[CentOS-root@xdlinux ➜ redis git:(6.0) ✗ ]$ calltree.pl 'replicationSetupSlaveForFullResync' '' 1 1 10
+  
+  replicationSetupSlaveForFullResync
+  ├── rdbSaveToSlavesSockets	[vim src/rdb.c +2540]
+  │   └── startBgsaveForReplication	[vim src/replication.c +638]
+  │       ├── syncCommand	[vim src/replication.c +711]
+  │       ├── updateSlavesWaitingBgsave	[vim src/replication.c +1221]
+  │       │   └── backgroundSaveDoneHandler	[vim src/rdb.c +2505]
+  │       │       └── checkChildrenDone	[vim src/server.c +1781]
+  │       │           ├── replconfCommand	[vim src/replication.c +863]
+  │       │           └── serverCron	[vim src/server.c +1848]
+  │       └── replicationCron	[vim src/replication.c +3109]
+  │           └── serverCron	[vim src/server.c +1848]
+  ├── startBgsaveForReplication	[vim src/replication.c +638]
+  │   ├── syncCommand	[vim src/replication.c +711]
+  │   ├── updateSlavesWaitingBgsave	[vim src/replication.c +1221]
+  │   │   └── backgroundSaveDoneHandler	[vim src/rdb.c +2505]
+  │   │       └── checkChildrenDone	[vim src/server.c +1781]
+  │   │           ├── replconfCommand	[vim src/replication.c +863]
+  │   │           └── serverCron	[vim src/server.c +1848]
+  │   └── replicationCron	[vim src/replication.c +3109]
+  │       └── serverCron	[vim src/server.c +1848]
+  └── syncCommand	[vim src/replication.c +711]
+```
 
 ## 3. 哨兵机制和Raft选举
 
