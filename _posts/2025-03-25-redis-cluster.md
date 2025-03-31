@@ -25,7 +25,7 @@ Redis的知识点提纲：
 
 ## 2. 主从复制
 
-Redis利用`RDB`和`AOF`能够提升单机系统上历史数据的可靠性，但单机异常时，新数据就无法写入了，也无法对外提供服务。该场景下，**主从集群**能够提升的服务可用性。
+Redis利用`RDB`和`AOF`能够提升单机系统上历史数据的可靠性，但单机异常时，新数据就无法写入了，也无法对外提供服务。该场景下，**主从集群**能够提升服务可用性。
 
 * 主从集群通过增加`副本冗余`、使用**主从库模式**并进行`读写分离`：只有主节点（或者称主库）负责**写**操作，主节点和从节点（或者称从库）均可进行**读**操作；
 * 主节点和从节点间通过**主从复制**进行集群数据的同步，主机异常时其中一个从节点能成为新的主节点（哨兵机制）并提供读写服务；
@@ -265,11 +265,29 @@ int replicationSetupSlaveForFullResync(client *slave, long long offset) {
   └── syncCommand	[vim src/replication.c +711]
 ```
 
+主库上最新的写操作位置：`master_repl_offset`
+
+```c
+// redis/src/server.h
+struct redisServer {
+    ...
+    /* Replication (master) */
+    char replid[CONFIG_RUN_ID_SIZE+1];  /* My current replication ID. */
+    char replid2[CONFIG_RUN_ID_SIZE+1]; /* replid inherited from master*/
+    // 记录当前的最新写操作在 repl_backlog_buffer 中的位置
+    long long master_repl_offset;   /* My current replication offset */
+    long long second_replid_offset; /* Accept offsets up to this for replid2. */
+    ...
+};
+```
+
 ## 3. 哨兵机制和Raft选举
 
 在Redis主从集群中，**哨兵机制**是实现主从库`自动切换`的关键机制，它有效地解决了主从复制模式下故障转移的问题。
 
-**哨兵**其实就是一个运行在特殊模式下的 Redis 进程，主从库实例运行的同时，它也在运行。哨兵主要负责的就是三个任务：`监控`、`选主（选择主库）`和`通知`。
+**哨兵**其实就是一个运行在特殊模式下的 Redis 进程，主从库实例运行的同时，它也在运行，**不提供读写业务**。
+
+哨兵主要负责的就是三个任务：`监控`、`选主（选择主库）`和`通知`。
 
 * `监控`：是指哨兵进程在运行时，周期性地给**所有的**主从库发送 PING 命令，检测它们是否仍然在线运行
     * 如果主库没有在规定时间内响应哨兵的 PING 命令，哨兵就会判定主库下线，然后开始自动切换主库的流程
@@ -284,18 +302,226 @@ int replicationSetupSlaveForFullResync(client *slave, long long offset) {
         * 若前两者都相同，则ID号最小的从库得分最高
 * `通知`：在执行通知任务时，哨兵会把新主库的连接信息发给其他从库，让它们执行 `replicaof` 命令，和新主库建立连接，并进行数据复制。同时，哨兵会把新主库的连接信息通知给客户端，让它们把请求操作发到新主库上。
 
+### 3.1. 哨兵启动
+
+先来看下哨兵的启动，跟普通的主从库实例有什么不同。`main()`函数启动时，就会检查是否是哨兵模式：
+
+* 方式1：`./redis-sentinel sentinel.conf` 方式启动
+* 方式2：`./redis-server sentinel.conf --sentinel` 方式启动
+
+逻辑如下，可看到哨兵模式时会修改支持的命令列表（`initSentinel`当中），并且不会去加载RDB和AOF文件的数据。
+
 ```c
-// redis/src/server.h
-struct redisServer {
+// redis/src/server.c
+int main(int argc, char **argv) {
     ...
-    /* Replication (master) */
-    char replid[CONFIG_RUN_ID_SIZE+1];  /* My current replication ID. */
-    char replid2[CONFIG_RUN_ID_SIZE+1]; /* replid inherited from master*/
-    // 记录当前的最新写操作在 repl_backlog_buffer 中的位置
-    long long master_repl_offset;   /* My current replication offset */
-    long long second_replid_offset; /* Accept offsets up to this for replid2. */
+    // 检查是否是哨兵模式启动
+    server.sentinel_mode = checkForSentinelMode(argc,argv);
+    // 初始化服务配置，里面会把 redisCommandTable 中定义的命令添加到 server.commands 中
+    initServerConfig();
     ...
+    if (server.sentinel_mode) {
+        // 初始化配置项，默认启动端口是 26379
+        // #define REDIS_SENTINEL_PORT 26379
+        initSentinelConfig();
+        // 哨兵服务初始化
+        // 其中会清空所有上述新增的redis命令，并设置 sentinelcmds 里的命令到commands
+        initSentinel();
+    }
+    ...
+    // 非哨兵模式
+    if (!server.sentinel_mode) {
+        serverLog(LL_WARNING,"Server initialized");
+        ...
+        moduleLoadFromQueue();
+        ACLLoadUsersAtStartup();
+        // 线程初始化
+        InitServerLast();
+        // 加载 RDB or AOF 数据到内存
+        loadDataFromDisk();
+        ...
+    } else {
+        InitServerLast();
+        // 哨兵服务启动
+        sentinelIsRunning();
+        if (server.supervised_mode == SUPERVISED_SYSTEMD) {
+            redisCommunicateSystemd("STATUS=Ready to accept connections\n");
+            redisCommunicateSystemd("READY=1\n");
+        }
+    }
+    ...
+    redisSetCpuAffinity(server.server_cpulist);
+    // 调整oom_score_adj，不让系统OOM
+    setOOMScoreAdj(-1);
+    // 事件循环
+    aeMain(server.el);
+    aeDeleteEventLoop(server.el);
+    return 0;
+}
+
+// 检查是否是以哨兵模式启动
+int checkForSentinelMode(int argc, char **argv) {
+    int j;
+
+    // 方式1：./redis-sentinel 方式启动
+    if (strstr(argv[0],"redis-sentinel") != NULL) return 1;
+    for (j = 1; j < argc; j++)
+        // 方式2：./redis-server --sentinel 方式启动
+        if (!strcmp(argv[j],"--sentinel")) return 1;
+    return 0;
+}
+```
+
+`initSentinel()`里的清空命令并添加哨兵相关命令的操作：
+
+* 注意：对于部分和常规Redis服务同名的命令，其对应的处理函数是不同的
+    * 比如 `publish`，此处对应 `sentinelPublishCommand`，而普通Redis主从服务的命令处理函数则是 `publishCommand`
+    * 还有 `info`，此处`sentinelInfoCommand`，而主从服务是 `infoCommand`
+    * 通过`./redis-cli -p 26379`连接哨兵实例时，执行`info`就能体现不同的结果了（相对于不用`-p`指定端口，默认用`6379`连接）
+
+```c
+// redis/src/sentinel.c
+struct redisCommand sentinelcmds[] = {
+    {"ping",pingCommand,1,"",0,NULL,0,0,0,0,0},
+    {"sentinel",sentinelCommand,-2,"",0,NULL,0,0,0,0,0},
+    {"subscribe",subscribeCommand,-2,"",0,NULL,0,0,0,0,0},
+    {"unsubscribe",unsubscribeCommand,-1,"",0,NULL,0,0,0,0,0},
+    {"psubscribe",psubscribeCommand,-2,"",0,NULL,0,0,0,0,0},
+    {"punsubscribe",punsubscribeCommand,-1,"",0,NULL,0,0,0,0,0},
+    {"publish",sentinelPublishCommand,3,"",0,NULL,0,0,0,0,0},
+    {"info",sentinelInfoCommand,-1,"",0,NULL,0,0,0,0,0},
+    {"role",sentinelRoleCommand,1,"ok-loading",0,NULL,0,0,0,0,0},
+    {"client",clientCommand,-2,"read-only no-script",0,NULL,0,0,0,0,0},
+    {"shutdown",shutdownCommand,-1,"",0,NULL,0,0,0,0,0},
+    {"auth",authCommand,2,"no-auth no-script ok-loading ok-stale fast",0,NULL,0,0,0,0,0},
+    {"hello",helloCommand,-2,"no-auth no-script fast",0,NULL,0,0,0,0,0}
 };
+
+void initSentinel(void) {
+    unsigned int j;
+
+    /* Remove usual Redis commands from the command table, then just add
+     * the SENTINEL command. */
+    // 清空所有的常规redis命令
+    dictEmpty(server.commands,NULL);
+    for (j = 0; j < sizeof(sentinelcmds)/sizeof(sentinelcmds[0]); j++) {
+        int retval;
+        struct redisCommand *cmd = sentinelcmds+j;
+
+        // 添加 sentinelcmds 里的命令到commands
+        retval = dictAdd(server.commands, sdsnew(cmd->name), cmd);
+        ...
+    }
+
+    /* Initialize various data structures. */
+    sentinel.current_epoch = 0;
+    sentinel.masters = dictCreate(&instancesDictType,NULL);
+    ...
+}
+```
+
+启动示例如下：
+
+```sh
+# 通过 ./redis-sentinel ../sentinel.conf 方式启动也和下面一样
+[CentOS-root@xdlinux ➜ src git:(6.0) ✗ ]$ ./redis-server ../sentinel.conf --sentinel
+9197:X 31 Mar 2025 22:12:07.789 # oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+9197:X 31 Mar 2025 22:12:07.789 # Redis version=6.0.20, bits=64, commit=de0d9632, modified=0, pid=9197, just started
+9197:X 31 Mar 2025 22:12:07.789 # Configuration loaded
+9197:X 31 Mar 2025 22:12:07.790 * Increased maximum number of open files to 10032 (it was originally set to 1024).
+                _._                                                  
+           _.-``__ ''-._                                             
+      _.-``    `.  `_.  ''-._           Redis 6.0.20 (de0d9632/0) 64 bit
+  .-`` .-```.  ```\/    _.,_ ''-._                                   
+ (    '      ,       .-`  | `,    )     Running in sentinel mode
+ |`-._`-...-` __...-.``-._|'` _.-'|     Port: 26379
+ |    `-._   `._    /     _.-'    |     PID: 9197
+  `-._    `-._  `-./  _.-'    _.-'                                   
+ |`-._`-._    `-.__.-'    _.-'_.-'|                                  
+ |    `-._`-._        _.-'_.-'    |           http://redis.io        
+  `-._    `-._`-.__.-'_.-'    _.-'                                   
+ |`-._`-._    `-.__.-'    _.-'_.-'|                                  
+ |    `-._`-._        _.-'_.-'    |                                  
+  `-._    `-._`-.__.-'_.-'    _.-'                                   
+      `-._    `-.__.-'    _.-'                                       
+          `-._        _.-'                                           
+              `-.__.-'                                               
+
+9197:X 31 Mar 2025 22:12:07.790 # WARNING: The TCP backlog setting of 511 cannot be enforced because /proc/sys/net/core/somaxconn is set to the lower value of 128.
+9197:X 31 Mar 2025 22:12:07.795 # Sentinel ID is bc3daf508b4407953522a5455aa470a80e056cd5
+9197:X 31 Mar 2025 22:12:07.795 # +monitor master mymaster 127.0.0.1 6379 quorum 2
+```
+
+### 3.2. 基于pub/sub机制的哨兵集群
+
+哨兵之间通过 **发布/订阅（`pub/sub`）机制** 进行相互发现，向主库的`__sentinel__:hello`频道进行`publish`和`subscribe`命令操作，发布自己的ip和端口。
+
+![redis-pub-sub](/images/2025-03-31-redis-pub-sub.png)  
+[原始图出处](https://time.geekbang.org/column/intro/100056701)
+
+发布订阅相关代码在 sentinel.c 中：
+
+```cpp
+// redis/src/sentinel.c
+#define SENTINEL_HELLO_CHANNEL "__sentinel__:hello"
+
+// 向 __sentinel__:hello 频道发布本哨兵的信息
+int sentinelSendHello(sentinelRedisInstance *ri) {
+    ...
+    // announce_ip、announce_port：当前哨兵ip和端口
+    // master_addr->ip、master_addr->port：主库ip和端口
+    snprintf(payload,sizeof(payload),
+        "%s,%d,%s,%llu," /* Info about this sentinel. */
+        "%s,%s,%d,%llu", /* Info about current master. */ 
+        announce_ip, announce_port, sentinel.myid,
+        (unsigned long long) sentinel.current_epoch,
+        /* --- */
+        master->name,master_addr->ip,master_addr->port,
+        (unsigned long long) master->config_epoch);
+    // 异步 PUBLISH 命令，发布信息
+    retval = redisAsyncCommand(ri->link->cc,
+        sentinelPublishReplyCallback, ri, "%s %s %s",
+        sentinelInstanceMapCommand(ri,"PUBLISH"),
+        SENTINEL_HELLO_CHANNEL,payload);
+    if (retval != C_OK) return C_ERR;
+    ri->link->pending_commands++;
+    return C_OK;
+}
+
+// 订阅 __sentinel__:hello 频道
+void sentinelReconnectInstance(sentinelRedisInstance *ri) {
+    ...
+    retval = redisAsyncCommand(link->pc,
+        sentinelReceiveHelloMessages, ri, "%s %s",
+        sentinelInstanceMapCommand(ri,"SUBSCRIBE"),
+        SENTINEL_HELLO_CHANNEL);
+    ...
+}
+```
+
+`sentinelSendHello`发布消息的调用时机，是在`serverCron`定时器回调函数当中：
+
+```sh
+[CentOS-root@xdlinux ➜ redis git:(6.0) ✗ ]$ calltree.pl 'sentinelSendHello' '' 1 1 10
+  
+  sentinelSendHello
+  └── sentinelSendPeriodicCommands	[vim src/sentinel.c +2720]
+      └── sentinelHandleRedisInstance	[vim src/sentinel.c +4480]
+          └── sentinelHandleDictOfRedisInstances	[vim src/sentinel.c +4516]
+              └── sentinelTimer	[vim src/sentinel.c +4571]
+                  └── serverCron	[vim src/server.c +1848]
+```
+
+`sentinelReconnectInstance`订阅的时机，也在`serverCron`定时器回调函数中：
+
+```sh
+[CentOS-root@xdlinux ➜ redis git:(6.0) ✗ ]$ calltree.pl 'sentinelReconnectInstance' '' 1 1 10
+  
+  sentinelReconnectInstance
+  └── sentinelHandleRedisInstance	[vim src/sentinel.c +4480]
+      └── sentinelHandleDictOfRedisInstances	[vim src/sentinel.c +4516]
+          └── sentinelTimer	[vim src/sentinel.c +4571]
+              └── serverCron	[vim src/server.c +1848]
 ```
 
 ## 4. 切片集群
