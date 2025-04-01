@@ -291,7 +291,7 @@ struct redisServer {
 
 * `监控`：是指哨兵进程在运行时，周期性地给**所有的**主从库发送 PING 命令，检测它们是否仍然在线运行
     * 如果主库没有在规定时间内响应哨兵的 PING 命令，哨兵就会判定主库下线，然后开始自动切换主库的流程
-    * 哨兵对主库的下线判断有 **“主观下线”** 和 **“客观下线”** 两种
+    * 哨兵对主库的下线判断有 **“主观下线”**（Subjectively Down） 和 **“客观下线”**（Objectively Down） 两种
         * 哨兵发现主库或从库对 PING 命令的响应超时了，那么，哨兵就会先把它标记为`主观下线`
         * `客观下线`：**半数以上（N/2+1）**哨兵判断主库为`主观下线`，避免误判
 * `选主`：主库挂了以后，哨兵就需要从很多个从库里，按照一定的规则选择一个从库实例，把它作为新的主库
@@ -372,7 +372,7 @@ int checkForSentinelMode(int argc, char **argv) {
 }
 ```
 
-`initSentinel()`里的清空命令并添加哨兵相关命令的操作：
+`initSentinel()`里会清空原来所有命令并添加哨兵相关命令：
 
 * 注意：对于部分和常规Redis服务同名的命令，其对应的处理函数是不同的
     * 比如 `publish`，此处对应 `sentinelPublishCommand`，而普通Redis主从服务的命令处理函数则是 `publishCommand`
@@ -420,22 +420,48 @@ void initSentinel(void) {
 }
 ```
 
-启动示例如下：
+`sentinelIsRunning`中则会向每个被监听的主节点发送事件信息：
+
+```c
+// redis/src/sentinel.c
+void sentinelIsRunning(void) {
+    ...
+    // 向每个被监听的主节点发送事件信息
+    sentinelGenerateInitialMonitorEvents();
+}
+
+void sentinelGenerateInitialMonitorEvents(void) {
+    dictIterator *di;
+    dictEntry *de;
+
+    di = dictGetIterator(sentinel.masters);
+    while((de = dictNext(di)) != NULL) {
+        sentinelRedisInstance *ri = dictGetVal(de);
+        // 发送事件，通过下面的日志，可看到发送的事件信息：+monitor master mymaster 127.0.0.1 6380 quorum 2
+        sentinelEvent(LL_WARNING,"+monitor",ri,"%@ quorum %d",ri->quorum);
+    }
+    dictReleaseIterator(di);
+}
+```
+
+启动示例如下，可同时指定日志等级，下面配置文件中redis的端口都改成了`6380`：
+
+* 其中`+reboot master mymaster 127.0.0.1 6380`是重启了`redis-server`后，哨兵感知到之后发送的事件
 
 ```sh
 # 通过 ./redis-sentinel ../sentinel.conf 方式启动也和下面一样
-[CentOS-root@xdlinux ➜ src git:(6.0) ✗ ]$ ./redis-server ../sentinel.conf --sentinel
-9197:X 31 Mar 2025 22:12:07.789 # oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
-9197:X 31 Mar 2025 22:12:07.789 # Redis version=6.0.20, bits=64, commit=de0d9632, modified=0, pid=9197, just started
-9197:X 31 Mar 2025 22:12:07.789 # Configuration loaded
-9197:X 31 Mar 2025 22:12:07.790 * Increased maximum number of open files to 10032 (it was originally set to 1024).
+[CentOS-root@xdlinux ➜ src git:(6.0) ✗ ]$ ./redis-sentinel ../sentinel.conf --loglevel verbose
+11292:X 01 Apr 2025 18:05:57.251 # oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+11292:X 01 Apr 2025 18:05:57.251 # Redis version=6.0.20, bits=64, commit=de0d9632, modified=0, pid=11292, just started
+11292:X 01 Apr 2025 18:05:57.251 # Configuration loaded
+11292:X 01 Apr 2025 18:05:57.252 * Increased maximum number of open files to 10032 (it was originally set to 1024).
                 _._                                                  
            _.-``__ ''-._                                             
       _.-``    `.  `_.  ''-._           Redis 6.0.20 (de0d9632/0) 64 bit
   .-`` .-```.  ```\/    _.,_ ''-._                                   
  (    '      ,       .-`  | `,    )     Running in sentinel mode
  |`-._`-...-` __...-.``-._|'` _.-'|     Port: 26379
- |    `-._   `._    /     _.-'    |     PID: 9197
+ |    `-._   `._    /     _.-'    |     PID: 11292
   `-._    `-._  `-./  _.-'    _.-'                                   
  |`-._`-._    `-.__.-'    _.-'_.-'|                                  
  |    `-._`-._        _.-'_.-'    |           http://redis.io        
@@ -447,19 +473,29 @@ void initSentinel(void) {
           `-._        _.-'                                           
               `-.__.-'                                               
 
-9197:X 31 Mar 2025 22:12:07.790 # WARNING: The TCP backlog setting of 511 cannot be enforced because /proc/sys/net/core/somaxconn is set to the lower value of 128.
-9197:X 31 Mar 2025 22:12:07.795 # Sentinel ID is bc3daf508b4407953522a5455aa470a80e056cd5
-9197:X 31 Mar 2025 22:12:07.795 # +monitor master mymaster 127.0.0.1 6379 quorum 2
+11292:X 01 Apr 2025 18:05:57.252 # WARNING: The TCP backlog setting of 511 cannot be enforced because /proc/sys/net/core/somaxconn is set to the lower value of 128.
+11292:X 01 Apr 2025 18:05:57.252 # Sentinel ID is bc3daf508b4407953522a5455aa470a80e056cd5
+11292:X 01 Apr 2025 18:05:57.252 # +monitor master mymaster 127.0.0.1 6380 quorum 2
+
+11292:X 01 Apr 2025 18:06:17.365 * +reboot master mymaster 127.0.0.1 6380
 ```
 
-### 3.2. 基于pub/sub机制的哨兵集群
+### 3.2. pub/sub机制的哨兵集群和客户端通知
 
-哨兵之间通过 **发布/订阅（`pub/sub`）机制** 进行相互发现，向主库的`__sentinel__:hello`频道进行`publish`和`subscribe`命令操作，发布自己的ip和端口。
+1、哨兵之间通过 **发布/订阅（`pub/sub`）机制** 进行相互发现，哨兵向主库的`__sentinel__:hello`频道进行`publish`和`subscribe`命令操作，发布自己的ip和端口。
 
 ![redis-pub-sub](/images/2025-03-31-redis-pub-sub.png)  
 [原始图出处](https://time.geekbang.org/column/intro/100056701)
 
-发布订阅相关代码在 sentinel.c 中：
+2、每个哨兵实例也提供`pub/sub`机制，**客户端**可以从哨兵订阅消息。哨兵提供的消息订阅频道有很多，不同频道包含了主从库切换过程中的不同关键事件，比如`实例进入主观下线`、`实例退出主观下线`、`主库地址发生变化`等。
+
+* 示例：订阅“所有实例进入客观下线状态的事件”：`SUBSCRIBE +odown`、订阅所有的事件：`PSUBSCRIBE  *`
+
+几个重要频道：  
+![sentinel-pub-channel](/images/sentinel-pub-channel.jpg)  
+[出处](https://time.geekbang.org/column/intro/100056701)
+
+向`__sentinel__:hello`频道发布订阅相关代码在 sentinel.c 中：
 
 ```cpp
 // redis/src/sentinel.c
@@ -499,7 +535,7 @@ void sentinelReconnectInstance(sentinelRedisInstance *ri) {
 }
 ```
 
-`sentinelSendHello`发布消息的调用时机，是在`serverCron`定时器回调函数当中：
+`__sentinel__:hello`频道的发布事件逻辑在`sentinelSendHello`中，对应的发布消息的调用时机，是在`serverCron`定时器回调函数当中：
 
 ```sh
 [CentOS-root@xdlinux ➜ redis git:(6.0) ✗ ]$ calltree.pl 'sentinelSendHello' '' 1 1 10
@@ -512,7 +548,7 @@ void sentinelReconnectInstance(sentinelRedisInstance *ri) {
                   └── serverCron	[vim src/server.c +1848]
 ```
 
-`sentinelReconnectInstance`订阅的时机，也在`serverCron`定时器回调函数中：
+`sentinelReconnectInstance`订阅`__sentinel__:hello`频道的调用时机，也在`serverCron`定时器回调函数中：
 
 ```sh
 [CentOS-root@xdlinux ➜ redis git:(6.0) ✗ ]$ calltree.pl 'sentinelReconnectInstance' '' 1 1 10
@@ -524,10 +560,100 @@ void sentinelReconnectInstance(sentinelRedisInstance *ri) {
               └── serverCron	[vim src/server.c +1848]
 ```
 
+### 3.3. 哨兵Leader选举
+
+当有多个哨兵判断出主节点故障后：
+
+* 1、哨兵集群会判断主库是否**客观下线**，若是则哨兵按照上述`选主打分规则`，从多个从库中选举出一个**新主库**
+* 2、哨兵集群间也会选举出一个**哨兵Leader**，负责主库的切换
+
+`quorum`参数表示能判断主库客观下线的最小哨兵实例数量；**选主及切换主库**，则需要满足总节点半数以上（`N/2+1`）。比如，有5个哨兵实例的Redis集群，`quorum`设置为2，若3个哨兵实例故障，则主库宕机异常时，可以正常判断主库客观下线，但是不满足半数（`3`）节点，所以无法选出新主库。
+
+**哨兵Leader选举并没有完全按照 Raft 协议来实现**。Raft选举相关论文学习，之前在 [MIT6.824学习笔记（四） -- Raft](https://xiaodongq.github.io/2024/08/30/mit-6-824-6-raft/) 中也学习过了，下面简单回顾并对比。
+
+* **Raft中**：有 `领导人（Leader）`、`跟随者（Follower）` 和 `候选人（Candidate）` 3种角色，通过定期心跳机制来 *维持Leader的权威* 和 *触发Leader选举*。在Leader异常时，`Follower`增加自己的`任期号`并切换为`Candidate`，并行地发起投票请求，当收到本任期号中半数以上选票则选举成功，成为`新Leader`，其他节点则承认新Leader并回到`Follower`状态。
+* **Redis中**：主节点正常运行过程中，哨兵之间的角色是**对等的**，只有哨兵发现主节点故障了，哨兵才按照`Raft`协议执行选举`Leader`的过程。
+
+哨兵的选举过程是在 `sentinelTimer` 中实现的（包含在上述`__sentinel__:hello`频道的发布订阅调用栈中）。
+
+主要调用逻辑是 `sentinelTimer` -> `sentinelHandleDictOfRedisInstances(sentinel.masters)`（传入的哈希表表示哨兵监听的主从节点） -> 遍历每个监听的节点并处理：`sentinelHandleRedisInstance(ri)`。里面会判断主观、客观下线，触发故障切换等，下面是函数流程：
+
+```c
+// redis/src/sentinel.c
+void sentinelHandleRedisInstance(sentinelRedisInstance *ri) {
+    // 1、尝试和断连的实例重新建立连接
+    sentinelReconnectInstance(ri);
+    // 2、向实例发送 PING、INFO、PUBLISH 等命令
+    sentinelSendPeriodicCommands(ri);
+    ...
+    // 3、检查监听的实例是否主观下线
+    sentinelCheckSubjectivelyDown(ri);
+
+    /* Masters and slaves */
+    if (ri->flags & (SRI_MASTER|SRI_SLAVE)) {
+        /* Nothing so far. */
+    }
+
+    /* Only masters */
+    // 4、针对监听的主节点，进行客观下线检查判断及故障切换等操作
+    if (ri->flags & SRI_MASTER) {
+        // 4.1、针对监听的主节点，检查其是否客观下线
+        sentinelCheckObjectivelyDown(ri);
+        // 4.2、判断是否要启动故障切换
+        if (sentinelStartFailoverIfNeeded(ri))
+            // 若需要切换，则获取其他哨兵实例对主节点状态的判断，并向其他哨兵发送 is-master-down-by-addr 命令，发起 Leader 选举
+            sentinelAskMasterStateToOtherSentinels(ri,SENTINEL_ASK_FORCED);
+        // 4.3、执行故障切换
+        sentinelFailoverStateMachine(ri);
+        // 4.4、再次获取其他哨兵实例对主节点状态的判断
+        sentinelAskMasterStateToOtherSentinels(ri,SENTINEL_NO_FLAGS);
+    }
+}
+```
+
+向其他哨兵实例获取主节点状态判断的完整命令，形式如：`sentinel is-master-down-by-addr 主节点IP 主节点端口 当前epoch 实例ID`，所有`sentinel`开头的命令，都是在 `sentinelCommand` 函数中处理的。
+
+获取其他哨兵的主节点状态判断和选举投票结果后，哨兵Leader选举的条件判断：
+
+```c
+// redis/src/sentinel.c
+char *sentinelGetLeader(sentinelRedisInstance *master, uint64_t epoch) {
+    ...
+    // voters 是所有哨兵的个数，max_votes 是获得的票数
+    // 赞成票的数量必须是超过半数以上的哨兵个数
+    voters_quorum = voters/2+1;
+    // 如果赞成票数不到半数的哨兵个数或者少于quorum阈值，那么Leader就为NULL
+    if (winner && (max_votes < voters_quorum || max_votes < master->quorum))
+        winner = NULL;
+
+    // 确定最终的Leader
+    winner = winner ? sdsnew(winner) : NULL;
+    ...
+    return winner;
+}
+```
+
+对应的调用流程：
+
+```sh
+[CentOS-root@xdlinux ➜ redis git:(6.0) ✗ ]$ calltree.pl 'sentinelGetLeader' '' 1 1 6
+sentinelGetLeader
+└── sentinelFailoverWaitStart	[vim src/sentinel.c +4205]
+    └── sentinelFailoverStateMachine	[vim src/sentinel.c +4432]
+        └── sentinelHandleRedisInstance	[vim src/sentinel.c +4480]
+            └── sentinelHandleDictOfRedisInstances	[vim src/sentinel.c +4516]
+                └── sentinelTimer	[vim src/sentinel.c +4571]
+```
+
+上述具体内部流程暂不做展开，后续按需深入。先跟着参考文章走读代码流程并注释：[redis 6.0](https://github.com/xiaodongQ/redis/tree/6.0)。
+
 ## 4. 切片集群
+
+
 
 ## 5. 小结
 
+梳理Redis的主从复制 和 哨兵集群、切片集群相关流程。
 
 ## 6. 参考
 
