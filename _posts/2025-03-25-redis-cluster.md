@@ -613,6 +613,34 @@ void sentinelHandleRedisInstance(sentinelRedisInstance *ri) {
 
 向其他哨兵实例获取主节点状态判断的完整命令，形式如：`sentinel is-master-down-by-addr 主节点IP 主节点端口 当前epoch 实例ID`，所有`sentinel`开头的命令，都是在 `sentinelCommand` 函数中处理的。
 
+哨兵会使用`sentinelRedisInstance`结构体来记录主节点的信息：
+
+```c
+// redis/src/sentinel.c
+typedef struct sentinelRedisInstance {
+    // 记录哨兵对主节点主观下线的判断结果
+    int flags;      /* See SRI_... defines */
+    char *name;     /* Master name from the point of view of this sentinel. */
+    char *runid;    /* Run ID of this instance, or unique ID if is a Sentinel.*/
+    ...
+    // 记录了哨兵和主节点间的两个连接，分别对应用来发送命令的连接 cc 和用来发送 Pub/Sub 消息的连接 pc
+    instanceLink *link; /* Link to the instance, may be shared for Sentinels. */
+    ...
+    // 保存了监听同一主节点的其他哨兵实例
+    dict *sentinels;    /* Other sentinels monitoring the same master. */
+    // 判断主节点为客观下线需要的哨兵数量
+    unsigned int quorum;/* Number of sentinels that need to agree on failure. */
+    ...
+    // 哨兵对Leader投票的结果，leaderID
+    char *leader;
+    // 哨兵对Leader投票的结果，leader纪元
+    uint64_t leader_epoch; /* Epoch of the 'leader' field. */
+    // 记录故障切换的状态
+    int failover_state; /* See SENTINEL_FAILOVER_STATE_* defines. */
+    ...
+} sentinelRedisInstance;
+```
+
 获取其他哨兵的主节点状态判断和选举投票结果后，哨兵Leader选举的条件判断：
 
 ```c
@@ -649,7 +677,90 @@ sentinelGetLeader
 
 ## 4. 切片集群
 
+当需要Redis保存大量数据时，一种方式是`纵向扩展`：增加服务器规格配置，比如增加内存容量、增加磁盘容量、使用更高配置的CPU。但是RDB进行持久化时，Redis会`fork`子进程来完成，在执行时会阻塞主线程，数据量越大，`fork`操作造成的主线程阻塞的时间越长。
 
+另一种方式是`横向扩展`：**切片集群**。切片集群也叫分片集群，是指启动多个Redis实例组成一个集群，然后按照一定的规则，把收到的数据划分成多份，每一份用一个实例来保存。
+
+切片集群是一种保存大量数据的通用机制，这个机制可以有不同的实现方案。根据路由规则所在位置的不同，可以分为 `客户端分片` 和 `服务端分片`。
+
+* 客户端分片指的是，key的路由规则放在客户端中
+    * 缺点是客户端需要维护这个路由规则，耦合在业务代码中
+    * `Redis Cluster` 把这个路由规则封装成了一个模块，当需要使用时集成这个模块即可。**Redis Cluster内置了哨兵逻辑，无需再部署哨兵**
+* 服务端分片指：路由规则不放在客户端，而是在客户端和服务端之间增加一个`中间代理层`，即`Proxy`，数据的路由规则就放在这个Proxy层来维护
+    * Proxy会把客户端请求根据路由规则，转发到对应的Redis节点，Redis集群还可横向扩容，这对于客户端来说都是透明无感知的
+    * `Twemproxy`、`Codis` 就是采用的这种方案
+
+这里简单介绍下 Redis Cluster 方案：
+
+* 采用 `哈希槽（Hash Slot）`来处理数据和实例之间的映射关系。
+* 在 Redis Cluster 方案中，一个切片集群共有 `16384` 个哈希槽，这些哈希槽类似于数据分区，每个键值对都会根据它的 key，被映射到一个哈希槽中。
+    * 哈希方式：`CRC16(key) % 16384`
+* 一致性协议采用：`gossip`协议
+* 简单测试
+    * 启动Redis实例：`redis-server`启动6个不同的端口Redis实例，启用`cluster-enabled yes`
+    * 创建集群：`redis-cli --cluster create 127.0.0.1:7000 127.0.0.1:7001 127.0.0.1:7002 127.0.0.1:7003 127.0.0.1:7004 127.0.0.1:7005 --cluster-replicas 1`
+
+相关定义：
+
+```c
+// redis/src/server.h
+struct redisServer {
+    ...
+    /* Cluster */
+    int cluster_enabled;      /* Is cluster enabled? */
+    mstime_t cluster_node_timeout; /* Cluster node timeout. */
+    char *cluster_configfile; /* Cluster auto-generated config file name. */
+    // 集群
+    struct clusterState *cluster;  /* State of the cluster */
+    ...
+};
+```
+
+```c
+// redis/src/cluster.h
+#define CLUSTER_SLOTS 16384
+
+// 每个集群节点对应一个 clusterNode
+typedef struct clusterNode {
+    ...
+    // 位图（bitmap），标记该节点负责哪些slots
+    unsigned char slots[CLUSTER_SLOTS/8]; /* slots handled by this node */
+    ...
+} clusterNode;
+
+// 整个集群结构
+typedef struct clusterState {
+    ...
+    int size;             /* Num of master nodes with at least one slot */
+    dict *nodes;          /* Hash table of name -> clusterNode structures */
+    dict *nodes_black_list; /* Nodes we don't re-add for a few seconds. */
+    // 当前节点负责的 slot 正在迁往哪个节点
+    clusterNode *migrating_slots_to[CLUSTER_SLOTS];
+    // 当前节点正在从哪个节点迁入某个 slot
+    clusterNode *importing_slots_from[CLUSTER_SLOTS];
+    // 16384 个 slot 分别是由哪个节点负责的
+    clusterNode *slots[CLUSTER_SLOTS];
+    // 每个slot存储的key数量
+    uint64_t slots_keys_count[CLUSTER_SLOTS];
+    // rax字典树，记录 slot 和 key 的对应关系，可以通过它快速找到 slot 上有哪些 keys
+    rax *slots_to_keys;
+    ...
+} clusterState;
+```
+
+相关接口：
+
+```c
+// redis/src/cluster.c
+clusterNode *createClusterNode(char *nodename, int flags);
+int clusterAddNode(clusterNode *node);
+void clusterAcceptHandler(aeEventLoop *el, int fd, void *privdata, int mask);
+void clusterReadHandler(connection *conn);
+void clusterSendPing(clusterLink *link, int type);
+...
+```
+
+此外还可了解：[PikiwiDB（Pika）](https://pikiwidb.cn/)，是360基础架构开源的键值数据库，基于SSD来实现大容量的Redis实例（兼容Redis），2023年更名为PikiwiDB。整体架构中包括了五部分，分别是网络框架、Pika 线程模块、Nemo 存储模块、**RocksDB** 和 **binlog机制**。
 
 ## 5. 小结
 
