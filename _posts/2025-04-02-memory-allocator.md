@@ -20,7 +20,7 @@ tags: 内存
 
 ## 2. 测试程序demo
 
-生成一个测试demo，也可见：[leak_test.cpp](https://github.com/xiaodongQ/prog-playground/tree/main/memory/leak/leak_test.cpp)，下述实验的结果均可见该目录。
+生成一个测试demo，也可见：[leak_test.cpp](https://github.com/xiaodongQ/prog-playground/blob/main/memory/leak/leak_test.cpp)，下述实验的结果均可见该目录。
 
 * 模拟内存泄漏：在单独线程中，随机申请 1KB~1MB 之间的内存，并且50%的概率不释放
 * 模拟空悬指针和野指针
@@ -433,11 +433,13 @@ $(TARGET): $(SRCS)
 # 使用 AddressSanitizer 编译
 # 若要检测到报错后支持继续执行，需要加`-fsanitize-recover=address`，并且运行时设置`ASAN_OPTIONS=halt_on_error=0`
 asan: CFLAGS += -fsanitize=address -fsanitize-recover=address
+asan: CFLAGS += -DTEST_LEAK
 asan: clean $(TARGET)
 
 # 单独使用 LeakSanitizer 编译 (通常与 AddressSanitizer 一起启用)
 # AddressSanitizer里面已经默认集成了LeakSanitizer，asan不需要显式指定
 lsan: CFLAGS += -fsanitize=leak
+lsan: CFLAGS += -DTEST_LEAK
 lsan: clean $(TARGET)
 
 # MemorySanitizer
@@ -563,11 +565,14 @@ int main(int argc, char *argv[]) {
 }
 
 // 方式2：
+#ifdef TEST_LEAK
+#include <sanitizer/lsan_interface.h>
+#endif
 int main(int argc, char *argv[]) {
     ...
-    // 手动触发内存泄漏检查，避免手动ctrl+c打断下面的while循环时无法触发检查
-    // 实际项目中可添加条件编译宏
+#ifdef TEST_LEAK
     __lsan_do_leak_check();
+#endif 
 
     // 主动进入无限循环，方便观察内存占用情况
     while (1) {
@@ -658,6 +663,8 @@ Freeing chunk 5
 All Tests Done.
 ^C
 ```
+
+完整代码可分别见：[leak_test_no-while-wait.cpp](https://github.com/xiaodongQ/prog-playground/blob/main/memory/leak/leak_test_no-while-wait.cpp) 和 [leak_test.cpp](https://github.com/xiaodongQ/prog-playground/blob/main/memory/leak/leak_test.cpp)。
 
 #### 4.2.3. ThreadSanitizer
 
