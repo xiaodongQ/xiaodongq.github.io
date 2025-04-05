@@ -14,7 +14,9 @@ tags: 内存
 
 ## 1. 背景
 
-[CPU及内存调度（二） -- Linux内存管理](https://xiaodongq.github.io/2025/03/20/memory-management/) 中梳理学习了Linux的虚拟内存结构，以及进程、线程创建时的大致区别，本篇梳理 ptmalloc、tcmalloc和 jemalloc 几个业界常用的内存分配器。
+[CPU及内存调度（二） -- Linux内存管理](https://xiaodongq.github.io/2025/03/20/memory-management/) 中梳理学习了Linux的虚拟内存结构，以及进程、线程创建时的大致区别。内存布局和内存的分配、释放机制，跟程序的性能息息相关，比如内存分配器在多线程场景下的锁竞争、brk/mmap不同场景下的使用、什么场景会延迟升高、内存碎片等。
+
+本篇就来梳理下 ptmalloc、tcmalloc和 jemalloc 几个业界常用的内存分配器，了解其内部实现的主要机制。程序出现内存相关性能问题时，有助于问题理解和根因定位，并进行针对性的性能优化。
 
 几篇参考文章：
 
@@ -25,9 +27,7 @@ tags: 内存
 
 ## 2. 总体说明
 
-### 2.1. 内存分配器
-
-业界常见的库包括：ptmalloc、tcmalloc、jemalloc
+常见的内存分配器：ptmalloc、tcmalloc、jemalloc
 
 * ptmalloc 是 GNU C库（glibc）的默认分配器
     * 多线程环境下的通用内存分配
@@ -47,7 +47,7 @@ tags: 内存
     * 优点：高并发下性能优异（尤其小对象频繁分配）；内存碎片较少，提供内存分析工具（如 heap profiler）
     * 缺点：线程缓存可能占用较多内存（需权衡缓存大小与性能）
     * 适用场景：多线程服务、高频小对象分配（如 Web 服务器）
-* jemalloc，Facebook开发，后成为 FreeBSD 默认分配器
+* jemalloc，Facebook（现Meta）开发，后成为 FreeBSD 默认分配器
     * 设计目标：降低内存碎片，提升多线程和长期运行服务的稳定性
     * 核心机制
         * 多 arena 分配：每个线程绑定特定 arena，动态扩展 arena 数量减少竞争
@@ -58,11 +58,19 @@ tags: 内存
     * 适用场景：长期运行的高负载服务（如数据库、实时系统）
     * Rust 早期默认 jemalloc，后切换为系统默认的分配器（如 Unix 的 ptmalloc）
 
-## 3. 小结
+## 3. ptmalloc
+
+## 4. tcmalloc
+
+## 5. jemalloc
 
 
+## 6. 小结
 
-## 4. 参考
+
+## 7. 参考
 
 * [ptmalloc、tcmalloc与jemalloc对比分析](https://www.cyningsun.com/07-07-2018/memory-allocator-contrasts.html)
 * [使用 jemalloc profile memory](https://www.jianshu.com/p/5fd2b42cbf3d)
+* [百度工程师带你探秘C++内存管理（理论篇](https://mp.weixin.qq.com/s/mZAteEkyu0QeFhe1ZXevZA)
+* [百度工程师带你探秘C++内存管理（ptmalloc篇）](https://mp.weixin.qq.com/s/ObS65EKz1c3jooQx6KJ6uw)
