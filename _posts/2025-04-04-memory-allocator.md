@@ -1,6 +1,6 @@
 ---
 layout: post
-title: CPU及内存调度（四） -- tcmalloc、jemalloc内存分配器
+title: CPU及内存调度（四） -- ptmalloc、tcmalloc、jemalloc内存分配器
 categories: CPU及内存调度
 tags: 内存
 ---
