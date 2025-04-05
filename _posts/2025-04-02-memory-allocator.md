@@ -8,19 +8,19 @@ tags: 内存
 * content
 {:toc}
 
-介绍内存问题定位工具并进行相关实验：`Valgrind Massif`、`AddressSanitizer`、`Memory Leak and Growth火焰图` 和 bcc中内存相关的工具。
+介绍内存问题定位工具并进行相关实验：Valgrind Massif、AddressSanitizer、Memory Leak and Growth火焰图 和 bcc中内存相关的工具。
 
 
 
 ## 1. 背景
 
-利用 [Valgrind Massif](https://valgrind.org/docs/manual/ms-manual.html)、[AddressSanitizer](https://github.com/google/sanitizers/wiki/AddressSanitizer) 进行内存相关实验。以及使用 [并发与异步编程（三） -- 性能分析工具：gperftools和火焰图](https://xiaodongq.github.io/2025/03/14/async-io-example-profile/) 中未展开的 [Memory Leak and Growth火焰图](https://www.brendangregg.com/FlameGraphs/memoryflamegraphs.html)。
+利用 [Valgrind Massif](https://valgrind.org/docs/manual/ms-manual.html)、[AddressSanitizer](https://github.com/google/sanitizers/wiki/AddressSanitizer) 进行内存相关实验。以及使用 [并发与异步编程（三） -- 性能分析工具：gperftools和火焰图](https://xiaodongq.github.io/2025/03/14/async-io-example-profile/) 中未展开的 [Memory Leak and Growth火焰图](https://www.brendangregg.com/FlameGraphs/memoryflamegraphs.html) 进行展示。
 
 并介绍下bcc tools里面内存相关的工具。
 
 ## 2. 测试程序demo
 
-生成一个测试demo，也可见：[leak_test.cpp](https://github.com/xiaodongQ/prog-playground/tree/main/memory/leak/leak_test.cpp)
+生成一个测试demo，也可见：[leak_test.cpp](https://github.com/xiaodongQ/prog-playground/tree/main/memory/leak/leak_test.cpp)，下述实验的结果均可见该目录。
 
 * 模拟内存泄漏：在单独线程中，随机申请 1KB~1MB 之间的内存，并且50%的概率不释放
 * 模拟空悬指针和野指针
@@ -151,7 +151,6 @@ Valgrind比较普遍的用法是用`memcheck`检查内存泄漏，不指定工�
 可查看官网介绍：[Valgrind Massif](https://valgrind.org/docs/manual/ms-manual.html)
 
 * Valgrind提供的堆分析器`massif`，用于监控程序的堆内存使用情况，可辅助识别内存泄漏和不必要的内存使用
-    * massif会**统计不同大小的内存块分配情况**，可辅助分析内存分布情况，比如是否有大量小块、少量大块的分配
     * massif会报告程序运行期间的峰值内存使用量，包括堆内存的最大分配量，对于**评估程序的内存需求**非常有用
 * 性能影响：程序变慢 `20` 倍左右（`10~30`）
 * 使用方式：`-g`编译；`valgrind --tool=massif xxx`，会生成一个分析文件；`ms_print ./massif.out.18042`输出报告
@@ -364,28 +363,35 @@ Google的`Sanitizer`系列工具，在gcc和clang中都集成了，通过`-fsani
 
 * `-fsanitize=memory`
 * 性能影响：程序变慢约3倍；影子内存与程序内存1:1，内存占用显著增加
+* clang支持，貌似没介绍gcc中的支持，暂不展开。详见：[MemorySanitizer](https://github.com/google/sanitizers/wiki/MemorySanitizer)
 
 4、**ThreadSanitizer（`TSan`）**，检测多线程程序中的数据竞争和**死锁**
 
 * `-fsanitize=thread`
+    * 需要安装：`yum install libtsan`
 * 性能影响：变慢约5-15倍；内存消耗增加5-10倍
+* 详见：[ThreadSanitizerCppManual](https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual)
+    * 支持的选项，可见：[ThreadSanitizerFlags](https://github.com/google/sanitizers/wiki/ThreadSanitizerFlags)
+    * 示例（使用空格间隔）：`TSAN_OPTIONS="history_size=7 force_seq_cst_atomics=1" ./myprogram`
 
 5、**UndefinedBehavaiorSnitizer（`UBSan`）**，检测未定义行为，如整数溢出、空指针解引用、类型转换错误等
 
 * `-fsanitize=undefined`
+    * 需要安装：`yum install libubsan`
 * 性能影响：开销通常小于10%
+* 详见：[UndefinedBehaviorSanitizer](https://github.com/llvm/llvm-project/blob/main/clang/docs/UndefinedBehaviorSanitizer.rst)，貌似只看到clang的
 
 对比汇总：
 
-| 工具               | 检测类型                  | 性能影响（时间） | 内存占用       |
-| ----------------  |  --------------------    | ------------- | ------------- |
-| AddressSanitizer (ASan) | 内存访问错误、泄漏       | 2×              | 高（虚拟内存） |
-| ThreadSanitizer (TSan)  | 数据竞争、死锁           | 5-15×           | 极高           |
-| MemorySanitizer (MSan)  | 未初始化内存使用         | 3×              | 高             |
-| UndefinedBehaviorSanitizer (UBSan) | 未定义行为       | <10%            | 低             |
-| Valgrind       | 综合检测（内存错误、性能） | 20×             | 极高           |
+| 工具                               | 检测类型                   | 性能影响（时间） | 内存占用       |
+|------------------------------------|----------------------------|------------------|----------------|
+| AddressSanitizer (ASan)            | 内存访问错误、泄漏         | 2×               | 高（虚拟内存） |
+| ThreadSanitizer (TSan)             | 数据竞争、死锁             | 5-15×            | 极高           |
+| MemorySanitizer (MSan)             | 未初始化内存使用           | 3×               | 高             |
+| UndefinedBehaviorSanitizer (UBSan) | 未定义行为                 | <10%             | 低             |
+| Valgrind                           | 综合检测（内存错误、性能） | 20×              | 极高           |
 
-使用建议：
+**使用建议**：
 
 * 快速开发调试：优先使用 ASan 或 UBSan（性能影响小，覆盖常见问题）。
     * ASan（内存错误） + UBSan（未定义行为） + LSan（泄漏检测）覆盖大部分常见问题
@@ -622,6 +628,7 @@ SUMMARY: AddressSanitizer: 1652500 byte(s) leaked in 5 allocation(s).
 
 ```sh
 [CentOS-root@xdlinux ➜ leak git:(main) ✗ ]$ LSAN_OPTIONS="exitcode=0:log_path=AddressSanitizer/asan-with-LSAN_OPTIONS.log" ASAN_OPTIONS="halt_on_error=0" ./leak_test 5
+
 ASAN_OPTIONS=halt_on_error=0
 LSAN_OPTIONS=exitcode=0:log_path=AddressSanitizer/asan-with-LSAN_OPTIONS.log
 
@@ -652,11 +659,55 @@ All Tests Done.
 ^C
 ```
 
+#### 4.2.3. ThreadSanitizer
+
+测试如下，检测到了`heap-use-after-free`使用问题。
+
+* 也可指定选项：`TSAN_OPTIONS="log_path=ThreadSanitizer/tsan.log halt_on_error=1" ./leak_test 5`
+* tsan中，halt_on_error默认是0，检测到错误不退出，具体可见上面贴的flags说明链接
+
+```sh
+[CentOS-root@xdlinux ➜ leak git:(main) ✗ ]$ make tsan
+rm -f leak_test
+g++ -Wall -g -fsanitize=thread -o leak_test leak_test.cpp -lpthread
+leak_test.cpp: In function ‘void simulate_wild_pointer()’:
+leak_test.cpp:75:11: warning: ‘wild_ptr’ may be used uninitialized in this function [-Wmaybe-uninitialized]
+     printf("Value at wild pointer: %d\n", *wild_ptr); // 可能导致段错误
+     ~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+[CentOS-root@xdlinux ➜ leak git:(main) ✗ ]$ ./leak_test 5
+ASAN_OPTIONS=(null)
+LSAN_OPTIONS=(null)
+
+Testing Dangling Pointer:
+Allocated memory and initialized with value: 42
+Memory freed, but ptr is still accessible.
+Dangling pointer triggered: Accessing freed memory...
+Allocated chunk 1 of size 451052 bytes
+Freeing chunk 1
+==================
+WARNING: ThreadSanitizer: heap-use-after-free (pid=43497)
+  Read of size 4 at 0x7b0400000000 by main thread:
+    #0 simulate_dangling_pointer() /home/workspace/prog-playground/memory/leak/leak_test.cpp:64 (leak_test+0x401023)
+    #1 main /home/workspace/prog-playground/memory/leak/leak_test.cpp:98 (leak_test+0x4011ff)
+
+  Previous write of size 8 at 0x7b0400000000 by main thread:
+    #0 free <null> (libtsan.so.0+0x2c16a)
+    #1 simulate_dangling_pointer() /home/workspace/prog-playground/memory/leak/leak_test.cpp:58 (leak_test+0x401003)
+    #2 main /home/workspace/prog-playground/memory/leak/leak_test.cpp:98 (leak_test+0x4011ff)
+
+SUMMARY: ThreadSanitizer: heap-use-after-free /home/workspace/prog-playground/memory/leak/leak_test.cpp:64 in simulate_dangling_pointer()
+==================
+...
+```
+
 ## 5. Memory 火焰图
 
 介绍文章：[Memory Leak and Growth火焰图](https://www.brendangregg.com/FlameGraphs/memoryflamegraphs.html)
 
-借助`perf`和`eBPF`来生成内存的火焰图，文章介绍了4种方法：
+### 5.1. 追踪方法
+
+借助`perf`和`eBPF`来采集内存信息，并生成火焰图，文章介绍了4种方法追踪内存申请事件：
 
 * 1、追踪用户态的 `malloc()`, `free()`
     * 使用bcc下的 stackcount 工具采集用户态的内存分配
@@ -683,13 +734,52 @@ All Tests Done.
     * `perf record -e page-faults -a -g -- sleep 30`
     * `/usr/share/bcc/tools/stackcount 't:exceptions:page_fault_*'`
 
+### 5.2. demo实验
 
+1、火焰图：`/usr/share/bcc/tools/stackcount -p $(pidof leak_test) -U c:malloc > out_leak_test.stack`
 
-## 6. 小结
+`stackcollapse.pl < out_leak_test.stack | flamegraph.pl --color=mem --title="malloc() Flame Graph" --countname="calls" > out_leak_test.svg`
 
+本demo集到的内容比较简单。
 
+2、memleak：`/usr/share/bcc/tools/memleak -p $(pidof leak_test) > memleak_leak_test.result`
 
-## 7. 参考
+```sh
+Attaching to pid 45324, Ctrl+C to quit.                                                                                                                       
+[07:21:41] Top 10 stacks with outstanding allocations:
+    975573 bytes in 3 allocations from stack
+        random_leak_memory(void*)+0x87 [leak_test]
+        start_thread+0xea [libpthread-2.28.so]
+[07:21:46] Top 10 stacks with outstanding allocations:
+    2238288 bytes in 5 allocations from stack
+        random_leak_memory(void*)+0x87 [leak_test]
+        start_thread+0xea [libpthread-2.28.so]
+[07:21:51] Top 10 stacks with outstanding allocations:
+    2238288 bytes in 5 allocations from stack
+        random_leak_memory(void*)+0x87 [leak_test]
+        start_thread+0xea [libpthread-2.28.so]
+[07:21:56] Top 10 stacks with outstanding allocations:
+    2238288 bytes in 5 allocations from stack
+        random_leak_memory(void*)+0x87 [leak_test]
+        start_thread+0xea [libpthread-2.28.so]
+[07:22:01] Top 10 stacks with outstanding allocations:
+    2238288 bytes in 5 allocations from stack
+        [unknown]
+        [unknown]
+```
+
+## 6. bcc tools工具
+
+之前 [eBPF学习实践系列（二） -- bcc tools网络工具集](https://xiaodongq.github.io/2024/06/10/bcc-tools-network/) 中介绍了网络相关工具，这里介绍并简单使用下内存工具。
+
+![bcc tools 2019](/images/bcc-tools-2019.png)  
+[出处](https://github.com/iovisor/bcc/blob/master/images/bcc_tracing_tools_2019.png)
+
+## 7. 小结
+
+介绍了内存问题定位工具并进行相关实验。
+
+## 8. 参考
 
 * [ptmalloc、tcmalloc与jemalloc对比分析](https://www.cyningsun.com/07-07-2018/memory-allocator-contrasts.html)
 * [使用 jemalloc profile memory](https://www.jianshu.com/p/5fd2b42cbf3d)
