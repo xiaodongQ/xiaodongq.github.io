@@ -14,7 +14,7 @@ tags: 内存
 
 ## 1. 背景
 
-利用 [Valgrind Massif](https://valgrind.org/docs/manual/ms-manual.html)、[AddressSanitizer](https://github.com/google/sanitizers/wiki/AddressSanitizer) 进行内存相关实验。以及使用 [并发与异步编程（三） -- 性能分析工具：gperftools和火焰图](https://xiaodongq.github.io/2025/03/14/async-io-example-profile/) 中未展开的 [Memory Leak and Growth火焰图](https://www.brendangregg.com/FlameGraphs/memoryflamegraphs.html) 进行展示。
+利用 [Valgrind Massif](https://valgrind.org/docs/manual/ms-manual.html)、[AddressSanitizer](https://github.com/google/sanitizers/wiki/AddressSanitizer) 进行内存相关实验。以及使用 [并发与异步编程（三） -- 性能分析工具：gperftools和火焰图](https://xiaodongq.github.io/2025/03/14/async-io-example-profile/) 中未具体展开的 [Memory Leak and Growth火焰图](https://www.brendangregg.com/FlameGraphs/memoryflamegraphs.html) 工具进行操作实践。
 
 并介绍下bcc tools里面内存相关的工具。
 
@@ -742,6 +742,8 @@ SUMMARY: ThreadSanitizer: heap-use-after-free /home/workspace/prog-playground/me
 
 本demo集到的内容比较简单。
 
+![out_leak_test](/images/out_leak_test.svg)
+
 2、memleak：`/usr/share/bcc/tools/memleak -p $(pidof leak_test) > memleak_leak_test.result`
 
 ```sh
@@ -770,10 +772,48 @@ Attaching to pid 45324, Ctrl+C to quit.
 
 ## 6. bcc tools工具
 
-之前 [eBPF学习实践系列（二） -- bcc tools网络工具集](https://xiaodongq.github.io/2024/06/10/bcc-tools-network/) 中介绍了网络相关工具，这里介绍并简单使用下内存工具。
+之前的文章中：
+
+* 在 [eBPF学习实践系列（二） -- bcc tools网络工具集](https://xiaodongq.github.io/2024/06/10/bcc-tools-network/) 中介绍了网络相关bcc工具
+* 在 [并发与异步编程（三） -- 性能分析工具：gperftools和火焰图](https://xiaodongq.github.io/2025/03/14/async-io-example-profile/) 中介绍了Scheduler下的offcputime、wakeuptime、offwaketime等几个工具用于生成不同类别的火焰图。
+
+本小节介绍下内存相关工具。
 
 ![bcc tools 2019](/images/bcc-tools-2019.png)  
 [出处](https://github.com/iovisor/bcc/blob/master/images/bcc_tracing_tools_2019.png)
+
+简要说明上述bcc tools图示中与内存、缓存相关的几个工具。
+
+Virtual Memory模块：
+
+* `memleak`
+    * 检测用户空间内存泄漏，跟踪 malloc/free 等内存操作（还有`realloc`、`calloc`、`posix_memalign`等库函数）
+* `oomkill`
+    * 监控 OOM Killer 杀死进程的事件。可以结合`dmesg`和`/var/log/messages`查看内核日志，分析内存耗尽原因
+* `shmsnoop`
+    * 跟踪 System V 共享内存操作（shmget/shmat/shmdt），调试共享内存通信异常或性能问题
+    * 使用场景：调试共享内存通信异常或性能问题
+* `slabratetop`
+    * 统计内核 SLAB 缓存的分配/释放速率，结合`slabtop`查看SLAB使用情况
+    * 使用场景：内核对象分配异常（如 dentry 缓存暴涨）
+* `drsnoop`
+    * 跟踪目录项缓存（dcache）查找事件
+    * 使用场景：分析文件路径解析性能（如频繁 stat 调用）
+
+VFS模块：
+
+* `cachestat`
+    * 统计系统级`页缓存`命中率（LRU 机制）
+    * 使用场景：评估系统缓存效率，分析磁盘 I/O 压力
+* `cachetop`
+    * 按进程/文件统计页缓存命中率
+    * 使用场景：定位具体进程或文件的缓存效率问题
+* `dcstat`
+    * 统计目录项缓存（dcache）的查找次数与命中率
+    * 使用场景：分析文件路径解析的整体效率
+* `dcsnoop`
+    * 跟踪单个目录项缓存查找事件（类似 drsnoop）
+    * 使用场景：调试具体文件路径的查找延迟或失败
 
 ## 7. 小结
 
