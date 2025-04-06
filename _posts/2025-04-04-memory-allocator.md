@@ -61,7 +61,7 @@ tags: 内存
 
 ## 3. ptmalloc
 
-### 3.1. 历史迭代说明
+### 3.1. 历史迭代
 
 历史迭代：glibc的内存分配器ptmalloc，起源于`Doug Lea`的`malloc`，或者叫`dlmalloc`。由`Wolfram Gloger`改进得到可以支持多线程。（**说明：下面篇幅中分别称dlmalloc和ptmalloc，ptmalloc指代当前glibc的版本**）
 
@@ -104,9 +104,10 @@ dlmalloc介绍：[A Memory Allocator](https://gee.cs.oswego.edu/dl/html/malloc.h
   Consistent balance across these factors results in a good general-purpose
   allocator for malloc-intensive programs.
 ...
+*/
 ```
 
-### 3.2. dlmalloc
+### 3.2. dlmalloc说明
 
 先简单看一下基础版本的`dlmalloc`，有助于理解后续的ptmalloc版本的设计思路、解决了什么问题。
 
@@ -246,9 +247,14 @@ void* dlmalloc(size_t bytes) {
 }
 ```
 
-### 3.3. ptmalloc
+### 3.3. ptmalloc说明
 
-从代码注释里看简要设计：
+从代码注释里看下主要的算法过程：
+
+* 对于大内存（`>= 512 字节`）的申请，是它最适合的分配场景，基于先进先出队列（FIFO）决定申请顺序（可能使用LRU）
+* 对于小内存（`<= 64 字节`）的申请，它是一个缓存分配器，维护了快速回收的chunk池
+* 对于两者之间的内存（`(64字节, 512字节)`）申请，为了合并大内存和小内存请求，它会尽可能同时满足上面两个目标
+* 对于特别大的的内存申请（`>= 128KB`），依赖使用系统的内存映射机制（比如`mmap`）
 
 ```c
 // glibc/malloc/malloc.c
