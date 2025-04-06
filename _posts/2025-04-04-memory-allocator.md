@@ -16,7 +16,7 @@ tags: 内存
 
 [CPU及内存调度（二） -- Linux内存管理](https://xiaodongq.github.io/2025/03/20/memory-management/) 中梳理学习了Linux的虚拟内存结构，以及进程、线程创建时的大致区别。内存布局和内存的分配、释放机制，跟程序的性能息息相关，比如内存分配器在多线程场景下的锁竞争、brk/mmap不同场景下的使用、什么场景会延迟升高、内存碎片等。
 
-程序出现内存相关性能问题时，理解所用内存分配器的内在逻辑有助于问题理解和根因定位，并进行针对性的性能优化。本篇就来梳理下 ptmalloc、tcmalloc和 jemalloc 几个业界常用的内存分配器，了解其内部实现的主要机制。
+程序调用malloc/free函数申请和释放内存，内存分配器则提供对内存的集中管理。当程序出现内存相关性能问题时，理解所用内存分配器的内在逻辑有助于问题理解和根因定位，并进行针对性的性能优化。本篇就来梳理下 ptmalloc、tcmalloc和 jemalloc 几个业界常用的内存分配器，了解其内部实现的主要机制。
 
 结合源码和几篇参考文章：
 
@@ -28,7 +28,7 @@ tags: 内存
 
 ## 2. 总体说明
 
-常见的内存分配器：ptmalloc、tcmalloc、jemalloc
+常见的内存分配器：ptmalloc、tcmalloc、jemalloc。
 
 * **ptmalloc** 全称是`Per-Thread Malloc`，是 GNU C库（glibc）的默认分配器
     * 多线程环境下的通用内存分配
@@ -65,10 +65,6 @@ tags: 内存
 
 历史迭代：glibc的内存分配器ptmalloc，起源于`Doug Lea`的`malloc`，或者叫`dlmalloc`。由`Wolfram Gloger`改进得到可以支持多线程。
 
-* dlmalloc介绍：[A Memory Allocator](https://gee.cs.oswego.edu/dl/html/malloc.html)
-    * 代码：[malloc.c](https://gee.cs.oswego.edu/pub/misc/malloc.c)
-    * 自己也归档了一份用于对比学习：[dlmalloc_src](https://github.com/xiaodongQ/prog-playground/tree/main/memory/dlmalloc_src)
-
 两位大佬的介绍：
 
 * `Doug Lea（道格.利）`是计算机科学领域的著名专家，尤其在Java并发编程方面贡献卓越。
@@ -79,6 +75,8 @@ tags: 内存
     * Doug Lea 的 dlmalloc 是 C/C++ 内存管理领域的基石之一，尽管现在有更现代的内存分配器，但其设计思想仍被广泛借鉴
 * `Wolfram Gloger` 是一位德国计算机科学家，以其在内存管理和动态内存分配器方面的贡献而闻名
     * 他对于 Doug Lea 的 dlmalloc 的改进版本：ptmalloc（Per-Thread Malloc），支持多线程环境下的高效内存分配，并被集成到 glibc（GNU C Library）中，成为 Linux 系统默认的 malloc 实现
+
+dlmalloc介绍：[A Memory Allocator](https://gee.cs.oswego.edu/dl/html/malloc.html)，代码：[malloc.c](https://gee.cs.oswego.edu/pub/misc/malloc.c)。自己也归档了一份用于对比学习：[dlmalloc_src](https://github.com/xiaodongQ/prog-playground/tree/main/memory/dlmalloc_src)。
 
 glibc（本地fork并切换了2.28版本）的代码注释中，也展示了上述迭代经过。并且说明了为什么用这个版本的malloc：
 

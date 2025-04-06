@@ -747,7 +747,7 @@ SUMMARY: ThreadSanitizer: heap-use-after-free /home/workspace/prog-playground/me
 
 `stackcollapse.pl < out_leak_test.stack | flamegraph.pl --color=mem --title="malloc() Flame Graph" --countname="calls" > out_leak_test.svg`
 
-本demo集到的内容比较简单。
+本demo场景收集到的内容比较简单。
 
 ![out_leak_test](/images/out_leak_test.svg)
 
