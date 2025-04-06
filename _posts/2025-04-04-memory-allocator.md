@@ -106,9 +106,7 @@ dlmalloc介绍：[A Memory Allocator](https://gee.cs.oswego.edu/dl/html/malloc.h
 ...
 ```
 
-### 3.2. 设计说明
-
-#### 3.2.1. dlmalloc
+### 3.2. dlmalloc
 
 先简单看一下基础版本的`dlmalloc`，有助于理解后续的ptmalloc版本的设计思路、解决了什么问题。
 
@@ -142,13 +140,15 @@ function definition after merge: 90
     * Binning：用于分类管理不同大小的空闲内存块，根据其大小被放入不同的“bin”（桶）中，便于快速查找适合的内存块
 * 参考：[A Memory Allocator](https://gee.cs.oswego.edu/dl/html/malloc.html)
 
+![dlmalloc-core-design](/images/2025-04-06-dlmalloc-core.png)
+
 2、线程安全性：启用加锁，需要编译时指定`USE_LOCKS`为非0（默认为0-不启用），`-DUSE_LOCKS=1`
 
 * 另外几个锁相关的宏：`USE_SPIN_LOCKS`、`USE_RECURSIVE_LOCKS`
 
-因为后续准备梳理下锁相关的性能，这里简要梳理学习下dlmalloc中的相关逻辑，其中的兼容性设计、自旋锁实现都值得学习。
+因为后续准备梳理下锁相关的内容，这里简要梳理学习下dlmalloc中的相关逻辑，其中的兼容性设计、自旋锁实现都值得学习。
 
-调整了一下缩进：
+锁相关的部分调整了一下缩进：
 
 ```c
 // prog-playground/memory/dlmalloc_src/malloc.c
@@ -226,7 +226,7 @@ DLMALLOC_EXPORT void  dlfree(void*);
 ...
 ```
 
-dlmalloc逻辑：
+dlmalloc逻辑，可以看到锁范围还是很大的：
 
 ```c
 void* dlmalloc(size_t bytes) {
@@ -246,7 +246,7 @@ void* dlmalloc(size_t bytes) {
 }
 ```
 
-#### 3.2.2. ptmalloc
+### 3.3. ptmalloc
 
 从代码注释里看简要设计：
 
@@ -296,5 +296,6 @@ struct malloc_chunk {
 ## 7. 参考
 
 * [ptmalloc、tcmalloc与jemalloc对比分析](https://www.cyningsun.com/07-07-2018/memory-allocator-contrasts.html)
+* [内存分配器ptmalloc,jemalloc,tcmalloc调研与对比](https://geekdaxue.co/read/ixxw@it/memory_allocators)
 * [使用 jemalloc profile memory](https://www.jianshu.com/p/5fd2b42cbf3d)
 * [百度工程师带你探秘C++内存管理（ptmalloc篇）](https://mp.weixin.qq.com/s/ObS65EKz1c3jooQx6KJ6uw)
