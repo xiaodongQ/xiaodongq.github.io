@@ -20,9 +20,15 @@ tags: 内存
 
 结合源码和几篇参考文章：
 
-* [MallocInternals](https://sourceware.org/glibc/wiki/MallocInternals)
-* [聊聊C语言中的malloc申请内存的内部原理](https://kfngxl.cn/index.php/archives/554/)
-* [百度工程师带你探秘C++内存管理（ptmalloc篇）](https://mp.weixin.qq.com/s/ObS65EKz1c3jooQx6KJ6uw)
+* ptmalloc
+    * [MallocInternals](https://sourceware.org/glibc/wiki/MallocInternals)
+    * [聊聊C语言中的malloc申请内存的内部原理](https://kfngxl.cn/index.php/archives/554/)
+    * [堆基础02：malloc源码分析](https://cata1oc.github.io/2022/07/16/%E5%A0%86%E5%9F%BA%E7%A1%8002-malloc%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90)
+    * [百度工程师带你探秘C++内存管理（ptmalloc篇）](https://mp.weixin.qq.com/s/ObS65EKz1c3jooQx6KJ6uw)
+* tcmalloc
+    * [记一次 TCMalloc Debug 经历 #2](https://zhuanlan.zhihu.com/p/81683409)
+* jemalloc
+    * [Jemalloc内存分配与优化实践](https://mp.weixin.qq.com/s/U3uylVKZ-FsMjdeX3lymog)
 * [ptmalloc、tcmalloc与jemalloc对比分析](https://www.cyningsun.com/07-07-2018/memory-allocator-contrasts.html)
 * [内存分配器ptmalloc,jemalloc,tcmalloc调研与对比](https://geekdaxue.co/read/ixxw@it/memory_allocators)
     * 原文是：[内存分配器ptmalloc,jemalloc,tcmalloc调研与对比](https://blog.csdn.net/Rong_Toa/article/details/110689404)
@@ -74,7 +80,7 @@ tags: 内存
 
 ### 3.1. 历史迭代
 
-历史迭代：glibc的内存分配器ptmalloc，起源于`Doug Lea`的`malloc`，或者叫`dlmalloc`。由`Wolfram Gloger`改进得到可以支持多线程。（**说明：下面篇幅中分别称dlmalloc和ptmalloc，ptmalloc指代当前glibc的版本**）
+历史迭代：glibc的内存分配器ptmalloc，起源于`Doug Lea`的`malloc`，或者叫`dlmalloc`。由`Wolfram Gloger`改进得到可以支持多线程。（**说明：下面篇幅中分别称dlmalloc和ptmalloc，ptmalloc指代当前glibc的版本，也叫`ptmalloc2`**）
 
 两位大佬的介绍：
 
@@ -262,31 +268,19 @@ void* dlmalloc(size_t bytes) {
 
 一些设计可见：[MallocInternals](https://sourceware.org/glibc/wiki/MallocInternals)
 
-从代码注释里看下主要的算法过程：
+其中的几个关键概念：
 
-* 对于大内存（`>= 512 字节`）的申请，是它最适合的分配场景，基于先进先出队列（FIFO）决定申请顺序（可能使用LRU）
-* 对于小内存（`<= 64 字节`）的申请，它是一个缓存分配器，维护了快速回收的chunk池
-* 对于两者之间的内存（`(64字节, 512字节)`）申请，为了合并大内存和小内存请求，它会尽可能同时满足上面两个目标
-* 对于特别大的的内存申请（`>= 128KB`），依赖使用系统的内存映射机制（比如`mmap`）
-
-```c
-// glibc/malloc/malloc.c
-/*
-...
-  The main properties of the algorithms are:
-  * For large (>= 512 bytes) requests, it is a pure best-fit allocator,
-    with ties normally decided via FIFO (i.e. least recently used).
-  * For small (<= 64 bytes by default) requests, it is a caching
-    allocator, that maintains pools of quickly recycled chunks.
-  * In between, and for combinations of large and small requests, it does
-    the best it can trying to meet both goals at once.
-  * For very large requests (>= 128KB by default), it relies on system
-    memory mapping facilities, if supported.
-...
-*/
-```
+* `Arena（内存分配区）`：用于管理内存分配的数据结构，每个线程被分配到特定的Arena，从该Arena的空闲列表中分配内存，从而减少线程间的内存分配冲突
+* `Heap（堆）`：Heap是一块连续的内存区域，被划分为多个大小不同的块（Chunk）供程序分配使用。
+    * 每个堆都归属于一个特定的 Arena，是内存分配的实际载体。
+    * 程序运行时，通过Arena对堆进行管理，分配和释放堆中的 Chunk，实现动态内存管理
+* `Chunk（内存块）`：是 malloc 库中内存管理的基本单位，是对分配给应用程序的内存块的一种封装。
+* `Memory（内存）`：应用程序地址空间的一部分，通常由 RAM 或 swap（磁盘交换空间）作为支持。
+* `Thread Local Cache (tcache)（线程本地缓存）`：每个线程都有一个线程本地缓存 tcache，用于存储少量可直接访问的chunk，无需加锁
 
 #### 3.3.1. malloc_state
+
+ptmalloc中使用 **分配区（`arena`）** 管理从操作系统批量申请来的内存，对应的结构为 `malloc_state`
 
 ```c
 // glibc/malloc/malloc.c
@@ -327,6 +321,18 @@ struct malloc_state
 };
 ```
 
+ptmalloc中存在一个全局的主分配区：
+
+```c
+// glibc/malloc/malloc.c
+static struct malloc_state main_arena =
+{
+  .mutex = _LIBC_LOCK_INITIALIZER,
+  .next = &main_arena,
+  .attached_threads = 1
+};
+```
+
 #### 3.3.2. malloc_chunk
 
 malloc_chunk 内存管理结构：
@@ -352,9 +358,9 @@ struct malloc_chunk {
 1）一个已分配chunk的结构示意图如下：
 
 * `mchunk_size`中，还包含了3位属性标志位：`|A|M|P|`
-    * `A`(NON_MAIN_ARENA) ：当前chunk块是否属于`非主分配区`
-    * `M`(IS_MMAPPED)：当前chunk是否是通过`mmap`分配的
-    * `P`(PREV_INUSE) ：表示前一个chunk是否在使用中，`P==1`表示在使用中
+    * `A`（NON_MAIN_ARENA） ：当前chunk块是否属于`非主分配区`
+    * `M`（IS_MMAPPED）：当前chunk是否是通过`mmap`分配的
+    * `P`（PREV_INUSE）：表示前一个chunk是否在使用中，`P==1`表示在使用中
 
 ```sh
 chunk-> +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
