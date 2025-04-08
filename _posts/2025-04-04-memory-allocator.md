@@ -24,6 +24,7 @@ tags: 内存
     * [MallocInternals](https://sourceware.org/glibc/wiki/MallocInternals)
     * [聊聊C语言中的malloc申请内存的内部原理](https://kfngxl.cn/index.php/archives/554/)
     * [堆基础02：malloc源码分析](https://cata1oc.github.io/2022/07/16/%E5%A0%86%E5%9F%BA%E7%A1%8002-malloc%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90)
+        * 里面了解下 pwndbg 的用法
     * [百度工程师带你探秘C++内存管理（ptmalloc篇）](https://mp.weixin.qq.com/s/ObS65EKz1c3jooQx6KJ6uw)
 * tcmalloc
     * [记一次 TCMalloc Debug 经历 #2](https://zhuanlan.zhihu.com/p/81683409)
@@ -80,7 +81,7 @@ tags: 内存
 
 ### 3.1. 历史迭代
 
-历史迭代：glibc的内存分配器ptmalloc，起源于`Doug Lea`的`malloc`，或者叫`dlmalloc`。由`Wolfram Gloger`改进得到可以支持多线程。（**说明：下面篇幅中分别称dlmalloc和ptmalloc，ptmalloc指代当前glibc的版本，也叫`ptmalloc2`**）
+历史迭代：glibc的内存分配器ptmalloc，起源于`Doug Lea`的`malloc`，或者叫`dlmalloc`。由`Wolfram Gloger`改进得到可以支持多线程。（**说明**：下面篇幅中分别称dlmalloc和ptmalloc，ptmalloc指代当前glibc的版本，也叫`ptmalloc2`；本篇中glibc代码基于2.28版本，和CentOS8一致）
 
 两位大佬的介绍：
 
@@ -100,7 +101,7 @@ dlmalloc介绍：[A Memory Allocator](https://gee.cs.oswego.edu/dl/html/malloc.h
 > 这并不是有史以来最快、最节省空间、最可移植或最可调优的 malloc 实现。然而，它在速度、空间节省、可移植性和可调优性之间达到了一致的平衡。正因如此，它成为了一个适用于 大量使用malloc程序 的优秀通用分配器。
 
 ```c
-// glibc/malloc/malloc.c
+// glibc-2.28/malloc/malloc.c
 /*
   This is a version (aka ptmalloc2) of malloc/free/realloc written by
   Doug Lea and adapted to multiple threads/arenas by Wolfram Gloger.
@@ -283,7 +284,7 @@ void* dlmalloc(size_t bytes) {
 ptmalloc中使用 **分配区（`arena`）** 管理从操作系统批量申请来的内存，对应的结构为 `malloc_state`
 
 ```c
-// glibc/malloc/malloc.c
+// glibc-2.28/malloc/malloc.c
 struct malloc_state
 {
   /* Serialize access.  */
@@ -324,7 +325,7 @@ struct malloc_state
 ptmalloc中存在一个全局的主分配区：
 
 ```c
-// glibc/malloc/malloc.c
+// glibc-2.28/malloc/malloc.c
 static struct malloc_state main_arena =
 {
   .mutex = _LIBC_LOCK_INITIALIZER,
@@ -338,7 +339,7 @@ static struct malloc_state main_arena =
 malloc_chunk 内存管理结构：
 
 ```c
-// glibc/malloc/malloc.c
+// glibc-2.28/malloc/malloc.c
 struct malloc_chunk {
   // 前一个空闲chunk的大小
   INTERNAL_SIZE_T      mchunk_prev_size;  /* Size of previous chunk (if free).  */
