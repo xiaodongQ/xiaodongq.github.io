@@ -1,6 +1,6 @@
 ---
 layout: post
-title: CPU及内存调度（四） -- ptmalloc、tcmalloc、jemalloc内存分配器
+title: CPU及内存调度（四） -- ptmalloc、tcmalloc、jemalloc、mimalloc内存分配器
 categories: CPU及内存调度
 tags: 内存
 ---
@@ -8,7 +8,7 @@ tags: 内存
 * content
 {:toc}
 
-梳理 ptmalloc、tcmalloc 和 jemalloc 内存分配器。
+梳理 ptmalloc、tcmalloc、jemalloc 和 mimalloc 内存分配器。
 
 
 
@@ -16,21 +16,22 @@ tags: 内存
 
 [CPU及内存调度（二） -- Linux内存管理](https://xiaodongq.github.io/2025/03/20/memory-management/) 中梳理学习了Linux的虚拟内存结构，以及进程、线程创建时的大致区别。内存的布局和分配、释放机制，跟程序的性能息息相关，比如内存分配器在多线程场景下的锁竞争、`brk`/`mmap`不同场景下的使用、什么场景会延迟升高、内存碎片等。
 
-程序调用`malloc`/`free`函数申请和释放内存，内存分配器则提供对内存的集中管理。理解所用内存分配器的内在逻辑，在程序设计以及出现内存相关性能瓶颈时，有助于问题理解和根因定位，并进行针对性的性能优化。本篇就来梳理下 `ptmalloc`、`tcmalloc`和 `jemalloc` 几个业界常用的内存分配器，了解其内部实现的主要机制。
+程序调用`malloc`/`free`函数申请和释放内存，内存分配器则提供对内存的集中管理。理解所用内存分配器的内在逻辑，在程序设计以及出现内存相关性能瓶颈时，有助于问题理解和根因定位，并进行针对性的性能优化。本篇就来梳理下 `ptmalloc`、`tcmalloc`、`jemalloc`和`mimalloc` 几个业界常用的内存分配器，了解其内部实现的主要机制。
 
 结合源码和几篇参考文章：
 
+* [MallocInternals](https://sourceware.org/glibc/wiki/MallocInternals)
+* [聊聊C语言中的malloc申请内存的内部原理](https://kfngxl.cn/index.php/archives/554/)
+* [百度工程师带你探秘C++内存管理（ptmalloc篇）](https://mp.weixin.qq.com/s/ObS65EKz1c3jooQx6KJ6uw)
 * [ptmalloc、tcmalloc与jemalloc对比分析](https://www.cyningsun.com/07-07-2018/memory-allocator-contrasts.html)
 * [内存分配器ptmalloc,jemalloc,tcmalloc调研与对比](https://geekdaxue.co/read/ixxw@it/memory_allocators)
-    * 原文是：[内存分配器ptmalloc,jemalloc,tcmalloc调研与对比](https://blog.csdn.net/Rong_Toa/article/details/110689404)，但CSDN阅读体验太差
-* [使用 jemalloc profile memory](https://www.jianshu.com/p/5fd2b42cbf3d)
-* [百度工程师带你探秘C++内存管理（ptmalloc篇）](https://mp.weixin.qq.com/s/ObS65EKz1c3jooQx6KJ6uw)
+    * 原文是：[内存分配器ptmalloc,jemalloc,tcmalloc调研与对比](https://blog.csdn.net/Rong_Toa/article/details/110689404)
 
 ## 2. 总体说明
 
-常见的内存分配器：ptmalloc、tcmalloc、jemalloc。
+常见的内存分配器：ptmalloc、tcmalloc、jemalloc、mimalloc。
 
-* **ptmalloc** 全称是`Per-Thread Malloc`，是 GNU C库（glibc）的默认分配器
+* **ptmalloc** 全称是`Posix Thread Malloc`，是 GNU C库（glibc）的默认分配器
     * 多线程环境下的通用内存分配器
     * 核心机制
         * 使用 `arena（分配区）`，每个线程优先使用独立 arena（数量有限，默认为核心数的 8 倍）
@@ -58,6 +59,16 @@ tags: 内存
     * 缺点：配置较复杂，默认策略可能不如 tcmalloc 激进
     * 适用场景：长期运行的高负载服务（如数据库、实时系统）
     * Rust 早期默认 jemalloc，后切换为系统默认的分配器（如 Unix 的 ptmalloc）
+* **mimalloc**，全称是`Microsoft MiMalloc`，微软开源的内存分配器
+    * 设计目标：提供高性能的内存分配器，减少内存碎片，并提升多线程环境下的扩展性
+    * 核心机制
+        * 分段式内存管理：mimalloc 将堆划分为多个独立的段（segment），每个段可以独立分配和释放，减少锁竞争。
+        * 局部缓存优化：每个线程维护自己的本地缓存，避免频繁访问全局堆。
+        * 延迟合并策略：通过延迟释放空闲内存块，减少外部碎片的同时提升分配效率。
+        * 隔离性与安全性：支持更安全的内存分配模式，防止某些类型的内存错误。
+    * 优点：高性能、内存利用率高、易于集成
+    * 缺点：生态系统支持不如 tcmalloc 和 jemalloc 成熟；性能优势在特定场景下可能不如其他分配器明显
+    * 适用场景：高并发、低延迟的现代服务（如云计算、实时处理系统）
 
 ## 3. ptmalloc
 
@@ -80,7 +91,7 @@ dlmalloc介绍：[A Memory Allocator](https://gee.cs.oswego.edu/dl/html/malloc.h
 
 当前glibc（本地fork并切换了2.28版本）的代码注释中，也展示了上述迭代经过。并且说明了为什么用这个版本的malloc：
 
-> 这并不是有史以来最快、最节省空间、最可移植或最可调优的 malloc 实现。然而，它在速度、空间节省、可移植性和可调优性之间达到了一致的平衡。正因如此，它成为了一个适用于大量使用 malloc 的程序的优秀通用分配器。
+> 这并不是有史以来最快、最节省空间、最可移植或最可调优的 malloc 实现。然而，它在速度、空间节省、可移植性和可调优性之间达到了一致的平衡。正因如此，它成为了一个适用于 大量使用malloc程序 的优秀通用分配器。
 
 ```c
 // glibc/malloc/malloc.c
@@ -147,7 +158,7 @@ function definition after merge: 90
 
 * 另外几个锁相关的宏：`USE_SPIN_LOCKS`、`USE_RECURSIVE_LOCKS`
 
-因为后续准备梳理下锁相关的内容，这里简要梳理学习下dlmalloc中的相关逻辑，其中的兼容性设计、自旋锁实现都值得学习。
+这里简要梳理下dlmalloc中锁的相关逻辑，其中的兼容性设计、自旋锁实现都值得学习。
 
 锁相关的部分调整了一下缩进：
 
@@ -249,6 +260,8 @@ void* dlmalloc(size_t bytes) {
 
 ### 3.3. ptmalloc说明
 
+一些设计可见：[MallocInternals](https://sourceware.org/glibc/wiki/MallocInternals)
+
 从代码注释里看下主要的算法过程：
 
 * 对于大内存（`>= 512 字节`）的申请，是它最适合的分配场景，基于先进先出队列（FIFO）决定申请顺序（可能使用LRU）
@@ -273,15 +286,60 @@ void* dlmalloc(size_t bytes) {
 */
 ```
 
-malloc_chunk 分配结构：
+#### 3.3.1. malloc_state
+
+```c
+// glibc/malloc/malloc.c
+struct malloc_state
+{
+  /* Serialize access.  */
+  __libc_lock_define (, mutex);
+  int flags;
+  int have_fastchunks;
+
+  /* Fastbins */
+  mfastbinptr fastbinsY[NFASTBINS];
+
+  /* Base of the topmost chunk -- not otherwise kept in a bin */
+  mchunkptr top;
+
+  /* The remainder from the most recent split of a small request */
+  mchunkptr last_remainder;
+
+  /* Normal bins packed as described above */
+  mchunkptr bins[NBINS * 2 - 2];
+
+  /* Bitmap of bins */
+  unsigned int binmap[BINMAPSIZE];
+
+  /* Linked list */
+  struct malloc_state *next;
+
+  /* Linked list for free arenas.  Access to this field is serialized
+     by free_list_lock in arena.c.  */
+  struct malloc_state *next_free;
+
+  INTERNAL_SIZE_T attached_threads;
+
+  /* Memory allocated from the system in this arena.  */
+  INTERNAL_SIZE_T system_mem;
+  INTERNAL_SIZE_T max_system_mem;
+};
+```
+
+#### 3.3.2. malloc_chunk
+
+malloc_chunk 内存管理结构：
 
 ```c
 // glibc/malloc/malloc.c
 struct malloc_chunk {
-
+  // 前一个空闲chunk的大小
   INTERNAL_SIZE_T      mchunk_prev_size;  /* Size of previous chunk (if free).  */
+  // 当前chunk的大小
   INTERNAL_SIZE_T      mchunk_size;       /* Size in bytes, including overhead. */
 
+  // fd和bk：chunk块空闲时存在，用于将空闲chunk块加入到空闲chunk块链表中统一管理
   struct malloc_chunk* fd;         /* double links -- used only if free. */
   struct malloc_chunk* bk;
 
@@ -291,17 +349,69 @@ struct malloc_chunk {
 };
 ```
 
+1）一个已分配chunk的结构示意图如下：
+
+* `mchunk_size`中，还包含了3位属性标志位：`|A|M|P|`
+    * `A`(NON_MAIN_ARENA) ：当前chunk块是否属于`非主分配区`
+    * `M`(IS_MMAPPED)：当前chunk是否是通过`mmap`分配的
+    * `P`(PREV_INUSE) ：表示前一个chunk是否在使用中，`P==1`表示在使用中
+
+```sh
+chunk-> +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |             Size of previous chunk, if unallocated (P clear)  |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |             Size of chunk, in bytes                     |A|M|P|
+      mem-> +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |             User data starts here...                          .
+      .                                                               .
+      .             (malloc_usable_size() bytes)                      .
+      .                                                               |
+nextchunk-> +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |             (size of chunk, but used for application data)    |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |             Size of next chunk, in bytes                |A|0|1|
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+```
+
+2）空闲的chunk存储在双向循环链表（circular doubly-linked list）中，示意图如下：
+
+```sh
+chunk-> +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |             Size of previous chunk, if unallocated (P clear)  |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    `head:' |             Size of chunk, in bytes                     |A|0|P|
+      mem-> +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |             Forward pointer to next chunk in list             |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |             Back pointer to previous chunk in list            |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |             Unused space (may be 0 bytes long)                .
+      .                                                               .
+      .                                                               |
+nextchunk-> +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+    `foot:' |             Size of chunk, in bytes                           |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |             Size of next chunk, in bytes                |A|0|0|
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+```
+
+
+
 ## 4. tcmalloc
 
 ## 5. jemalloc
 
+## 6. mimalloc
 
-## 6. 小结
+
+## 7. 小结
 
 
-## 7. 参考
+## 8. 参考
 
+* [MallocInternals](https://sourceware.org/glibc/wiki/MallocInternals)
+* [百度工程师带你探秘C++内存管理（ptmalloc篇）](https://mp.weixin.qq.com/s/ObS65EKz1c3jooQx6KJ6uw)
+* [聊聊C语言中的malloc申请内存的内部原理](https://kfngxl.cn/index.php/archives/554/)
 * [ptmalloc、tcmalloc与jemalloc对比分析](https://www.cyningsun.com/07-07-2018/memory-allocator-contrasts.html)
 * [内存分配器ptmalloc,jemalloc,tcmalloc调研与对比](https://geekdaxue.co/read/ixxw@it/memory_allocators)
-* [使用 jemalloc profile memory](https://www.jianshu.com/p/5fd2b42cbf3d)
-* [百度工程师带你探秘C++内存管理（ptmalloc篇）](https://mp.weixin.qq.com/s/ObS65EKz1c3jooQx6KJ6uw)
+* LLM
