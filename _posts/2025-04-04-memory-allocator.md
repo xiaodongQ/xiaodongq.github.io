@@ -492,7 +492,7 @@ Major new features:
 * 超出一定大小则直接`mmap()`从系统申请内存 ->
 * `fastbins`（可能填充tcache） ->
 * `smallbins`（可能填充tcache） ->
-* 若还未满足，则把`fastbins`里的内容移动到`unsorted bin`中并进行合并 ->
+* 若还未满足，则把`fastbins`里的内容移动（此处的移动只是链表指针操作）到`unsorted bin`中并进行合并 ->
 * 将`unsorted bin`中的chunk，移除并移动到`smallbins`或者`largebins`，过程中也涉及合并，发现有满足的chunk内存块则返回 ->
 * 申请大小足够大则尝试 从`largebins` 申请 ->
 * `fastbins`中还有chunk则重复前面步骤（即移动`fastbins`里内容到`unsorted bin`中...）
