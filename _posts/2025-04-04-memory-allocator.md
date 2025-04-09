@@ -498,7 +498,7 @@ Major new features:
 * `fastbins`中还有chunk则重复前面步骤（即移动`fastbins`里内容到`unsorted bin`中...）
 * 从`top`中分离一部分，可能事先扩展`top bin`
 
-具体一点的流程先贴一下（此处是还未支持tcache的版本），暂不深入梳理代码：
+具体一点的流程先贴一下（此处是还未支持tcache的版本），供参考，暂不深入梳理代码：
 
 ![malloc-process-detail](/images/2025-04-10-malloc-process-detail.png)  
 [出处](https://mp.weixin.qq.com/s/ObS65EKz1c3jooQx6KJ6uw)
@@ -620,7 +620,7 @@ free算法（具体见 [MallocInternals](https://sourceware.org/glibc/wiki/Mallo
 
 ![free-algorithm](/images/2025-04-09-free-algorithm.png)
 
-具体一点的流程先贴一下（此处是还未支持tcache的版本），暂不深入梳理代码：
+具体一点的流程先贴一下（此处是还未支持tcache的版本），供参考，暂不深入梳理代码：
 
 ![free-process-detail](/images/2025-04-10-free-process-detail.png)  
 [出处](https://mp.weixin.qq.com/s/ObS65EKz1c3jooQx6KJ6uw)
