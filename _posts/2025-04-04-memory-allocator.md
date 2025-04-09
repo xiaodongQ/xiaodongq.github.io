@@ -1,6 +1,6 @@
 ---
 layout: post
-title: CPU及内存调度（四） -- ptmalloc、tcmalloc、jemalloc、mimalloc内存分配器
+title: CPU及内存调度（四） -- ptmalloc、tcmalloc、jemalloc、mimalloc内存分配器（上）
 categories: CPU及内存调度
 tags: 内存
 ---
@@ -8,7 +8,7 @@ tags: 内存
 * content
 {:toc}
 
-梳理 ptmalloc、tcmalloc、jemalloc 和 mimalloc 内存分配器。
+梳理 ptmalloc、tcmalloc、jemalloc 和 mimalloc 内存分配器，本篇先梳理ptmalloc。
 
 
 
@@ -463,7 +463,7 @@ nextchunk-> +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
 #### 3.3.3. thread cache
 
-glibc 2.26版本中，malloc引入了`thread cache`（tcache），访问这部分cache不需要加锁。
+glibc 2.26（2017-08-02）版本中，malloc引入了`thread cache`（tcache），访问这部分cache不需要加锁。
 
 ```sh
 # glibc-2.28/NEWS
@@ -497,6 +497,11 @@ Major new features:
 * 申请大小足够大则尝试 从`largebins` 申请 ->
 * `fastbins`中还有chunk则重复前面步骤（即移动`fastbins`里内容到`unsorted bin`中...）
 * 从`top`中分离一部分，可能事先扩展`top bin`
+
+具体一点的流程先贴一下（此处是还未支持tcache的版本），暂不深入梳理代码：
+
+![malloc-process-detail](/images/2025-04-10-malloc-process-detail.png)  
+[出处](https://mp.weixin.qq.com/s/ObS65EKz1c3jooQx6KJ6uw)
 
 malloc对应的代码：
 
@@ -615,17 +620,44 @@ free算法（具体见 [MallocInternals](https://sourceware.org/glibc/wiki/Mallo
 
 ![free-algorithm](/images/2025-04-09-free-algorithm.png)
 
-## 4. tcmalloc
+具体一点的流程先贴一下（此处是还未支持tcache的版本），暂不深入梳理代码：
 
+![free-process-detail](/images/2025-04-10-free-process-detail.png)  
+[出处](https://mp.weixin.qq.com/s/ObS65EKz1c3jooQx6KJ6uw)
 
+对应的代码入口如下，本篇中暂不展开。
 
-## 5. jemalloc
+```c
+// glibc-2.28/malloc/malloc.c
+strong_alias (__libc_free, __free) strong_alias (__libc_free, free)
+void __libc_free (void *mem)
+{
+  ...
+  ar_ptr = arena_for_chunk (p);
+  _int_free (ar_ptr, p, 0);
+}
 
+static void
+_int_free (mstate av, mchunkptr p, int have_lock)
+{
+  ...
+}
+```
 
-## 7. 小结
+#### 3.3.6. 优缺点
 
+梳理了设计以及代码流程，再来看下述优缺点会更有体感：
 
-## 8. 参考
+![ptmalloc-advantages-disadvantages](/images/ptmalloc-advantages-disadvantages.png)  
+[出处](https://mp.weixin.qq.com/s/ObS65EKz1c3jooQx6KJ6uw)
+
+## 4. 小结
+
+总体梳理对比了ptmalloc、tcmalloc、jemalloc 和 mimalloc 几个内存分配器的特性，并看了下dlmalloc。
+
+限于篇幅，本篇先覆盖了ptmalloc的代码跟踪，对其设计思路和实现进行印证。很多逻辑未深入，作为一个引子为进一步深入打下基础。
+
+## 5. 参考
 
 * [MallocInternals](https://sourceware.org/glibc/wiki/MallocInternals)
 * [百度工程师带你探秘C++内存管理（ptmalloc篇）](https://mp.weixin.qq.com/s/ObS65EKz1c3jooQx6KJ6uw)
