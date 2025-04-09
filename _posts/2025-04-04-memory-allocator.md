@@ -23,9 +23,9 @@ tags: 内存
 * ptmalloc
     * [MallocInternals](https://sourceware.org/glibc/wiki/MallocInternals)
     * [聊聊C语言中的malloc申请内存的内部原理](https://kfngxl.cn/index.php/archives/554/)
-    * [堆基础02：malloc源码分析](https://cata1oc.github.io/2022/07/16/%E5%A0%86%E5%9F%BA%E7%A1%8002-malloc%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90)
-        * 里面了解下 pwndbg 的用法
     * [百度工程师带你探秘C++内存管理（ptmalloc篇）](https://mp.weixin.qq.com/s/ObS65EKz1c3jooQx6KJ6uw)
+    * [堆基础02：malloc源码分析](https://cata1oc.github.io/2022/07/16/%E5%A0%86%E5%9F%BA%E7%A1%8002-malloc%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90)
+        * 了解下 pwndbg 的用法
 * tcmalloc
     * [记一次 TCMalloc Debug 经历 #2](https://zhuanlan.zhihu.com/p/81683409)
 * jemalloc
@@ -281,39 +281,77 @@ void* dlmalloc(size_t bytes) {
 
 #### 3.3.1. malloc_state
 
-ptmalloc中使用 **分配区（`arena`）** 管理从操作系统批量申请来的内存，对应的结构为 `malloc_state`
+ptmalloc中使用 **分配区（`arena`）** 管理从操作系统批量申请来的内存，对应的结构为 `malloc_state`，每个arena分配区中的基本内存分配单位是`malloc_chunk`（简称chunk）（结构定义见下小节）。
+
+其中涉及的fastbins、smallbins、largebins 和 unsortedbins，说明见下面的注释，以及示意图。
 
 ```c
 // glibc-2.28/malloc/malloc.c
 struct malloc_state
 {
   /* Serialize access.  */
+  // libc的锁，用于保护当前分配区（arena）
+  // 多个分配区只是能降低锁竞争的发生，但不能完全杜绝，需要一个锁来应对多线程申请内存时的竞争问题
   __libc_lock_define (, mutex);
+
+  /* Flags (formerly in max_fast).  */
   int flags;
+
+  /* Set if the fastbin chunks contain recently inserted free blocks.  */
+  /* Note this is a bool but not all targets support atomics on booleans.  */
   int have_fastchunks;
 
+  // 下面的 mfastbinptr、mchunkptr，都是 malloc_chunk* 的别名，表示内存块
   /* Fastbins */
+  // fastbins 是用来管理尺寸最小空闲内存块的链表
+    // fastbin 中有多个链表，每个 bin 链表管理的都是固定大小的 chunk 内存块。
+    // 在 64 位系统下，每个链表管理的 chunk 元素大小分别是 32 字节、48 字节、......、128 字节 等不同的大小。
+    // `fastbin_index`函数可以快速地根据要申请的内存大小找到 fastbins 下对应的数组下标
   mfastbinptr fastbinsY[NFASTBINS];
 
   /* Base of the topmost chunk -- not otherwise kept in a bin */
+  // top chunk：独立于 fastbins、smallbins、largebins 和 unsortedbins 之外的一个特殊的 chunk
+  // 如果没有空闲的 chunk 可用的时候，或者需要分配的 chunk 足够大，当各种 bins 都不满足需求，会从top chunk 中尝试分配。
   mchunkptr top;
 
   /* The remainder from the most recent split of a small request */
   mchunkptr last_remainder;
 
   /* Normal bins packed as described above */
+  // bins 是用来管理空闲内存块的主要链表数组，
+  // NBINS 大小是128，即bins数组长度最大 254（254个空闲链表）
+  // 根据管理的内存块的大小，有以下3类：
+    // 1、unsorted bin（1个，bin[1]）
+      // 管理的内存块不再是和 smallbins 或 largebins 中那样是相同或者相近大小的。而是不固定，是被当做缓存区来用的
+      // 当用户释放一个堆块之后，会先进入 unsortedbin。再次分配堆块时，ptmalloc 会优先检查这个链表中是否存在合适的堆块
+        // 如果找到了，就直接返回给用户(这个过程可能会对 unsortedbin 中的堆块进行切割)
+        // 若没有找到合适的，系统也会顺带清空这个链表上的元素，把它放到合适的 smallbin 或者 largebin 中
+    // 2、small bins（62 个，bin[2]~bin[63]）
+      // 每个small bin链表里面，有64（NSMALLBINS）个链表指针
+      // 同一个 small bin 中的 chunk 具有相同的大小，在64位系统上，两个相邻的 small bin 中的 chunk 大小相差16字节（SMALLBIN_WIDTH）
+      // small bin 管理的内存块大小是从 32 字节、48 字节、......、1008 字节
+      // `smallbin_index`可以根据申请的字节大小快速算出其在 smallbin 中的下标
+    // 3、large bins（63 个，bin[64]~bin[126]）
+      // 和 smallbins 的区别是它管理的内存块比较大。其管理的内存是 1024 起的
+      // 相邻的 largebin 之间管理的内存块大小不再是固定的等差数列
+  // (bin[0] 和 bin[127] 没有被使用）
   mchunkptr bins[NBINS * 2 - 2];
 
   /* Bitmap of bins */
+  // bins的使用位图
   unsigned int binmap[BINMAPSIZE];
 
   /* Linked list */
+  // 链表，通过这个指针，ptmalloc 把所有的分配区都以一个链表组织起来
   struct malloc_state *next;
 
   /* Linked list for free arenas.  Access to this field is serialized
      by free_list_lock in arena.c.  */
   struct malloc_state *next_free;
 
+  /* Number of threads attached to this arena.  0 if the arena is on
+     the free list.  Access to this field is serialized by
+     free_list_lock in arena.c.  */
   INTERNAL_SIZE_T attached_threads;
 
   /* Memory allocated from the system in this arena.  */
@@ -321,6 +359,16 @@ struct malloc_state
   INTERNAL_SIZE_T max_system_mem;
 };
 ```
+
+`bins`中管理了smallbins、largebins 和 unsortedbins等不同类型的空闲链表，示意图如下：
+
+![malloc_state-bins](/images/malloc_state-bins.png)  
+[出处](https://kfngxl.cn/index.php/archives/554/)
+
+bins和fastbins示意，下图则更为直观：
+
+![malloc_state-bins](/images/malloc_state-bins_2.png)  
+[出处](https://mp.weixin.qq.com/s/ObS65EKz1c3jooQx6KJ6uw)
 
 ptmalloc中存在一个全局的主分配区：
 
@@ -336,7 +384,7 @@ static struct malloc_state main_arena =
 
 #### 3.3.2. malloc_chunk
 
-malloc_chunk 内存管理结构：
+`malloc_chunk` 内存管理结构：
 
 ```c
 // glibc-2.28/malloc/malloc.c
@@ -346,7 +394,7 @@ struct malloc_chunk {
   // 当前chunk的大小
   INTERNAL_SIZE_T      mchunk_size;       /* Size in bytes, including overhead. */
 
-  // fd和bk：chunk块空闲时存在，用于将空闲chunk块加入到空闲chunk块链表中统一管理
+  // fd和bk：chunk块空闲时存在，后续和前驱指针，用于将空闲chunk块加入到空闲chunk块链表中统一管理
   struct malloc_chunk* fd;         /* double links -- used only if free. */
   struct malloc_chunk* bk;
 
@@ -380,6 +428,11 @@ nextchunk-> +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 ```
 
+示意图如下：
+
+![malloc_chunk_struct](/images/malloc_chunk_struct.png)  
+[出处](https://mp.weixin.qq.com/s/ObS65EKz1c3jooQx6KJ6uw)
+
 2）空闲的chunk存储在双向循环链表（circular doubly-linked list）中，示意图如下：
 
 ```sh
@@ -401,6 +454,8 @@ nextchunk-> +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
       |             Size of next chunk, in bytes                |A|0|0|
       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 ```
+
+#### 3.3.3. malloc分配过程
 
 
 
