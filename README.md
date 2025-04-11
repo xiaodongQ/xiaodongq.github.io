@@ -1,11 +1,12 @@
 # xiaodongQ.github.io
 
-A Blog based on template [gaohaoyang.github.io](https://github.com/Gaohaoyang/gaohaoyang.github.io.git)
+Personal Blog
 
 ## Thanks
 
-The blog used many tool/service,many thanks to:
+The blog used many tool/service, many thanks to:
 
+* [jekyll-theme-chirpy](https://github.com/cotes2020/jekyll-theme-chirpy), latestly change style
 * [Gaohaoyang](https://github.com/Gaohaoyang/gaohaoyang.github.io.git), template based on here;
 * [wenfh2020.com](https://wenfh2020.com), change style to this blog
 * [Github](https://github.com/), all the data based on;

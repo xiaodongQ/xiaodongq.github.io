@@ -343,7 +343,7 @@ struct malloc_state
 1、`mfastbinptr fastbinsY[NFASTBINS]`：用于管理小尺寸的空闲内存块，其中包含多个链表
 
 * fastbin 中有多个链表（且都是**单链表**），每个 bin 链表管理的都是**固定大小**的 chunk 内存块。
-* 在 64 位系统下，每个链表管理的 chunk 元素大小分别是 32 字节、48 字节、...、128 字节 等不同的大小。
+* 在 64 位系统下，每个链表管理的 chunk 元素大小分别是 32 字节、48 字节、...、**128** 字节 等不同的大小。
 * `fastbin_index`函数可以快速地根据要申请的内存大小找到 fastbins 下对应的数组下标
 
 2、`mchunkptr bins[NBINS * 2 - 2]`：用来管理空闲内存块的主要链表数组（且都是**双向链表**）
@@ -360,10 +360,10 @@ struct malloc_state
 * 2）`small bins`（62 个，bin[2]~bin[63]）
     * 每个small bin链表里面，有64（`NSMALLBINS`）个链表指针。
     * **同一个**small bin中的 chunk 具有**相同的大小**，在64位系统上，两个相邻的 small bin 中的 chunk 大小相差16字节（`SMALLBIN_WIDTH`）
-    * small bin 管理的内存块大小是从 32 字节、48 字节、...、1008 字节
+    * small bin 管理的内存块大小是从 32 字节、48 字节、...、**1008** 字节
     * `smallbin_index`函数 可以根据申请的字节大小快速算出其在 smallbin 中的下标
 * 3）`large bins`（63 个，bin[64]~bin[126]）
-    * 和 smallbins 的区别是它管理的内存块比较大，其管理的内存是 1024 起的
+    * 和 smallbins 的区别是它管理的内存块比较大，其管理的内存是 **1024** 起的
     * 相邻的 largebin 之间管理的内存块大小不再是固定的等差数列
 
 malloc_state结构示意图如下：
@@ -486,17 +486,17 @@ Major new features:
 
 ![malloc-algorithm](/images/2025-04-09-malloc-algorithm.png)
 
-即malloc分配时，依次判断是否有合适的空间，一达到满足条件则返回：
+即malloc分配时，依次判断是否有合适的空间（基于`request2size`**规范化后的长度**判断，即`申请大小+长度字段+对齐`），一达到满足条件则返回：
 
 * `tcache` ->
-* 超出一定大小则直接`mmap()`从系统申请内存 ->
-* `fastbins`（可能填充tcache） ->
-* `smallbins`（可能填充tcache） ->
-* 若还未满足，则把`fastbins`里的内容移动（此处的移动只是链表指针操作）到`unsorted bin`中并进行合并 ->
-* 将`unsorted bin`中的chunk，移除并移动到`smallbins`或者`largebins`，过程中也涉及合并，发现有满足的chunk内存块则返回 ->
+* 超出一定大小（阈值是动态的，除非指定mmap_threshold）或没有可用的`arenas`分配区（第一次启动？），则直接`mmap()`从系统申请内存 ->
+* 申请小于等于fastbin管理的内存块最大大小（64位系统中：`160`字节），`fastbins`（可能填充tcache） ->
+* 小于`1024`字节（下图中的512B是32位系统？），`smallbins`（可能填充tcache） ->
+* 若还未满足，则把`fastbins`里的相邻chunk合并，并移动（此处的移动只是链表指针操作，或者叫链接）到`unsorted bin` ->
+* 将`unsorted bin`中的chunk，切割分配并放入到`smallbins`或者`largebins`，过程中也涉及合并，发现有满足的chunk内存块则返回 ->
 * 申请大小足够大则尝试 从`largebins` 申请 ->
 * `fastbins`中还有chunk则重复前面步骤（即移动`fastbins`里内容到`unsorted bin`中...）
-* 从`top`中分离一部分，可能事先扩展`top bin`
+* 上述都不满足，则从`top`中分离一部分，可能会事先扩展`top bin`
 
 具体一点的流程先贴一下（此处是还未支持tcache的版本），供参考，暂不深入梳理代码：
 
