@@ -95,7 +95,12 @@ tags: jekyll
 
 主题：[jekyll-theme-chirpy](https://github.com/cotes2020/jekyll-theme-chirpy)，里面有几篇示例文章介绍了效果和写博客的语法。
 
-效果很丰富，可以参考：[文本和排版](https://pansong291.github.io/chirpy-demo-zhCN/posts/text-and-typography/)
+[博客主页](https://chirpy.cotes.page/)
+
+效果很丰富，可以参考中文博客：[文本和排版](https://pansong291.github.io/chirpy-demo-zhCN/posts/text-and-typography/)
+
+图标修改，生成网站: [icon-batch](https://lzltool.cn/icon-batch)
+[realfavicongenerator](https://realfavicongenerator.net/)
 
 #### 5.1. 转换说明
 
@@ -142,7 +147,20 @@ tags: [TAG1, TAG2]     # TAG names should always be lowercase
 ...
 ```
 
-#### 5.2. 显示提示效果
+#### 5.2. git 提交要求
+
+github workflow里会检查提交log的规范性：
+
+`- uses: wagoid/commitlint-github-action@v6`
+
+`feat, fix, docs, style, refactor, test, chore`
+
+```sh
+feat: note
+xxx
+```
+
+#### 5.3. 显示提示效果
 
 引用后面加：`{: .prompt-tip }`、`{: .prompt-info }`、`{: .prompt-warning }`、`{: .prompt-danger }`
 
@@ -165,11 +183,11 @@ tags: [TAG1, TAG2]     # TAG names should always be lowercase
 {: .prompt-danger }
 ```
 
-#### 5.3. 设置图片宽度和高度
+#### 5.4. 设置图片宽度和高度
 
 `![Desktop View](/assets/img/sample/mockup.png){: width="700" height="400" }`，也可缩写`w=`、`h=`
 
-#### 5.4. 图片位置
+#### 5.5. 图片位置
 
 默认情况下，图片居中，可以使用 `normal`、`left` 和 `right` 类之中的一个指定位置
 
@@ -187,7 +205,7 @@ tags: [TAG1, TAG2]     # TAG names should always be lowercase
 
 > 指定位置后，不应添加图片标题。
 
-#### 5.5. 深色/浅色模式、阴影
+#### 5.6. 深色/浅色模式、阴影
 
 `light`/`dark`指定深浅，在切换主题时，图片也会有不同效果
 
@@ -195,7 +213,7 @@ tags: [TAG1, TAG2]     # TAG names should always be lowercase
 
 ![Desktop View](/assets/img/sample/mockup.png){: .shadow }
 
-#### 5.6. 置顶帖子
+#### 5.7. 置顶帖子
 
 可以将一个或多个帖子置顶到首页，置顶的帖子会根据其发布日期以相反的顺序排序
 
@@ -205,7 +223,7 @@ pin: true
 ---
 ```
 
-#### 5.7. 隐藏代码块行号
+#### 5.8. 隐藏代码块行号
 
 可以隐藏行号：`.nolineno`
 
@@ -214,7 +232,7 @@ echo 'No more line numbers!'
 ```
 {: .nolineno }
 
-#### 5.8. 脚注
+#### 5.9. 脚注
 
 `footnote[^footnote]`形式：
 
@@ -229,14 +247,14 @@ Click the hook will locate the footnote[^footnote], and here is another footnote
 [^fn-nth-2]: The 2nd footnote source
 ```
 
-#### 5.9. 链接
+#### 5.10. 链接
 
 除了 `[]()` 形式，还可以：
 
 `<http://127.0.0.1:4000>`
 
 
-#### 5.10. 列表
+#### 5.11. 列表
 
 主要是其中的`待办列表`，可以展示勾选框：
 
@@ -261,7 +279,7 @@ Click the hook will locate the footnote[^footnote], and here is another footnote
   - [ ] Step 3
 ```
 
-#### 5.11. 描述列表
+#### 5.12. 描述列表
 
 会避免展示成 `* xxx` 里面的缩进形式
 
