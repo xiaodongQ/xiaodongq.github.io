@@ -1,84 +1,49 @@
-<footer class="site-footer">
+<!-- The Footer -->
 
+<footer
+  aria-label="Site Info"
+  class="
+    d-flex flex-column justify-content-center text-muted
+    flex-lg-row justify-content-lg-between align-items-lg-center pb-lg-3
+  "
+>
+  <p>
+    {{- '©' }}
+    <time>{{ 'now' | date: '%Y' }}</time>
 
-    <div class="wrapper">
+    {% if site.social.links %}
+      <a href="{{ site.social.links[0] }}">{{ site.social.name }}</a>.
+    {% else %}
+      <em class="fst-normal">{{ site.social.name }}</em>.
+    {% endif %}
 
-        <p class="description">
-            {% if site.description_footer %} {{site.description_footer}} {% endif %}
-        </p>
-        <p class="contact">
-            Contact me at: {% if site.github_username %}
-            <a href="https://github.com/{{site.github_username}}" title="GitHub"><i class="fa fa-github" aria-hidden="true"></i></a> {% endif %} {% if site.email %}
-            <a href="mailto:{{site.email}}" title="email"><i class="fa fa-envelope-o" aria-hidden="true"></i></a> {% endif %} {% if site.weibo_username %}
-            <a href="http://weibo.com/{{site.weibo_username}}" title="Weibo"><i class="fa fa-weibo" aria-hidden="true"></i></a> {% endif %} {% if site.zhihu_username %}
-            <a href="https://www.zhihu.com/people/{{site.zhihu_username}}" title="Zhihu"><i class="iconfont icon-daoruzhihu"></i></a> {% endif %} {% if site.twitter_username %}
-            <a href="https://twitter.com/{{site.twitter_username}}" title="Twitter"><i class="fa fa-twitter" aria-hidden="true"></i></a> {% endif %} {% if site.facebook_username %}
-            <a href="https://www.facebook.com/{{site.facebook_username}}" title="Facebook"><i class="fa fa-facebook-official" aria-hidden="true"></i></a> {% endif %}  {% if site.linkedIn_username %}
-            <a href="https://www.linkedin.com/in/{{site.linkedIn_username}}" title="LinkedIn"><i class="fa fa-linkedin" aria-hidden="true"></i></a> {% endif %} {% if site.dribbble_username %}
-            <a href=" https://dribbble.com/{{site.dribbble_username}}" title="Dribbble"><i class="fa fa-dribbble" aria-hidden="true"></i></a> {% endif %}
-        </p>
-        <p>
-            本站总访问量<span id="busuanzi_value_site_pv"></span>次，本站访客数<span id="busuanzi_value_site_uv"></span>人次，本文总阅读量<span id="busuanzi_value_page_pv"></span>次
-        </p>
-        <p class="power">
-            <span>
-                Site powered by <a href="https://jekyllrb.com/">Jekyll</a> & <a href="https://pages.github.com/">Github Pages</a>.
-            </span>
-            <span>
-                Theme designed by <a href="https://github.com/Gaohaoyang">HyG</a>,<a href="https://wenfh2020.com/">wenfh2020</a>.
-            </span>
-        </p>
-    </div>
+    {% if site.data.locales[include.lang].copyright.brief %}
+      <span
+        data-bs-toggle="tooltip"
+        data-bs-placement="top"
+        title="{{ site.data.locales[include.lang].copyright.verbose }}"
+      >
+        {{- site.data.locales[include.lang].copyright.brief -}}
+      </span>
+    {% endif %}
+  </p>
+
+  <p>
+    {%- capture _platform -%}
+      <a href="https://jekyllrb.com" target="_blank" rel="noopener">Jekyll</a>
+    {%- endcapture -%}
+
+    {%- capture _theme -%}
+      <a
+        data-bs-toggle="tooltip"
+        data-bs-placement="top"
+        title="v{{ theme.version }}"
+        href="https://github.com/cotes2020/jekyll-theme-chirpy"
+        target="_blank"
+        rel="noopener"
+      >Chirpy</a>
+    {%- endcapture -%}
+
+    {{ site.data.locales[include.lang].meta | replace: ':PLATFORM', _platform | replace: ':THEME', _theme }}
+  </p>
 </footer>
-
-<!-- https://highlightjs.org/static/demo/ -->
-<!-- <link href="https://apps.bdimg.com/libs/highlight.js/9.1.0/styles/arta.min.css" rel="stylesheet">
-<script src="http://apps.bdimg.com/libs/highlight.js/9.1.0/highlight.min.js"></script>
-<script>hljs.initHighlightingOnLoad();</script> -->
-
-<!-- <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script> -->
-
-<!-- jQuery -->
-<!-- <script src="{{ '/js/jquery.min.js' | prepend: site.baseurl }}"></script> -->
-<!-- <script src="https://libs.baidu.com/jquery/2.0.0/jquery.min.js"></script> -->
-<script src="https://cdn.bootcss.com/jquery/1.12.4/jquery.min.js"></script>
-            
-
-<!-- Bootstrap Core JavaScript -->
-<!-- <script src="https://libs.baidu.com/bootstrap/3.0.3/js/bootstrap.min.js"></script> -->
-<script src="https://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
-
-<!-- <link href="{{ '/js/bootstrap.min.js' | prepend: site.baseurl }}" rel="stylesheet"> -->
-
-<!-- inside <head> -->
-<!-- <link href="https://cdn.jsdelivr.net/npm/zoom-vanilla.js/dist/zoom.css" rel="stylesheet"> -->
-
-<link href="{{ '/zoom-vanilla/css/zoom.css' | prepend: site.baseurl }}" rel="stylesheet">
-
-<!-- before </body> -->
-<!-- <script src="https://cdn.jsdelivr.net/npm/zoom-vanilla.js/dist/zoom-vanilla.min.js"></script> -->
-
-<script src="{{ '/zoom-vanilla/dist/zoom-vanilla.min.js' | prepend: site.baseurl }}"></script>
-
-
-<!-- <script src="{{ '/js/bootstrap.min.js' | prepend: site.baseurl }}"></script> -->
-
-<div class="cb-search-tool" style="position: fixed; top:0 ; bottom:0; left:0; right: 0;
-      opacity: 0.95; background-color: #111111; z-index: 9999; display: none;">
-    <input type="text" autocomplete="off" class="form-control cb-search-content" id="cb-search-content"
-        style="position: fixed; top: 60px" placeholder="搜索文章题目...">
-
-    <div style="position: fixed; top: 16px; right: 16px;">
-        <img src="/search/img/cb-close.png" id="cb-close-btn" />
-    </div>
-</div>
-
-<!-- Custom Theme JavaScript -->
-<script src="{{ '/js/codeboy.min.js' | prepend: site.baseurl }}"></script>
-
-<link rel="stylesheet" href="{{ '/search/css/cb-search.css' | prepend: site.baseurl }}">
-<!-- <link rel="stylesheet" href="//cdn.bootcss.com/bootstrap/3.3.6/css/bootstrap.min.css"> -->
-<script src="{{ '/search/js/bootstrap3-typeahead.min.js' | prepend: site.baseurl }}"></script>
-<script src="{{ '/search/js/cb-search.min.js' | prepend: site.baseurl }}"></script>
-
-<script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
