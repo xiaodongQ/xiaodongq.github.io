@@ -1,10 +1,31 @@
-_site
-.sass-cache
+# Bundler cache
+.bundle
+vendor
+Gemfile.lock
+
+# Jekyll cache
+.jekyll-cache
 .jekyll-metadata
-.vscode
+_site
+
+# RubyGems
+*.gem
+
+# NPM dependencies
+node_modules
+package-lock.json
+
+# IDE configurations
+.idea
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/tasks.json
+
+# Misc
+_sass/vendors
+assets/js/dist
+
+.sass-cache
 .DS_Store
 .swp
-_posts/1970-12-30-md简历.md
-_posts/1970-12-30-md简历.html
-_posts/tmp.md
-images/srcfiles/.$leveldb类图.drawio.bkp

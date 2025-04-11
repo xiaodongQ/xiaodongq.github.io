@@ -6,7 +6,7 @@ Personal Blog
 
 The blog used many tool/service, many thanks to:
 
-* [jekyll-theme-chirpy](https://github.com/cotes2020/jekyll-theme-chirpy), latestly change style
+* [jekyll-theme-chirpy](https://github.com/cotes2020/jekyll-theme-chirpy), lately change to this style
 * [Gaohaoyang](https://github.com/Gaohaoyang/gaohaoyang.github.io.git), template based on here;
 * [wenfh2020.com](https://wenfh2020.com), change style to this blog
 * [Github](https://github.com/), all the data based on;
