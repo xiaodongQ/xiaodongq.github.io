@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: STL容器之map使用和C++11遍历新用法
 categories: C/C++
 tags: STL

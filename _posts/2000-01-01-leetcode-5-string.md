@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: LeetCode刷题学习（五） -- 字符串
 categories: LeetCode
 tags: LeetCode 数据结构与算法

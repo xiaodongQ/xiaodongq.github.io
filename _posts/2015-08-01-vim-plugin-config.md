@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: Vim插件配置
 categories: Linux
 tags: Vim

@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: leveldb学习笔记（七） -- 布隆过滤器
 categories: 存储
 tags: 存储 leveldb

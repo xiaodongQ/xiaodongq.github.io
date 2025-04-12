@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: Linux存储IO栈梳理（四） -- 通用块层
 categories: 存储
 tags: 存储 IO

@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: Windows利器Cmder&使用Markdown写博客
 categories: 工具
 tags: Markdown

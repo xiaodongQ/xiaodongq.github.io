@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: TCP发送接收过程（三） -- 学习netfilter和iptables
 categories: 网络
 tags: TCP netfilter iptables

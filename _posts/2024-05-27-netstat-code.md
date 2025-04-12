@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: 分析netstat中的Send-Q和Recv-Q
 categories: 网络
 tags: Linux 网络

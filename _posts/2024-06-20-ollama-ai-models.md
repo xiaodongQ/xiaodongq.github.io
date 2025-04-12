@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: ollama搭建本地个人知识库
 categories: 大模型
 tags: 工具 大模型

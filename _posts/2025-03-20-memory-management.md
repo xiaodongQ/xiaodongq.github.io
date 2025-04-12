@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: CPU及内存调度（二） -- Linux内存管理
 categories: CPU及内存调度
 tags: 内存

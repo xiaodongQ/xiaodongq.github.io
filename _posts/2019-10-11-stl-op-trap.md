@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: STL容器之容器基本操作和删除成员需注意的陷阱
 categories: C/C++
 tags: STL

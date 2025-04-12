@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: Rust学习实践（四） -- Rust特性：智能指针
 categories: Rust
 tags: Rust

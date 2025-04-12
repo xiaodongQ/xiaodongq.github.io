@@ -1,16 +1,11 @@
 ---
-layout: post
+layout: _post
 title: CPU及内存调度（三） -- 内存问题定位工具和实验
 categories: CPU及内存调度
 tags: 内存
 ---
 
-* content
-{:toc}
-
 介绍内存问题定位工具并进行相关实验：Valgrind Massif、AddressSanitizer、Memory Leak and Growth火焰图 和 bcc中内存相关的工具。
-
-
 
 ## 1. 背景
 

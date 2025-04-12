@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: Rust学习实践（五） -- Rust特性：并发编程
 categories: Rust
 tags: Rust

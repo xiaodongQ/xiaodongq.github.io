@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: MySQL学习实践（二） -- MySQL事务
 categories: MySQL
 tags: 存储 MySQL

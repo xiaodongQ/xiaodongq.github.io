@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: DeepSeek 3FS学习实践（一） -- 事件循环
 categories: 存储
 tags: 3FS 存储

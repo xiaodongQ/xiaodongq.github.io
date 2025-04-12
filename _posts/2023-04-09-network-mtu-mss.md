@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: 网络实验-设置机器的MTU和MSS
 categories: 案例实验
 tags: 网络

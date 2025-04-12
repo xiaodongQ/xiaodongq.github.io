@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: Redis学习实践（二） -- 多线程、RDB和AOF
 categories: Redis
 tags: Redis 存储

@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: TCP发送接收过程（一） -- Wireshark跟踪TCP流统计图
 categories: 网络
 tags: TCP Wireshark 接收窗口
@@ -459,6 +459,6 @@ TCP长肥管道（长肥网络）指在具有高带宽（Bandwidth）和高延�
 
 11、[在Wireshark的tcptrace图中看清TCP拥塞控制算法的细节(CUBIC/BBR算法为例)](https://blog.csdn.net/dog250/article/details/53227203)
 
-12、[Understanding the tcptrace Time-Sequence Graph in Wireshark]((https://packetbomb.com/understanding-the-tcptrace-time-sequence-graph-in-wireshark/))
+12、[Understanding the tcptrace Time-Sequence Graph in Wireshark](https://packetbomb.com/understanding-the-tcptrace-time-sequence-graph-in-wireshark/)
 
 13、GPT

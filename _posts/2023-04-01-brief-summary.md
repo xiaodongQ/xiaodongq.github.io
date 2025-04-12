@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: 阶段小结
 categories: 其他
 tags: 杂记

@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: Mac搭建python开发环境搭建及学习笔记
 categories: Linux
 tags: Python

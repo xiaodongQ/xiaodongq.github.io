@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: Solana开发学习（一） -- 总体说明
 categories: Solana
 tags: Solana

@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: ActWithPrudence翻译学习
 categories: 翻译学习
 tags: 翻译学习

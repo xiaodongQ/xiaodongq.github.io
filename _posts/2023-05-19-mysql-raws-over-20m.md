@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: MySQL单表超过2000万后会怎么样
 categories: 案例实验
 tags: MySQL

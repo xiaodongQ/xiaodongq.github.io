@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: ioserver服务实验（二） -- epoll使用梳理
 categories: 网络
 tags: 网络 epoll

@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: sar和pidstat使用
 categories: Linux
 tags: sar pidstat

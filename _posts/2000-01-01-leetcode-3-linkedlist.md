@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: LeetCode刷题学习（三） -- 链表篇
 categories: LeetCode
 tags: LeetCode 数据结构与算法

@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: 追踪内核网络堆栈的几种方式
 categories: 网络
 tags: TCP 内核

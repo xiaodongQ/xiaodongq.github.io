@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: C++不可拷贝类和右值引用
 categories: C/C++
 tags: 右值引用

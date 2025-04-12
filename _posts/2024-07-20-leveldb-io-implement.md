@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: leveldb学习笔记（二） -- 读写操作流程
 categories: 存储
 tags: 存储 leveldb

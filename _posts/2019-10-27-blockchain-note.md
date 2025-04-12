@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: 区块链学习笔记
 categories: 其他
 tags: 区块链

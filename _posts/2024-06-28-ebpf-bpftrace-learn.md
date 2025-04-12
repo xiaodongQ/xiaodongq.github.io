@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: eBPF学习实践系列（六） -- bpftrace学习和使用
 categories: eBPF
 tags: eBPF bpftrace

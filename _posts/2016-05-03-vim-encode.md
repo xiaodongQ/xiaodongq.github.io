@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: Vim编码识别及转换
 categories: Linux
 tags: Vim

@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: C++中的RAII机制和互斥锁应用
 categories: C/C++
 tags: RAII mutex

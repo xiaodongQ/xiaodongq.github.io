@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: TCP半连接全连接（四） -- eBPF跟踪全连接队列溢出（下）
 categories: 网络
 tags: 网络

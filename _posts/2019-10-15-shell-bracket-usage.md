@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: Shell中各种括号的作用和区别
 categories: Shell
 tags: Shell

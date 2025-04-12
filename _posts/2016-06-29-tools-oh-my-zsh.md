@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: 实用工具集合之oh-my-zsh
 categories: 工具
 tags: zsh

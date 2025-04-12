@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: 行为型设计模式-策略模式
 categories: 设计模式
 tags: 设计模式

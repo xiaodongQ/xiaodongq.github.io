@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: 梳理Redis中的epoll机制
 categories: 网络
 tags: 网络 epoll Redis

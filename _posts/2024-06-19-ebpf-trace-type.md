@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: eBPF学习实践系列（四） -- eBPF的各种追踪类型
 categories: eBPF
 tags: eBPF libbpf

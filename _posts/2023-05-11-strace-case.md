@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: strace工具案例
 categories: Linux
 tags: strace

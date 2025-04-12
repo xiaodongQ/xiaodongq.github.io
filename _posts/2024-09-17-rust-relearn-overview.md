@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: Rust学习实践（一） -- 总体说明和Rust基础
 categories: Rust
 tags: Rust

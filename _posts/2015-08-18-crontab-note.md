@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: crontab学习使用笔记
 categories: Linux
 tags: Shell

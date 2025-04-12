@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: Linux构建自动化过期日志备份
 categories: C/C++
 tags: crontab Shell

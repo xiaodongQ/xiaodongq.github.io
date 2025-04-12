@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: AI Agent学习实践笔记
 categories: 大模型
 tags: 大模型 AI

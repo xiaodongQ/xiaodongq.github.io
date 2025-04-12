@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: 结构型设计模式
 categories: 设计模式
 tags: 设计模式

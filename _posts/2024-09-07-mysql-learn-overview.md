@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: MySQL学习实践（一） -- 整体架构和基本操作的流程
 categories: MySQL
 tags: 存储 MySQL

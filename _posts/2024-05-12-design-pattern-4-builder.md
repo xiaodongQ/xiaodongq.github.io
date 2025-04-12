@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: 创建型设计模式-建造者模式
 categories: 设计模式
 tags: 设计模式

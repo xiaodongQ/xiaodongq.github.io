@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: Rust学习实践（八） -- Demo项目：实现简易Redis
 categories: Rust
 tags: Rust

@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: 如何关闭一个TCP连接？
 categories: 网络
 tags: 网络 tcpkill hping3

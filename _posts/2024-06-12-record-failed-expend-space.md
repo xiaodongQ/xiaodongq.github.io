@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: 记一次失败的/boot分区扩容
 categories: Linux
 tags: Linux

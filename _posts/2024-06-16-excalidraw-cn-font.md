@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: Excalidraw白板工具和快捷键
 categories: 工具
 tags: 工具

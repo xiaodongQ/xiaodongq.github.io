@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: Redis学习实践（三） -- 主从复制和集群
 categories: Redis
 tags: Redis 存储

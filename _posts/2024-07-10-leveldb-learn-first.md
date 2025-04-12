@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: leveldb学习笔记（一） -- 整体架构和基本操作
 categories: 存储
 tags: 存储 leveldb

@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: eBPF学习实践系列（三） -- 基于libbpf开发实践
 categories: eBPF
 tags: eBPF libbpf CO-RE

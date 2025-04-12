@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: Rust学习实践（九） -- Demo项目：几个Demo练习
 categories: Rust
 tags: Rust

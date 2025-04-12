@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: GitHub Pages及jekyll搭建博客
 categories: 工具
 tags: jekyll
@@ -114,7 +114,7 @@ tags: jekyll
 
 ```
 ---
-layout: post
+layout: _post
 title: CPU及内存调度（三） -- 内存问题定位工具和实验
 categories: CPU及内存调度
 tags: 内存
@@ -185,23 +185,23 @@ xxx
 
 #### 5.4. 设置图片宽度和高度
 
-`![Desktop View](/assets/img/sample/mockup.png){: width="700" height="400" }`，也可缩写`w=`、`h=`
+`![Desktop View](/assets/img/favicons/android-chrome-512x512.png){: width="700" height="400" }`，也可缩写`w=`、`h=`
 
 #### 5.5. 图片位置
 
 默认情况下，图片居中，可以使用 `normal`、`left` 和 `right` 类之中的一个指定位置
 
-正常位置：`![Desktop View](/assets/img/sample/mockup.png){: .normal }`
+正常位置：`![Desktop View](/assets/img/favicons/android-chrome-512x512.png){: .normal }`
 
-向左对齐：`![Desktop View](/assets/img/sample/mockup.png){: .left }`
+向左对齐：`![Desktop View](/assets/img/favicons/android-chrome-512x512.png){: .left }`
 
 向左浮动：可以实现图在左侧，右侧是文字的效果：
 
-`![Desktop View](/posts/20190808/mockup.png){: width="972" height="589" .w-50 .left}`
+`![Desktop View](/assets/img/favicons/android-chrome-512x512.png){: width="972" height="589" .w-50 .left}`
 
 向右浮动：可以实现图在右侧，左侧是文字的效果：
 
-`![Desktop View](/posts/20190808/mockup.png){: width="972" height="589" .w-50 .right}`
+`![Desktop View](/assets/img/favicons/android-chrome-512x512.png){: width="972" height="589" .w-50 .right}`
 
 > 指定位置后，不应添加图片标题。
 
@@ -211,7 +211,7 @@ xxx
 
 `![Light mode only](/path/to/light-mode.png){: .light }`
 
-![Desktop View](/assets/img/sample/mockup.png){: .shadow }
+![Desktop View](/assets/img/favicons/android-chrome-512x512.png){: .shadow }
 
 #### 5.7. 置顶帖子
 

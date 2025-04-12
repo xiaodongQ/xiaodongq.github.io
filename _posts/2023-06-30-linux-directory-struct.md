@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: 从1万空文件占用空间大小看Linux文件系统结构
 categories: 案例实验
 tags: 存储 文件系统

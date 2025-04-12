@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: 内存调试检测工具Valgrind简介
 categories: C/C++
 tags: 内存泄漏

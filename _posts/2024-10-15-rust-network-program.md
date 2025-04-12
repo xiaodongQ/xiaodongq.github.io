@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: Rust学习实践（七） -- Rust网络编程和Demo
 categories: Rust
 tags: Rust

@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: 并发与异步编程（四） -- 异步demo实验并分析性能
 categories: 并发与异步编程
 tags: CPU 存储 异步编程

@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: _post
 title: 构建工程化的makefile
 categories: C/C++
 tags: makefile C/C++
