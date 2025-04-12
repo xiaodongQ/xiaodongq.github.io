@@ -262,7 +262,7 @@ tcptrace图表通过展示TCP数据包的发送和接收时间以及序列号，
 已发送的数据（蓝点）和ACK线之间，竖直方向的距离代表在途字节数（Bytes in flight）
 
 ![tcptrace1](https://packetbomb.com/wp-content/uploads/2014/06/tcptrace1.png)  
-[出处](https://packetbomb.com/understanding-the-tcptrace-time-sequence-graph-in-wireshark/)
+[出处](https://packetbomb.com/understanding-the-tcptrace-time-sequence-graph-in-wireshark)
 
 #### 3.6.1. 另外两种线：SACK和丢包
 
