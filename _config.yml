@@ -78,10 +78,12 @@ theme_mode:   # [light|dark]
 # will be added to all image (site avatar & posts' images) paths starting with '/'
 #
 # e.g. 'https://cdn.com'
-img_cdn: "https://cdn.jsdelivr.net/gh/xiaodongQ/xiaodongq.github.io"
+# img_cdn: "https://cdn.jsdelivr.net/gh/xiaodongQ/xiaodongq.github.io"
+img_cdn: 
 
 # the avatar on sidebar, support local or CORS resources
-avatar: "https://cdn.jsdelivr.net/gh/xiaodongQ/xiaodongq.github.io/assets/img/favicons/favicon-192x192.png"
+# avatar: "https://cdn.jsdelivr.net/gh/xiaodongQ/xiaodongq.github.io/assets/img/favicons/favicon-192x192.png"
+avatar: "/assets/img/favicons/favicon-192x192.png"
 
 # boolean type, the global switch for ToC in posts.
 toc: true
