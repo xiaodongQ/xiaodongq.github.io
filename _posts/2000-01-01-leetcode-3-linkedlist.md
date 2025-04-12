@@ -1,16 +1,10 @@
 ---
-layout: post
 title: LeetCode刷题学习（三） -- 链表篇
 categories: LeetCode
-tags: LeetCode 数据结构与算法
+tags: [LeetCode, 数据结构与算法]
 ---
 
-* content
-{:toc}
-
 LeetCode刷题学习记录，链表篇。
-
-
 
 ## 1. 基础
 

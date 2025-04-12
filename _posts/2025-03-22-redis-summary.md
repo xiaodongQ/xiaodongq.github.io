@@ -1,16 +1,10 @@
 ---
-layout: post
 title: Redis学习实践（一） -- 数据类型和底层数据结构
 categories: Redis
-tags: Redis 存储
+tags: [Redis, 存储]
 ---
 
-* content
-{:toc}
-
 本篇说明Redis数据类型和对应的底层数据结构。
-
-
 
 ## 1. 背景
 

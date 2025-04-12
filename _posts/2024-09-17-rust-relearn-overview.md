@@ -1,16 +1,10 @@
 ---
-layout: post
 title: Rust学习实践（一） -- 总体说明和Rust基础
 categories: Rust
 tags: Rust
 ---
 
-* content
-{:toc}
-
 Rust学习实践，本篇为开篇，总体说明和Rust基础。
-
-
 
 ## 1. 背景
 

@@ -1,13 +1,8 @@
 ---
-layout: post
 title: 实用工具集合之tmux
 categories: 工具
 tags: tmux
 ---
-
-* content
-{:toc}
-
 
 ## tmux
 

@@ -1,16 +1,10 @@
 ---
-layout: post
 title: leveldb学习笔记（三） -- 日志结构实现
 categories: 存储
-tags: 存储 leveldb
+tags: [存储, leveldb]
 ---
 
-* content
-{:toc}
-
 leveldb学习笔记，本篇学习日志结构对应的实现。
-
-
 
 ## 1. 背景
 

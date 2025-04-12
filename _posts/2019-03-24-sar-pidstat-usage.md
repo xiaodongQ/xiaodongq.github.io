@@ -1,16 +1,10 @@
 ---
-layout: post
 title: sar和pidstat使用
 categories: Linux
-tags: sar pidstat
+tags: [sar, pidstat]
 ---
 
-* content
-{:toc}
-
 sar和pidstat使用，监测系统和程序性能状态
-
-
 
 ## sar
 

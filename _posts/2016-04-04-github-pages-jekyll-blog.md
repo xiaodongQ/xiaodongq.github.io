@@ -1,20 +1,14 @@
 ---
-layout: post
 title: GitHub Pages及jekyll搭建博客
 categories: 工具
 tags: jekyll
 ---
 
-* content
-{:toc}
-
 使用GitHub Pages和jekyll搭建个人博客。
-
-
 
 ### 1. 遇到的问题
 
-本人博客clone自以下模板：
+博客最初clone自以下模板：
 
 一个淡雅简明的博客风格: [Gaohaoyang](https://github.com/Gaohaoyang/gaohaoyang.github.io.git)
 
@@ -99,14 +93,14 @@ tags: jekyll
 
 效果很丰富，可以参考中文博客：[文本和排版](https://pansong291.github.io/chirpy-demo-zhCN/posts/text-and-typography/)，[对应仓库](https://github.com/pansong291/chirpy-demo-zhCN)
 
-图标修改，生成网站: [icon-batch](https://lzltool.cn/icon-batch)
+图标修改，生成网站: [icon-batch](https://lzltool.cn/icon-batch)、
 [realfavicongenerator](https://realfavicongenerator.net/)
 
 #### 5.1. 转换说明
 
 1、博客头部结构
 
-可以不变，不过若有多个标签，需要修改为 `[tag1, tag2]` 方式；
+有差异，若有多个标签，需要修改为 `[tag1, tag2]` 方式；
 
 分类最多2个，也用`[]`
 
@@ -114,7 +108,7 @@ tags: jekyll
 
 ```
 ---
-layout: post
+layout: _posts
 title: CPU及内存调度（三） -- 内存问题定位工具和实验
 categories: CPU及内存调度
 tags: 内存
@@ -131,7 +125,7 @@ tags: 内存
 ...
 ```
 
-2）新结构，默认的layout就为`post`。可以不变
+2）新结构，默认的layout就为`post`，不用显式指定layout
 
 ```
 ---
@@ -145,6 +139,20 @@ tags: [TAG1, TAG2]     # TAG names should always be lowercase
 
 ## 章节1
 ...
+```
+
+示例：
+
+```
+---
+title:      "xxxxxx"
+date:       2024-06-05
+categories: [xxx1,xxx2]
+tag: [xxx1,xxx2,xxx3]
+math: true
+description: xxxxxxx
+comments: true
+---
 ```
 
 #### 5.2. git 提交要求
@@ -185,23 +193,23 @@ xxx
 
 #### 5.4. 设置图片宽度和高度
 
-`![Desktop View](/assets/img/sample/mockup.png){: width="700" height="400" }`，也可缩写`w=`、`h=`
+`![Desktop View](/assets/img/favicons/sample/mockup.png){: width="700" height="400" }`，也可缩写`w=`、`h=`
 
 #### 5.5. 图片位置
 
 默认情况下，图片居中，可以使用 `normal`、`left` 和 `right` 类之中的一个指定位置
 
-正常位置：`![Desktop View](/assets/img/sample/mockup.png){: .normal }`
+正常位置：`![Desktop View](/assets/img/favicons/sample/mockup.png){: .normal }`
 
-向左对齐：`![Desktop View](/assets/img/sample/mockup.png){: .left }`
+向左对齐：`![Desktop View](/assets/img/favicons/sample/mockup.png){: .left }`
 
 向左浮动：可以实现图在左侧，右侧是文字的效果：
 
-`![Desktop View](/posts/20190808/mockup.png){: width="972" height="589" .w-50 .left}`
+`![Desktop View](/assets/img/favicons/sample/mockup.png){: width="972" height="589" .w-50 .left}`
 
 向右浮动：可以实现图在右侧，左侧是文字的效果：
 
-`![Desktop View](/posts/20190808/mockup.png){: width="972" height="589" .w-50 .right}`
+`![Desktop View](/assets/img/favicons/sample/mockup.png){: width="972" height="589" .w-50 .right}`
 
 > 指定位置后，不应添加图片标题。
 
@@ -211,7 +219,7 @@ xxx
 
 `![Light mode only](/path/to/light-mode.png){: .light }`
 
-![Desktop View](/assets/img/sample/mockup.png){: .shadow }
+![Desktop View](/assets/img/favicons/sample/mockup.png){: .shadow }
 
 #### 5.7. 置顶帖子
 
@@ -289,4 +297,25 @@ Sun
 
 Moon
 : the natural satellite of the earth, visible by reflected light from the sun
+```
+
+#### 5.13. 安装Giscus 评论系统
+
+参考：[Hugo 博客引入 Giscus 评论系统](https://www.lixueduan.com/posts/blog/02-add-giscus-comment/)
+
+配置到 _config.yml 的 giscus
+
+#### 5.14. cdn加速
+
+jsDeliver
+
+#### 5.15. 网站数据统计
+
+page view和分析：
+
+[goatcounter](https://www.goatcounter.com/)
+
+```
+<script data-goatcounter="https://xiaodongq.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
 ```

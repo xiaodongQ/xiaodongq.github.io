@@ -1,16 +1,10 @@
 ---
-layout: post
 title: C++中的RAII机制和互斥锁应用
 categories: C/C++
-tags: RAII mutex
+tags: [RAII, mutex]
 ---
 
-* content
-{:toc}
-
 介绍RAII (Resource Acquisition Is Initialization) 资源获取即初始化，及其使用。
-
-
 
 ## RAII概念
 

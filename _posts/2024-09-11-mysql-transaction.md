@@ -1,16 +1,10 @@
 ---
-layout: post
 title: MySQL学习实践（二） -- MySQL事务
 categories: MySQL
-tags: 存储 MySQL
+tags: [存储, MySQL]
 ---
 
-* content
-{:toc}
-
 MySQL学习实践，本篇学习梳理MySQL事务。
-
-
 
 ## 1. 背景
 

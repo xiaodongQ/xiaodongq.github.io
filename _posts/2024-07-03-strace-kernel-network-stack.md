@@ -1,16 +1,10 @@
 ---
-layout: post
 title: 追踪内核网络堆栈的几种方式
 categories: 网络
-tags: TCP 内核
+tags: [TCP, 内核]
 ---
 
-* content
-{:toc}
-
 介绍学习几种追踪内核网络堆栈的方式
-
-
 
 ## 1. 背景
 

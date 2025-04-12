@@ -1,16 +1,10 @@
 ---
-layout: post
 title: CPU及内存调度（二） -- Linux内存管理
 categories: CPU及内存调度
 tags: 内存
 ---
 
-* content
-{:toc}
-
 本篇梳理Linux内存管理及相关的进程、线程创建。
-
-
 
 ## 1. 背景
 

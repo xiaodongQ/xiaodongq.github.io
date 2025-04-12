@@ -1,16 +1,10 @@
 ---
-layout: post
 title: 从1万空文件占用空间大小看Linux文件系统结构
 categories: 案例实验
-tags: 存储 文件系统
+tags: [存储, 文件系统]
 ---
 
-* content
-{:toc}
-
 当一个目录中包含1万个空文件时，目录会占用多大的空间？
-
-
 
 ## 1. 背景
 

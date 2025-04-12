@@ -1,16 +1,10 @@
 ---
-layout: post
 title: MIT6.824学习笔记（一） -- 课程介绍 及 MapReduce
 categories: MIT6.824
-tags: 分布式 MapReduce
+tags: [分布式, MapReduce]
 ---
 
-* content
-{:toc}
-
 MIT6.824（2020）学习笔记，此为第一篇。
-
-
 
 ## 1. 背景
 

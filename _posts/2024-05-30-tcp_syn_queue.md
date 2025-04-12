@@ -1,16 +1,10 @@
 ---
-layout: post
 title: TCP半连接全连接（二） -- 半连接队列代码逻辑
 categories: 网络
-tags: 网络 TCP
+tags: [网络, TCP]
 ---
 
-* content
-{:toc}
-
 半连接队列相关过程分析及实验，并用工具跟踪。本文先分析半连接相关代码逻辑。
-
-
 
 ## 1. 背景
 

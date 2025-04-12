@@ -1,16 +1,10 @@
 ---
-layout: post
 title: leveldb学习笔记（二） -- 读写操作流程
 categories: 存储
-tags: 存储 leveldb
+tags: [存储, leveldb]
 ---
 
-* content
-{:toc}
-
 leveldb学习笔记，本篇学习其读写操作流程。
-
-
 
 ## 1. 背景
 

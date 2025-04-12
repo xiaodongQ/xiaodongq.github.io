@@ -1,16 +1,10 @@
 ---
-layout: post
 title: Rust学习实践（八） -- Demo项目：实现简易Redis
 categories: Rust
 tags: Rust
 ---
 
-* content
-{:toc}
-
 Rust学习实践，实现简易Redis Demo，学习`tokio`异步运行时用法。
-
-
 
 ## 1. 背景
 

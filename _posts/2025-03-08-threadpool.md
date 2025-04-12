@@ -1,16 +1,10 @@
 ---
-layout: post
 title: 并发与异步编程（一） -- 实现一个简单线程池
 categories: 并发与异步编程
-tags: CPU 线程池 C++
+tags: [CPU, 线程池, C++]
 ---
 
-* content
-{:toc}
-
 基于C++实现一个线程池。
-
-
 
 ## 1. 背景
 

@@ -1,16 +1,10 @@
 ---
-layout: post
 title: MySQL单表超过2000万后会怎么样
 categories: 案例实验
 tags: MySQL
 ---
 
-* content
-{:toc}
-
 实验学习：MySQL单表超过2000万条记录，分析现象。
-
-
 
 ## 1. 背景
 

@@ -1,16 +1,10 @@
 ---
-layout: post
 title: STL容器之map使用和C++11遍历新用法
 categories: C/C++
 tags: STL
 ---
 
-* content
-{:toc}
-
 STL容器之map使用, unordered_map区别，C++11中auto遍历用法，以及algorithm算法库中for_each的使用方法
-
-
 
 ## C++11 for循环新用法
 

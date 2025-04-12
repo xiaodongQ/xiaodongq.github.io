@@ -1,16 +1,10 @@
 ---
-layout: post
 title: AI Agent学习实践笔记
 categories: 大模型
-tags: 大模型 AI
+tags: [大模型, AI]
 ---
 
-* content
-{:toc}
-
 HuggingFace AI Agents Course学习笔记（AI智能体）
-
-
 
 ## 1. 背景
 

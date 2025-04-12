@@ -1,16 +1,10 @@
 ---
-layout: post
 title: TCP半连接全连接（三） -- eBPF跟踪全连接队列溢出（上）
 categories: 网络
 tags: 网络
 ---
 
-* content
-{:toc}
-
 通过eBPF跟踪TCP全连接队列溢出现象并进行分析，先基于bcc tools。
-
-
 
 ## 1. 背景
 

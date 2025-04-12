@@ -1,16 +1,10 @@
 ---
-layout: post
 title: 构建工程化的makefile
 categories: C/C++
-tags: makefile C/C++
+tags: [makefile, C/C++]
 ---
 
-* content
-{:toc}
-
 构建一个Linux下通用的C/C++工程Makefile
-
-
 
 ## 缘由
 

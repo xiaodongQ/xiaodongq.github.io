@@ -1,16 +1,10 @@
 ---
-layout: post
 title: LeetCode刷题学习（四） -- 哈希表
 categories: LeetCode
-tags: LeetCode 数据结构与算法
+tags: [LeetCode, 数据结构与算法]
 ---
 
-* content
-{:toc}
-
 LeetCode刷题学习记录，哈希表篇。
-
-
 
 ## 1. 基础
 

@@ -1,20 +1,12 @@
 ---
-layout: post
 title: Windows利器Cmder&使用Markdown写博客
 categories: 工具
 tags: Markdown
 ---
 
-* content
-{:toc}
-
 介绍cmder、sublime、Markdown
 
-
-
-## 工具
-
-### Cmder
+## 1. Cmder
 
 右键在当前位置打开终端，操作习惯跟linux终端差不了多少，可以使用大量linux命令，集成了grep、tar、curl等等工具。终于不用再忍受Windows的cmd了。*有一点不足的就是在我电脑上启动后加载比较慢，要等个7、8秒才能操作(之前的笔记了，慢的原因还不确定 20191103注)*(cmder_mini中执行find，与linux下有点差别，e.g. `find . -name "window*"` 执行报`拒绝访问 - .`和 `找不到文件 - -NAME`，要`find "-name" "*.go"`形式才执行正常)
 
@@ -27,7 +19,7 @@ tags: Markdown
   - 右下角->Settings(或者快捷键Win+Alt+P)->搜索框搜 chcp，添加`chcp 65001` `set LANG=zh_CN.UTF-8`->保存重启cmder即可
   - [cmder 中文乱码的解决方法](https://blog.csdn.net/lamp_yang_3533/article/details/79841328)
 
-### Markdown
+## 2. Markdown
 
   之前在CSDN写博客的时候看到Markdown，觉得排版格式挺好看的，不过也没有去看看它的语法。其语法很直观，十分钟内就能操作熟悉了。
 
@@ -46,7 +38,7 @@ tags: Markdown
   * St下Markdown使用：
   **[sublime text 2 下的Markdown写作](http://www.jianshu.com/p/378338f10263)**
 
-#### sublime插件
+### 2.1. sublime插件
 
  SideBarEnhancements     增强侧边栏
 
@@ -71,9 +63,7 @@ tags: Markdown
 
     **[Atom Markdown 相关插件](https://segmentfault.com/a/1190000004271747)**
 
-***
-
-### 踩过的坑
+### 2.2. 踩过的坑
 
 1. Atom里安装Package时，报编译有问题，有些包的依赖关系没有找到，还是用apm(atom package manager)来装插件方便。Atom安装时是自带有apm的，记得添加其路径到path环境变量。**因为环境变量未添加的问题导致一直以为还需要安装其他应用，apm的路径比较深：**
 

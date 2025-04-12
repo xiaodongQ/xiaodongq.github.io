@@ -1,18 +1,12 @@
 ---
-layout: post
 title: C++构造函数的隐式转换和转换函数
 categories: C/C++
-tags: 类型转换 智能指针
+tags: [类型转换, 智能指针]
 ---
-
-* content
-{:toc}
 
 C++构造函数的隐式转换和转换函数说明，和explicit关键字使用。
 
 近期使用智能指针，涉及到一些相关概念和特性(值语义/value semantics 和 对象语义/object semantics)，于此记录说明(智能指针别处单独说明)。
-
-
 
 ## explicit说明符
 

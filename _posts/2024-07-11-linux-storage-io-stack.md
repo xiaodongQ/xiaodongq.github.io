@@ -1,16 +1,10 @@
 ---
-layout: post
 title: Linux存储IO栈梳理（一） -- 存储栈全貌图
 categories: 存储
-tags: 存储 IO
+tags: [存储, IO]
 ---
 
-* content
-{:toc}
-
 Linux存储IO栈梳理学习
-
-
 
 ## 1. 背景
 

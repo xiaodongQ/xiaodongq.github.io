@@ -1,16 +1,10 @@
 ---
-layout: post
 title: Rust学习实践（二） -- Demo项目：文件搜索工具
 categories: Rust
 tags: Rust
 ---
 
-* content
-{:toc}
-
 Rust学习实践，进行Rust的“实战”（Demo）练习：文件搜索工具。
-
-
 
 ## 1. 背景
 
@@ -85,7 +79,7 @@ Rust学习实践，进行Rust的“实战”（Demo）练习：文件搜索工�
     * 进程环境的检查和操作，例如获取环境变量、命令行参数等
     * [Module std::env](https://doc.rust-lang.org/std/env/index.html)
 * `std::env::args()`函数
-    * [Function std::env::args]((https://doc.rust-lang.org/std/env/fn.args.html))
+    * [Function std::env::args](https://doc.rust-lang.org/std/env/fn.args.html)
 
 ```rust
 use std::env;

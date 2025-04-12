@@ -1,16 +1,10 @@
 ---
-layout: post
 title: C++中gRPC访问结构体成员和const访问限制
 categories: C/C++
-tags: const gRPC
+tags: [const, gRPC]
 ---
 
-* content
-{:toc}
-
 介绍C++中gRPC访问结构体成员的方式和const成员函数访问时的限制。
-
-
 
 当gRPC proto协议中定义的message消息不仅仅包含基本的int、string等类型，还包含结构体类型时，访问结构体类型成员不适用`.变量名()/.set_变量名()`形式。
 

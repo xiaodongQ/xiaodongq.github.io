@@ -1,16 +1,10 @@
 ---
-layout: post
 title: 分析netstat中的Send-Q和Recv-Q
 categories: 网络
-tags: Linux 网络
+tags: [Linux, 网络]
 ---
 
-* content
-{:toc}
-
 跟踪分析netstat中`Send-Q`和`Recv-Q`在不同连接状态(listen和非listen)下的含义。
-
-
 
 ## 1. 背景
 

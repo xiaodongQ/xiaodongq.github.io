@@ -1,16 +1,10 @@
 ---
-layout: post
 title: Linux存储IO栈梳理（三） -- eBPF和ftrace跟踪IO写流程
 categories: 存储
-tags: 存储 IO
+tags: [存储, IO]
 ---
 
-* content
-{:toc}
-
 跟踪Linux存储IO写流程。
-
-
 
 ## 1. 背景
 

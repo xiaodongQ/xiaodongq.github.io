@@ -1,17 +1,11 @@
 ---
-layout: post
 title: ActWithPrudence翻译学习
 categories: 翻译学习
 tags: 翻译学习
 ---
 
-* content
-{:toc}
-
 每个程序员应该了解的97件事 - Act with Prudence。  
 行事谨慎并考虑后果，碰到技术债务应该怎么做。
-
-
 
 ## Act with Prudence
 

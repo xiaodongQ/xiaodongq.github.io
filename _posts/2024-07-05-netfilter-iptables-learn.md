@@ -1,16 +1,10 @@
 ---
-layout: post
 title: TCP发送接收过程（三） -- 学习netfilter和iptables
 categories: 网络
-tags: TCP netfilter iptables
+tags: [TCP, netfilter, iptables]
 ---
 
-* content
-{:toc}
-
 netfilter作为网络协议栈非常关键的一部分，本篇学习下netfilter和iptables，有助于理解TCP发送接收过程
-
-
 
 ## 1. 背景
 

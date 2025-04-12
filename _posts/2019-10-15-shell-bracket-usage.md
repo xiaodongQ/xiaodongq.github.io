@@ -1,19 +1,12 @@
 ---
-layout: post
 title: Shell中各种括号的作用和区别
 categories: Shell
 tags: Shell
 ---
 
-* content
-{:toc}
-
 Shell中各种括号的作用和区别，单小括号() 和 双小括号(())、 单中括号[] 和 双中括号[[]]、 大括号、花括号 {}。
 
 对各自功能和使用方式，做个整理学习。
-
-
-
 
 ### Shell中各种括号的作用和区别
 

@@ -1,12 +1,8 @@
 ---
-layout: post
 title: 内存调试检测工具Valgrind简介
 categories: C/C++
 tags: 内存泄漏
 ---
-
-* content
-{:toc}
 
 [应用Valgrind发现Linux程序的内存问题](https://www.ibm.com/developerworks/cn/linux/l-cn-valgrind/)
 

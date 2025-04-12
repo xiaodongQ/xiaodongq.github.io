@@ -1,16 +1,10 @@
 ---
-layout: post
 title: leveldb学习笔记（四） -- memtable结构实现
 categories: 存储
-tags: 存储 leveldb
+tags: [存储, leveldb]
 ---
 
-* content
-{:toc}
-
 leveldb学习笔记，本篇学习memtable结构实现，学习其基于的跳表实现细节。
-
-
 
 ## 1. 背景
 

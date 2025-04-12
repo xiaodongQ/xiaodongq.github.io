@@ -1,16 +1,10 @@
 ---
-layout: post
 title: Excalidraw白板工具和快捷键
 categories: 工具
 tags: 工具
 ---
 
-* content
-{:toc}
-
 Excalidraw白板工具和快捷键
-
-
 
 ## 1. 工具简要介绍
 

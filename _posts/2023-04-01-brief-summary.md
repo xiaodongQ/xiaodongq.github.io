@@ -1,16 +1,10 @@
 ---
-layout: post
 title: 阶段小结
 categories: 其他
 tags: 杂记
 ---
 
-* content
-{:toc}
-
 很久没更新了，没有仪式感地做个小结。
-
-
 
 ## 停更原因
 

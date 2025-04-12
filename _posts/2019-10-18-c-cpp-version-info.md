@@ -1,16 +1,10 @@
 ---
-layout: post
 title: C和C++的历史版本迭代整理
 categories: C/C++
 tags: C/C++版本
 ---
 
-* content
-{:toc}
-
 介绍C和C++的历史版本迭代。部分常用特性说明。
-
-
 
 ## C++各版本
 

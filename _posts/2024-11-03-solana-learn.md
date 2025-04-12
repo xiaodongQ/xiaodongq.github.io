@@ -1,16 +1,10 @@
 ---
-layout: post
 title: Solana开发学习（一） -- 总体说明
 categories: Solana
 tags: Solana
 ---
 
-* content
-{:toc}
-
 Rust项目学习：Solana。
-
-
 
 ## 1. 背景
 

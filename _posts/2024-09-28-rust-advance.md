@@ -1,16 +1,10 @@
 ---
-layout: post
 title: Rust学习实践（三） -- Rust特性：生命周期及函数式编程
 categories: Rust
 tags: Rust
 ---
 
-* content
-{:toc}
-
 Rust学习实践，进一步学习梳理Rust特性。
-
-
 
 ## 1. 背景
 

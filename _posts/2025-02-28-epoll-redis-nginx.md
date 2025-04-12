@@ -1,16 +1,10 @@
 ---
-layout: post
 title: 梳理Redis中的epoll机制
 categories: 网络
-tags: 网络 epoll Redis
+tags: [网络, epoll, Redis]
 ---
 
-* content
-{:toc}
-
 梳理 Redis ~~和 Nginx~~ 中的epoll机制。
-
-
 
 ## 1. 背景
 

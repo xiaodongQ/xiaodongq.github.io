@@ -1,16 +1,10 @@
 ---
-layout: post
 title: Rust学习实践（五） -- Rust特性：并发编程
 categories: Rust
 tags: Rust
 ---
 
-* content
-{:toc}
-
 Rust学习实践，进一步学习梳理Rust特性：多线程并发编程。
-
-
 
 ## 1. 背景
 

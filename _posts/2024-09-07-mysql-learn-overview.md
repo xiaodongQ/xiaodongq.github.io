@@ -1,16 +1,10 @@
 ---
-layout: post
 title: MySQL学习实践（一） -- 整体架构和基本操作的流程
 categories: MySQL
-tags: 存储 MySQL
+tags: [存储, MySQL]
 ---
 
-* content
-{:toc}
-
 MySQL学习实践，本篇介绍整体架构和基本操作的流程。
-
-
 
 ## 1. 背景
 

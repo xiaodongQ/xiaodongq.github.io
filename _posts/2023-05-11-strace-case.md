@@ -1,16 +1,10 @@
 ---
-layout: post
 title: strace工具案例
 categories: Linux
 tags: strace
 ---
 
-* content
-{:toc}
-
 记录利用strace排查问题的案例
-
-
 
 ## 1. 前言
 
