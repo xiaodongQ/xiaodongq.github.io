@@ -97,7 +97,7 @@ tags: jekyll
 
 [博客主页](https://chirpy.cotes.page/)
 
-效果很丰富，可以参考中文博客：[文本和排版](https://pansong291.github.io/chirpy-demo-zhCN/posts/text-and-typography/)
+效果很丰富，可以参考中文博客：[文本和排版](https://pansong291.github.io/chirpy-demo-zhCN/posts/text-and-typography/)，[对应仓库](https://github.com/pansong291/chirpy-demo-zhCN)
 
 图标修改，生成网站: [icon-batch](https://lzltool.cn/icon-batch)
 [realfavicongenerator](https://realfavicongenerator.net/)
