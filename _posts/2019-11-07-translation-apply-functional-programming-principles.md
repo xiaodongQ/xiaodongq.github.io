@@ -1,17 +1,11 @@
 ---
-layout: post
 title: ApplyFunctionalProgrammingPrinciples翻译学习
 categories: 翻译学习
 tags: 翻译学习
 ---
 
-* content
-{:toc}
-
 每个程序员应该了解的97件事 - Apply Functional Programming Principles。  
 应用函数式编程原理。设计有更高引用透明性的函数。
-
-
 
 ## Apply Functional Programming Principles
 

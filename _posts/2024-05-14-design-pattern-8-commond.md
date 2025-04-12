@@ -1,16 +1,10 @@
 ---
-layout: post
 title: 行为型设计模式-命令模式
 categories: 设计模式
 tags: 设计模式
 ---
 
-* content
-{:toc}
-
 行为型设计模式-命令模式模式示例记录
-
-
 
 ## 1. 背景
 

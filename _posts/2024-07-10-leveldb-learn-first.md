@@ -1,16 +1,10 @@
 ---
-layout: post
 title: leveldb学习笔记（一） -- 整体架构和基本操作
 categories: 存储
-tags: 存储 leveldb
+tags: [存储, leveldb]
 ---
 
-* content
-{:toc}
-
 leveldb学习笔记，本篇说明整体架构和基本操作，并进行代码验证。
-
-
 
 ## 1. 背景
 

@@ -1,18 +1,12 @@
 ---
-layout: post
 title: C++不可拷贝类和右值引用
 categories: C/C++
 tags: 右值引用
 ---
 
-* content
-{:toc}
-
 介绍右值引用和不可拷贝类在C++11之前和C++11中，以及boost中的用法。
 
 并对C++11中新特性：delete弃置函数和default，以及constexpr进行说明。
-
-
 
 ## 不可拷贝类
 

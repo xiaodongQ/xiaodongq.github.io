@@ -1,16 +1,10 @@
 ---
-layout: post
 title: 创建型设计模式-原型模式
 categories: 设计模式
 tags: 设计模式
 ---
 
-* content
-{:toc}
-
 创建型设计模式-原型模式示例记录
-
-
 
 ## 1. 背景
 

@@ -1,16 +1,10 @@
 ---
-layout: post
 title: Rust学习实践（七） -- Rust网络编程和Demo
 categories: Rust
 tags: Rust
 ---
 
-* content
-{:toc}
-
 Rust学习实践，学习Rust网络编程，并编写Web服务器Demo。
-
-
 
 ## 1. 背景
 

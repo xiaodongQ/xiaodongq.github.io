@@ -1,16 +1,10 @@
 ---
-layout: post
 title: Vim插件配置
 categories: Linux
 tags: Vim
 ---
 
-* content
-{:toc}
-
-
-
-## Vim
+## 1. Vim
 
 [Vim插件及配置](https://github.com/xiaodongQ/dot-vimrc)
 
@@ -41,7 +35,7 @@ tags: Vim
 
 ---
 
-## 代码补全
+## 2. 代码补全
 
 * vim-snipmate和vim-snippets 生成代码片段
 
@@ -76,7 +70,7 @@ tags: Vim
       * [centos7源码编译安装lua:lua5.1升级lua5.3](https://blog.csdn.net/feinifi/article/details/80078721)
     + `./configure --enable-luainterp --enable-gui=no --without-x --enable-multibyte --with-lua-prefix=/usr/local`
 
-## 快速跳转
+## 3. 快速跳转
 
 * vim-matchit 标签跳转
 
@@ -90,7 +84,7 @@ tags: Vim
 
     <leader>全局映射为,  用法<leader>j 根据出现的标号选择，进行向下跳转(另还有：,k ,w ,b)
 
-## 快速编辑
+## 4. 快速编辑
 
 * vim-surround 处理成对出现的“包围结构”
 
@@ -128,7 +122,7 @@ tags: Vim
 
     `let g:indent_guides_guide_size = 1 ` 设置宽度
 
-## IDE特性
+## 5. IDE特性
 
 * nerdtree 树形目录
 * TabBar buffer选项卡

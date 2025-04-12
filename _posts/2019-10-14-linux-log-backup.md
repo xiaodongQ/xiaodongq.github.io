@@ -1,16 +1,10 @@
 ---
-layout: post
 title: Linux构建自动化过期日志备份
 categories: C/C++
-tags: crontab Shell
+tags: [crontab, Shell]
 ---
 
-* content
-{:toc}
-
 Linux下使用crontab和shell脚本实现过期日志移动备份到备份路径
-
-
 
 ## 缘由
 

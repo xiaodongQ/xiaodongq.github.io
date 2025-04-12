@@ -1,16 +1,10 @@
 ---
-layout: post
 title: 记一个systemd设置自启动问题
 categories: Linux
 tags: systemd
 ---
 
-* content
-{:toc}
-
 记一个/etc/init.d下的服务自启动设置失败问题
-
-
 
 ## 1. 背景
 

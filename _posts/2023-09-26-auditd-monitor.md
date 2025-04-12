@@ -1,16 +1,10 @@
 ---
-layout: post
 title: 服务究竟被谁kill了？ -- 利用audit审计监测
 categories: Linux
 tags: audit
 ---
 
-* content
-{:toc}
-
 利用audit审计监测服务被谁kill了
-
-
 
 ## 1. 背景
 

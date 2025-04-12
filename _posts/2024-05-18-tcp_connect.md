@@ -1,16 +1,10 @@
 ---
-layout: post
 title: TCP半连接全连接（一） -- 全连接队列相关过程
 categories: 网络
 tags: 网络
 ---
 
-* content
-{:toc}
-
 梳理学习TCP建立连接相关过程和全连接队列，结合相关配置进行实验。
-
-
 
 ## 1. 背景
 

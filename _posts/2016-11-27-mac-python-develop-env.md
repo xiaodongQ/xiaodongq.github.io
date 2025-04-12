@@ -1,19 +1,12 @@
 ---
-layout: post
 title: Mac搭建python开发环境搭建及学习笔记
 categories: Linux
 tags: Python
 ---
 
-* content
-{:toc}
-
 在慕课网上了解python的web框架django，搭建python环境时遇到些问题。
 
 OS X系统自带了python运行环境，但作为开发不是很方便，tab键无补全提示；另外后续需要安装一些模块。所以安装一下ipython和pip。
-
-
-
 
 ## 工具安装
 

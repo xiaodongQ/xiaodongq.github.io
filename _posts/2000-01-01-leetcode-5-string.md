@@ -1,16 +1,10 @@
 ---
-layout: post
 title: LeetCode刷题学习（五） -- 字符串
 categories: LeetCode
-tags: LeetCode 数据结构与算法
+tags: [LeetCode, 数据结构与算法]
 ---
 
-* content
-{:toc}
-
 LeetCode刷题学习记录，字符串篇。
-
-
 
 ## 1. 344.反转字符串
 

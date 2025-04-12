@@ -1,16 +1,10 @@
 ---
-layout: post
 title: 记一次失败的/boot分区扩容
 categories: Linux
 tags: Linux
 ---
 
-* content
-{:toc}
-
 CentOS的`/boot`分区空间不够用了，记录失败的扩容过程。
-
-
 
 ## 1. 背景
 

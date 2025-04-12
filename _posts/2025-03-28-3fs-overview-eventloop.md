@@ -1,16 +1,10 @@
 ---
-layout: post
 title: DeepSeek 3FS学习实践（一） -- 事件循环
 categories: 存储
-tags: 3FS 存储
+tags: [3FS, 存储]
 ---
 
-* content
-{:toc}
-
 本篇梳理3FS中的事件循环实现流程。
-
-
 
 ## 1. 背景
 

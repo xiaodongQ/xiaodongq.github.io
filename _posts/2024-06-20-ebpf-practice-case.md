@@ -1,16 +1,10 @@
 ---
-layout: post
 title: eBPF学习实践系列（五） -- 分析tcplife.bpf.c程序
 categories: eBPF
-tags: eBPF libbpf BCC
+tags: [eBPF, libbpf, BCC]
 ---
 
-* content
-{:toc}
-
 跟踪分析bcc项目ibbpf-tools中的 `tcplife.bpf.c` 程序
-
-
 
 ## 1. 背景
 

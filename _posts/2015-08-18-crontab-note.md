@@ -1,18 +1,12 @@
 ---
-layout: post
 title: crontab学习使用笔记
 categories: Linux
 tags: Shell
 ---
 
-* content
-{:toc}
-
 crontab命令常见于Unix和类Unix的操作系统之中，用于设置周期性被执行的指令。
 
-
-
-## crond简介及crontab文件
+## 1. crond简介及crontab文件
 
 部分参考：
 
@@ -60,7 +54,7 @@ MAILTO=root
 对于命名：如果是自己新建的crontab文件，命名成 "crontab", "crontab.xd"，用vim打开都能显示语法高亮;
 而"crontab_xd", "xd_crontab", "crontab_xd.xd"则不行。 使用crontab.用户名方式命名
 
-### 部分用法示例：
+### 1.1. 部分用法示例：
 
 更多实例查看上面的链接
 
@@ -87,7 +81,7 @@ MAILTO=root
   `* */2 * * * cmd （错误）`
   `0 */2 * * * cmd （正确）`
 
-## crontab 命令
+## 2. crontab 命令
 
 通过crontab 命令，我们可以在固定的间隔时间执行指定的系统指令或 shell script脚本。
 
@@ -102,9 +96,9 @@ crontab [-u user] [ -e | -l | -r ]
 -i：在删除用户的crontab文件时给确认提示。
 ```
 
-## 注意事项
+## 3. 注意事项
 
-### 环境变量问题
+### 3.1. 环境变量问题
 
 不要假定cron知道所需要的特殊环境，它其实并不知道。所以你要保证在shelll脚本中提供所有必要的路径和环境变量，除了一些自动设置的全局变量。所以注意如下3点：
 
@@ -127,7 +121,7 @@ export RUN_CONF=/home/d139/conf/platform/cbp/cbp_jboss.conf
 0 * * * * . /etc/profile;/bin/sh /var/www/java/audit_no_count/bin/restart_audit.sh
 ```
 
-### 日志清理问题
+### 3.2. 日志清理问题
 
 每条任务调度执行完毕，系统都会将任务输出信息通过电子邮件的形式发送给当前系统用户(/var/mail/用户, /var/log/messages)等系统日志文件，这样日积月累，日志信息会非常大，可能会影响系统的正常运行，因此，将每条任务进行重定向处理非常重要。
 

@@ -1,16 +1,10 @@
 ---
-layout: post
 title: 实用工具集合之oh-my-zsh
 categories: 工具
 tags: zsh
 ---
 
-* content
-{:toc}
-
 oh-my-zsh的安装和使用
-
-
 
 ## zsh说明
 

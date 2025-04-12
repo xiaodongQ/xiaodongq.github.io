@@ -1,20 +1,14 @@
 ---
-layout: post
 title: Vim编码识别及转换
 categories: Linux
 tags: Vim
 ---
-
-* content
-{:toc}
 
 ## Vim编码
 
 具体参考： [Vim文件编码识别与乱码处理](http://edyfox.codecarver.org/html/vim_fileencodings_detection.html)
 
 在 Vim 中，有四个与编码有关的选项，它们是：fileencodings、fileencoding、encoding 和 termencoding。
-
-
 
 1. encoding 是 Vim 内部使用的字符编码方式。
 2. termencoding 是 Vim 用于屏幕显示的编码，在显示的时候，Vim 会把内部编码转换为屏幕编码，再用于输出。

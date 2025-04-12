@@ -1,16 +1,10 @@
 ---
-layout: post
 title: leveldb学习笔记（五） -- sstable实现
 categories: 存储
-tags: 存储 leveldb
+tags: [存储, leveldb]
 ---
 
-* content
-{:toc}
-
 leveldb学习笔记，本篇学习sstable实现。
-
-
 
 ## 1. 背景
 

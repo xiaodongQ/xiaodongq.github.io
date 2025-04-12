@@ -1,16 +1,10 @@
 ---
-layout: post
 title: TCP发送接收过程（二） -- 实际案例看TCP性能和窗口、Buffer的关系
 categories: 网络
-tags: TCP Wireshark 接收缓冲区
+tags: [TCP, Wireshark, 接收缓冲区]
 ---
 
-* content
-{:toc}
-
 通过实际案例看TCP性能和窗口、Buffer的关系，并用Wireshark跟踪TCP Stream Graphs
-
-
 
 ## 1. 背景
 

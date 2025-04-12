@@ -1,16 +1,10 @@
 ---
-layout: post
 title: Rust学习实践（九） -- Demo项目：几个Demo练习
 categories: Rust
 tags: Rust
 ---
 
-* content
-{:toc}
-
 Rust学习实践，几个Demo练习。
-
-
 
 ## 1. 背景
 

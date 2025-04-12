@@ -1,16 +1,10 @@
 ---
-layout: post
 title: eBPF学习实践系列（二） -- bcc tools网络工具集
 categories: eBPF
-tags: Linux eBPF
+tags: [Linux, eBPF]
 ---
 
-* content
-{:toc}
-
 bcc tools工具集中网络部分说明和使用。
-
-
 
 ## 1. 背景
 

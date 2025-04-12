@@ -1,16 +1,10 @@
 ---
-layout: post
 title: 结构型设计模式
 categories: 设计模式
 tags: 设计模式
 ---
 
-* content
-{:toc}
-
 7种结构型设计模式示例记录
-
-
 
 ## 1. 背景
 

@@ -1,16 +1,10 @@
 ---
-layout: post
 title: RFC1180学习笔记
 categories: 网络
 tags: 网络
 ---
 
-* content
-{:toc}
-
 [[译] RFC 1180：朴素 TCP/IP 教程（1991）](http://arthurchiao.art/blog/rfc1180-a-tcp-ip-tutorial-zh/) 学习笔记
-
-
 
 ## 1. 前言
 

@@ -1,16 +1,10 @@
 ---
-layout: post
 title: eBPF学习实践系列（三） -- 基于libbpf开发实践
 categories: eBPF
-tags: eBPF libbpf CO-RE
+tags: [eBPF, libbpf, CO-RE]
 ---
 
-* content
-{:toc}
-
 基于libbpf开发实践
-
-
 
 ## 1. 背景
 

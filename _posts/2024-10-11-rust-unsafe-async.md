@@ -1,16 +1,10 @@
 ---
-layout: post
 title: Rust学习实践（六） -- Rust特性：unsafe、macro宏编程、异步编程
 categories: Rust
 tags: Rust
 ---
 
-* content
-{:toc}
-
 Rust学习实践，进一步学习梳理Rust特性：unsafe、macro宏编程、异步编程。
-
-
 
 ## 1. 背景
 

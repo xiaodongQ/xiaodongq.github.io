@@ -1,16 +1,10 @@
 ---
-layout: post
 title: 如何关闭一个TCP连接？
 categories: 网络
-tags: 网络 tcpkill hping3
+tags: [网络, tcpkill, hping3]
 ---
 
-* content
-{:toc}
-
 介绍如何利用`tcpkill`和`hping3`关闭一个TCP连接，以及基本原理。
-
-
 
 ## 1. 背景
 

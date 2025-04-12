@@ -1,16 +1,10 @@
 ---
-layout: post
 title: Redis学习实践（二） -- 多线程、RDB和AOF
 categories: Redis
-tags: Redis 存储
+tags: [Redis, 存储]
 ---
 
-* content
-{:toc}
-
 本篇梳理Redis支持的关键特性和机制：多线程、RDB、AOF。
-
-
 
 ## 1. 背景
 

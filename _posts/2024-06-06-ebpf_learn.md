@@ -1,16 +1,10 @@
 ---
-layout: post
 title: eBPF学习实践系列（一） -- 初识eBPF
 categories: eBPF
-tags: Linux eBPF
+tags: [Linux, eBPF]
 ---
 
-* content
-{:toc}
-
 eBPF学习实践，初步整理学习。
-
-
 
 ## 1. 背景
 

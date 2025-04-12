@@ -1,16 +1,10 @@
 ---
-layout: post
 title: 网络实验-设置机器的MTU和MSS
 categories: 案例实验
 tags: 网络
 ---
 
-* content
-{:toc}
-
 网络案例实践：设置机器的MTU和MSS。通过案例理解MTU和TCP MSS协商。
-
-
 
 ## 1. 概念
 

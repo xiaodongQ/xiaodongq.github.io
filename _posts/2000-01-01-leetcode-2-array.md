@@ -1,16 +1,10 @@
 ---
-layout: post
 title: LeetCode刷题学习（二） -- 数组篇
 categories: LeetCode
-tags: LeetCode 数据结构与算法
+tags: [LeetCode, 数据结构与算法]
 ---
 
-* content
-{:toc}
-
 LeetCode刷题学习记录，数组篇。
-
-
 
 ## 1. 704.二分查找
 

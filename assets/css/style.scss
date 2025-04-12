@@ -1,0 +1,21 @@
+---
+---
+
+/*
+  If the number of TAB files has changed, the following variable is required.
+  And it must be defined before `@import`.
+*/
+// {% comment %}
+/* {% endcomment %}
+$tab-count: {{ site.tabs | size | plus: 1 }}; // plus 1 for home tab
+
+@import "{{ site.theme }}";
+{% comment %} */
+// {% endcomment %}
+
+/* append your custom style below */
+
+// 新窗打开外部链接图标
+i.fa.fa-external-link {
+  font-size: .5rem;
+}
