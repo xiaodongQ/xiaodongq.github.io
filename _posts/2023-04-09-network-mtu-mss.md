@@ -168,7 +168,7 @@ iptables -I FORWARD -p tcp -m tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 10
 scp root@192.168.1.150:/home/xd/workspace/experiment/temp.dat .
 ```
 
-抓包文件：[scp-overmss-smss1460-dmss100.pcapng](images/srcfiles/scp-overmss-smss1460-dmss100.pcapng)  
+抓包文件：[scp-overmss-smss1460-dmss100.pcapng](/images/srcfiles/scp-overmss-smss1460-dmss100.pcapng)  
 抓包截图：![2023-05-07-over-mss](/images/2023-05-07-over-mss.png)
 
 * **疑问(TODO)**

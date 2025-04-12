@@ -16,9 +16,6 @@ tags: Vim
 
 自己用的配置，基于[humiaozuzu/dot-vimrc](https://github.com/humiaozuzu/dot-vimrc)的配置根据需要做了少量修改。
 
-截图：
-![Vim效果截图](http://7xsl51.com1.z0.glb.clouddn.com/Vim_screenshot.png)
-
 截图中展示了Nerdtree, Tagbar, Tabbar, Ack。另外还有多种插件：代码编辑时补全代码及代码段、语法检查、快速跳转、快速注释、文件模糊查找、状态栏等等功能。配合快捷键特别好用。
 
 在新机器配置时，步骤：

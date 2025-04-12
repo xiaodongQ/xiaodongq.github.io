@@ -25,10 +25,6 @@ tags: tmux
 
 [Tmux - Linux从业者必备利器](http://cenalulu.github.io/linux/tmux/)
 
-效果截图：
-
-![tmux效果截图](http://7xsl51.com1.z0.glb.clouddn.com/tmux_screenshot.jpg)
-
 ## session会话操作
 
 ```
