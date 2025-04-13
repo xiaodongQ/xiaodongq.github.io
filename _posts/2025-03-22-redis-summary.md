@@ -1,5 +1,6 @@
 ---
 title: Redis学习实践（一） -- 数据类型和底层数据结构
+description: Redis数据类型和对应的底层数据结构。
 categories: Redis
 tags: [Redis, 存储]
 ---

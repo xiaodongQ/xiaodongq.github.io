@@ -1,5 +1,6 @@
 ---
 title: 博客主题切换为Chirpy
+description: 博客主题切换为 jekyll-theme-chirpy
 categories: 工具
 tags: [博客, Jekyll]
 ---
