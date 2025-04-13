@@ -1,5 +1,6 @@
 ---
 title: ioserver服务实验（一） -- 借助trae搭建项目
+description: 借助trae快速搭建项目，实现C++读写服务demo，借此作为场景进行实验。
 categories: C/C++
 tags: [AI, C++]
 ---
