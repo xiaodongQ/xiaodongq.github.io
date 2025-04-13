@@ -311,11 +311,6 @@ jsDeliver
 
 #### 5.15. 网站数据统计
 
-page view和分析：
+page view和分析，使用：[goatcounter](https://www.goatcounter.com/)
 
-[goatcounter](https://www.goatcounter.com/)
-
-```
-<script data-goatcounter="https://xiaodongq.goatcounter.com/count"
-        async src="//gc.zgo.at/count.js"></script>
-```
+统计见：[xd goatcounter](https://xiaodongq.goatcounter.com/)
