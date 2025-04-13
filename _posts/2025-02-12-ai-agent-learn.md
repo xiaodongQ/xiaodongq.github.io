@@ -1,5 +1,6 @@
 ---
 title: AI Agent学习实践笔记
+description: HuggingFace AI Agents Course学习笔记（AI智能体）
 categories: 大模型
 tags: [大模型, AI]
 ---
@@ -19,13 +20,13 @@ HuggingFace AI Agents Course学习笔记（AI智能体）
 
 You can access the course here 👉 <a href="https://hf.co/learn/agents-course" target="_blank">https://hf.co/learn/agents-course</a>
 
-| Unit | Topic                          | Description                                                                 |
-|------|--------------------------------|-----------------------------------------------------------------------------|
-| 0    | [Welcome to the Course](https://huggingface.co/learn/agents-course/en/unit0/introduction) | Welcome, guidelines, necessary tools, and course overview.                  |
-| 1    | [Introduction to Agents](https://huggingface.co/learn/agents-course/en/unit1/introduction)       | Definition of agents, LLMs, model family tree, and special tokens.          |
-| 2    | [2_frameworks](https://huggingface.co/learn/agents-course/en/unit2/README.md)                     | Overview of smolagents, LangChain, LangGraph, and LlamaIndex.               |
-| 3    | [3_use_cases](https://huggingface.co/learn/agents-course/en/unit3/README.md)                      | SQL, code, retrieval, and on-device agents using various frameworks.        |
-| 4    | [4_final_assignment_with_benchmark](https://huggingface.co/learn/agents-course/en/unit4/README.md) | Automated evaluation of agents and leaderboard with student results.        |
+| Unit | Topic                                                                                              | Description                                                          |
+| ---- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| 0    | [Welcome to the Course](https://huggingface.co/learn/agents-course/en/unit0/introduction)          | Welcome, guidelines, necessary tools, and course overview.           |
+| 1    | [Introduction to Agents](https://huggingface.co/learn/agents-course/en/unit1/introduction)         | Definition of agents, LLMs, model family tree, and special tokens.   |
+| 2    | [2_frameworks](https://huggingface.co/learn/agents-course/en/unit2/README.md)                      | Overview of smolagents, LangChain, LangGraph, and LlamaIndex.        |
+| 3    | [3_use_cases](https://huggingface.co/learn/agents-course/en/unit3/README.md)                       | SQL, code, retrieval, and on-device agents using various frameworks. |
+| 4    | [4_final_assignment_with_benchmark](https://huggingface.co/learn/agents-course/en/unit4/README.md) | Automated evaluation of agents and leaderboard with student results. |
 
 ## 2. 单元1：Agents介绍
 
@@ -68,14 +69,14 @@ Transformer 架构有3种类型：
 
 常见模型：
 
-|模型|公司|
-|--|--|
-|Deepseek-R1|DeepSeek|
-|GPT4|OpenAI|
-|Llama 3|Meta (Facebook AI Research)|
-|SmolLM2|Hugging Face|
-|Gemma|Google|
-|Mistral|Mistral|
+| 模型        | 公司                        |
+| ----------- | --------------------------- |
+| Deepseek-R1 | DeepSeek                    |
+| GPT4        | OpenAI                      |
+| Llama 3     | Meta (Facebook AI Research) |
+| SmolLM2     | Hugging Face                |
+| Gemma       | Google                      |
+| Mistral     | Mistral                     |
 
 #### 2.2.1. LLM 的工作原理
 
@@ -183,12 +184,12 @@ AI智能体（AI Agents）的一个关键方面是其`采取行动（take action
 
 下面是AI智能体中常用的一些工具：
 
-|Tool|Description|
-|--|--|
-|Web Search|允许智能体从互联网获取最新信息|
-|Image Generation|根据文本描述创建图像|
-|Retrieval|从外部源检索信息|
-|API Interface|与外部API（如GitHub、YouTube、Spotify等）进行交互|
+| Tool             | Description                                       |
+| ---------------- | ------------------------------------------------- |
+| Web Search       | 允许智能体从互联网获取最新信息                    |
+| Image Generation | 根据文本描述创建图像                              |
+| Retrieval        | 从外部源检索信息                                  |
+| API Interface    | 与外部API（如GitHub、YouTube、Spotify等）进行交互 |
 
 上面只是一些示例，还可根据实际需求创建工具。一个好的工具应能补充LLM的能力，弥补其在算术运算、获取实时数据（模型仅基于历史训练数据）等方面的不足。
 

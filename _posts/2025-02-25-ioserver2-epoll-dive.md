@@ -1,5 +1,6 @@
 ---
 title: ioserver服务实验（二） -- epoll使用梳理
+description: 基于ioserver demo项目，梳理epoll的使用。
 categories: 网络
 tags: [网络, epoll]
 ---
