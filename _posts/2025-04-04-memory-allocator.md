@@ -1,5 +1,6 @@
 ---
 title: CPU及内存调度（四） -- ptmalloc、tcmalloc、jemalloc、mimalloc内存分配器（上）
+description: 梳理 ptmalloc、tcmalloc、jemalloc 和 mimalloc 内存分配器，本篇先梳理ptmalloc。
 categories: CPU及内存调度
 tags: 内存
 ---
