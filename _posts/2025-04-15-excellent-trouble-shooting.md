@@ -36,19 +36,26 @@ TODO List里面，收藏待看的文章已经不少了，有一类是觉得比�
 
 [Brendan Gregg's Blog](https://www.brendangregg.com/blog/index.html)
 
-里面有一些实际案例和场景介绍，对理解大佬开发的火焰图、bcc、perf-tools等一些工具的使用和应用场景很有帮助，否则只是停留于第一个层面。
+里面有一些实际案例和场景介绍，对理解大佬开发的火焰图、bcc、perf-tools等一些工具的使用场景和灵活应用很有帮助，否则只是停留于知道层面。
 
 #### 2.1.1. page占用很高
 
 [Analyzing a High Rate of Paging](https://www.brendangregg.com/blog/2021-08-30/high-rate-of-paging.html)
 
-问题：微服务管理上传大小文件（100 Gbytes、40 Gbytes），page页占用一直很高
+问题：微服务管理上传大小文件（100 Gbytes、40 Gbytes），大文件要数小时，小文件只要几分钟。云端监测工具显示大文件时**page页占用很高**
 
-* iostat
-* biolatency（bcc）
-* bitesize
-* free（缓存）
-* cachestat（bcc）
+* 先来60s系列性能检查：`iostat` **查看总体io占用情况**
+    * 发现`r_await`读等待相对较高（写的话write-back模式有cache一般等待少），`avgqu-sz`平均队列长度不少在排队，io大小则是128KB（用`rkB/s`/`r/s`，即可查看读取的io块大小，比如4K、32K、128K等）
+    * [60s系列Linux命令版本](https://xiaodongq.github.io/2025/04/14/handy-tools/#45-60s%E7%B3%BB%E5%88%97linux%E5%91%BD%E4%BB%A4%E7%89%88%E6%9C%AC)
+* 检查硬盘延时：`biolatency`（bcc）
+    * bcc工具检查总体的bio延时情况，大部分延时统计在`[16, 127 ms]`。判断是负载比较大，**排除是硬盘的异常**。
+* 检查io负载情况：bitesize（bcc）
+    * 上面判断负载大，于是`bitsize`看下**io负载分布情况**（会展示不同程序的各个读写IO区间的负载分布），没明显异常
+* 继续60s系列性能检查：`free`（缓存）
+    * free不多了，很多在`page cache`页面缓存里面（64GB内存，有48GB在page cache里）
+    * 初步分析：对于48GB的page cache，**100GB的文件会破坏page cache，而 40GB 文件则适合**
+* 缓存命中情况确认：`cachestat`（bcc和perf-tools里都有该工具）
+    * 确实缓存命中率有很多比较低，造成了对硬盘io，延迟会比较大
 
 最终发现是大文件对应的page页缓存命中率很低：
 
