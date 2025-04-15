@@ -1,6 +1,6 @@
 ---
 title: 阶段小结
-categories: [小结]
+categories: [杂记]
 tags: 杂记
 ---
 

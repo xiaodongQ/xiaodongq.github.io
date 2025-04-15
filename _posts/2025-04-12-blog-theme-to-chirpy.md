@@ -285,7 +285,7 @@ jsDeliver （感觉更新博客后很久看不到效果，cdn缓存体验了下�
 
 1、page view和分析，使用：[goatcounter](https://www.goatcounter.com/)
 
-统计见：[xd goatcounter](https://xiaodongq.goatcounter.com/)
+统计：[xd goatcounter](https://xiaodongq.goatcounter.com/)
 
 2、另外在底部增加 不蒜子
 
