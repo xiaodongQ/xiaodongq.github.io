@@ -82,6 +82,54 @@ pin: true
 
 ## 4. eBPF：bcc tools、bpftrace
 
+当前几个工具集里有些功能是重复的：`bcc tools`（也包括支持`CO-RE`的libbpf版本）、`bpftrace tools`，以平时使用的情况来看，原生安装的`bcc tools`/`bpftrace tools`通用性更好。自己归档的工具（[tools](https://github.com/xiaodongQ/prog-playground/tree/main/tools)）是基于较新的版本，里面有些实现要求更高的内核版本。
+
+> 1）较高版本内核（比如5.10），尽量用新工具：libbpf版本更小、更快
+>
+> 2）较低版本内核，用默认安装版本（比如`yum instal`），或者去github仓库下载对应版本
+{: .prompt-tip }
+
+比如`bitesize`的使用对比：
+
+```sh
+# 1、自行编译的bcc tools libbpf版本，提示内核要求>=5.11.0（自己环境只是4.18.0-348.7.1.el8_5.x86_64）
+[CentOS-root@xdlinux ➜ ~ ]$ which bitesize 
+/home/workspace/bcc_20250315/libbpf-tools/bcc_libbpf-tools_bin_db5b63f/bitesize
+[CentOS-root@xdlinux ➜ ~ ]$ bitesize
+libbpf: prog 'block_rq_issue': BPF program load failed: -EACCES
+libbpf: prog 'block_rq_issue': -- BEGIN PROG LOAD LOG --
+arg#0 type is not a struct
+Unrecognized arg#0 type PTR
+; if (LINUX_KERNEL_VERSION >= KERNEL_VERSION(5, 11, 0))
+...
+
+# 2、自己基于github最近release的归档，也报错了。/home/workspace/prog-playground/tools/bpftrace-tools_v0.23.1
+[CentOS-root@xdlinux ➜ bpftrace-tools_v0.23.1 git:(main) ✗ ]$ ./bitesize.bt 
+./bitesize.bt:23:2-9: ERROR: Can not access field 'comm' on type '(ctx) struct _tracepoint_block_block_rq_issue *'. Try dereferencing it first, or using '->'
+    @[args.comm] = hist(args.bytes);
+    ~~~~~~~
+
+# 3、yum安装的bcc tools则可运行
+[CentOS-root@xdlinux ➜ bpftrace-tools_v0.23.1 git:(main) ✗ ]$ /usr/share/bcc/tools/bitesize
+Tracing block I/O... Hit Ctrl-C to end.
+^C
+Process Name = kworker/11:1H
+     Kbytes              : count     distribution
+         0 -> 1          : 1        |****************************************|
+         2 -> 3          : 1        |****************************************|
+# 4、yum安装的bpftrace tools也可运行
+[CentOS-root@xdlinux ➜ bpftrace-tools_v0.23.1 git:(main) ✗ ]$ /usr/share/bpftrace/tools/bitesize.bt 
+Attaching 3 probes...
+Tracing block device I/O... Hit Ctrl-C to end.
+^C
+I/O size (bytes) histograms by process name:
+
+@[kworker/11:1H]: 
+[0]                    1 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@|
+[1]                    0 |                                                    |
+[2, 4)                 0 |                                                    |
+```
+
 ### 4.1. Linux内核版本对BPF的支持情况
 
 ![linux_kernel_event_bpf](/images/linux_kernel_event_bpf.png)  
