@@ -6,7 +6,8 @@ theme: jekyll-theme-chirpy
 # The language of the webpage › http://www.lingoes.net/en/translator/langcode.htm
 # If it has the same name as one of the files in folder `_data/locales`, the layout language will also be changed,
 # otherwise, the layout language will use the default value of 'en'.
-lang: zh-CN
+# lang: zh-CN
+lang: en
 
 # Change to your timezone › https://kevinnovak.github.io/Time-Zone-Picker
 timezone: Asia/Shanghai
@@ -14,9 +15,9 @@ timezone: Asia/Shanghai
 # jekyll-seo-tag settings › https://github.com/jekyll/jekyll-seo-tag/blob/master/docs/usage.md
 # ↓ --------------------------
 
-title: xiaodongQ # the main title
+title: Known unknowns # the main title
 
-tagline: 技术博客 # it will display as the subtitle
+tagline: Tech Blog # it will display as the subtitle
 
 description: >- # used by seo meta and the atom feed
   Personal blog for technical writing.

@@ -1,6 +1,6 @@
 ---
 title: ActWithPrudence翻译学习
-categories: [英语学习, 翻译]
+categories: [阅读笔记, 英文翻译]
 tags: 翻译学习
 ---
 

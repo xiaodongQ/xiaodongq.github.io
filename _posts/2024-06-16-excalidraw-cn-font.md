@@ -1,6 +1,6 @@
 ---
 title: Excalidraw白板工具和快捷键
-categories: [工具和命令]
+categories: [工具和命令, HandyTools]
 tags: 工具
 ---
 
