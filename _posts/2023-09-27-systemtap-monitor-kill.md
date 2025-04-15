@@ -1,6 +1,6 @@
 ---
 title: 服务究竟被谁kill了？ -- 利用SystemTap监测
-categories: Linux
+categories: [Troubleshooting]
 tags: SystemTap
 ---
 

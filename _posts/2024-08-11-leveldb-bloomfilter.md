@@ -1,6 +1,6 @@
 ---
 title: leveldb学习笔记（七） -- 布隆过滤器
-categories: 存储
+categories: [存储和数据库, leveldb]
 tags: [存储, leveldb]
 ---
 

@@ -1,6 +1,6 @@
 ---
 title: Rust学习实践（九） -- Demo项目：几个Demo练习
-categories: Rust
+categories: [编程语言, Rust]
 tags: Rust
 ---
 

@@ -1,6 +1,6 @@
 ---
 title: ApplyFunctionalProgrammingPrinciples翻译学习
-categories: 翻译学习
+categories: [英语学习, 翻译]
 tags: 翻译学习
 ---
 

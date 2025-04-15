@@ -1,6 +1,6 @@
 ---
 title: 构建工程化的makefile
-categories: C/C++
+categories: [编程语言, C/C++]
 tags: [makefile, C/C++]
 ---
 

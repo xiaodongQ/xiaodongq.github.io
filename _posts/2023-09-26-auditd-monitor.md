@@ -1,6 +1,6 @@
 ---
 title: 服务究竟被谁kill了？ -- 利用audit审计监测
-categories: Linux
+categories: [Troubleshooting]
 tags: audit
 ---
 

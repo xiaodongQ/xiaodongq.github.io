@@ -1,6 +1,6 @@
 ---
 title: Rust学习实践（三） -- Rust特性：生命周期及函数式编程
-categories: Rust
+categories: [编程语言, Rust]
 tags: Rust
 ---
 

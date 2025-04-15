@@ -1,8 +1,8 @@
 ---
 title: 工具集索引
 description: 统一记录工具和小技巧，便于随时查找和使用
-categories: 工具
-tags: [工具, Wireshark, eBPF, bcc, ss, TCP]
+categories: [工具和命令, HandyTools]
+tags: [Wireshark, eBPF, bcc, ss, bpftrace]
 pin: true
 ---
 
@@ -114,7 +114,7 @@ bpftrace提供的追踪类型：
 
 ### 4.5. 60s系列Linux命令版本
 
-```
+```sh
 uptime
 dmesg | tail
 vmstat 1
@@ -135,7 +135,7 @@ top
 
 **使用方式**：项目地址中有已经打包好的release二进制文件，下载即可使用，**依赖glibc版本 >= GLIBC_2.29**。
 
-直接执行，会展示当前生效的监测点；可选择某个监测点后回车，会用图表形式显示eBPF程序在该样本周期内的平均执行时间、每秒事件数和估算的CPU利用率。
+直接执行，会展示当前生效的监测点列表和资源消耗总览；可选择某个监测点后回车，会用图表形式显示eBPF程序在该样本周期内的平均执行时间、每秒事件数和估算的CPU利用率。
 
 ![bpftop区间统计](/images/2025-04-15-bpftop.png)
 

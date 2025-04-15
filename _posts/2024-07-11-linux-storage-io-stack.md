@@ -1,6 +1,6 @@
 ---
 title: Linux存储IO栈梳理（一） -- 存储栈全貌图
-categories: 存储
+categories: [存储和数据库, IO栈]
 tags: [存储, IO]
 ---
 

@@ -1,6 +1,6 @@
 ---
 title: leveldb学习笔记（一） -- 整体架构和基本操作
-categories: 存储
+categories: [存储和数据库, leveldb]
 tags: [存储, leveldb]
 ---
 

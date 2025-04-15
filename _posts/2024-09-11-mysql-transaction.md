@@ -1,6 +1,6 @@
 ---
 title: MySQL学习实践（二） -- MySQL事务
-categories: MySQL
+categories: [存储和数据库, MySQL]
 tags: [存储, MySQL]
 ---
 

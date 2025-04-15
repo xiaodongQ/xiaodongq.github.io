@@ -1,6 +1,6 @@
 ---
 title: C和C++的历史版本迭代整理
-categories: C/C++
+categories: [编程语言, C/C++]
 tags: C/C++版本
 ---
 

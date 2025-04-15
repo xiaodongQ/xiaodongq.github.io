@@ -1,6 +1,6 @@
 ---
 title: leveldb学习笔记（三） -- 日志结构实现
-categories: 存储
+categories: [存储和数据库, leveldb]
 tags: [存储, leveldb]
 ---
 

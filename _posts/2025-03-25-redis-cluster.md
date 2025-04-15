@@ -1,7 +1,7 @@
 ---
 title: Redis学习实践（三） -- 主从复制和集群
 description: Redis支持的关键特性和机制：主从复制 和 集群。
-categories: Redis
+categories: [存储和数据库, Redis]
 tags: [Redis, 存储]
 ---
 

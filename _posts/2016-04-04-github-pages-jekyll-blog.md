@@ -1,6 +1,6 @@
 ---
 title: GitHub Pages及jekyll搭建博客
-categories: 工具
+categories: [工具和命令, Blog]
 tags: jekyll
 ---
 

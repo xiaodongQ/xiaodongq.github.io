@@ -1,6 +1,6 @@
 ---
 title: sar和pidstat使用
-categories: Linux
+categories: [工具和命令, Linux]
 tags: [sar, pidstat]
 ---
 

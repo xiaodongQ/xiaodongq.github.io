@@ -1,6 +1,6 @@
 ---
 title: Rust学习实践（二） -- Demo项目：文件搜索工具
-categories: Rust
+categories: [编程语言, Rust]
 tags: Rust
 ---
 
