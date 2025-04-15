@@ -22,14 +22,17 @@ pin: true
 
 详情见：[TCP发送接收过程（一） -- Wireshark跟踪TCP流统计图](https://xiaodongq.github.io/2024/06/30/tcp-wireshark-tcp-graphs/)
 
-![TCP流图形tcptrace](/images/2024-07-01-wireshark-tcptrace.png){: .w-50 .left}
+![TCP流图形tcptrace](/images/2024-07-01-wireshark-tcptrace.png)
 
-几个示意图：
+示意图：
 
-![tcp RTT图形](/images/2024-07-02-tcp-graph-rtt.png){: .w-50 .left}
-![tcp throughput图](/images/2024-07-02-tcp-graph-throughput.png){: .w-50 .right}
-![tcptrace图](/images/2024-07-02-tcp-graph-tcptrace.png){: .w-50 .left}
-![窗口规模变化图](/images/2024-07-02-tcp-graph-wnd-scaling.png){: .w-50 .right}
+![tcp RTT图形](/images/2024-07-02-tcp-graph-rtt.png)
+
+![tcp throughput图](/images/2024-07-02-tcp-graph-throughput.png)
+
+![tcptrace图](/images/2024-07-02-tcp-graph-tcptrace.png)
+
+![窗口规模变化图](/images/2024-07-02-tcp-graph-wnd-scaling.png)
 
 ### 1.3. 新增实用列（Apply as Column）
 
