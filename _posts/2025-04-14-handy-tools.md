@@ -2,7 +2,7 @@
 title: 工具集索引
 description: 统一记录工具和小技巧，便于随时查找和使用
 categories: 工具
-tags: [工具]
+tags: [工具, Wireshark, eBPF, bcc, ss, TCP]
 pin: true
 ---
 
@@ -77,17 +77,39 @@ pin: true
 
 使用实验可参考：[CPU及内存调度（三） -- 内存问题定位工具和实验](https://xiaodongq.github.io/2025/04/02/memory-profiling-tools)
 
-## 4. bcc tools
+## 4. eBPF：bcc tools、bpftrace
 
-[eBPF学习实践系列（二） -- bcc tools网络工具集](https://xiaodongq.github.io/2024/06/10/bcc-tools-network/)
+### 4.1. Linux内核版本对BPF的支持情况
 
-![bcc tools 2019](/images/bcc-tools-2019.png)  
+![linux_kernel_event_bpf](/images/linux_kernel_event_bpf.png)  
 
-### 4.1. 60s系列BPF版本
+[eBPF学习实践系列（一） -- 初识eBPF](https://xiaodongq.github.io/2024/06/06/ebpf_learn/)
+
+### 4.2. bcc tools
+
+![bcc tools 2019](/images/bcc-tools-2019.png) 
+
+下面几篇博客做了一些介绍：
+
+* [eBPF学习实践系列（一） -- 初识eBPF](https://xiaodongq.github.io/2024/06/06/ebpf_learn/)
+* 网络相关：[eBPF学习实践系列（二） -- bcc tools网络工具集](https://xiaodongq.github.io/2024/06/10/bcc-tools-network/)
+* 内存相关：[CPU及内存调度（三） -- 内存问题定位工具和实验](https://xiaodongq.github.io/2025/04/02/memory-profiling-tools/#6-bcc-tools%E5%B7%A5%E5%85%B7)
+
+自行编译了bcc libbpf版本，工具归档在：[tools](https://github.com/xiaodongQ/prog-playground/tree/main/tools)
+
+### 4.3. bpftrace
+
+bpftrace提供的追踪类型：
+
+![bpftrace提供的追踪类型](/images/bpftrace_probes_2018.png)
+
+介绍和工具使用，可见：[eBPF学习实践系列（六） -- bpftrace学习和使用](https://xiaodongq.github.io/2024/06/28/ebpf-bpftrace-learn/)
+
+### 4.4. 60s系列BPF版本
 
 ![bcc tools 60s](/images/ebpf_60s-bcctools2017.png)
 
-### 4.2. 60s系列Linux命令版本
+### 4.5. 60s系列Linux命令版本
 
 ```
 uptime
@@ -102,13 +124,59 @@ sar -n TCP,ETCP 1
 top
 ```
 
-## 5. bpftrace
+## 5. perf-tools（ftrace和perf写的工具集）
 
-bpftrace提供的追踪类型：
+![perf-tools工具集](/images/perf-tools_2016.png)
 
-![bpftrace提供的追踪类型](/images/bpftrace_probes_2018.png)
+介绍可见：[eBPF学习实践系列（一） -- 初识eBPF](https://xiaodongq.github.io/2024/06/06/ebpf_learn/)。
 
-[eBPF学习实践系列（六） -- bpftrace学习和使用](https://xiaodongq.github.io/2024/06/28/ebpf-bpftrace-learn/)
+### 5.1. perf使用示例
 
+perf的使用，可以见Brendan Gregg大佬的网站：[perf Examples](https://www.brendangregg.com/perf.html)
 
+### 5.2. funcgraph实践使用
 
+追踪调用栈经验：结合`bpftrace`和`funcgraph`跟踪前后调用栈。
+
+可见：
+
+* [Linux存储IO栈梳理（二） -- Linux内核存储栈流程和接口：追踪工具说明](https://xiaodongq.github.io/2024/08/13/linux-kernel-fs/#42-%E8%BF%BD%E8%B8%AA%E5%B7%A5%E5%85%B7%E8%AF%B4%E6%98%8E)
+* [Linux存储IO栈梳理（三） -- eBPF和ftrace跟踪IO写流程](https://xiaodongq.github.io/2024/08/15/linux-write-io-stack/)
+
+## 6. 源码阅读分析：calltree.pl 和 cpptree.pl
+
+有点像用户态的bpftrace+funcgraph，可以通过mode：0还是1控制查看的调用栈方向。
+
+示例：  
+![redis-replicaof-call-tree](/images/2025-03-30-redis-replicaof.png)
+
+* 作者对工具的介绍：[C++阅码神器cpptree.pl和calltree.pl的使用](https://zhuanlan.zhihu.com/p/339910341)
+* 自己的归档，里面也写了用法：[cpp-calltree](https://github.com/xiaodongQ/prog-playground/tree/main/tools/cpp-calltree)
+
+里面有使用到：
+
+* 查看调用栈：[Redis学习实践（三） -- 主从复制和集群](https://xiaodongq.github.io/2025/03/25/redis-cluster/#23-%E4%B8%BB%E5%BA%93%E5%BA%94%E7%AD%94%E5%A4%84%E7%90%86)
+* 查看代码规模：[CPU及内存调度（四） -- ptmalloc、tcmalloc、jemalloc、mimalloc内存分配器（上）](https://xiaodongq.github.io/2025/04/04/memory-allocator/#32-dlmalloc%E8%AF%B4%E6%98%8E)
+
+## 7. 命令和小技巧
+
+### 7.1. ss 查看TCP信息、过滤端口
+
+几个选项：
+
+* `-o`：显示keepalive定时器
+* `-i`：显示TCP信息详情，选项、拥塞算法、拥塞窗口、各类超时时间等
+* `state xxx`：过滤TCP状态
+* `dst :8008` 过滤目的端口（src则过滤源端口）
+* 要过滤ip则要通过grep/awk匹配，ss里不支持选项过滤ip
+
+```sh
+# ss -o -i state established dst :8008  (-o显示keepalive定时器；-i展示tcp信息；state xxx不要放后面去了)
+# 过滤目的端口8008的established连接
+[root@localhost qxd]# ss -o -intp dst :8008|grep -v TIME-WAIT
+State Recv-Q Send-Q         Local Address:Port            Peer Address:Port Process
+ESTAB 0      0      [::ffff:192.168.1.62]:45038 [::ffff:192.168.1.220]:8008 users:(("java",pid=7870,fd=274))
+         ts sack cubic wscale:7,7 rto:201 rtt:0.958/0.075 ato:40 mss:1448 pmtu:1500 rcvmss:536 advmss:1448 cwnd:185 ssthresh:132 bytes_sent:71412318 bytes_retrans:73848 bytes_acked:71338471 bytes_received:14550 segs_out:49431 segs_in:5428 data_segs_out:49428 data_segs_in:66 send 2236993737bps lastsnd:9 lastrcv:4 lastack:9 pacing_rate 2683692144bps delivery_rate 2122156352bps delivered:49429 busy:311ms retrans:0/51 dsack_dups:51 reordering:300 reord_seen:156 rcv_space:14480 rcv_ssthresh:64088 minrtt:0.047                                     
+ESTAB 0      266148 [::ffff:192.168.1.62]:59606 [::ffff:10.12.152.253]:8008 users:(("java",pid=7870,fd=254)) timer:(on,004ms,0)
+         ts sack cubic wscale:7,7 rto:201 rtt:0.889/0.061 ato:40 mss:1448 pmtu:1500 rcvmss:536 advmss:1448 cwnd:291 ssthresh:217 bytes_sent:201549420 bytes_retrans:503904 bytes_acked:200779369 bytes_received:40824 segs_out:139531 segs_in:36139 data_segs_out:139525 data_segs_in:185 send 3791838020bps lastrcv:3 pacing_rate 4547647888bps delivery_rate 3241453728bps delivered:139299 busy:964ms unacked:184 retrans:0/348 dsack_dups:305 reordering:300 reord_seen:13051 rcv_space:14480 rcv_ssthresh:64088 minrtt:0.044   
+```
