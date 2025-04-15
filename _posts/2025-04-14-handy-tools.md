@@ -127,6 +127,20 @@ sar -n TCP,ETCP 1
 top
 ```
 
+### 4.6. 查看eBPF自身的资源消耗
+
+发现一个有意思的工具：[bpftop](https://github.com/Netflix/bpftop)，可以查看eBPF自身的消耗，还能够在时间序列图中显示统计数据。
+
+工具由Netflix的工程师Jose Fernandez开源，基于Rust开发。作者对工具的介绍：[Announcing bpftop: Streamlining eBPF performance optimization](https://netflixtechblog.com/announcing-bpftop-streamlining-ebpf-performance-optimization-6a727c1ae2e5)
+
+**使用方式**：项目地址中有已经打包好的release二进制文件，下载即可使用，**依赖glibc版本 >= GLIBC_2.29**。
+
+直接执行，会展示当前生效的监测点；可选择某个监测点后回车，会用图表形式显示eBPF程序在该样本周期内的平均执行时间、每秒事件数和估算的CPU利用率。
+
+![bpftop区间统计](/images/2025-04-15-bpftop.png)
+
+也可参考：[eBPF实战教程七 -- 性能监控工具—bpftop](https://www.modb.pro/db/1846730191072227328)
+
 ## 5. perf-tools（ftrace和perf写的工具集）
 
 ![perf-tools工具集](/images/perf-tools_2016.png)
@@ -165,6 +179,9 @@ perf的使用，可以见Brendan Gregg大佬的网站：[perf Examples](https://
 
 ### 7.1. ss 查看TCP信息、过滤端口
 
+> 注意：需要依赖tcp_diag模块，缺少该模块会退化成netstat方式读取/proc文件。ldmod没有则可`modprobe tcp_diag`加载。
+{: .prompt-warning }
+
 几个选项：
 
 * `-o`：显示keepalive定时器
@@ -183,3 +200,19 @@ ESTAB 0      0      [::ffff:192.168.1.62]:45038 [::ffff:192.168.1.220]:8008 user
 ESTAB 0      266148 [::ffff:192.168.1.62]:59606 [::ffff:10.12.152.253]:8008 users:(("java",pid=7870,fd=254)) timer:(on,004ms,0)
          ts sack cubic wscale:7,7 rto:201 rtt:0.889/0.061 ato:40 mss:1448 pmtu:1500 rcvmss:536 advmss:1448 cwnd:291 ssthresh:217 bytes_sent:201549420 bytes_retrans:503904 bytes_acked:200779369 bytes_received:40824 segs_out:139531 segs_in:36139 data_segs_out:139525 data_segs_in:185 send 3791838020bps lastrcv:3 pacing_rate 4547647888bps delivery_rate 3241453728bps delivered:139299 busy:964ms unacked:184 retrans:0/348 dsack_dups:305 reordering:300 reord_seen:13051 rcv_space:14480 rcv_ssthresh:64088 minrtt:0.044   
 ```
+
+## 8. 扩展工具
+
+### 8.1. gdb工具：pwndbg
+
+梳理内存分配器时了解到的工具，试了下功能，效果很好。除了覆盖原有的gdb命令，还会显示对应的汇编，配色效果很炫，后续若学习汇编可以用起来。
+
+`pwndbg（/paʊnˈdiˌbʌɡ/）`是一款基于 GDB 的 Python 调试工具，专为二进制漏洞利用和分析而设计，在 CTF（Capture The Flag）竞赛、漏洞研究以及二进制安全领域应用广泛。
+
+项目仓库：[pwndbg](https://github.com/pwndbg/pwndbg)
+
+**使用方式**：下载项目中打包好的release文件即可使用，如：`pwndbg_2025.02.19_x86_64-portable.tar.xz`。
+
+和gdb一样使用，展示的信息很丰富，还有一些特定功能命令，比如`arena`查看堆区结构。各个部分可以和tmux配置结合，在不同的窗口展示。
+
+![pwndbg-case](/images/2025-04-15-pwndbg-case.png)
