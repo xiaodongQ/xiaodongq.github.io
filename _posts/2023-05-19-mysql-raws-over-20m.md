@@ -1,6 +1,6 @@
 ---
 title: MySQL单表超过2000万后会怎么样
-categories: 案例实验
+categories: [存储和数据库, MySQL]
 tags: MySQL
 ---
 

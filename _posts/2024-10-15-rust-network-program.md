@@ -1,6 +1,6 @@
 ---
 title: Rust学习实践（七） -- Rust网络编程和Demo
-categories: Rust
+categories: [编程语言, Rust]
 tags: Rust
 ---
 

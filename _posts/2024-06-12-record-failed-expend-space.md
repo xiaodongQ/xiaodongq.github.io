@@ -1,6 +1,6 @@
 ---
 title: 记一次失败的/boot分区扩容
-categories: Linux
+categories: [工具和命令, Linux]
 tags: Linux
 ---
 

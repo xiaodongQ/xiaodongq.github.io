@@ -1,6 +1,6 @@
 ---
 title: leveldb学习笔记（二） -- 读写操作流程
-categories: 存储
+categories: [存储和数据库, leveldb]
 tags: [存储, leveldb]
 ---
 

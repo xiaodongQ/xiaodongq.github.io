@@ -1,7 +1,7 @@
 ---
 title: AI Agent学习实践笔记
 description: HuggingFace AI Agents Course学习笔记（AI智能体）
-categories: 大模型
+categories: [AI, 大模型]
 tags: [大模型, AI]
 ---
 

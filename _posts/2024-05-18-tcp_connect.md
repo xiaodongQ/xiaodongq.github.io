@@ -1,6 +1,6 @@
 ---
 title: TCP半连接全连接（一） -- 全连接队列相关过程
-categories: 网络
+categories: [网络, TCP]
 tags: 网络
 ---
 

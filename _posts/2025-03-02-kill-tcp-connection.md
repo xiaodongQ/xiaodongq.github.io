@@ -1,7 +1,7 @@
 ---
 title: 如何关闭一个TCP连接？
 description: 介绍如何利用`tcpkill`和`hping3`关闭一个TCP连接，以及基本原理。
-categories: 网络
+categories: [网络, TCP]
 tags: [网络, tcpkill, hping3]
 ---
 

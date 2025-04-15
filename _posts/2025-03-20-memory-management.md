@@ -1,7 +1,7 @@
 ---
 title: CPU及内存调度（二） -- Linux内存管理
 description: 梳理Linux内存管理及相关的进程、线程创建。
-categories: CPU及内存调度
+categories: [CPU及内存调度]
 tags: 内存
 ---
 

@@ -1,6 +1,6 @@
 ---
 title: Vim编码识别及转换
-categories: Linux
+categories: [工具和命令, Linux]
 tags: Vim
 ---
 

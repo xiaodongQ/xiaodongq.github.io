@@ -114,7 +114,7 @@ static constexpr SizeClassInfo List[] = {
 
 TCMalloc管理的`堆内存（heap）`被划分成编译期确定大小的`page`页，一连串连续的`page`页由`span`对象表示。
 
-注意这里的`page`和内核`TLB`中的`page`不是一回事，TCMalloc的page大小（`page size`）目前有4KiB, 8KiB, 32KiB, 和 256KiB。
+注意这里的`page`和内核`TLB`中的`page`不是一回事，TCMalloc的page大小（`page size`）目前有4KiB, 8KiB, 32KiB 和 256KiB。
 
 `pagemap`用来查找`object`属于哪个`span`。TCMalloc使用一个2层或者3层的 **`radix树（radix tree）`** 来映射`span`中所有的内存位置，radix是一种紧凑型的前缀树（`Compact Prefix Tree`）。
 
@@ -139,7 +139,7 @@ TCMalloc中有2种后端：
 
 ### 2.4. 提供的API说明
 
-TCMalloc实现了 C 和 C++ 的动态内存操作API，支持C11, C++11, C++14, 和 C++17。
+TCMalloc实现了 C 和 C++ 的动态内存操作API，支持C11, C++11, C++14 和 C++17。
 
 1、C++接口
 
@@ -159,6 +159,7 @@ TODO
 
 ## 3. jemalloc
 
+TODO
 
 ## 4. mimalloc
 

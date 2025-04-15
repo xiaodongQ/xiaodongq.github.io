@@ -1,6 +1,6 @@
 ---
 title: MySQL学习实践（三） -- MySQL索引
-categories: MySQL
+categories: [存储和数据库, MySQL]
 tags: [存储, MySQL]
 ---
 

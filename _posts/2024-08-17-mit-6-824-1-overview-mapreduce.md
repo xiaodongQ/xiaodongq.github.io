@@ -1,6 +1,6 @@
 ---
 title: MIT6.824学习笔记（一） -- 课程介绍 及 MapReduce
-categories: MIT6.824
+categories: [公开课, MIT6.824]
 tags: [分布式, MapReduce]
 ---
 

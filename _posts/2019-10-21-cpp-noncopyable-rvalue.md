@@ -1,6 +1,6 @@
 ---
 title: C++不可拷贝类和右值引用
-categories: C/C++
+categories: [编程语言, C/C++]
 tags: 右值引用
 ---
 

@@ -1,6 +1,6 @@
 ---
 title: Rust学习实践（八） -- Demo项目：实现简易Redis
-categories: Rust
+categories: [编程语言, Rust]
 tags: Rust
 ---
 

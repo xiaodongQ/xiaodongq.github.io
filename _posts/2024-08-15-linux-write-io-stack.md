@@ -1,6 +1,6 @@
 ---
 title: Linux存储IO栈梳理（三） -- eBPF和ftrace跟踪IO写流程
-categories: 存储
+categories: [存储和数据库, IO栈]
 tags: [存储, IO]
 ---
 

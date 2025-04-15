@@ -1,6 +1,6 @@
 ---
 title: Rust学习实践（四） -- Rust特性：智能指针
-categories: Rust
+categories: [编程语言, Rust]
 tags: Rust
 ---
 

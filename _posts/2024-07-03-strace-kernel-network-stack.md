@@ -1,6 +1,6 @@
 ---
 title: 追踪内核网络堆栈的几种方式
-categories: 网络
+categories: [网络, TCP]
 tags: [TCP, 内核]
 ---
 

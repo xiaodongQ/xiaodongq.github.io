@@ -1,6 +1,6 @@
 ---
 title: C++构造函数的隐式转换和转换函数
-categories: C/C++
+categories: [编程语言, C/C++]
 tags: [类型转换, 智能指针]
 ---
 

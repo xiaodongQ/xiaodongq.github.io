@@ -1,6 +1,6 @@
 ---
 title: LeetCode刷题学习（五） -- 字符串
-categories: LeetCode
+categories: [数据结构与算法, LeetCode]
 tags: [LeetCode, 数据结构与算法]
 ---
 

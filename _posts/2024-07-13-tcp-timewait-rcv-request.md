@@ -1,6 +1,6 @@
 ---
 title: 网络实验 -- TIME_WAIT状态的连接收到SYN是什么表现
-categories: 网络
+categories: [网络, TCP]
 tags: [TCP, 网络]
 ---
 

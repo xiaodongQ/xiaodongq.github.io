@@ -1,6 +1,6 @@
 ---
 title: 区块链学习笔记
-categories: 其他
+categories: [区块链, 技术原理]
 tags: 区块链
 ---
 

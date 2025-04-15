@@ -1,6 +1,6 @@
 ---
 title: 实用工具集合之tmux
-categories: 工具
+categories: [工具和命令, HandyTools]
 tags: tmux
 ---
 

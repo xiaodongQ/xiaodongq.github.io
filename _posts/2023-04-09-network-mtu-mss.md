@@ -1,6 +1,6 @@
 ---
 title: 网络实验-设置机器的MTU和MSS
-categories: 案例实验
+categories: [网络, TCP]
 tags: 网络
 ---
 

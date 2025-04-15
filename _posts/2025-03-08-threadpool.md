@@ -1,7 +1,7 @@
 ---
 title: 并发与异步编程（一） -- 实现一个简单线程池
 description: 实现一个线程池。
-categories: 并发与异步编程
+categories: [并发与异步编程]
 tags: [CPU, 线程池, C++]
 ---
 

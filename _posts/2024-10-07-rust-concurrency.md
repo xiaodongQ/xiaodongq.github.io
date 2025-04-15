@@ -1,6 +1,6 @@
 ---
 title: Rust学习实践（五） -- Rust特性：并发编程
-categories: Rust
+categories: [编程语言, Rust]
 tags: Rust
 ---
 

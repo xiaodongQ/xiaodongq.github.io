@@ -1,7 +1,7 @@
 ---
 title: Solana开发学习（一） -- 总体说明
-categories: Solana
-tags: Solana
+categories: [区块链, Solana]
+tags: [Solana, Rust]
 ---
 
 Rust项目学习：Solana。

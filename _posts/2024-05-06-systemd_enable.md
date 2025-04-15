@@ -1,6 +1,6 @@
 ---
 title: 记一个systemd设置自启动问题
-categories: Linux
+categories: [Troubleshooting]
 tags: systemd
 ---
 

@@ -1,7 +1,7 @@
 ---
 title: 并发与异步编程（三） -- 性能分析工具：gperftools和火焰图
 description: 异步编程实验，使用 gperftools 和 火焰图 进行性能分析。本篇先介绍工具。
-categories: 并发与异步编程
+categories: [并发与异步编程]
 tags: [CPU, 存储, 异步编程]
 ---
 

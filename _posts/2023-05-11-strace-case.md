@@ -1,6 +1,6 @@
 ---
 title: strace工具案例
-categories: Linux
+categories: [Troubleshooting]
 tags: strace
 ---
 

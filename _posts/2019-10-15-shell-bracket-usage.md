@@ -1,6 +1,6 @@
 ---
 title: Shell中各种括号的作用和区别
-categories: Shell
+categories: [工具和命令, Linux]
 tags: Shell
 ---
 

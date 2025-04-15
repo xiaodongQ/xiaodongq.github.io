@@ -1,7 +1,7 @@
 ---
 title: 梳理Redis中的epoll机制
 description: 梳理 Redis 中的epoll机制。
-categories: 网络
+categories: [存储和数据库, Redis]
 tags: [网络, epoll, Redis]
 ---
 

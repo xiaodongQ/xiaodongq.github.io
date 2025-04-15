@@ -1,6 +1,6 @@
 ---
 title: Rust学习实践（一） -- 总体说明和Rust基础
-categories: Rust
+categories: [编程语言, Rust]
 tags: Rust
 ---
 

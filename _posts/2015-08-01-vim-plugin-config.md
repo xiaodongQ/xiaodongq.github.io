@@ -1,6 +1,6 @@
 ---
 title: Vim插件配置
-categories: Linux
+categories: [工具和命令, Linux]
 tags: Vim
 ---
 

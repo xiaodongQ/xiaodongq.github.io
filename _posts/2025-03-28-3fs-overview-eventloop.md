@@ -1,7 +1,7 @@
 ---
 title: DeepSeek 3FS学习实践（一） -- 事件循环
 description: 3FS中的事件循环实现流程。
-categories: 存储
+categories: [存储和数据库, 3FS]
 tags: [3FS, 存储]
 ---
 
