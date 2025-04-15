@@ -108,6 +108,8 @@ bpftrace提供的追踪类型：
 
 介绍和工具使用，可见：[eBPF学习实践系列（六） -- bpftrace学习和使用](https://xiaodongq.github.io/2024/06/28/ebpf-bpftrace-learn/)
 
+bpftrace-tools 自己也归档了一份便于统一使用：[tools](https://github.com/xiaodongQ/prog-playground/tree/main/tools)
+
 ### 4.4. 60s系列BPF版本
 
 ![bcc tools 60s](/images/ebpf_60s-bcctools2017.png)
@@ -170,7 +172,7 @@ perf的使用，可以见Brendan Gregg大佬的网站：[perf Examples](https://
 * 作者对工具的介绍：[C++阅码神器cpptree.pl和calltree.pl的使用](https://zhuanlan.zhihu.com/p/339910341)
 * 自己的归档，里面也写了用法：[cpp-calltree](https://github.com/xiaodongQ/prog-playground/tree/main/tools/cpp-calltree)
 
-里面有使用到：
+使用到该工具：
 
 * 查看调用栈：[Redis学习实践（三） -- 主从复制和集群](https://xiaodongq.github.io/2025/03/25/redis-cluster/#23-%E4%B8%BB%E5%BA%93%E5%BA%94%E7%AD%94%E5%A4%84%E7%90%86)
 * 查看代码规模：[CPU及内存调度（四） -- ptmalloc、tcmalloc、jemalloc、mimalloc内存分配器（上）](https://xiaodongq.github.io/2025/04/04/memory-allocator/#32-dlmalloc%E8%AF%B4%E6%98%8E)
@@ -179,10 +181,10 @@ perf的使用，可以见Brendan Gregg大佬的网站：[perf Examples](https://
 
 ### 7.1. ss 查看TCP信息、过滤端口
 
-> 注意：需要依赖tcp_diag模块，缺少该模块会退化成netstat方式读取/proc文件。ldmod没有则可`modprobe tcp_diag`加载。
+> 注意：需要依赖tcp_diag模块，缺少该模块会退化成netstat一样的方式读取/proc文件。lsmod没有则可`modprobe tcp_diag`加载。
 {: .prompt-warning }
 
-几个选项：
+实用选项：
 
 * `-o`：显示keepalive定时器
 * `-i`：显示TCP信息详情，选项、拥塞算法、拥塞窗口、各类超时时间等
