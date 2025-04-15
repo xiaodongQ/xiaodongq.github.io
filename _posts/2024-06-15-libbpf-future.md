@@ -1,6 +1,6 @@
 ---
 title: eBPF学习实践系列（三） -- 基于libbpf开发实践
-categories: eBPF
+categories: [eBPF]
 tags: [eBPF, libbpf, CO-RE]
 ---
 
@@ -288,16 +288,16 @@ git clone https://github.com/alibaba/sreworks-ext.git
 
 目录说明：
 
-| 目录/文件 | 说明 |
-| :--: | :--: |
-| `./` | 项目用户态代码和主Makefile |
-| `./progs` | 项目内核态bpf程序代码 |
-| `./include` | 项目的业务代码相关的头文件 |
-| `./helpers` | 非来自于libbpf库的一些helper文件 |
+|     目录/文件      |                 说明                  |
+| :----------------: | :-----------------------------------: |
+|        `./`        |      项目用户态代码和主Makefile       |
+|     `./progs`      |         项目内核态bpf程序代码         |
+|    `./include`     |      项目的业务代码相关的头文件       |
+|    `./helpers`     |   非来自于libbpf库的一些helper文件    |
 | `./tools/lib/bpf/` | 来自于libbpf-1.3.0/src/的库文件或代码 |
-| `./tools/include/` | 来自于libbpf-1.3.0/include/的头文件 |
-| `./tools/build/` | 项目构建时一些feature探测代码 |
-| `./tools/scripts/` | 项目Makefile所依赖的一些功能函数 |
+| `./tools/include/` |  来自于libbpf-1.3.0/include/的头文件  |
+|  `./tools/build/`  |     项目构建时一些feature探测代码     |
+| `./tools/scripts/` |   项目Makefile所依赖的一些功能函数    |
 
 #### 3.1.1. 如何查看libbpf版本
 
