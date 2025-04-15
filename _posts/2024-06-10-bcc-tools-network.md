@@ -1,6 +1,6 @@
 ---
 title: eBPF学习实践系列（二） -- bcc tools网络工具集
-categories: eBPF
+categories: [eBPF]
 tags: [Linux, eBPF]
 ---
 
