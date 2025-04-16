@@ -291,14 +291,13 @@ jsDeliver （感觉更新博客后很久看不到效果，cdn缓存体验了下�
 
 参考：[6. 增加站点统计](https://huanyushi.github.io/posts/chirpy-blog-customization/#6-%E5%A2%9E%E5%8A%A0%E7%AB%99%E7%82%B9%E7%BB%9F%E8%AE%A1)
 
-### 5.4. markdown解析器：kramdown
+### 5.4. markdown解析器说明：kramdown
 
 kramdown 是一个用 Ruby 实现的 Markdown 的解析器，Jekyll默认就是使用kramdown。
 
 介绍：[kramdown Documentation](https://kramdown.gettalong.org/documentation.html)
 
 支持的语法：[kramdown Syntax](https://kramdown.gettalong.org/syntax.html)，支持内容比较丰富，比如数学公式、脚注（`footnote[^footnote]`，`[^footnote]: xxx`）。
-
 
 ### 5.5. 目录不折叠
 
@@ -312,6 +311,22 @@ kramdown 是一个用 Ruby 实现的 Markdown 的解析器，Jekyll默认就是�
   max-height: none !important;
 }
 ```
+
+### 优化文本搜索
+
+当前搜索结果比较模糊，效果不大好。调整为支持精准搜索和搜索结果匹配展示。从参考文章的博客拷贝使用，由于lib是个子模块，新增一个assets/lib2。
+
+相关文件从默认主题复制新增后，对比参考链接修改：
+
+```sh
+	new file:   _data/origin/cors.yml
+	new file:   _includes/search-loader.html
+	new file:   assets/js/data/search.json
+	new file:   assets/lib2/simple-jekyll-search/simple-jekyll-search.js
+	new file:   assets/lib2/simple-jekyll-search/simple-jekyll-search.min.js
+```
+
+参考：[优化文本搜索](https://ittousei.github.io/posts/customize-my-blog/#%E4%BC%98%E5%8C%96%E6%96%87%E6%9C%AC%E6%90%9C%E7%B4%A2)
 
 ### 5.6. 增加4个新的prompt
 
@@ -372,3 +387,4 @@ To be or not to be. That is a question.
 * [chirpy博客改造指北（个人向）](https://makicelse.github.io/posts/%E7%BD%91%E7%AB%99%E6%94%B9%E9%80%A0/)
 * [Chirpy Blog Customization](https://huanyushi.github.io/posts/chirpy-blog-customization)
 * [Hugo 博客引入 Giscus 评论系统](https://www.lixueduan.com/posts/blog/02-add-giscus-comment/)
+* [优化文本搜索](https://ittousei.github.io/posts/customize-my-blog/#%E4%BC%98%E5%8C%96%E6%96%87%E6%9C%AC%E6%90%9C%E7%B4%A2)

@@ -1,0 +1,80 @@
+<!--
+  Jekyll Simple Search loader
+  See: <https://github.com/christian-fei/Simple-Jekyll-Search>
+-->
+
+{% capture result_elem %}
+  <article class="px-1 px-sm-2 px-lg-4 px-xl-0">
+    <header>
+      <h2><a href="{url}">{title}</a></h2>
+      <div class="post-meta d-flex flex-column flex-sm-row text-muted mt-1 mb-1">
+        {date}
+        {categories}
+      </div>
+    </header>
+    <p>
+      {content}
+    </p>
+  </article>
+{% endcapture %}
+
+{% capture not_found %}<p class="mt-5">{{ site.data.locales[include.lang].search.no_results }}</p>{% endcapture %}
+
+<script>
+  /* Note: dependent library will be loaded in `js-selector.html` */
+  SimpleJekyllSearch({
+    searchInput: document.getElementById('search-input'),
+    resultsContainer: document.getElementById('search-results'),
+    json: '{{ '/assets/js/data/search.json' | relative_url }}',
+    searchResultTemplate: '{{ result_elem | strip_newlines }}',
+    noResultsText: '{{ not_found }}',
+    templateMiddleware: function(prop, value, template) {
+      if (prop === 'date') {
+        const date = new Date(value);
+        const options = { year: 'numeric', month: 'short', day: 'numeric' };
+        const formattedDate = date.toLocaleDateString('en-US', options);
+        if (value === '') {
+          return `${value}`;
+        } else {
+          return `<div class="me-sm-4"><i class="far fa-calendar fa-fw"></i>${formattedDate}</div>`;
+        }
+      }
+
+      if (prop === 'categories') {
+        if (value === '') {
+          return `${value}`;
+        } else {
+          return `<div class="me-sm-4"><i class="far fa-folder fa-fw"></i>${value}</div>`;
+        }
+      }
+
+      if (prop === 'title') {
+        var input = document.getElementById("search-input").value.toLowerCase();
+        let titleOccurrence = value.toLowerCase().indexOf(input);
+        if (titleOccurrence != -1) {
+          return `${value.substring(0, titleOccurrence)}<mark style="background-color: rgba(255, 255, 153, 0.5);">${value.substring(titleOccurrence, titleOccurrence+input.length)}</mark>${value.substring(titleOccurrence+input.length, value.length)}`;
+        } else {
+          return `${value}`;
+        }
+      }
+
+      if (prop === 'content') {
+        var input = document.getElementById("search-input").value.toLowerCase();
+        let firstOccurrence = value.toLowerCase().indexOf(input);
+        if (firstOccurrence != -1) {
+          let start = firstOccurrence - 50;
+          if (start < 0) {
+            start = 0;
+          }
+          while (start > 0 && value[start-1] != " " && value[start-1] != "，" && value[start-1] != "。") {
+            start--;
+          }
+          return `${value.substring(start, firstOccurrence)}<mark style="background-color: rgba(255, 255, 153, 0.5);">${value.substring(firstOccurrence, firstOccurrence+input.length)}</mark>${value.substring(firstOccurrence+input.length, start+250)}`;
+        } else {
+          return `${value}`;
+        }
+      }
+
+    }
+  });
+</script>
