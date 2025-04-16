@@ -56,6 +56,9 @@ TODO List里面，收藏待看的文章已经不少了，有一类是觉得比�
     * 初步分析：对于48GB的page cache，**100GB的文件会破坏page cache，而 40GB 文件则适合**
 * 缓存命中情况确认：`cachestat`（bcc和perf-tools里都有该工具）
     * 确实缓存命中率有很多比较低，造成了对硬盘io，延迟会比较大
+* **解决方式**
+    * 定位到问题原因就好解决了。1）最简单的是服务迁移到更大内存的示例上，满足100GB文件的缓存要求 2）重构代码以约束内存使用：分别处理文件各部分，而不是多次传输文件后一次性处理
+    * 本案例问题的杀手锏是 `cachestat`
 
 最终发现是大文件对应的page页缓存命中率很低：
 
@@ -77,14 +80,70 @@ Counting cache functions... Output every 1 seconds.
 
 [Redis 延迟毛刺问题定位-软中断篇](https://www.cyningsun.com/09-17-2024/redis-latency-irqoff.html)
 
-问题：redis有毛刺
+问题：通过`业务监控系统`，发现线上Redis集群有延迟毛刺，出现的时间点不定，但大概每小时会有1次，每次持续大概10分钟
 
-* 发现 rx missed_errors 高，
-* ethtool -G 修改网卡ring buffer
-* 软中断线程收包阻塞，rx drop 是因为软中断线程收包慢导致的
-    * 使用字节跳动团队的 [trace-irqoff](https://github.com/bytedance/trace-irqoff)
-* 可perf record -e skb:kfree_skb检查丢包
+* **整个链路**是 Redis SDK -> Redis Proxy -> 各个Redis
+    * 性能之巅中的建议：**性能分析时先画出架构链路图**
+* 通过监控面板，查看 Redis Proxy 调 Redis 的链路，有毛刺
+* eBPF 抓取 Redis 执行耗时并未发现慢速命令，说明并非是业务使用命令导致的。
+    * **TODO：** eBPF检查应用程序的关键函数（uprobe？还可以offcputime检查fork、io等操作）
+* 缩短问题链路：通过上2步，**问题范围缩小**到 Redis Proxy 调用 Redis 的链路，先聚焦**网络层面**
+* 网络问题分析
+    * 出现毛刺的时间点，`mtr`检查丢包和延时，一切正常
+    * 检查问题集群的上层交换机，一切正常
+    * 检查到某个主机的监控，有延迟情况
+    * 发现该机器上 **rx 的`missed_errors`** 高
+        * 是 `ethtool -S eno2 |grep rx |grep error` 展示的指标
+    * 找一台机器调高 ring buffer 大小为 4096
+        * 调整buffer方式：`ethtool -G <nic> rx 4096`
+        * `ethtool -g eno2` 查看网卡队列长度
+    * 持续观察一天，问题不再复现
+* 网络团队判断是业务层有周期性阻塞性的任务，导致**软中断线程收包阻塞**，`rx drop`是因为软中断线程收包慢导致的。
+    * 使用字节跳动团队的 [trace-irqoff](https://github.com/bytedance/trace-irqoff) 监控中断延迟
+* 可`perf record -e skb:kfree_skb`检查丢包
     * 腾讯、字节等厂在此基础上进行了更加友好的封装：nettrace、netcap
+
+`ifconfig`、`ethtool -S`统计信息示例，关注发送和接收的计数统计（非案例中的采集）：
+
+```sh
+# ifconfig统计的网口接收、发送包信息
+[CentOS-root@xdlinux ➜ ~ ]$ ifconfig enp4s0
+enp4s0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 192.168.1.150  netmask 255.255.255.0  broadcast 192.168.1.255
+        ...
+        ether 1c:69:7a:f5:39:32  txqueuelen 1000  (Ethernet)
+        RX packets 3424820  bytes 3773136623 (3.5 GiB)
+        RX errors 0  dropped 300959  overruns 0  frame 0
+        TX packets 1365612  bytes 142186791 (135.5 MiB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+# ethtool -S 统计信息，和上面的RX、TX相关信息是对应的
+[CentOS-root@xdlinux ➜ ~ ]$ ethtool -S enp4s0
+NIC statistics:
+     tx_packets: 1365613
+     rx_packets: 3424821
+     tx_errors: 0
+     rx_errors: 0
+     rx_missed: 0
+     align_errors: 0
+     tx_single_collisions: 0
+     tx_multi_collisions: 0
+     unicast: 2691160
+     broadcast: 729420
+     multicast: 4241
+     tx_aborted: 0
+     tx_underrun: 0
+```
+
+另外发现博主的历史文章，也覆盖了之前看过的网络发送和接收文章翻译：
+
+* [译｜Monitoring and Tuning the Linux Networking Stack: Receiving Data](https://www.cyningsun.com/04-24-2023/monitoring-and-tuning-the-linux-networking-stack-recv-cn.html#Receive-Packet-Steering-RPS)
+* [译｜Monitoring and Tuning the Linux Networking Stack: Sending Data](https://www.cyningsun.com/04-25-2023/monitoring-and-tuning-the-linux-networking-stack-sent-cn.html)
+
+关注的ArthurChiao's Blog中也做了翻译，排版更好一点：
+
+* [[译] Linux 网络栈监控和调优：发送数据（2017）](https://arthurchiao.art/blog/tuning-stack-tx-zh/)
+* [[译] Linux 网络栈监控和调优：接收数据（2016）](https://arthurchiao.art/blog/tuning-stack-rx-zh/)
 
 ### 2.3. 进程调度
 
