@@ -314,17 +314,9 @@ kramdown 是一个用 Ruby 实现的 Markdown 的解析器，Jekyll默认就是�
 
 ### 优化文本搜索
 
-当前搜索结果比较模糊，效果不大好。调整为支持精准搜索和搜索结果匹配展示。从参考文章的博客拷贝使用，由于lib是个子模块，新增一个assets/lib2。
+当前搜索结果比较模糊，效果不大好。调整为支持精准搜索。从参考文章的博客拷贝使用，由于lib是个子模块，新增一个assets/lib2。
 
 相关文件从默认主题复制新增后，对比参考链接修改：
-
-```sh
-	new file:   _data/origin/cors.yml
-	new file:   _includes/search-loader.html
-	new file:   assets/js/data/search.json
-	new file:   assets/lib2/simple-jekyll-search/simple-jekyll-search.js
-	new file:   assets/lib2/simple-jekyll-search/simple-jekyll-search.min.js
-```
 
 参考：[优化文本搜索](https://ittousei.github.io/posts/customize-my-blog/#%E4%BC%98%E5%8C%96%E6%96%87%E6%9C%AC%E6%90%9C%E7%B4%A2)
 
