@@ -325,6 +325,76 @@ H/W path             Device        Class          Description
 /0/101/0/0.1.0       /dev/sda      disk           20TB xx20000xxxxxx-3K
 ```
 
+### 7.3. 网卡相关工具命令
+
+1、`ethtool -S`查看统计信息，快速查看是否有网络瓶颈：`ethtool -S eth1 | grep -E "discard|error|drop"`
+
+下面的网卡队列数和ring buffer数都会影响性能
+
+2、`ethtool -l eth1`查看网卡队列数（每个队列都是缓存和管理网络数据包的独立通道），`ethtool -L`设置
+
+多队列支持并发处理数据包，每个队列产生独立的中断（IRQ），可通过中断绑定（smp_affinity）分配到不同CPU核心。
+
+```sh
+[root@store test]# ethtool -l eth1
+Channel parameters for eth1:
+Pre-set maximums:
+RX:             n/a
+TX:             n/a
+Other:          1
+# 硬件支持的最大队列数（总队列数）（通常与CPU核心数相关）
+Combined:       63
+Current hardware settings:
+RX:             n/a
+TX:             n/a
+Other:          1
+# 当前启用的队列数
+# 最佳实践：队列数应与处理网络中断的CPU核心数一致（例如：8队列绑定8个CPU）
+Combined:       40
+```
+
+3、检查中断分配：`cat /proc/interrupts | grep eth1`，中断计数是否均衡在各个CPU上
+
+```sh
+# 设置网卡中断负载均衡。启用irqbalance服务 或者 手动绑定
+# 在高吞吐量网络环境中，irqbalance可能会频繁调整中断分配，导致额外的开销，反而影响性能（NUMA、虚拟化环境、低延迟场景建议手动）
+1. 遍历/sys/class/net/确定网卡
+2. /proc/interrupts里是每个CPU的中断情况，grep网卡查看该网卡对应的中断
+3. 从/proc/interrupts里过滤出该网卡对应的中断号列表
+（中断号, CPU核心中断计数, 中断控制器类型, 中断触发方式, 设备或中断源名称）（类型列举：timer-系统定时器、rtc0-实时时钟、eth0-网卡、nvme0q0-NVMe硬盘队列、ahci-SATA控制器）
+           CPU0       CPU1       CPU2       CPU3   ...   CPU14      CPU15
+   0:         64          0          0          0  ...       0          0   PCI-MSI 12582912-edge      eth0
+   8:          0          0          0          0  ...       0          0   PCI-MSI 12582913-edge      eth0-TxRx-0
+4. 将中断号均衡绑定CPU。可每个中断号依次绑定不同CPU（比如：echo 1、echo 2、echo 4、echo 8到该网卡中断号列表，以达到均衡）
+    将中断号为 100 的中断绑定到 CPU0 和 CPU1
+    支持中断号绑定多个CPU，示例：echo 3 > /proc/irq/100/smp_affinity  # 3 = 二进制 00000011（CPU0 和 CPU1）
+```
+
+5、`ethtool -g eth1` 查看网卡环形缓冲区(ring buffer)大小（条目数），`-G`设置
+
+```sh
+# 环缓冲区过小会导致在高流量下数据包被丢弃，因为网卡来不及处理。
+# 开销：每个缓冲区条目占用约 2KB 内存；增大缓冲区会轻微增加网络延迟，需权衡缓冲区大小与延迟
+[root@store test]# ethtool -g eth1
+Ring parameters for eth1:
+Pre-set maximums:
+RX:             4096
+RX Mini:        n/a
+RX Jumbo:       n/a
+TX:             4096
+Current hardware settings:
+# RX 接收ring buffer数
+RX:             512
+RX Mini:        n/a
+RX Jumbo:       n/a
+# TX 发送ring buffer数
+TX:             512
+RX Buf Len:             n/a
+TX Push:        n/a
+```
+
+6、`ethtool -k eth1` 查看网卡的卸载功能状态，包括RSS是否启用等
+
 ## 8. 扩展工具
 
 ### 8.1. C++工具：Compiler Explorer 和 C++ Insights

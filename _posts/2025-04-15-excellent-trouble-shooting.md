@@ -135,6 +135,8 @@ NIC statistics:
      tx_underrun: 0
 ```
 
+网络队列、ring buffer查看相关命令示例见：[实用工具集索引](https://xiaodongq.github.io/2025/04/14/handy-tools/)
+
 另外发现博主的历史文章，也覆盖了之前看过的网络发送和接收文章翻译：
 
 * [译｜Monitoring and Tuning the Linux Networking Stack: Receiving Data](https://www.cyningsun.com/04-24-2023/monitoring-and-tuning-the-linux-networking-stack-recv-cn.html#Receive-Packet-Steering-RPS)
@@ -238,7 +240,7 @@ drwxr-xr-x 2 root root 67 Mar 30 10:29 127.0.0.1-2025-03-30-10:29:58
 -rw------- 1 root root  80K Mar 30 10:29 vmcore-dmesg.txt
 ```
 
-2、crash，用于分析系统coredump文件
+2、crash：用于分析系统coredump文件
 
 分析dump文件需要内核vmlinux，安装对应内核的dbgsym包（没有则手动下载rmp安装：http://debuginfo.centos.org）
 
@@ -263,20 +265,7 @@ WARNING: kernel relocated [324MB]: patching 103007 gdb minimal_symbol values
     DUMPFILE: /var/crash/127.0.0.1-2025-03-30-10:29:58/vmcore  [PARTIAL DUMP]
         CPUS: 16
         DATE: Sun Mar 30 10:29:39 CST 2025
-      UPTIME: 7 days, 01:25:30
-LOAD AVERAGE: 0.00, 0.00, 0.00
-       TASKS: 340
-    NODENAME: xdlinux
-     RELEASE: 4.18.0-348.7.1.el8_5.x86_64
-     VERSION: #1 SMP Wed Dec 22 13:25:12 UTC 2021
-     MACHINE: x86_64  (3792 Mhz)
-      MEMORY: 31.4 GB
-       PANIC: "sysrq: SysRq : Trigger a crash"
-         PID: 35261
-     COMMAND: "zsh"
-        TASK: ffff9a25a9511800  [THREAD_INFO: ffff9a25a9511800]
-         CPU: 2
-       STATE: TASK_RUNNING (SYSRQ)
+     ...
 
 crash> 
 ```
@@ -284,15 +273,11 @@ crash>
 2、常用命令：ps、bt、log
 
 ```sh
-
 crash> ps
    PID    PPID  CPU       TASK        ST  %MEM     VSZ    RSS  COMM
 >     0      0   0  ffffffff96a18840  RU   0.0       0      0  [swapper/0]
 >     0      0   1  ffff9a2403880000  RU   0.0       0      0  [swapper/1]
       0      0   2  ffff9a2403884800  RU   0.0       0      0  [swapper/2]
->     0      0   3  ffff9a24038ab000  RU   0.0       0      0  [swapper/3]
->     0      0   4  ffff9a24038a9800  RU   0.0       0      0  [swapper/4]
->     0      0   5  ffff9a24038ae000  RU   0.0       0      0  [swapper/5]
 ...
 
 crash> bt
@@ -307,12 +292,7 @@ PID: 35261  TASK: ffff9a25a9511800  CPU: 2   COMMAND: "zsh"
  #7 [ffffb694057a3dc0] page_fault at ffffffff95e0111e
     [exception RIP: sysrq_handle_crash+18]
     RIP: ffffffff959affd2  RSP: ffffb694057a3e78  RFLAGS: 00010246
-    RAX: ffffffff959affc0  RBX: 0000000000000063  RCX: 0000000000000000
-    RDX: 0000000000000000  RSI: ffff9a2afe296858  RDI: 0000000000000063
-    RBP: 0000000000000004   R8: 0000000000000456   R9: ffff9a2400057460
-    R10: ffffffff959136f0  R11: ffffb694057a3d30  R12: 0000000000000000
-    R13: 0000000000000000  R14: ffffffff962af240  R15: 0000000000000000
-    ORIG_RAX: ffffffffffffffff  CS: 0010  SS: 0018
+...
 
 crash> log
 [    0.000000] Linux version 4.18.0-348.7.1.el8_5.x86_64 (mockbuild@kbuilder.bsys.centos.org) (gcc version 8.5.0 20210514 (Red Hat 8.5.0-4) (GCC)) #1 SMP Wed Dec 22 13:25:12 UTC 2021
