@@ -114,7 +114,7 @@ Counting cache functions... Output every 1 seconds.
     * awk 'NR > 1 { print $1, 1000 * $NF }' out.biosnoop | /home/local/HeatMap/trace2heatmap.pl --unitstime=s --unitslabel=us --maxlat=2000 > out.biosnoop.svg
 
 试了下，长这样（可见[heatmap_sample实验归档](https://github.com/xiaodongQ/prog-playground/tree/main/heatmap_sample)）：  
-[biosnoop-heatmap](/images/out.biosnoop.svg)
+![biosnoop-heatmap](/images/out.biosnoop.svg)
 
 ### 2.2. 软中断案例
 
@@ -141,8 +141,9 @@ Counting cache functions... Output every 1 seconds.
 * 网络团队判断是业务层有周期性阻塞性的任务，导致**软中断线程收包阻塞**，`rx drop`是因为软中断线程收包慢导致的。
     * 使用字节跳动团队的 [trace-irqoff](https://github.com/bytedance/trace-irqoff) 监控中断延迟
     * 在自己家里的机器上试了下好像没结果，后续按需使用。编译会生成一个`.ko`，`install`会加载到内核中。
-* 可`perf record -e skb:kfree_skb`检查丢包（也可利用各类eBPF工具）
-    * 腾讯、字节等厂在此基础上进行了更加友好的封装：nettrace、netcap
+* 问题确认和解决：经相关同事确认，故障出现的前一两天确实灰度了光模块监控，会通过定期逐个机器遍历远程调用 `ethtool -m` 读取光模块的信息。程序回滚之后问题恢复。
+* 另外可`perf record -e skb:kfree_skb`检查丢包（也可利用各类eBPF工具）
+    * 腾讯、字节等厂在此基础上进行了更加友好的封装：`nettrace`、`netcap`
 
 `ifconfig`、`ethtool -S`统计信息示例，关注发送和接收的计数统计（非案例中的采集）：
 
@@ -180,7 +181,60 @@ NIC statistics:
 * [[译] Linux 网络栈监控和调优：发送数据（2017）](https://arthurchiao.art/blog/tuning-stack-tx-zh/)
 * [[译] Linux 网络栈监控和调优：接收数据（2016）](https://arthurchiao.art/blog/tuning-stack-rx-zh/)
 
-### 2.3. 进程调度案例
+### 2.3. Redis长尾延迟案例
+
+其实是上面 “软中断篇” 的上篇：[记一次 Redis 延时毛刺问题定位](https://www.cyningsun.com/12-22-2023/redis-latency-spike.html)
+
+问题：部分线上集群出现10分钟一次的耗时毛刺
+
+* **整个链路**是 Redis SDK -> Redis Proxy -> 各个Redis
+* 在 Redis Proxy 可以观察到明显的请求耗时毛刺，可以确定问题确实出现在 Redis Proxy 调用 Redis 的某个环节
+    * 问题非必现，且不固定于某台机器
+    * 问题发现时，相同/类似毛刺现象涉及众多集群
+    * 在线的 Redis 版本缺少 P99 指标（耗时指标仅包括执行耗时，不包括包括等待耗时）耗时毛刺被平均之后无法观察到
+* 定位
+    * 基于现有指标缩小问题的范围，按可能性排查范围：业务请求 > 网络 > 系统 > 应用
+        * 之前碰到过 `atop` 采集进程 `PSS` 导致延迟增加。此次停止所有 atop 之后，请求延迟消失。
+        * 先说结论，原因：线上部分机器部署的 atop 版本 默认启用了 `-R` 选项。**在 atop 读 /proc/${pid}/smaps 时，会遍历整个进程的页表，期间会持有内存页表的锁。如果在此期间进程发生虚拟内存地址分配，也需要获取锁，就需要等待锁释放。具体到应用层面就是请求耗时毛刺。**
+    * 根因分析。可以看看里面的手段思路
+        * `smaps`使用的文件类型是`seq_file`序列文件。
+            * `smaps` 文件包含了每个进程的内存段的详细信息，包括但不限于各段的大小、权限、偏移量、设备号、inode 号以及最值得注意的——各段的 `PSS（Proportional Set Size，比例集大小）`和 `RSS（Resident Set Size，常驻集大小）`。（针对多进程共享内存的场景，`PSS`的物理内存统计比`RSS`更为准确）。
+            * 关于序列文件，之前梳理netstat的实现流程中也涉及了。其读取proc文件系统的`/proc/net/tcp`就是用的序列文件，其简要流程可见：[分析netstat中的Send-Q和Recv-Q](https://xiaodongq.github.io/2024/05/27/netstat-code/#3-procnettcp%E6%96%87%E4%BB%B6%E6%9B%B4%E6%96%B0%E9%80%BB%E8%BE%91) 
+        * 
+
+看下自己机器上 smaps内容 和 maps内容的示例（更多一点的信息可以看本文的补充篇）：
+
+```sh
+# smaps内容
+[CentOS-root@xdlinux ➜ ~ ]$ cat /proc/$(pidof mysqld)/smaps
+# 该内存段的虚拟地址范围，smaps里有很多段范围信息
+# r-xp 是权限标志；00000000：偏移量，表示文件映射到内存中的偏移位置
+# fd:00：设备号，fd 是主设备号，00 是次设备号；136301417：inode号，标识文件
+# /usr/libexec/mysqld：内存映射的文件路径
+55a5d35ad000-55a5d70ba000 r-xp 00000000 fd:00 136301417                  /usr/libexec/mysqld
+# 内存段的总大小，包括未使用的部分
+Size:              60468 kB
+# KernelPageSize 和 MMUPageSize，是 内核和硬件 MMU（内存管理单元）支持的页面大小，通常为 4 KB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+# Resident Set Size，常驻物理内存
+Rss:               28692 kB
+# Proportional Set Size，按比例分配的内存大小。此处和Rss一样，说明没有共享内存
+Pss:               28692 kB
+...
+...
+
+# maps内容
+[CentOS-root@xdlinux ➜ ~ ]$ cat /proc/$(pidof mysqld)/maps
+55a5d35ad000-55a5d70ba000 r-xp 00000000 fd:00 136301417                  /usr/libexec/mysqld
+55a5d70ba000-55a5d722f000 r--p 03b0c000 fd:00 136301417                  /usr/libexec/mysqld
+55a5d722f000-55a5d75b6000 rw-p 03c81000 fd:00 136301417                  /usr/libexec/mysqld
+...
+55a5d7f4e000-55a5da7d0000 rw-p 00000000 00:00 0                          [heap]
+...
+```
+
+### 2.4. 进程调度案例
 
 [阴差阳错｜记一次深入内核的数据库抖动排查](https://zhuanlan.zhihu.com/p/14709946806?utm_campaign=shareopn&utm_medium=social&utm_psn=1889473112485106949&utm_source=wechat_session)
 
@@ -198,7 +252,7 @@ NIC statistics:
 * 利用https://github.com/brendangregg/perf-tools/tree/master里的`functrace`很轻易的找到了::write会调用down_write
 * **数据库里哪个路径需要加mmap_sem的写锁**
 
-### 2.4. eBPF辅助案例
+### 2.5. eBPF辅助案例
 
 * [eBPF/Ftrace 双剑合璧：no space left on device 无处遁形](https://mp.weixin.qq.com/s/VuD20JgMQlbf-RIeCGniaA)
     * 问题：生产环境中遇到了几次创建容器报错 ”no space left on device“ 失败，但排查发现磁盘使用空间和 inode 都比较正常
@@ -291,100 +345,4 @@ zStorage：小川
 [DPDK内存碎片优化，性能最高提升30+倍!](https://mp.weixin.qq.com/s?__biz=Mzg3Mjg2NjU4NA==&mid=2247484462&idx=1&sn=406c59905ea57718018c602cba66f40e&chksm=cee9f259f99e7b4f7597eb6754367214a28f120c062c72c827f6e8c4225f9e54e4c65d4395d8&scene=21#wechat_redirect)
 
 [DPDK Graph Pipeline框架简介与实现原理](https://mp.weixin.qq.com/s?__biz=Mzg3Mjg2NjU4NA==&mid=2247483974&idx=1&sn=25a198745ee4bec9755fe1f64f500dd8&chksm=cee9f431f99e7d27527c7a74c0fd2969c00cf904cd5a25d09dd9e2ba1adb1e2f1a3ced267940&scene=21#wechat_redirect)
-
-## 4. 问题定位工具
-
-### 4.1. kdump 和 crash
-
-1、kdump：
-
-```sh
-# 触发系统panic：
-[CentOS-root@xdlinux ➜ ~ ]$ echo c > /proc/sysrq-trigger
-# 查看dump文件
-[CentOS-root@xdlinux ➜ ~ ]$ ll /var/crash 
-drwxr-xr-x 2 root root 67 Mar 30 10:29 127.0.0.1-2025-03-30-10:29:58
-[CentOS-root@xdlinux ➜ ~ ]$ ll /var/crash/127.0.0.1-2025-03-30-10:29:58 
-# 上次内核的dmesg信息
--rw------- 1 root root  98K Mar 30 10:29 kexec-dmesg.log
--rw------- 1 root root 295M Mar 30 10:29 vmcore
-# 崩溃时的dmesg信息
--rw------- 1 root root  80K Mar 30 10:29 vmcore-dmesg.txt
-```
-
-2、crash：用于分析系统coredump文件
-
-分析dump文件需要内核vmlinux，安装对应内核的dbgsym包（没有则手动下载rmp安装：http://debuginfo.centos.org）
-
-内核调试符号包：kernel-debuginfo、kernel-debuginfo-common。可以到阿里云的镜像站下载对应内核版本，比较快。
-
-`rpm -ivh`手动安装，会安装到：`/usr/lib/debug/lib/modules`
-
-**分析方法：**
-
-1、加载：
-
-```sh
-[CentOS-root@xdlinux ➜ download ]$ crash /var/crash/127.0.0.1-2025-03-30-10\:29\:58/vmcore /usr/lib/debug/lib/modules/`uname -r`/vmlinux
-
-crash 7.3.0-2.el8
-...
-This GDB was configured as "x86_64-unknown-linux-gnu"...
-
-WARNING: kernel relocated [324MB]: patching 103007 gdb minimal_symbol values
-
-      KERNEL: /usr/lib/debug/lib/modules/4.18.0-348.7.1.el8_5.x86_64/vmlinux
-    DUMPFILE: /var/crash/127.0.0.1-2025-03-30-10:29:58/vmcore  [PARTIAL DUMP]
-        CPUS: 16
-        DATE: Sun Mar 30 10:29:39 CST 2025
-     ...
-
-crash> 
-```
-
-2、常用命令：ps、bt、log
-
-```sh
-crash> ps
-   PID    PPID  CPU       TASK        ST  %MEM     VSZ    RSS  COMM
->     0      0   0  ffffffff96a18840  RU   0.0       0      0  [swapper/0]
->     0      0   1  ffff9a2403880000  RU   0.0       0      0  [swapper/1]
-      0      0   2  ffff9a2403884800  RU   0.0       0      0  [swapper/2]
-...
-
-crash> bt
-PID: 35261  TASK: ffff9a25a9511800  CPU: 2   COMMAND: "zsh"
- #0 [ffffb694057a3b98] machine_kexec at ffffffff954641ce
- #1 [ffffb694057a3bf0] __crash_kexec at ffffffff9559e67d
- #2 [ffffb694057a3cb8] crash_kexec at ffffffff9559f56d
- #3 [ffffb694057a3cd0] oops_end at ffffffff9542613d
- #4 [ffffb694057a3cf0] no_context at ffffffff9547562f
- #5 [ffffb694057a3d48] __bad_area_nosemaphore at ffffffff9547598c
- #6 [ffffb694057a3d90] do_page_fault at ffffffff95476267
- #7 [ffffb694057a3dc0] page_fault at ffffffff95e0111e
-    [exception RIP: sysrq_handle_crash+18]
-    RIP: ffffffff959affd2  RSP: ffffb694057a3e78  RFLAGS: 00010246
-...
-
-crash> log
-[    0.000000] Linux version 4.18.0-348.7.1.el8_5.x86_64 (mockbuild@kbuilder.bsys.centos.org) (gcc version 8.5.0 20210514 (Red Hat 8.5.0-4) (GCC)) #1 SMP Wed Dec 22 13:25:12 UTC 2021
-[    0.000000] Command line: BOOT_IMAGE=(hd0,gpt6)/vmlinuz-4.18.0-348.7.1.el8_5.x86_64 root=/dev/mapper/cl_desktop--mme7h3a-root ro crashkernel=auto resume=/dev/mapper/cl_desktop--mme7h3a-swap rd.lvm.lv=cl_desktop-mme7h3a/root rd.lvm.lv=cl_desktop-mme7h3a/swap rhgb quiet
-[    0.000000] x86/fpu: Supporting XSAVE feature 0x001: 'x87 floating point registers'
-
-crash> kmem -i
-                 PAGES        TOTAL      PERCENTAGE
-    TOTAL MEM  8013423      30.6 GB         ----
-         FREE  7215135      27.5 GB   90% of TOTAL MEM
-         USED   798288         3 GB    9% of TOTAL MEM
-       SHARED    32189     125.7 MB    0% of TOTAL MEM
-      BUFFERS      915       3.6 MB    0% of TOTAL MEM
-       CACHED   481884       1.8 GB    6% of TOTAL MEM
-         SLAB    27734     108.3 MB    0% of TOTAL MEM
-
-   TOTAL HUGE        0            0         ----
-    HUGE FREE        0            0    0% of TOTAL HUGE
-
-   TOTAL SWAP   262143      1024 MB         ----
-    SWAP USED        0            0    0% of TOTAL SWAP
-```
 
