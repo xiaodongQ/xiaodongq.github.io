@@ -22,7 +22,7 @@ tags: [博客, Jekyll]
 
 走了些弯路折腾了很久：之前直接clone原仓库，拷贝post的文章过去简单修改，一直生成不了博客主页。
 
-说明下比较正确的路径：
+说明下比较简便的路径：
 
 * 1、通过 [Getting Started](https://chirpy.cotes.page/posts/getting-started/)里的 `Option 1. Using the Starter` 方式，通过作者单独的一个模板仓库来创建。
     * 里面只保留了必要配置，不像原仓库里有很多html、css、scss等实现，没有那么多理解成本

@@ -76,7 +76,7 @@ Counting cache functions... Output every 1 seconds.
 [...]
 ```
 
-### 2.2. 软中断
+### 2.2. 软中断案例
 
 [Redis 延迟毛刺问题定位-软中断篇](https://www.cyningsun.com/09-17-2024/redis-latency-irqoff.html)
 
@@ -145,7 +145,7 @@ NIC statistics:
 * [[译] Linux 网络栈监控和调优：发送数据（2017）](https://arthurchiao.art/blog/tuning-stack-tx-zh/)
 * [[译] Linux 网络栈监控和调优：接收数据（2016）](https://arthurchiao.art/blog/tuning-stack-rx-zh/)
 
-### 2.3. 进程调度
+### 2.3. 进程调度案例
 
 [阴差阳错｜记一次深入内核的数据库抖动排查](https://zhuanlan.zhihu.com/p/14709946806?utm_campaign=shareopn&utm_medium=social&utm_psn=1889473112485106949&utm_source=wechat_session)
 
@@ -163,7 +163,7 @@ NIC statistics:
 * 利用https://github.com/brendangregg/perf-tools/tree/master里的`functrace`很轻易的找到了::write会调用down_write
 * **数据库里哪个路径需要加mmap_sem的写锁**
 
-### 2.4. eBPF
+### 2.4. eBPF辅助案例
 
 挖坑的张师傅：
 
@@ -222,78 +222,15 @@ zStorage：小川
 
 ### 4.1. kdump 和 crash
 
-#### 4.1.1. 资源下载
-
-下载：kernel-debuginfo 和 kernel-debuginfo-common
-搜索centos-debuginfo，此处选一个阿里云的：https://developer.aliyun.com/mirror/centos-debuginfo/
-到阿里云的镜像站，下载比较快：
-`uname -r 为：4.18.0-348.7.1.el8_5.x86_64`
-则下载：
-`kernel-debuginfo-4.18.0-348.7.1.el8_5.x86_64.rpm`
-`kernel-debuginfo-common-x86_64-4.18.0-348.7.1.el8_5.x86_64.rpm`
-
-systemtap、crash都需要
-
-
-#### 4.1.2. 1、安装kdump：
-
-`yum install kexec-tools`
-
-配置文件中定义了保存位置：
+1、kdump：
 
 ```sh
-# vi /etc/kdump.conf
-# 保存位置
-path /var/crash
-# 生成coredump的行为
-# default <reboot | halt | poweroff | shell | dump_to_rootfs> 
-```
-
-grub里定义了发生崩溃时，分配的内存：`crashkernel`，auto是自动分配，也可限制大小`crashkernel=512M`。
-
-如果修改grub则需要更新grub配置，并使能生效
-
-```sh
-[CentOS-root@xdlinux ➜ download ]$ cat /etc/default/grub
-GRUB_TIMEOUT=5
-GRUB_DISTRIBUTOR="$(sed 's, release .*$,,g' /etc/system-release)"
-GRUB_DEFAULT=saved
-GRUB_DISABLE_SUBMENU=true
-GRUB_TERMINAL_OUTPUT="console"
-GRUB_CMDLINE_LINUX="crashkernel=auto resume=/dev/mapper/cl_desktop--mme7h3a-swap rd.lvm.lv=cl_desktop-mme7h3a/root rd.lvm.lv=cl_desktop-mme7h3a/swap rhgb quiet"
-GRUB_DISABLE_RECOVERY="true"
-GRUB_ENABLE_BLSCFG=true
-```
-
-#### 4.1.3. 2、启动kdump
-
-```sh
-[CentOS-root@xdlinux ➜ ~ ]$ service kdump status
-Redirecting to /bin/systemctl status kdump.service
-● kdump.service - Crash recovery kernel arming
-   Loaded: loaded (/usr/lib/systemd/system/kdump.service; enabled; vendor preset: enabled)
-   Active: active (exited) since Sun 2025-03-23 09:04:16 CST; 1 weeks 0 days ago
-  Process: 1612 ExecStart=/usr/bin/kdumpctl start (code=exited, status=0/SUCCESS)
- Main PID: 1612 (code=exited, status=0/SUCCESS)
-    Tasks: 0 (limit: 200021)
-   Memory: 0B
-   CGroup: /system.slice/kdump.service
-```
-
-#### 4.1.4. 3、手动触发crash
-
-触发系统panic：
-`echo c > /proc/sysrq-trigger`
-
-#### 4.1.5. 4、检查内核转储文件
-
-```sh
+# 触发系统panic：
+[CentOS-root@xdlinux ➜ ~ ]$ echo c > /proc/sysrq-trigger
+# 查看dump文件
 [CentOS-root@xdlinux ➜ ~ ]$ ll /var/crash 
-total 0
 drwxr-xr-x 2 root root 67 Mar 30 10:29 127.0.0.1-2025-03-30-10:29:58
-
 [CentOS-root@xdlinux ➜ ~ ]$ ll /var/crash/127.0.0.1-2025-03-30-10:29:58 
-total 295M
 # 上次内核的dmesg信息
 -rw------- 1 root root  98K Mar 30 10:29 kexec-dmesg.log
 -rw------- 1 root root 295M Mar 30 10:29 vmcore
@@ -301,60 +238,15 @@ total 295M
 -rw------- 1 root root  80K Mar 30 10:29 vmcore-dmesg.txt
 ```
 
-#### 4.1.6. 5、安装crash，用于分析coredump文件
-
-`yum install crash`
+2、crash，用于分析系统coredump文件
 
 分析dump文件需要内核vmlinux，安装对应内核的dbgsym包（没有则手动下载rmp安装：http://debuginfo.centos.org）
 
-```sh
-# 1. 安装基础工具包
-sudo yum install -y kexec-tools crash
+内核调试符号包：kernel-debuginfo、kernel-debuginfo-common。可以到阿里云的镜像站下载对应内核版本，比较快。
 
-# 2. 安装内核调试符号包（关键依赖）
-# 手动下载rpm安装：http://debuginfo.centos.org/8/x86_64/Packages/
-sudo yum install -y kernel-debuginfo kernel-debuginfo-common
-
-# 3. 确认安装
-rpm -qa | grep -E "kexec-tools|crash|kernel-debuginfo"
-
-```
-
-到阿里云的镜像站，下载比较快：
-    `uname -r 为：4.18.0-348.7.1.el8_5.x86_64`
-则下载：
-    `kernel-debuginfo-4.18.0-348.7.1.el8_5.x86_64.rpm`
-    `kernel-debuginfo-common-x86_64-4.18.0-348.7.1.el8_5.x86_64.rpm`
 `rpm -ivh`手动安装，会安装到：`/usr/lib/debug/lib/modules`
 
-```sh
-[CentOS-root@xdlinux ➜ download ]$ ll /usr/lib/debug/lib/modules 
-total 0
-drwxr-xr-x 5 root root 63 Mar 30 12:04 4.18.0-348.7.1.el8_5.x86_64
-[CentOS-root@xdlinux ➜ download ]$ ll /usr/lib/debug/lib/modules/4.18.0-348.7.1.el8_5.x86_64 
-total 847M
-drwxr-xr-x  8 root root   80 Mar 30 12:04 internal
-drwxr-xr-x 13 root root  141 Mar 30 12:04 kernel
-drwxr-xr-x  2 root root   52 Mar 30 12:04 vdso
--rwxr-xr-x  1 root root 847M Dec 22  2021 vmlinux
-```
-
-#### 4.1.7. 6、crash分析
-
-方法：
-
-```sh
-# 进入crash分析界面（指定内核符号和vmcore路径）
-crash /usr/lib/debug/lib/modules/$(uname -r)/vmlinux /var/crash/*/vmcore
-
-# 常用命令：
-  - bt       # 查看崩溃时的调用栈
-  - log      # 查看内核日志
-  - ps       # 查看崩溃时的进程状态
-  - exit     # 退出
-```
-
-##### 4.1.7.1. 实操
+**分析方法：**
 
 1、加载：
 
@@ -362,25 +254,7 @@ crash /usr/lib/debug/lib/modules/$(uname -r)/vmlinux /var/crash/*/vmcore
 [CentOS-root@xdlinux ➜ download ]$ crash /var/crash/127.0.0.1-2025-03-30-10\:29\:58/vmcore /usr/lib/debug/lib/modules/`uname -r`/vmlinux
 
 crash 7.3.0-2.el8
-Copyright (C) 2002-2021  Red Hat, Inc.
-Copyright (C) 2004, 2005, 2006, 2010  IBM Corporation
-Copyright (C) 1999-2006  Hewlett-Packard Co
-Copyright (C) 2005, 2006, 2011, 2012  Fujitsu Limited
-Copyright (C) 2006, 2007  VA Linux Systems Japan K.K.
-Copyright (C) 2005, 2011, 2020-2021  NEC Corporation
-Copyright (C) 1999, 2002, 2007  Silicon Graphics, Inc.
-Copyright (C) 1999, 2000, 2001, 2002  Mission Critical Linux, Inc.
-This program is free software, covered by the GNU General Public License,
-and you are welcome to change it and/or distribute copies of it under
-certain conditions.  Enter "help copying" to see the conditions.
-This program has absolutely no warranty.  Enter "help warranty" for details.
- 
-GNU gdb (GDB) 7.6
-Copyright (C) 2013 Free Software Foundation, Inc.
-License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
-This is free software: you are free to change and redistribute it.
-There is NO WARRANTY, to the extent permitted by law.  Type "show copying"
-and "show warranty" for details.
+...
 This GDB was configured as "x86_64-unknown-linux-gnu"...
 
 WARNING: kernel relocated [324MB]: patching 103007 gdb minimal_symbol values
@@ -407,7 +281,7 @@ LOAD AVERAGE: 0.00, 0.00, 0.00
 crash> 
 ```
 
-2、ps、bt、log
+2、常用命令：ps、bt、log
 
 ```sh
 
@@ -462,58 +336,3 @@ crash> kmem -i
     SWAP USED        0            0    0% of TOTAL SWAP
 ```
 
-#### 4.1.8. crash常用命令汇总
-
-一、基础命令
-命令	用途	示例/参数
-bt	查看崩溃时的调用栈（Backtrace）	
-    bt：当前任务的调用栈
-    bt -l：所有CPU的调用栈
-    bt <PID>：指定进程的调用栈
-ps	查看崩溃时的进程状态	
-    ps：所有进程列表
-    ps -t：显示线程
-    ps <PID>：查看特定进程的详细信息
-log	查看内核日志（dmesg输出）	
-    log：完整内核日志
-    log -m：按时间排序日志
-vm	查看内存使用情况	
-    vm：系统内存统计
-    vm -v：详细内存信息
-sys	查看系统信息	
-    sys：系统基本信息（启动时间、CPU等）
-    sys config：内核编译配置
-exit 或 q	退出crash工具	
-
-二、高级调试命令
-命令	用途	示例/参数
-dis	反汇编指令	
-    dis <函数名>：反汇编函数
-    dis <地址>：反汇编指定地址的代码
-struct	查看结构体定义	
-    struct task_struct：查看任务结构体
-    struct task_struct.comm：查看结构体成员定义
-search	搜索内存中的值	
-    search -u deadbeef：搜索十六进制值
-    search -s "panic"：搜索字符串
-irq	查看中断状态	
-    irq -b：中断统计信息
-mod	查看内核模块信息	
-    mod：已加载模块列表
-    mod -S <模块名>：查看模块的符号信息
-kmem	分析内核内存分配	
-    kmem -i：SLAB分配器统计
-    kmem -s：内存泄漏检查
-task	查看任务（进程）的详细信息	
-    task <PID>：显示任务的内核栈、寄存器等
-files	查看进程打开的文件描述符	
-    files <PID>：显示进程的文件句柄
-net	查看网络状态	
-    net -s：网络设备统计
-    net -S：套接字状态
-
-三、实战示例
-
-快速参考流程图：
-启动crash → 2. 检查调用栈 (`bt`) → 3. 查看进程 (`ps`) 
-   → 4. 分析内存 (`vm`/`kmem`) → 5. 反汇编关键函数 (`dis`) → 退出
