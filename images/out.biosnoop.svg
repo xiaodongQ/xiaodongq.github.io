@@ -1,0 +1,96 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" width="500" height="490" onload="init(evt)" viewBox="0 0 500 490" xmlns="http://www.w3.org/2000/svg" >
+<!-- Heat map visualization. See https://github.com/brendangregg/HeatMap for latest version, and http://www.brendangregg.com/heatmaps.html for examples. -->
+<style type="text/css">
+	.func_g:hover { stroke:black; stroke-width:0.5; }
+</style>
+<script type="text/ecmascript">
+<![CDATA[
+	var details;
+	function init(evt) { details = document.getElementById("details").firstChild; }
+	function s(s, l, c, acc, total) {
+		var pct = Math.floor(c / total * 100);
+		var apct = Math.floor(acc / total * 100);
+
+		if (0 == 1) {
+			details.nodeValue = "time " + s + "s, range " + l + ", count: " + c + ", colpct: " + pct + "%, acc: " + acc + ", acc pct: " + apct + "%";
+		} else {
+			details.nodeValue = "time " + s + "s, range " + l + ", count: " + c + ", colpct: " + pct + "%";
+		}
+	}
+	function c() { details.nodeValue = ' '; }
+]]>
+</script>
+<rect x="0.0" y="0" width="500.0" height="490.0" fill="rgb(255,255,255)" id="bkg" />
+<text text-anchor="middle" x="250" y="24" font-size="17" font-family="Verdana" fill="rgb(0,0,0)"  >Latency Heat Map</text>
+<text text-anchor="left" x="250" y="477" font-size="12" font-family="Verdana" fill="rgb(0,0,0)"  >Time</text>
+<text text-anchor="" x="10" y="460" font-size="12" font-family="Verdana" fill="rgb(0,0,0)" id="details" > </text>
+<rect x="10.0" y="372" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('0','320-360us',1,1,3)" onmouseout="c()" />
+<rect x="10.0" y="260" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('0','880-920us',1,2,3)" onmouseout="c()" />
+<rect x="10.0" y="44" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('0','1960-2000us',1,3,3)" onmouseout="c()" />
+<rect x="34.0" y="428" width="8.0" height="8.0" fill="rgb(255,0,0)" onmouseover="s('3','40-80us',19,19,82)" onmouseout="c()" />
+<rect x="34.0" y="420" width="8.0" height="8.0" fill="rgb(255,202,185)" onmouseover="s('3','80-120us',3,22,82)" onmouseout="c()" />
+<rect x="34.0" y="404" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('3','160-200us',1,23,82)" onmouseout="c()" />
+<rect x="34.0" y="396" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('3','200-240us',1,24,82)" onmouseout="c()" />
+<rect x="34.0" y="388" width="8.0" height="8.0" fill="rgb(255,215,197)" onmouseover="s('3','240-280us',2,26,82)" onmouseout="c()" />
+<rect x="34.0" y="380" width="8.0" height="8.0" fill="rgb(255,215,197)" onmouseover="s('3','280-320us',2,28,82)" onmouseout="c()" />
+<rect x="34.0" y="372" width="8.0" height="8.0" fill="rgb(255,114,104)" onmouseover="s('3','320-360us',10,38,82)" onmouseout="c()" />
+<rect x="34.0" y="364" width="8.0" height="8.0" fill="rgb(255,202,185)" onmouseover="s('3','360-400us',3,41,82)" onmouseout="c()" />
+<rect x="34.0" y="356" width="8.0" height="8.0" fill="rgb(255,139,127)" onmouseover="s('3','400-440us',8,49,82)" onmouseout="c()" />
+<rect x="34.0" y="348" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('3','440-480us',1,50,82)" onmouseout="c()" />
+<rect x="34.0" y="340" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('3','480-520us',1,51,82)" onmouseout="c()" />
+<rect x="34.0" y="324" width="8.0" height="8.0" fill="rgb(255,202,185)" onmouseover="s('3','560-600us',3,54,82)" onmouseout="c()" />
+<rect x="34.0" y="308" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('3','640-680us',1,55,82)" onmouseout="c()" />
+<rect x="34.0" y="300" width="8.0" height="8.0" fill="rgb(255,189,174)" onmouseover="s('3','680-720us',4,59,82)" onmouseout="c()" />
+<rect x="34.0" y="292" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('3','720-760us',1,60,82)" onmouseout="c()" />
+<rect x="34.0" y="284" width="8.0" height="8.0" fill="rgb(255,177,162)" onmouseover="s('3','760-800us',5,65,82)" onmouseout="c()" />
+<rect x="34.0" y="276" width="8.0" height="8.0" fill="rgb(255,215,197)" onmouseover="s('3','800-840us',2,67,82)" onmouseout="c()" />
+<rect x="34.0" y="260" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('3','880-920us',1,68,82)" onmouseout="c()" />
+<rect x="34.0" y="236" width="8.0" height="8.0" fill="rgb(255,202,185)" onmouseover="s('3','1000-1040us',3,71,82)" onmouseout="c()" />
+<rect x="34.0" y="228" width="8.0" height="8.0" fill="rgb(255,189,174)" onmouseover="s('3','1040-1080us',4,75,82)" onmouseout="c()" />
+<rect x="34.0" y="188" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('3','1240-1280us',1,76,82)" onmouseout="c()" />
+<rect x="34.0" y="172" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('3','1320-1360us',1,77,82)" onmouseout="c()" />
+<rect x="34.0" y="52" width="8.0" height="8.0" fill="rgb(255,177,162)" onmouseover="s('3','1920-1960us',5,82,82)" onmouseout="c()" />
+<rect x="50.0" y="428" width="8.0" height="8.0" fill="rgb(255,202,185)" onmouseover="s('5','40-80us',3,3,13)" onmouseout="c()" />
+<rect x="50.0" y="420" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('5','80-120us',1,4,13)" onmouseout="c()" />
+<rect x="50.0" y="404" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('5','160-200us',1,5,13)" onmouseout="c()" />
+<rect x="50.0" y="348" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('5','440-480us',1,6,13)" onmouseout="c()" />
+<rect x="50.0" y="308" width="8.0" height="8.0" fill="rgb(255,215,197)" onmouseover="s('5','640-680us',2,8,13)" onmouseout="c()" />
+<rect x="50.0" y="292" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('5','720-760us',1,9,13)" onmouseout="c()" />
+<rect x="50.0" y="180" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('5','1280-1320us',1,10,13)" onmouseout="c()" />
+<rect x="50.0" y="124" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('5','1560-1600us',1,11,13)" onmouseout="c()" />
+<rect x="50.0" y="68" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('5','1840-1880us',1,12,13)" onmouseout="c()" />
+<rect x="50.0" y="52" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('5','1920-1960us',1,13,13)" onmouseout="c()" />
+<rect x="58.0" y="428" width="8.0" height="8.0" fill="rgb(255,215,197)" onmouseover="s('6','40-80us',2,2,18)" onmouseout="c()" />
+<rect x="58.0" y="404" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('6','160-200us',1,3,18)" onmouseout="c()" />
+<rect x="58.0" y="380" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('6','280-320us',1,4,18)" onmouseout="c()" />
+<rect x="58.0" y="372" width="8.0" height="8.0" fill="rgb(255,189,174)" onmouseover="s('6','320-360us',4,8,18)" onmouseout="c()" />
+<rect x="58.0" y="364" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('6','360-400us',1,9,18)" onmouseout="c()" />
+<rect x="58.0" y="356" width="8.0" height="8.0" fill="rgb(255,202,185)" onmouseover="s('6','400-440us',3,12,18)" onmouseout="c()" />
+<rect x="58.0" y="300" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('6','680-720us',1,13,18)" onmouseout="c()" />
+<rect x="58.0" y="276" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('6','800-840us',1,14,18)" onmouseout="c()" />
+<rect x="58.0" y="260" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('6','880-920us',1,15,18)" onmouseout="c()" />
+<rect x="58.0" y="244" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('6','960-1000us',1,16,18)" onmouseout="c()" />
+<rect x="58.0" y="204" width="8.0" height="8.0" fill="rgb(255,215,197)" onmouseover="s('6','1160-1200us',2,18,18)" onmouseout="c()" />
+<rect x="66.0" y="380" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('7','280-320us',1,1,4)" onmouseout="c()" />
+<rect x="66.0" y="372" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('7','320-360us',1,2,4)" onmouseout="c()" />
+<rect x="66.0" y="292" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('7','720-760us',1,3,4)" onmouseout="c()" />
+<rect x="66.0" y="236" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('7','1000-1040us',1,4,4)" onmouseout="c()" />
+<rect x="74.0" y="428" width="8.0" height="8.0" fill="rgb(255,215,197)" onmouseover="s('8','40-80us',2,2,14)" onmouseout="c()" />
+<rect x="74.0" y="396" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('8','200-240us',1,3,14)" onmouseout="c()" />
+<rect x="74.0" y="380" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('8','280-320us',1,4,14)" onmouseout="c()" />
+<rect x="74.0" y="372" width="8.0" height="8.0" fill="rgb(255,202,185)" onmouseover="s('8','320-360us',3,7,14)" onmouseout="c()" />
+<rect x="74.0" y="284" width="8.0" height="8.0" fill="rgb(255,215,197)" onmouseover="s('8','760-800us',2,9,14)" onmouseout="c()" />
+<rect x="74.0" y="268" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('8','840-880us',1,10,14)" onmouseout="c()" />
+<rect x="74.0" y="244" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('8','960-1000us',1,11,14)" onmouseout="c()" />
+<rect x="74.0" y="236" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('8','1000-1040us',1,12,14)" onmouseout="c()" />
+<rect x="74.0" y="228" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('8','1040-1080us',1,13,14)" onmouseout="c()" />
+<rect x="74.0" y="52" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('8','1920-1960us',1,14,14)" onmouseout="c()" />
+<rect x="82.0" y="412" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('9','120-160us',1,1,4)" onmouseout="c()" />
+<rect x="82.0" y="372" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('9','320-360us',1,2,4)" onmouseout="c()" />
+<rect x="82.0" y="348" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('9','440-480us',1,3,4)" onmouseout="c()" />
+<rect x="82.0" y="260" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('9','880-920us',1,4,4)" onmouseout="c()" />
+<rect x="114.0" y="284" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('13','760-800us',1,1,2)" onmouseout="c()" />
+<rect x="114.0" y="44" width="8.0" height="8.0" fill="rgb(255,227,208)" onmouseover="s('13','1960-2000us',1,2,2)" onmouseout="c()" />
+</svg>

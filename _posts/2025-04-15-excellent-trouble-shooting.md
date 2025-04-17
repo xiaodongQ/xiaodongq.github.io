@@ -1,6 +1,6 @@
 ---
 title: 问题定位和性能优化案例集锦
-description: 记录精彩的问题定位过程和性能优化手段，内化并为我所用
+description: 记录精彩的问题定位过程和性能优化手段，内化并能为自己所用。
 categories: [Troubleshooting]
 tags: [Troubleshooting]
 pin: true
@@ -76,6 +76,46 @@ Counting cache functions... Output every 1 seconds.
 [...]
 ```
 
+#### 2.1.2. 其他博客内容
+
+先列举下面内容，还有很多内容值得一读和实验：
+
+* [Linux ftrace TCP Retransmit Tracing](https://www.brendangregg.com/blog/2014-09-06/linux-ftrace-tcp-retransmit-tracing.html)
+    * 用ftrace（perf-tools里面的`tcpretrans`）追踪TCP重传
+    * 之前用tc构造过重传实验，不过用的是bcc tools里的`tcpretrans`。有一个差别是：**perf-tools中的`tcpretrans`可以追踪堆栈**。
+        * bcc实验见：[eBPF学习实践系列（二） -- bcc tools网络工具集](https://xiaodongq.github.io/2024/06/10/bcc-tools-network/#38-tcpretrans%E9%87%8D%E4%BC%A0%E7%9A%84tcp%E8%BF%9E%E6%8E%A5%E8%B7%9F%E8%B8%AA)
+* [perf sched for Linux CPU scheduler analysis](https://www.brendangregg.com/blog/2017-03-16/perf-sched.html)
+    * 介绍`perf sched`追踪调度延迟和分布情况，bcc中提供的调度相关工具为：`runqlat`、`runqslower`、`runqlen`
+* [Linux bcc/BPF Run Queue (Scheduler) Latency](https://www.brendangregg.com/blog/2016-10-08/linux-bcc-runqlat.html)
+    * 关于延迟，这篇文章单独做了介绍，`runqlat`、`runqlat`
+* [Linux bcc/eBPF tcpdrop](https://www.brendangregg.com/blog/2018-05-31/linux-tcpdrop.html)
+    * 介绍通过`tcpdrop`追踪TCP丢包的原因（显示调用路径）
+* [Poor Disk Performance](https://www.brendangregg.com/blog/2021-05-09/poor-disk-performance.html)
+    * 跟踪一个读延迟很大的磁盘，结合`iostat` 和 bcc的`biolatency`工具，来检查延迟分布
+        * `aqu-sz`队列不长，但是`r_await`读延迟很大，434.31ms，说明不是负载太高的原因，而是磁盘本身的问题
+    * 以及通过bcc中的 `biosnoop` 来查看每个磁盘事件，可以看到这块盘的dd事件及其对应的延迟
+* [Linux bcc tcptop](https://www.brendangregg.com/blog/2016-10-15/linux-bcc-tcptop.html)
+    * 介绍 `tcptop` 查看当前TCP流量的统计情况，按大小排列
+    * 之前在 [eBPF学习实践系列（二） -- bcc tools网络工具集](https://xiaodongq.github.io/2024/06/10/bcc-tools-network/#32-tcptop%E7%BB%9F%E8%AE%A1tcp%E5%8F%91%E9%80%81%E6%8E%A5%E6%94%B6%E7%9A%84%E5%90%9E%E5%90%90%E9%87%8F) 里也实验过了。
+* [Linux bcc ext4 Latency Tracing](https://www.brendangregg.com/blog/2016-10-06/linux-bcc-ext4dist-ext4slower.html)
+    * 使用 `ext4dist` 追踪ext4文件系统的操作延迟，`write`、`read`、`open`等操作
+    * `ext4slower` 查看高延迟
+
+以及几篇解释指标迷惑性的文章：
+
+* [CPU Utilization is Wrong](https://www.brendangregg.com/blog/2017-05-09/cpu-utilization-is-wrong.html)
+* [Linux Load Averages: Solving the Mystery](https://www.brendangregg.com/blog/2017-08-08/linux-load-averages.html)
+
+[Latency Heat Maps](https://www.brendangregg.com/HeatMaps/latency.html)
+
+* 介绍了**延迟热力图**
+* 通过bcc的`biosnoop.py`，或者perf-tools里面的`iosnoop`（针对老版本内核用perf写的）采集，而后通过：[HeatMap](https://github.com/brendangregg/HeatMap)生成
+    * `/usr/share/bcc/tools/biosnoop > out.biosnoop`，用`stress -c 8 -m 4 -i 4`加点压力采集
+    * awk 'NR > 1 { print $1, 1000 * $NF }' out.biosnoop | /home/local/HeatMap/trace2heatmap.pl --unitstime=s --unitslabel=us --maxlat=2000 > out.biosnoop.svg
+
+试了下，长这样（可见[heatmap_sample实验归档](https://github.com/xiaodongQ/prog-playground/tree/main/heatmap_sample)）：  
+[biosnoop-heatmap](/images/out.biosnoop.svg)
+
 ### 2.2. 软中断案例
 
 [Redis 延迟毛刺问题定位-软中断篇](https://www.cyningsun.com/09-17-2024/redis-latency-irqoff.html)
@@ -100,7 +140,8 @@ Counting cache functions... Output every 1 seconds.
     * 持续观察一天，问题不再复现
 * 网络团队判断是业务层有周期性阻塞性的任务，导致**软中断线程收包阻塞**，`rx drop`是因为软中断线程收包慢导致的。
     * 使用字节跳动团队的 [trace-irqoff](https://github.com/bytedance/trace-irqoff) 监控中断延迟
-* 可`perf record -e skb:kfree_skb`检查丢包
+    * 在自己家里的机器上试了下好像没结果，后续按需使用。编译会生成一个`.ko`，`install`会加载到内核中。
+* 可`perf record -e skb:kfree_skb`检查丢包（也可利用各类eBPF工具）
     * 腾讯、字节等厂在此基础上进行了更加友好的封装：nettrace、netcap
 
 `ifconfig`、`ethtool -S`统计信息示例，关注发送和接收的计数统计（非案例中的采集）：
@@ -111,7 +152,6 @@ Counting cache functions... Output every 1 seconds.
 enp4s0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
         inet 192.168.1.150  netmask 255.255.255.0  broadcast 192.168.1.255
         ...
-        ether 1c:69:7a:f5:39:32  txqueuelen 1000  (Ethernet)
         RX packets 3424820  bytes 3773136623 (3.5 GiB)
         RX errors 0  dropped 300959  overruns 0  frame 0
         TX packets 1365612  bytes 142186791 (135.5 MiB)
@@ -125,14 +165,7 @@ NIC statistics:
      tx_errors: 0
      rx_errors: 0
      rx_missed: 0
-     align_errors: 0
-     tx_single_collisions: 0
-     tx_multi_collisions: 0
-     unicast: 2691160
-     broadcast: 729420
-     multicast: 4241
-     tx_aborted: 0
-     tx_underrun: 0
+     ...
 ```
 
 网络队列、ring buffer查看相关命令示例见：[实用工具集索引](https://xiaodongq.github.io/2025/04/14/handy-tools/)
@@ -167,10 +200,49 @@ NIC statistics:
 
 ### 2.4. eBPF辅助案例
 
-挖坑的张师傅：
+* [eBPF/Ftrace 双剑合璧：no space left on device 无处遁形](https://mp.weixin.qq.com/s/VuD20JgMQlbf-RIeCGniaA)
+    * 问题：生产环境中遇到了几次创建容器报错 ”no space left on device“ 失败，但排查发现磁盘使用空间和 inode 都比较正常
+    * 定位：
+        * 拿报错信息在内核中直接搜索
+        * 利用bcc tools提供的 **`syscount`**（ubuntu上是`syscount-bpfcc`），基于错误码来进行系统调用过滤
+        * `syscount-bpfcc -e ENOSPC --ebpf` 指定错误码，初步确定了 dokcerd 系统调用 `mount` 的返回 ENOSPC 报错
+            * `mount`中的实现，会调用：`__arm64_sys_mount`（arm平台）
+        * 而后利用perf-tools提供的 **`funcgraph`**，跟踪内核函数的调用子流程
+            * `./funcgraph -m 2 __arm64_sys_mount`，限制堆栈层级
+            * 在内核函数调用过程中，如果遇到出错，一般会直接跳转到错误相关的清理函数逻辑中（不再继续调用后续的子函数），这里我们可将注意力从 __arm64_sys_mount 函数转移到尾部的内核函数 `path_mount` 中重点分析。
+        * 通过bcc tools提供的 **`trace`**（ubuntu上是trace-bpfcc） 获取整个函数调用链的返回值（上述`path_mount`的子流程都进行监测）
+            * 跟踪到其中`count_mounts`的返回值 0xffffffe4 转成 10 进制，则正好为 -28（0x1B)，= -ENOSPC（28）
+        * 进一步分析`count_mounts`的源码确定到了原因：确定是当前namespace中加载的文件数量超过了系统所允许的`sysctl_mount_max`最大值
+    * 在根源定位以后，将该值调大为默认值 100000，重新 docker run 命令即可成功。
 
-* [一次使用 eBPF LSM 来解决系统时间被回调的记录](https://mp.weixin.qq.com/s/6jpXhWpHhGbkz6fHSKckBw)
 * [一次使用 ebpf 来解决 k8s 网络通信故障记录](https://mp.weixin.qq.com/s/cK8Ffhr2M6okysu-_iI6jg)
+    * 场景问题：网络方案使用的是 Flannel VXLAN 覆盖网络，发送一些数据到对端的 vxlan 监听的 8472 端口，是可以抓到包的，说明网络链路是通的。但是vxlan 发送的 udp 包对端却始终收不到
+    * 定位：
+        * 找到其中一个 vxlan 包来手动发送：
+            * 使用 nc 手动发送，通过抓包确认对端没有收到，
+            * 但是随便换一个内容（里面是普通 ascii 字符串）发送，对端是可以立刻抓到包的。
+        * 通过分析分析两边的丢包（使用 dropwatch、systemtap 等工具），并没有看到 udp 相关的丢包，因此推断问题可能出现在了 vxlan 包的特点上，大概率是被中间交换机等设备拦截。
+        * 拦截设备如何可以精准识别 vxlan 的包？查看rfc了解 vxlan 的特征
+            * 可以知道 vxlan 包的包头是固定的 0x08，中间交换机大概率是根据这个来判断的
+            * 于是初步的测试，把一直发送不成功的包，稍微改一下。
+            * 只改了一个字节，对端就能收到了，vxlan 的 flag 也变为了 0x88
+    * 解决方式可选
+        * 联系客户处理、切换k8s网路模型、使用iptables或eBPF来hack修改
+    * 说下hack方式：使用rust aya来快速开发 ebpf 程序，`Aya`是一个用 Rust 编写的 eBPF 开发框架，专注于简化 Linux eBPF 程序的开发过程。
+        * 使用 ebpf 来把每个发出去的 vxlan 包的第一个字节从 0x08 改为 0x88（或者其它），收到对端的 vxlan 包以后，再把 0x88 还原为 0x08，交给内核处理 vxlan 包
+        * 处理出站流量（egress）：把 vxlan 包中第一个字节从 0x08 改为 0x88；
+        * 出入入站：ingress 流量处理是完全一样的，把 0x88 改为 0x80
+* [一次使用 eBPF LSM 来解决系统时间被回调的记录](https://mp.weixin.qq.com/s/6jpXhWpHhGbkz6fHSKckBw)
+
+若要自己写eBPF工具，结合场景更有体感，可以看看DBdoctor的几篇文章：
+
+* [eBPF实战教程二｜数据库网络流量最精准的量化方法(含源码)](https://www.modb.pro/db/1799006796924407808)
+    * 基于BCC，利用`kprobe`写了一个eBPF程序，观测MySQL的接收和发送的数据包
+    * 对于统计TCP接收的网络流量，应该选择`tcp_cleanup_rbuf`函数，而不是选择`tcp_recvmsg`。选用`tcp_recvmsg`函数会存在统计的重复和遗漏
+    * 探测了：`tcp_sendmsg`和`tcp_cleanup_rbuf`函数
+* [eBPF实战教程三｜数据库磁盘IO最精准的量化方法(含源码)](https://www.modb.pro/db/1802889896725139456)
+    * 基于BCC，利用`kprobe`写了一个eBPF程序，观测MySQL库表维度的磁盘IO的读写
+    * 探测了：`vfs_read`和`vfs_write`
 
 ## 3. 性能优化
 
