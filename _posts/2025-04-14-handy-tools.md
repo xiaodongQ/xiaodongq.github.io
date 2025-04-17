@@ -8,6 +8,8 @@ pin: true
 
 一些工具和小技巧，有时候要去翻历史博客或者重新搜索，此处进行归档索引，便于随时查找和使用。
 
+![handy-tools.drawio](/images/handy-tools.drawio.svg)
+
 ## 1. Wireshark
 
 ### 1.1. 协议包示意图（Packet Diagram）
@@ -251,9 +253,92 @@ ESTAB 0      266148 [::ffff:192.168.1.62]:59606 [::ffff:10.12.152.253]:8008 user
          ts sack cubic wscale:7,7 rto:201 rtt:0.889/0.061 ato:40 mss:1448 pmtu:1500 rcvmss:536 advmss:1448 cwnd:291 ssthresh:217 bytes_sent:201549420 bytes_retrans:503904 bytes_acked:200779369 bytes_received:40824 segs_out:139531 segs_in:36139 data_segs_out:139525 data_segs_in:185 send 3791838020bps lastrcv:3 pacing_rate 4547647888bps delivery_rate 3241453728bps delivered:139299 busy:964ms unacked:184 retrans:0/348 dsack_dups:305 reordering:300 reord_seen:13051 rcv_space:14480 rcv_ssthresh:64088 minrtt:0.044   
 ```
 
+### 7.2. 硬盘相关工具命令
+
+下面工具只是主要关注了2个硬盘相关字段，还有很多其他信息。工具放在这里备用，用的时候能第一时间想起来。
+
+lsblk、fdisk、smarctl、/sys/block文件系统、blockdev、lshw、hdparm
+
+1、查看扇区：
+
+```sh
+# 1、lsblk
+[root@localhost test]# lsblk /dev/sda -d -o NAME,PHY-SEC,LOG-SEC
+NAME PHY-SEC LOG-SEC
+sda     4096     512
+
+# 2、fdisk -l
+[root@localhost test]# fdisk -l /dev/sda | grep "Sector size"
+Sector size (logical/physical): 512 bytes / 4096 bytes
+
+# 3、smartctl
+[root@localhost Service]# smartctl -a /dev/sda | grep "Sector Size"
+Sector Sizes:     512 bytes logical, 4096 bytes physical
+
+# 4、hdparm（不适用于NVME接口）
+[root@localhost test]# hdparm -I /dev/sda | grep "Sector size"
+        Logical  Sector size:                   512 bytes
+        Physical Sector size:                  4096 bytes
+
+# 5、/sys/block查看逻辑扇区大小（通常与文件系统相关）
+[root@localhost test]# cat /sys/block/sda/queue/logical_block_size
+512
+# /sys/block查看物理扇区大小（磁盘硬件实际扇区）
+[root@localhost test]# cat /sys/block/sda/queue/physical_block_size
+4096
+
+# 6、blockdev 查看逻辑扇区大小
+[root@localhost test]# blockdev --getss /dev/sda
+512
+# blockdev 查看物理扇区大小
+[root@localhost test]# blockdev --getpbsz /dev/sda
+4096
+```
+
+2、是否SSD：
+
+```sh
+# 1、lsblk，ROTA 或者 MODEL型号判断
+[root@localhost test]# lsblk -d -o NAME,ROTA,SIZE,MODEL
+NAME    ROTA   SIZE MODEL
+sda        1  18.2T xx20000NM002H-xxxx33
+sdb        1  18.2T xx20000NM002H-xxxx33
+sdy        0 476.9G xx512Gxxxxxx
+nvme1n1    0 953.9G xx1Txxxxxxxx
+
+# 2、/sys/block文件系统
+[root@localhost test]# cat /sys/block/sda/queue/rotational
+1
+
+# 3、smartctl 有转速则为HDD
+[root@localhost test]# smartctl -a /dev/sda | grep "Rotation Rate"
+Rotation Rate:    7200 rpm
+
+# 4、lshw
+[root@localhost test]# lshw -class disk -short
+H/W path             Device        Class          Description
+=============================================================
+/0/100/11.5/0.0.0    /dev/sdy      disk           512GB xx512Gxxxxxx
+/0/100/1b/0/1        /dev/nvme0n1  disk           960GB NVMe disk
+/0/100/1d/0/1        /dev/nvme1n1  disk           1024GB NVMe disk
+/0/101/0/0.0.0       /dev/sdb      disk           20TB xx20000xxxxxx-3K
+/0/101/0/0.1.0       /dev/sda      disk           20TB xx20000xxxxxx-3K
+```
+
 ## 8. 扩展工具
 
-### 8.1. gdb工具：pwndbg
+### 8.1. C++工具：Compiler Explorer 和 C++ Insights
+
+1、**Compiler Explorer**：[Compiler Explorer](https://godbolt.org/)
+
+* 支持各类语言的编译（C++、go、rust...），选择不同编译器，设置不同选项，进行快速验证
+* 还可以查看汇编输出
+
+2、**C++ Insights**：[C++ Insights](https://cppinsights.io/)
+
+* 理解编译器怎么处理代码的
+
+### 8.2. gdb工具：pwndbg
 
 梳理内存分配器时了解到的工具，试了下功能，效果很好。除了覆盖原有的gdb命令，还会显示对应的汇编，配色效果很炫，后续若学习汇编可以用起来。
 
@@ -266,3 +351,25 @@ ESTAB 0      266148 [::ffff:192.168.1.62]:59606 [::ffff:10.12.152.253]:8008 user
 和gdb一样使用，展示的信息很丰富，还有一些特定功能命令，比如`arena`查看堆区结构。各个部分可以和tmux配置结合，在不同的窗口展示。
 
 ![pwndbg-case](/images/2025-04-15-pwndbg-case.png)
+
+### 8.3. 画图：draw.io 和 Excalidraw
+
+* [Excalidraw](https://excalidraw.com/)
+* [draw.io](https://app.diagrams.net/)
+
+1、记录下draw.io常用组件的快捷键，用起来也比较丝滑，不过快捷键体验感比较好的还得是Excalidraw。
+
+```
+a: 文本
+d: 方框
+c: 箭头
+f: 圆
+r: 菱形
+x: 自由绘制
+```
+
+2、draw.io 的几个亮点
+
+* **动态流图**，即文章开头的动图效果
+* 设置默认样式
+* 配色比较美观
