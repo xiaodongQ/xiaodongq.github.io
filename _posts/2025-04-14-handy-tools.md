@@ -86,7 +86,7 @@ pin: true
 
 当前几个工具集里有些功能是重复的：`bcc tools`（也包括支持`CO-RE`的libbpf版本）、`bpftrace tools`，以平时使用的情况来看，原生安装的`bcc tools`/`bpftrace tools`通用性更好。自己归档的工具（[tools](https://github.com/xiaodongQ/prog-playground/tree/main/tools)）是基于较新的版本，里面有些实现要求更高的内核版本。
 
-> 1）较高版本内核（比如5.10），尽量用新工具：libbpf版本更小、更快
+> 1）较高版本内核（比如5.10），可以用新工具：libbpf版本更小、更快
 >
 > 2）较低版本内核，用默认安装版本（比如`yum instal`），或者去github仓库下载对应版本
 {: .prompt-tip }
