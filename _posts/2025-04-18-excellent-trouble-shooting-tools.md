@@ -7,7 +7,7 @@ tags: [Troubleshooting]
 
 ## 1. 背景
 
-限于 [问题定位和性能优化案例集锦](https://xiaodongq.github.io/2025/04/15/excellent-trouble-shooting/) 的篇幅，其中的几个工具实验在本篇中进行记录。
+限于 [问题定位和性能优化案例集锦](https://xiaodongq.github.io/2025/04/15/excellent-trouble-shooting/) 的篇幅，其中的一些指标、工具、实验等在本篇中进行记录。
 
 ## 2. 系统指标
 
@@ -299,7 +299,7 @@ redis-server   1206    376.53                0 /usr/bin/redis-server:processComm
 
 上面是yum安装的Redis服务，为了避免符号丢失的影响。这里也使用自己编译的`redis-server`启动下，并追踪对应的bin。
 
-貌似也没更多的堆栈，不过。
+不过貌似也没更多的堆栈。
 
 ```sh
 [CentOS-root@xdlinux ➜ src git:(6.0) ✗ ]$ /usr/share/bcc/tools/funcslower -UK -u 1 '/home/workspace/redis/src/redis-server:processCommand'
@@ -328,9 +328,7 @@ funcslower     71980    22.70               3a vfs_write
 
 ### 3.3. funcgraph （perf-tools工具）
 
-`funcgraph` 工具之前用过很多次了，很好用，这里特别再提一下。但只是在perf-tools中，bcc里没有。
-
-追踪内核态的接口调用栈，
+`funcgraph` 工具之前用过很多次了，追踪内核态的接口调用栈很方便，这里特别再提一下。只是在perf-tools中，bcc里没有。
 
 比如下文中的使用示例：  
 [Linux存储IO栈梳理（二） -- Linux内核存储栈流程和接口](https://xiaodongq.github.io/2024/08/13/linux-kernel-fs/)
@@ -341,7 +339,7 @@ funcslower     71980    22.70               3a vfs_write
 
 bcc的 `syscount`（上面有小节说明） 也提供系统调用的耗时统计情况。
 
-不过此处统计效果更好，提供了`histogram`分布图，可以直观的发现长尾问题。
+不过此处`perf trace`统计效果更好，提供了`histogram`分布图，可以直观的发现长尾问题。
 
 ```sh
 [CentOS-root@xdlinux ➜ tools ]$ perf trace -p $(pidof redis-server) -s
@@ -457,7 +455,7 @@ drwxr-xr-x 2 root root 67 Mar 30 10:29 127.0.0.1-2025-03-30-10:29:58
 
 分析dump文件需要内核vmlinux，安装对应内核的dbgsym包（没有则手动下载rmp安装：http://debuginfo.centos.org）
 
-内核调试符号包：kernel-debuginfo、kernel-debuginfo-common。可以到阿里云的镜像站下载对应内核版本，比较快。
+内核调试符号包：kernel-debuginfo、kernel-debuginfo-common。可以到阿里云的镜像站（比如 [centos-debuginfo](https://developer.aliyun.com/mirror/centos-debuginfo/)）下载对应内核版本，比较快。
 
 `rpm -ivh`手动安装，会安装到：`/usr/lib/debug/lib/modules`
 

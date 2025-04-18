@@ -78,12 +78,12 @@ Counting cache functions... Output every 1 seconds.
 
 #### 2.1.2. 其他博客内容
 
-先列举下面内容，还有很多内容值得一读和实验：
+先列下面这些文章，还有很多内容值得一读和实验：
 
 * [Linux ftrace TCP Retransmit Tracing](https://www.brendangregg.com/blog/2014-09-06/linux-ftrace-tcp-retransmit-tracing.html)
     * 用ftrace（perf-tools里面的`tcpretrans`）追踪TCP重传
     * 之前用tc构造过重传实验，不过用的是bcc tools里的`tcpretrans`。有一个差别是：**perf-tools中的`tcpretrans`可以追踪堆栈**。
-        * bcc实验见：[eBPF学习实践系列（二） -- bcc tools网络工具集](https://xiaodongq.github.io/2024/06/10/bcc-tools-network/#38-tcpretrans%E9%87%8D%E4%BC%A0%E7%9A%84tcp%E8%BF%9E%E6%8E%A5%E8%B7%9F%E8%B8%AA)
+        * 之前自己的bcc实验见：[eBPF学习实践系列（二） -- bcc tools网络工具集](https://xiaodongq.github.io/2024/06/10/bcc-tools-network/#38-tcpretrans%E9%87%8D%E4%BC%A0%E7%9A%84tcp%E8%BF%9E%E6%8E%A5%E8%B7%9F%E8%B8%AA)
 * [perf sched for Linux CPU scheduler analysis](https://www.brendangregg.com/blog/2017-03-16/perf-sched.html)
     * 介绍`perf sched`追踪调度延迟和分布情况，bcc中提供的调度相关工具为：`runqlat`、`runqslower`、`runqlen`
 * [Linux bcc/BPF Run Queue (Scheduler) Latency](https://www.brendangregg.com/blog/2016-10-08/linux-bcc-runqlat.html)
@@ -109,11 +109,12 @@ Counting cache functions... Output every 1 seconds.
 [Latency Heat Maps](https://www.brendangregg.com/HeatMaps/latency.html)
 
 * 介绍了**延迟热力图**
-* 通过bcc的`biosnoop.py`，或者perf-tools里面的`iosnoop`（针对老版本内核用perf写的）采集，而后通过：[HeatMap](https://github.com/brendangregg/HeatMap)生成
+* 通过bcc的`biosnoop.py`，或者perf-tools里面的`iosnoop`（针对老版本内核用perf写的）采集，而后通过 [HeatMap](https://github.com/brendangregg/HeatMap) 生成热力图
+* 实验下：
     * `/usr/share/bcc/tools/biosnoop > out.biosnoop`，用`stress -c 8 -m 4 -i 4`加点压力采集
-    * awk 'NR > 1 { print $1, 1000 * $NF }' out.biosnoop | /home/local/HeatMap/trace2heatmap.pl --unitstime=s --unitslabel=us --maxlat=2000 > out.biosnoop.svg
+    * `awk 'NR > 1 { print $1, 1000 * $NF }' out.biosnoop | /home/local/HeatMap/trace2heatmap.pl --unitstime=s --unitslabel=us --maxlat=2000 > out.biosnoop.svg`
 
-试了下，长这样（可见[heatmap_sample实验归档](https://github.com/xiaodongQ/prog-playground/tree/main/heatmap_sample)）：  
+生成的图长这样（可见[heatmap_sample实验归档](https://github.com/xiaodongQ/prog-playground/tree/main/heatmap_sample)）：  
 ![biosnoop-heatmap](/images/out.biosnoop.svg)
 
 ### 2.2. 软中断案例
@@ -123,7 +124,7 @@ Counting cache functions... Output every 1 seconds.
 问题：通过`业务监控系统`，发现线上Redis集群有延迟毛刺，出现的时间点不定，但大概每小时会有1次，每次持续大概10分钟
 
 * **整个链路**是 Redis SDK -> Redis Proxy -> 各个Redis
-    * 性能之巅中的建议：**性能分析时先画出架构链路图**
+    * PS：性能之巅中的建议 -- **性能分析时先画出架构链路图**
 * 通过监控面板，查看 Redis Proxy 调 Redis 的链路，有毛刺
 * eBPF 抓取 Redis 执行耗时并未发现慢速命令，说明并非是业务使用命令导致的。
     * **TODO：** eBPF检查应用程序的关键函数（uprobe？还可以offcputime检查fork、io等操作）
