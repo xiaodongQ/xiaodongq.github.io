@@ -102,14 +102,63 @@ VmFlags: rd ex mr mw me dw sd
 
 ### 3.1. bcc syscount
 
-用`syscount`统计错误码出现的次数：
+```sh
+[CentOS-root@xdlinux ➜ tools ]$ ./syscount -h
+usage: syscount [-h] [-p PID] [-i INTERVAL] [-d DURATION] [-T TOP] [-x]
+                [-e ERRNO] [-L] [-m] [-P] [-l]
+
+Summarize syscall counts and latencies.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p PID, --pid PID     trace only this pid
+  -i INTERVAL, --interval INTERVAL
+                        print summary at this interval (seconds)
+  -d DURATION, --duration DURATION
+                        total duration of trace, in seconds
+  -T TOP, --top TOP     print only the top syscalls by count or latency
+  -x, --failures        trace only failed syscalls (return < 0)
+  -e ERRNO, --errno ERRNO
+                        trace only syscalls that return this error (numeric or
+                        EPERM, etc.)
+  -L, --latency         collect syscall latency
+  -m, --milliseconds    display latency in milliseconds (default:
+                        microseconds)
+  -P, --process         count by process and not by syscall
+  -l, --list            print list of recognized syscalls and exit
+```
+
+1、指定进程，查看有什么耗时高的函数
 
 ```sh
-[CentOS-root@xdlinux ➜ ~ ]$ /usr/share/bcc/tools/syscount -e ENOSPC       
+# -L打印耗时
+[CentOS-root@xdlinux ➜ tools ]$ ./syscount -L -p $(pidof redis-server)  -i 1 
+Tracing syscalls, printing top 10... Ctrl+C to quit.
+[22:36:12]
+SYSCALL                   COUNT        TIME (us)
+epoll_wait                    9       903357.105
+openat                       10          165.590
+read                         20          128.471
+getpid                       10           21.898
+close                        10           10.570
+
+[22:36:13]
+SYSCALL                   COUNT        TIME (us)
+epoll_wait                   10      1003186.186
+openat                       10          166.682
+read                         20          128.159
+getpid                       10           20.359
+close                        10            9.638
+```
+
+2、用`syscount`统计错误码出现的次数：
+
+```sh
+[CentOS-root@xdlinux ➜ ~ ]$ /usr/share/bcc/tools/syscount -e ENOSPC
 Tracing syscalls, printing top 10... Ctrl+C to quit.
 ```
 
-也可根据错误码查看eBPF的程序代码细节：
+3、也可根据错误码查看eBPF的程序代码细节：
 
 ```sh
 # syscount -e ENOSPC 用于统计返回 ENOSPC 错误的系统调用次数
@@ -146,7 +195,247 @@ TRACEPOINT_PROBE(raw_syscalls, sys_enter) {
     ...
 ```
 
-### 3.2. kdump 和 crash
+### 3.2. funcslower 跟踪用户空间接口耗时
+
+> bcc 和 perf-tools 中都有`funcslower`，但是 perf-tools 中的功能更丰富一些。
+{: .prompt-tip }
+
+#### 3.2.1. bcc和perf-tools中的 funcslower 说明
+
+1、perf-tools 中的 funcslower：只能追踪内核函数，没有用户程序的函数
+
+```sh
+[CentOS-root@xdlinux ➜ tools git:(main) ]$ perf-tools/bin/funcslower -h
+USAGE: funcslower [-aChHPt] [-p PID] [-L TID] [-d secs] funcstring latency_us
+                 -a              # all info (same as -HPt)
+                 -C              # measure on-CPU time only
+                 -d seconds      # trace duration, and use buffers
+                 -h              # this usage message
+                 -H              # include column headers
+                 -p PID          # trace when this pid is on-CPU
+                 -L TID          # trace when this thread is on-CPU
+                 -P              # show process names & PIDs
+                 -t              # show timestamps
+  eg,
+       funcslower vfs_read 10000 # trace vfs_read() slower than 10 ms
+```
+
+追踪的信息比较简单：
+
+```sh
+[CentOS-root@xdlinux ➜ bin git:(master) ✗ ]$ ./funcslower vfs_write 10 -a      
+Tracing "vfs_write" slower than 10 us... Ctrl-C to end.
+  8) + 28.774 us   |  } /* vfs_write */
+  6) + 39.595 us   |  } /* vfs_write */
+ 13) + 12.122 us   |  } /* vfs_write */
+  6) + 19.035 us   |  } /* vfs_write */
+ 13) + 10.009 us   |  } /* vfs_write */
+  6) + 20.338 us   |  } /* vfs_write */
+  6) + 12.894 us   |  } /* vfs_write */
+  8) + 12.854 us   |  } /* vfs_write */
+ 13) + 16.992 us   |  } /* vfs_write */
+  6) + 53.711 us   |  } /* vfs_write */
+```
+
+2、bcc中的 funcslower：
+
+```sh
+[CentOS-root@xdlinux ➜ tools git:(main) ]$ /usr/share/bcc/tools/funcslower -h
+usage: funcslower [-h] [-p PID] [-m MIN_MS] [-u MIN_US] [-a ARGUMENTS] [-T]
+                  [-t] [-v] [-f] [-U] [-K]
+                  function [function ...]
+
+Trace slow kernel or user function calls.
+
+positional arguments:
+  function              function(s) to trace
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -p PID, --pid PID     trace this PID only
+  -m MIN_MS, --min-ms MIN_MS
+                        minimum duration to trace (ms)
+  -u MIN_US, --min-us MIN_US
+                        minimum duration to trace (us)
+  -a ARGUMENTS, --arguments ARGUMENTS
+                        print this many entry arguments, as hex
+  -T, --time            show HH:MM:SS timestamp
+  -t, --timestamp       show timestamp in seconds at us resolution
+  -v, --verbose         print the BPF program for debugging purposes
+  -f, --folded          output folded format, one line per stack (for flame
+                        graphs)
+  -U, --user-stack      output user stack trace
+  -K, --kernel-stack    output kernel stack trace
+
+examples:
+  ./funcslower vfs_write        # trace vfs_write calls slower than 1ms
+  ./funcslower -m 10 vfs_write  # same, but slower than 10ms
+  ./funcslower -u 10 c:open     # trace open calls slower than 10us
+  ./funcslower -p 135 c:open    # trace pid 135 only
+  ./funcslower c:malloc c:free  # trace both malloc and free slower than 1ms
+  ./funcslower -a 2 c:open      # show first two arguments to open
+  ./funcslower -UK -m 10 c:open # Show user and kernel stack frame of open calls slower than 10ms
+  ./funcslower -f -UK c:open    # Output in folded format for flame graphs
+```
+
+#### 3.2.2. bcc funcslower使用实验
+
+`funcslower` **可以跟踪用户空间接口**，包括glibc库和应用程序。也可以跟踪内核函数。
+
+比如下面追踪`Redis`中的事件循环处理函数，通过`redis-cli`连接后追踪到下述函数调用：
+
+```sh
+# `-UK`：用户空间和内核空间均输出；
+# `-u 300`：追踪比 300 us更慢的函数；
+# `-p` 追踪指定进程
+# '/usr/bin/redis-server:processCommand'：追踪应用程序的函数，格式是：`应用程序:函数名`（上面的不使用`-p`指定进程也可以使用此处追踪）
+[CentOS-root@xdlinux ➜ ~ ]$ /usr/share/bcc/tools/funcslower -UK -u 300 -p $(pidof redis-server) '/usr/bin/redis-server:processCommand'
+Tracing function calls slower than 300 us... Ctrl+C to quit.
+COMM           PID    LAT(us)             RVAL FUNC
+redis-server   1206    376.53                0 /usr/bin/redis-server:processCommand 
+    b'processInputBuffer'
+    b'[unknown]'
+```
+
+上面是yum安装的Redis服务，为了避免符号丢失的影响。这里也使用自己编译的`redis-server`启动下，并追踪对应的bin。
+
+貌似也没更多的堆栈，不过。
+
+```sh
+[CentOS-root@xdlinux ➜ src git:(6.0) ✗ ]$ /usr/share/bcc/tools/funcslower -UK -u 1 '/home/workspace/redis/src/redis-server:processCommand'
+Tracing function calls slower than 1 us... Ctrl+C to quit.
+COMM           PID    LAT(us)             RVAL FUNC
+redis-server   71546   592.09                0 /home/workspace/redis/src/redis-server:processCommand 
+    b'processCommandAndResetClient'
+redis-server   71546    15.20                0 /home/workspace/redis/src/redis-server:processCommand 
+    b'processCommandAndResetClient'
+```
+
+追踪内核函数`vfs_write`的示例：
+
+```sh
+[CentOS-root@xdlinux ➜ src git:(6.0) ✗ ]$ /usr/share/bcc/tools/funcslower vfs_write -u 10 -KU
+Tracing function calls slower than 10 us... Ctrl+C to quit.
+COMM           PID    LAT(us)             RVAL FUNC
+sshd           70712    29.73               1c vfs_write 
+    b'kretprobe_trampoline'
+    b'__libc_write'
+funcslower     71980    22.70               3a vfs_write 
+    b'kretprobe_trampoline'
+    b'__write'
+...
+```
+
+### 3.3. funcgraph （perf-tools工具）
+
+`funcgraph` 工具之前用过很多次了，很好用，这里特别再提一下。但只是在perf-tools中，bcc里没有。
+
+追踪内核态的接口调用栈，
+
+比如下文中的使用示例：  
+[Linux存储IO栈梳理（二） -- Linux内核存储栈流程和接口](https://xiaodongq.github.io/2024/08/13/linux-kernel-fs/)
+
+## 4. perf
+
+### 4.1. perf trace
+
+bcc的 `syscount`（上面有小节说明） 也提供系统调用的耗时统计情况。
+
+不过此处统计效果更好，提供了`histogram`分布图，可以直观的发现长尾问题。
+
+```sh
+[CentOS-root@xdlinux ➜ tools ]$ perf trace -p $(pidof redis-server) -s
+^C
+ Summary of events:
+
+ redis-server (1206), 922 events, 100.0%
+
+   syscall            calls  errors  total       min       avg       max       stddev
+                                     (msec)    (msec)    (msec)    (msec)        (%)
+   --------------- --------  ------ -------- --------- --------- ---------     ------
+   epoll_wait            77      0  7624.287     0.000    99.017   100.533      1.32%
+   openat                77      0     1.561     0.015     0.020     0.033      3.04%
+   read                 154     77     1.470     0.003     0.010     0.048      5.61%
+   close                 77      0     0.157     0.001     0.002     0.003      2.14%
+   getpid                77      0     0.155     0.001     0.002     0.003      1.91%
+```
+
+### 4.2. perf sched 跟踪调度
+
+跟着 Brendan Gregg 大佬的文章实验：[perf sched for Linux CPU scheduler analysis](https://www.brendangregg.com/blog/2017-03-16/perf-sched.html)
+
+```sh
+# 需要先record
+perf sched record -- sleep 10
+# 再 perf script --header、perf sched latency、perf sched map、perf sched timehist 等操作，都要依赖上面的数据
+perf sched timehist
+```
+
+```sh
+# 查看sched相关tracepoint
+# ![关注的sched events](https://pic2.zhimg.com/v2-1f2e0cf64d471d642537d3839f414311_1440w.jpg)
+[CentOS-root@xdlinux ➜ ~ ]$ bpftrace -l 'tracepoint:sched:*'
+tracepoint:sched:sched_kthread_stop
+# perf也可查看，模糊匹配
+[CentOS-root@xdlinux ➜ ~ ]$ perf list sched
+  sched:sched_swap_numa                              [Tracepoint event]
+  sched:sched_switch                                 [Tracepoint event]
+  sched:sched_wait_task                              [Tracepoint event]
+```
+
+`perf sched`：分析调度时延
+
+```sh
+# perf sched record 采集
+[CentOS-root@xdlinux ➜ ~ ]$ perf sched record sleep 5
+[ perf record: Woken up 1 times to write data ]
+[ perf record: Captured and wrote 0.485 MB perf.data (2267 samples) ]
+
+# perf script / perf sched script 分析切换
+[CentOS-root@xdlinux ➜ ~ ]$ perf script
+    perf 35478 [000] 605084.480470: sched:sched_stat_runtime: comm=perf pid=35478 runtime=48942 [ns] vruntime=436496118956 [ns]
+    perf 35478 [000] 605084.480473:       sched:sched_waking: comm=migration/0 pid=12 prio=0 target_cpu=000
+    perf 35478 [000] 605084.480474: sched:sched_stat_runtime: comm=perf pid=35478 runtime=5360 [ns] vruntime=436496124316 [ns]
+    perf 35478 [000] 605084.480475:       sched:sched_switch: prev_comm=perf prev_pid=35478 prev_prio=120 prev_state=R+ ==> next_comm=migration/0 next_pid=12 next_prio=0
+migration/0    12 [000] 605084.480477: sched:sched_migrate_task: comm=perf pid=35478 prio=120 orig_cpu=0 dest_cpu=1
+migration/0    12 [000] 605084.480483:       sched:sched_switch: prev_comm=migration/0 prev_pid=12 prev_prio=0 prev_state=D ==> next_comm=swapper/0 next_pid=0 next_prio=120
+
+# perf sched latency 分析延时
+[CentOS-root@xdlinux ➜ ~ ]$ perf sched latency
+---------------------------------------------------------------------------------------------------------------------------------
+  Task        |   Runtime ms  | Switches | Avg delay ms    | Max delay ms    | Max delay start           | Max delay end          |
+ --------------------------------------------------------------------------------------------------------------------------------
+  mysqld:(24)        |  6.093 ms |   24  | avg:   0.000 ms | max:   0.000 ms | max start:     0.000000 s | max end:     0.000000 s
+  tuned:(3)          |  2.057 ms |    3  | avg:   0.000 ms | max:   0.000 ms | max start:     0.000000 s | max end:     0.000000 s
+  perf:(2)           |  1.655 ms |    1  | avg:   0.000 ms | max:   0.000 ms | max start:     0.000000 s | max end:     0.000000 s
+  sleep:35479        |  0.952 ms |    1  | avg:   0.000 ms | max:   0.000 ms | max start:     0.000000 s | max end:     0.000000 s
+  irqbalance:1117    |  0.465 ms |    1  | avg:   0.000 ms | max:   0.000 ms | max start:     0.000000 s | max end:     0.000000 s
+  in:imjournal:1763  |  0.194 ms |    1  | avg:   0.000 ms | max:   0.000 ms | max start:     0.000000 s | max end:     0.000000 s
+  NetworkManager:1200|  0.138 ms |    1  | avg:   0.000 ms | max:   0.000 ms | max start:     0.000000 s | max end:     0.000000 s
+
+# perf sched map 分析cpu情况，星号表示调度事件发生所在的 CPU，点号表示该 CPU 正在 IDLE
+[CentOS-root@xdlinux ➜ ~ ]$ perf sched map
+  *A0                                                      605084.480475 secs A0 => migration/0:12
+  *.                                                       605084.480483 secs .  => swapper:0
+   .  *B0                                                  605084.480555 secs B0 => migration/1:17
+   .  *.                                                   605084.480561 secs 
+   .   .  *C0                                              605084.480684 secs C0 => migration/2:23
+   .   .  *.                                               605084.480693 secs 
+
+# perf sched timehist
+[CentOS-root@xdlinux ➜ ~ ]$ perf sched timehist
+          time    cpu  task name                       wait time  sch delay   run time
+                        [tid/pid]                          (msec)     (msec)     (msec)
+--------------- ------  ------------------------------  ---------  ---------  ---------
+  605084.480473 [0000]  perf[35478]                                                      awakened: migration/0[12]
+  605084.480475 [0000]  perf[35478]                         0.000      0.000      0.000                                 
+  605084.480477 [0000]  migration/0[12]                                                  migrated: perf[35478] cpu 0 => 1
+  605084.480483 [0000]  migration/0[12]                     0.000      0.001      0.007                                 
+  605084.480553 [0001]  perf[35478]                                                      awakened: migration/1[17]
+  605084.480555 [0001]  perf[35478]                         0.000      0.000      0.000 
+```
+
+## 5. kdump 和 crash
 
 1、kdump：
 

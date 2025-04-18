@@ -197,10 +197,15 @@ NIC statistics:
         * 之前碰到过 `atop` 采集进程 `PSS` 导致延迟增加。此次停止所有 atop 之后，请求延迟消失。
         * 先说结论，原因：线上部分机器部署的 atop 版本 默认启用了 `-R` 选项。**在 atop 读 /proc/${pid}/smaps 时，会遍历整个进程的页表，期间会持有内存页表的锁。如果在此期间进程发生虚拟内存地址分配，也需要获取锁，就需要等待锁释放。具体到应用层面就是请求耗时毛刺。**
     * 根因分析。可以看看里面的手段思路
-        * `smaps`使用的文件类型是`seq_file`序列文件。
+        * 了解`smaps`中的内容和文件更新原理，proc使用的文件类型是`seq_file`序列文件。
             * `smaps` 文件包含了每个进程的内存段的详细信息，包括但不限于各段的大小、权限、偏移量、设备号、inode 号以及最值得注意的——各段的 `PSS（Proportional Set Size，比例集大小）`和 `RSS（Resident Set Size，常驻集大小）`。（针对多进程共享内存的场景，`PSS`的物理内存统计比`RSS`更为准确）。
             * 关于序列文件，之前梳理netstat的实现流程中也涉及了。其读取proc文件系统的`/proc/net/tcp`就是用的序列文件，其简要流程可见：[分析netstat中的Send-Q和Recv-Q](https://xiaodongq.github.io/2024/05/27/netstat-code/#3-procnettcp%E6%96%87%E4%BB%B6%E6%9B%B4%E6%96%B0%E9%80%BB%E8%BE%91) 
-        * 
+        * 进程耗时分2大部分：**用户空间** 和 **内核空间** 的耗时
+            * 在缺乏统计系统和百分位延时指标时，`用户空间`的耗时，可以使用bcc的 `funcslower`（示例实验见补充文章）
+            * `内核空间`耗时，可选工具：
+                * bcc的`syscount`，syscount 并不能直接查看调用层级，但可以通过对比不同时间区间的延迟变化发现问题，可指定进程。
+                * `perf trace`：相较于 syscount 提供了 histogram 图，**可以直观的发现长尾问题**（示例实验见补充文章）
+            * 然后，可进一步使用perf-tools的 `funcgraph` 定位到耗时异常的函数
 
 看下自己机器上 smaps内容 和 maps内容的示例（更多一点的信息可以看本文的补充篇）：
 
@@ -259,15 +264,86 @@ Pss:               28692 kB
     * 定位：
         * 拿报错信息在内核中直接搜索
         * 利用bcc tools提供的 **`syscount`**（ubuntu上是`syscount-bpfcc`），基于错误码来进行系统调用过滤
-        * `syscount-bpfcc -e ENOSPC --ebpf` 指定错误码，初步确定了 dokcerd 系统调用 `mount` 的返回 ENOSPC 报错
+        * `syscount-bpfcc -e ENOSPC --ebpf` 指定错误码，**初步确定了 dokcerd 系统调用 `mount` 的返回 ENOSPC 报错**
             * `mount`中的实现，会调用：`__arm64_sys_mount`（arm平台）
-        * 而后利用perf-tools提供的 **`funcgraph`**，跟踪内核函数的调用子流程
+        * 而后利用perf-tools提供的 **`funcgraph`，跟踪内核函数的调用子流程**
             * `./funcgraph -m 2 __arm64_sys_mount`，限制堆栈层级
             * 在内核函数调用过程中，如果遇到出错，一般会直接跳转到错误相关的清理函数逻辑中（不再继续调用后续的子函数），这里我们可将注意力从 __arm64_sys_mount 函数转移到尾部的内核函数 `path_mount` 中重点分析。
-        * 通过bcc tools提供的 **`trace`**（ubuntu上是trace-bpfcc） 获取整个函数调用链的返回值（上述`path_mount`的子流程都进行监测）
+        * 通过bcc tools提供的 **`trace`（ubuntu上是trace-bpfcc） 获取整个函数调用链的返回值**（上述`path_mount`的子流程都进行监测）
             * 跟踪到其中`count_mounts`的返回值 0xffffffe4 转成 10 进制，则正好为 -28（0x1B)，= -ENOSPC（28）
         * 进一步分析`count_mounts`的源码确定到了原因：确定是当前namespace中加载的文件数量超过了系统所允许的`sysctl_mount_max`最大值
     * 在根源定位以后，将该值调大为默认值 100000，重新 docker run 命令即可成功。
+
+* [【BPF网络篇系列-2】容器网络延时之 ipvs 定时器篇](https://www.ebpf.top/post/ebpf_network_kpath_ipvs/)
+    * kubernetes 底层负载均衡 ipvs 模块导致的网络抖动问题。
+    * 问题：容器集群中新部署的`服务A`，通过服务注册发现访问下游`服务B`，调用延时 999 线偶发抖动，测试 QPS 比较小，从业务监控上看起来比较明显，最大的延时可以达到 200 ms。
+        * 服务间的访问通过 gRPC 接口访问，节点发现基于 consul 的服务注册发现。
+    * 定位
+        * 初步定位：在服务 A 容器内的抓包分析和排查，服务A在其他ECS部署也没有改善，逐步把**范围缩小至服务 B 所在的主机上的底层网络抖动**
+        * 经过多次 ping 包测试，寻找到了某台主机 A 与 主机 B 两者之间的 **ping 延时抖动与服务调用延时抖动规律比较一致**，由于 ping 包 的分析比 gRPC 的分析更加简单直接，因此我们**将目标转移至底层网络的 ping 包测试的轨道上**。
+        * 在 ping 测试过程中分别在主机 A 和主机 B 上使用 tcpdump 抓包分析，发现在主机 B 上的 eth1 与网卡 cali95f3fd83a87 之间的延时达 `133 ms`。
+            * 到此为止问题已经逐步明确，在主机 B 上接收到 ping 包在转发过程中有 100 多ms 的延时，那么**是什么原因导致的 ping 数据包在主机 B转发的延时呢？**
+            * **网络数据包内核中的处理流程**：数据 -> 网卡DMA数据到`Ring Buffer` -> 网络设备驱动发起硬中断通知CPU（中断处理函数即`ISR，Interrupt Service Routines`） -> CPU发起软中断 -> `ksoftirqd`线程处理软中断，从Ring Buffer收包 -> 帧数据保存为一个skb -> 网络协议层处理，处理后数据放到socket的接收队列 -> 内核唤醒用户进程
+            * 之前自己也基于几篇参考链接梳理过，可见：[TCP发送接收过程（一） -- Wireshark跟踪TCP流统计图](https://xiaodongq.github.io/2024/06/30/tcp-wireshark-tcp-graphs/)
+        * 这里用了个基于bcc写的工具：[traceicmpsoftirq.py](https://gist.github.com/theojulienne/9d78a0cb68dbe56f19a2ae6316bc6846)，跟踪ping时的中断情况
+            * 使用bcc里面的`trace`追踪`icmp_echo`的效果也差不多（可到`/proc/kallsyms`里过滤icmp相关的符号）
+            * 从主机 A ping `主机B中容器IP` 的地址，每次处理包的处理都会固定落到 `CPU#0` 上
+            * 出现延时的时候该 CPU#0 都在运行软中断处理内核线程 `ksoftirqd/0`，即在处理软中断的过程中调用的数据包处理，软中断另外一种处理时机如上所述 irq_exit 硬中断退出时；
+            * 通过实际的测试验证，ping `主机B宿主机IP` 地址时候，全部都落在了 `CPU#19` 上。
+        * 而后重点开始排查 CPU#0 上的 CPU 内核态的性能指标，看看是否有运行的函数导致了软中断处理的延期。
+            * `perf top -C 0 -U` 查看CPU0
+            * 并采集CPU0的火焰图
+            * 注意到 CPU#0 的内核态中，`estimation_timer` 这个函数的使用率一直占用比较高，同样我们通过对于 CPU#0 上的火焰图分析，也基本与 perf top 的结果一致。
+        * 用perf-tools的 `funcgraph` 分析函数 estimation_timer 在内核中的调用关系图和占用延时
+            * `funcgraph -m 1 -a -d 6 estimation_timer`
+            * 注意到 estimation_timer 函数在 CPU#0 内核中的遍历一次遍历时间为 119 ms，在内核处理软中断的情况中占用过长的时间，这一定会影响到其他软中断的处理。
+            * PS：自己的环境4.18.0-348.7.1.el8_5.x86_64里，/proc/kallsyms里已经没有`estimation_timer`符号了
+        * 进一步用bcc的`softirqs`，查看CPU0的软中断延时分布
+            * `/usr/share/bcc/tools/softirqs -d  10 1 -C 0`
+            * 通过 timer 在持续 10s 内的 timer 数据分析，我们发现执行的时长分布在 [65 - 130] ms区间的记录有 5 条。这个结论完全与通过 funcgraph 工具抓取到的 estimation_timer 在 CPU#0 上的延时一致。
+        * **原因确认**：去分析 ipvs 相关的源码，使用 `estimation_timer` 的场景
+            * 从 estimation_timer 的函数实现来看，会首先调用 spin_lock 进行锁的操作，然后遍历当前 Network Namespace 下的全部 ipvs 规则。由于我们集群的某些历史原因导致生产集群中的 Service 比较多，因此导致一次遍历的时候会占用比较长的时间。
+            * 既然每个 Network Namespace 下都会有 estimation_timer 的遍历，为什么只有 CPU#0 上的规则如此多呢？
+            * 这是因为只有主机的 Host Network Namespace 中才会有全部的 ipvs 规则，这个我们也可以通过 ipvsadm -Ln (执行在 Host Network Namespace 下) 验证。
+            * 从现象来看，CPU#0 是 ipvs 模块加载的时候用于处理宿主机 Host Network Namespace 中的 ipvs 规则，当然这个核的加载完全是随机的。
+    * 解决
+        * 为了保证生产环境的稳定和实施的难易程度，最终我们把眼光定位在 Linux Kernel 热修的 `kpatch` 方案上，`kpath` 实现的 `livepatch` 功能可以实时为正在运行的内核提供功能增强，无需重新启动系统。（**`kpatch`热修复，留个印象**）
+
+trace追踪示例，在另一台机器ping即可看到本机处理对应中断的CPU：
+
+```sh
+[CentOS-root@xdlinux ➜ tools ]$ /usr/share/bcc/tools/trace icmp_echo
+PID     TID     COMM            FUNC             
+0       0       swapper/15      icmp_echo        
+0       0       swapper/15      icmp_echo        
+0       0       swapper/15      icmp_echo        
+0       0       swapper/15      icmp_echo        
+0       0       swapper/15      icmp_echo
+```
+
+* [【BPF网络篇系列-1】k8s api-server slb 异常流量定位分析](https://www.ebpf.top/post/ebpf_network_traffic_monitor/)
+    * 问题：k8s集群近期新增服务后，某天SLB（Server Load Balancing，服务负载均衡）告警出现了流量丢失
+    * 定位：
+        * 首先第一步需要确定丢包时刻出口流量流向何处，使用了 `iftop` 工具（其底层基于 `libpcap` 的机制实现）
+            * `iftop -n -t -s 5 -L 5` // -s 5 5s 后退出， -L 5 只打印最大的 5 行
+        * 由于 SLB 流量抖动时间不固定，因此需要通过定时采集的方式来进行流量记录，然后结合 SLB 的流量时间点进行分析
+            * `iftop -nNB -P -f "tcp port 6443" -t -s 60 -L 100 -o 40s`，-P显示统计中的流量端口，-o 40s 按照近 40s 排序
+        * 发现在 SLB 流量高峰**出现丢包的时候，数据都是发送到 kube-proxy 进程**，由于集群规模大概 1000 台左右，在集群 Pod 出现集中调度的时候，会出现大量的同步事件
+            * 通过阅读 kube-proxy 的源码，得知 kube-proxy 进程只会从 kube-apiserver 上**同步 service 和 endpoint 对象**
+            * 在该集群中的 Service 对象基本固定，那么在高峰流量期同步的必然是 **endpoint 对象**。
+    * 原因：
+        * SLB 高峰流量时间点正好是我们一个离线服务 A 从混部集群中重新调度的时间，而该服务的副本大概有 1000 多个。
+        * 服务 A 需要跨集群重新调度的时候（即使通过了平滑调度处理）由于批量 Pod 的频繁创建和销毁， endpoint 的状态更新流量会变得非常大，从而导致 SLB 的流量超过带宽限制，导致流量丢失。
+    * **iftop 和 tcptop 性能对比**
+        * 考虑到 libpcap 的获取包的性能，决定采用 iperf 工具进行压测，使用`iperf3`打流并开着`iftop`监控。
+            * 服务端绑核到15核上，`taskset -c 15 iperf3 -s`
+            * 客户端绑到14核，`taskset -c 14 iperf3 -c 127.0.0.1 -t 120`
+            * 用pidstat、top查看`iftop`的资源消耗（`top -p $(pidof iftop)`、`pidstat -p $(pidof iftop) 1`）
+            * 结果：pidstat 分析 iftop 程序的 CPU 的消耗，发现主要在 %system ，大概 50%，%user 大概 20%。 在 16C 的系统中，占用掉一个核，占用资源不到 5%，生产环境也是可以接受。
+        * bcc中的`tcptop`，同样用`iperf3`打流，查看资源使用情况
+            * 避免了每个数据包从内核传递到用户空间（`iftop` 中为 256个头部字节）
+            * `pidstat -p 11264  1`查看，%user %system 基本上都为 0
+            * `tcptop` 的数据统计和分析的功能**转移到了内核空间的 BPF 程序中，用户空间只是定期负责收集汇总的数据**，从整体性能上来讲会比使用 `libpcap` 库（底层采用 cBPF）**采集协议头数据（256字节）通过 mmap 映射内存的方式传递到用户态**分析性能更加高效。
 
 * [一次使用 ebpf 来解决 k8s 网络通信故障记录](https://mp.weixin.qq.com/s/cK8Ffhr2M6okysu-_iI6jg)
     * 场景问题：网络方案使用的是 Flannel VXLAN 覆盖网络，发送一些数据到对端的 vxlan 监听的 8472 端口，是可以抓到包的，说明网络链路是通的。但是vxlan 发送的 udp 包对端却始终收不到
@@ -282,8 +358,8 @@ Pss:               28692 kB
             * 只改了一个字节，对端就能收到了，vxlan 的 flag 也变为了 0x88
     * 解决方式可选
         * 联系客户处理、切换k8s网路模型、使用iptables或eBPF来hack修改
-    * 说下hack方式：使用rust aya来快速开发 ebpf 程序，`Aya`是一个用 Rust 编写的 eBPF 开发框架，专注于简化 Linux eBPF 程序的开发过程。
-        * 使用 ebpf 来把每个发出去的 vxlan 包的第一个字节从 0x08 改为 0x88（或者其它），收到对端的 vxlan 包以后，再把 0x88 还原为 0x08，交给内核处理 vxlan 包
+    * 说下**hack方式**：使用rust aya来快速开发eBPF程序，`Aya`是一个用Rust编写的 eBPF 开发框架，专注于简化Linux eBPF程序的开发过程。
+        * **使用 ebpf 来把每个发出去的 vxlan 包的第一个字节从 0x08 改为 0x88（或者其它），收到对端的 vxlan 包以后，再把 0x88 还原为 0x08，交给内核处理 vxlan 包**
         * 处理出站流量（egress）：把 vxlan 包中第一个字节从 0x08 改为 0x88；
         * 出入入站：ingress 流量处理是完全一样的，把 0x88 改为 0x80
 * [一次使用 eBPF LSM 来解决系统时间被回调的记录](https://mp.weixin.qq.com/s/6jpXhWpHhGbkz6fHSKckBw)
@@ -297,6 +373,13 @@ Pss:               28692 kB
 * [eBPF实战教程三｜数据库磁盘IO最精准的量化方法(含源码)](https://www.modb.pro/db/1802889896725139456)
     * 基于BCC，利用`kprobe`写了一个eBPF程序，观测MySQL库表维度的磁盘IO的读写
     * 探测了：`vfs_read`和`vfs_write`
+
+### 2.6. softlockup、hardlockup、内核hung住等定位思路
+
+* [Softlockup和Hardlockup介绍和定位思路总结](https://zhuanlan.zhihu.com/p/463434168)
+* [Oom介绍和定位思路](https://zhuanlan.zhihu.com/p/463434212)
+* [内核Hungtask原理和定位思路总结](https://zhuanlan.zhihu.com/p/463433198)
+* [ftrace&perf解决实际调度问题](https://zhuanlan.zhihu.com/p/420487043)
 
 ## 3. 性能优化
 
