@@ -444,22 +444,13 @@ tracepoint:sched:sched_kthread_stop
   sched:sched_wait_task                              [Tracepoint event]
 ```
 
-`perf sched`：分析调度时延
+`perf sched`实践策略：**`record`采集，`latency`查看延时分布找到可疑位置，`script`分析对应时间点的具体调度事件**
 
 ```sh
 # perf sched record 采集
 [CentOS-root@xdlinux ➜ ~ ]$ perf sched record sleep 5
 [ perf record: Woken up 1 times to write data ]
 [ perf record: Captured and wrote 0.485 MB perf.data (2267 samples) ]
-
-# perf script / perf sched script 分析切换
-[CentOS-root@xdlinux ➜ ~ ]$ perf script
-    perf 35478 [000] 605084.480470: sched:sched_stat_runtime: comm=perf pid=35478 runtime=48942 [ns] vruntime=436496118956 [ns]
-    perf 35478 [000] 605084.480473:       sched:sched_waking: comm=migration/0 pid=12 prio=0 target_cpu=000
-    perf 35478 [000] 605084.480474: sched:sched_stat_runtime: comm=perf pid=35478 runtime=5360 [ns] vruntime=436496124316 [ns]
-    perf 35478 [000] 605084.480475:       sched:sched_switch: prev_comm=perf prev_pid=35478 prev_prio=120 prev_state=R+ ==> next_comm=migration/0 next_pid=12 next_prio=0
-migration/0    12 [000] 605084.480477: sched:sched_migrate_task: comm=perf pid=35478 prio=120 orig_cpu=0 dest_cpu=1
-migration/0    12 [000] 605084.480483:       sched:sched_switch: prev_comm=migration/0 prev_pid=12 prev_prio=0 prev_state=D ==> next_comm=swapper/0 next_pid=0 next_prio=120
 
 # perf sched latency 分析延时
 [CentOS-root@xdlinux ➜ ~ ]$ perf sched latency
@@ -473,6 +464,15 @@ migration/0    12 [000] 605084.480483:       sched:sched_switch: prev_comm=migra
   irqbalance:1117    |  0.465 ms |    1  | avg:   0.000 ms | max:   0.000 ms | max start:     0.000000 s | max end:     0.000000 s
   in:imjournal:1763  |  0.194 ms |    1  | avg:   0.000 ms | max:   0.000 ms | max start:     0.000000 s | max end:     0.000000 s
   NetworkManager:1200|  0.138 ms |    1  | avg:   0.000 ms | max:   0.000 ms | max start:     0.000000 s | max end:     0.000000 s
+
+# perf script、 perf sched script 都可以分析具体d的原始事件，分析sched调度切换
+[CentOS-root@xdlinux ➜ ~ ]$ perf script
+    perf 35478 [000] 605084.480470: sched:sched_stat_runtime: comm=perf pid=35478 runtime=48942 [ns] vruntime=436496118956 [ns]
+    perf 35478 [000] 605084.480473:       sched:sched_waking: comm=migration/0 pid=12 prio=0 target_cpu=000
+    perf 35478 [000] 605084.480474: sched:sched_stat_runtime: comm=perf pid=35478 runtime=5360 [ns] vruntime=436496124316 [ns]
+    perf 35478 [000] 605084.480475:       sched:sched_switch: prev_comm=perf prev_pid=35478 prev_prio=120 prev_state=R+ ==> next_comm=migration/0 next_pid=12 next_prio=0
+migration/0    12 [000] 605084.480477: sched:sched_migrate_task: comm=perf pid=35478 prio=120 orig_cpu=0 dest_cpu=1
+migration/0    12 [000] 605084.480483:       sched:sched_switch: prev_comm=migration/0 prev_pid=12 prev_prio=0 prev_state=D ==> next_comm=swapper/0 next_pid=0 next_prio=120
 
 # perf sched map 分析cpu情况，星号表示调度事件发生所在的 CPU，点号表示该 CPU 正在 IDLE
 [CentOS-root@xdlinux ➜ ~ ]$ perf sched map
@@ -494,6 +494,41 @@ migration/0    12 [000] 605084.480483:       sched:sched_switch: prev_comm=migra
   605084.480483 [0000]  migration/0[12]                     0.000      0.001      0.007                                 
   605084.480553 [0001]  perf[35478]                                                      awakened: migration/1[17]
   605084.480555 [0001]  perf[35478]                         0.000      0.000      0.000 
+```
+
+下面是 [问题定位和性能优化案例集锦 -- 进程调度案例](https://xiaodongq.github.io/2025/04/15/excellent-trouble-shooting/#24-%E8%BF%9B%E7%A8%8B%E8%B0%83%E5%BA%A6%E6%A1%88%E4%BE%8B) 中抓取的调度延迟情况：
+
+```sh
+$ perf sched latency
+...
+  :211677:211677        |    160.391 ms |     2276 | avg:    2.231 ms | max:  630.267 ms | max at: 1802765.259076 s
+  :211670:211670        |    137.200 ms |     2018 | avg:    2.356 ms | max:  591.592 ms | max at: 1802765.270541 s
+...
+
+$ perf sched script
+# 结果截取
+# tid 114把tid 115唤醒了（在075核上），但过了500+ms后，009核上的tid 112运行完才再次调度tid 115。
+# 这意味着009核出于某些原因一直不运行tid 115
+rpchandler   114 [011] 1802764.628809:       sched:sched_wakeup: rpchandler:211677 [120] success=1 CPU:075
+rpchandler   112 [009] 1802765.259076:       sched:sched_switch: rpchandler:211674 [120] T ==> rpchandler:211677 [120]
+rpchandler   115 [009] 1802765.259087: sched:sched_stat_runtime: comm=rpchandler pid=211677 runtime=12753 [ns] vruntime=136438477015677 [ns]
+```
+
+再往前看看009这个核在干嘛，发现一直在调度时间轮线程：
+
+```sh
+ TimeWheel.Routi    43 [009] 1802765.162014: sched:sched_stat_runtime: comm=TimeWheel.Routi pid=210771 runtime=2655 [ns] vruntime=136438438256234 [ns]
+ TimeWheel.Routi    43 [009] 1802765.162015:       sched:sched_switch: TimeWheel.Routi:210771 [120] D ==> swapper/9:0 [120]
+         swapper     0 [009] 1802765.163067:       sched:sched_wakeup: TimeWheel.Routi:210771 [120] success=1 CPU:009
+         swapper     0 [009] 1802765.163069:       sched:sched_switch: swapper/9:0 [120] S ==> TimeWheel.Routi:210771 [120]
+ TimeWheel.Routi    43 [009] 1802765.163073: sched:sched_stat_runtime: comm=TimeWheel.Routi pid=210771 runtime=4047 [ns] vruntime=136438438260281 [ns]
+ TimeWheel.Routi    43 [009] 1802765.163074:       sched:sched_switch: TimeWheel.Routi:210771 [120] D ==> swapper/9:0 [120]
+         swapper     0 [009] 1802765.164129:       sched:sched_wakeup: TimeWheel.Routi:210771 [120] success=1 CPU:009
+         swapper     0 [009] 1802765.164131:       sched:sched_switch: swapper/9:0 [120] S ==> TimeWheel.Routi:210771 [120]
+ TimeWheel.Routi    43 [009] 1802765.164135: sched:sched_stat_runtime: comm=TimeWheel.Routi pid=210771 runtime=3616 [ns] vruntime=136438438263897 [ns]
+ TimeWheel.Routi    43 [009] 1802765.164137:       sched:sched_switch: TimeWheel.Routi:210771 [120] D ==> swapper/9:0 [120]
+         swapper     0 [009] 1802765.165187:       sched:sched_wakeup: TimeWheel.Routi:210771 [120] success=1 CPU:009
+         swapper     0 [009] 1802765.165189:       sched:sched_switch: swapper/9:0 [120] S ==> TimeWheel.Routi:210771 [120]
 ```
 
 ## 5. kdump 和 crash

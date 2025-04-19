@@ -10,7 +10,7 @@ pin: true
 
 TODO List里面，收藏待看的文章已经不少了，有一类是觉得比较精彩的问题定位过程，还有一类是性能优化相关的文章，需要先还一些“技术债”了。
 
-本篇将这些文章内容做简要分析，作为索引供后续不定期翻阅。另外，补充篇 [问题定位和性能优化案例集锦 -- 工具补充实验](https://xiaodongq.github.io/2025/04/18/excellent-trouble-shooting-tools/) 中会记录一些涉及的工具说明和实验记录。
+本篇将这些文章内容做简要分析，**作为索引供后续不定期翻阅**。另外，补充篇 [问题定位和性能优化案例集锦 -- 工具补充实验](https://xiaodongq.github.io/2025/04/18/excellent-trouble-shooting-tools/) 中会记录一些涉及的工具说明和实验记录。
 
 这里再说说 **知识效率** 和 **工程效率**（具体见：[如何在工作中学习](https://plantegg.github.io/2018/05/23/%E5%A6%82%E4%BD%95%E5%9C%A8%E5%B7%A5%E4%BD%9C%E4%B8%AD%E5%AD%A6%E4%B9%A0/)，里面讲得非常好）：
 
@@ -210,15 +210,16 @@ NIC statistics:
         * `smaps`序列文件对应 `seq_file` 的操作，由 `seq_operations` 定义读取进程数据的操作
             * `pid_smaps_open`打开、`seq_read`读取
             * 读取时，会调用`mmap_read_lock_killable`给整个`mm`结构体加锁，在读取结束时，m_stop会调用`mmap_read_unlock`解锁
+                * 即 `mmap_sem`，里面是一个和VMA相关的读写锁：`struct rw_semaphore`
             * 上述用到的锁结构是`mmap_lock`，该**锁的粒度很大**，当进程发生 `VMA`（虚拟内存区） 操作都需要持有该锁，如内存分配和释放。
                 * 遍历 VMA 耗时：如果进程的内存比较大，就会长时间持有该锁，影响进程的内存管理。
             * `syscount -L -i 30 -p $PID` 抓取问题前后`mmap`的耗时变化，**问题发生时mmap耗时 177 ms**
                 * `SYSCALL      COUNT        TIME (us)`
                 * `mmap          1           11.003` （时间点 [21:39:27]）
                 * `mmap          1       177477.938` （时间点 [21:40:14]）
-        * 其他追踪
-            * `perf trace -p $PID -s` 追踪、
-            * `funcgraph`追踪、
+        * 其他方式继续追踪佐证
+            * `perf trace -p $PID -s` 追踪
+            * `funcgraph`追踪
             * `bpftrace -e 'tracepoint:mmap_lock:mmap_lock_start_locking /args->write == true/{ @[comm, kstack] = count();}'`
                 * 不需要记住，需要时`perf list`过滤查看具体的追踪点
                 * PS：自己4.18的内核环境里面，貌似没有`mmap_lock`这个tracepoint了
@@ -275,11 +276,105 @@ Pss:               28692 kB
     * 其中 “ticker运行在容器内，绑核” 是最抖的，调度延迟经常>5ms，但抖动的频率远高于我们的数据库进程，而抖动幅度又远小于，还是不太相似。
 * 还是从应用进程入手，让GPT写了个脚本，在容器内不停地通过`perf sched`抓取操作系统的调度事件，然后等待抖动复现。
     * 复现后利用`perf sched latency`看看各个线程的调度延迟以及时间点 （`perf sched`实验可见补充文章）
-* 进程发送了SIGSTOP
-    * 同事很快锁定了其中一个由安全团队部署的插件，因为在内网wiki里它的介绍是：进程监控
-    * 进一步从安全团队了解到该插件会利用/proc伪文件系统定时扫描宿主机上所有进程的cpuset、comm、cwd等信息，需要排查具体是插件的哪个行为导致了抖动
-* 利用 perf-tools 里的 `functrace` 很轻易的找到了`::write`会调用`down_write`
-* **数据库里哪个路径需要加mmap_sem的写锁**
+    * `:211677:211677        |    160.391 ms |     2276 | avg:    2.231 ms | max:  630.267 ms | max at: 1802765.259076 s`
+    * `:211670:211670        |    137.200 ms |     2018 | avg:    2.356 ms | max:  591.592 ms | max at: 1802765.270541 s`
+    * 这俩的max at时间点是接近的，max抖动的值和数据库的慢请求日志也能对上。**说明数据库的抖动就是来自于内核调度延迟**
+    * 根据max at的时间点在`perf sched script`里找原始的事件，下面贴了perf sched结果
+        * tid 114把tid 115唤醒了（在075核上），但过了500+ms后，009核上的tid 112运行完才再次调度tid 115
+        * 这意味着009核出于某些原因一直不运行tid 115
+        * 再往前看看009这个核在干嘛，发现一直在调度时间轮线程
+    * 猜测
+        * TimeWheel由于干的活非常轻(2us)，sleep时间(1ms)相对显得非常大，于是vruntime涨的很慢
+        * 由于调度，rpchandler线程到了TimeWheel所在的核上，它的vruntime在新核上属于很大的
+        * cfs调度器倾向于一直调度TimeWheel线程
+* 容器里抓取内容缺少部分事件，无法实锤，在宿主机抓取`perf sched`
+    * `rpchandler 211677 [067] 1889343.661328:       sched:sched_switch: rpchandler:211677 [120] T ==> swapper/67:0 [120]`
+    * `swapper     0 [067] 1889344.350873:       sched:sched_wakeup: rpchandler:211677 [120] success=1 CPU:067`
+    * 发现某次切出后过了`689ms`才被swapper唤醒，和数据库观测到的延迟吻合
+        * 注意到211677是**以`T`状态切出**的，这个状态的意思是 *stopped by job control signal*，也就是**有人给线程发SIGSTOP信号**。收到这个信号的线程会被暂停，直到之后收到`SIGCONT`信号才会继续运行。
+        * 可以推断有个什么外部进程在给所有线程发信号，用来抓取某些信息。结合之前cgroup限流的知识，很有可能就是这个进程发送了`SIGSTOP`后正好用尽了时间片被cfs调度器切出，过了**几百毫秒**后才重新执行，发送了`SIGCONT`信号。
+    * **在这个时间点附近观察有没有什么可疑的进程**，同事很快锁定了其中一个由安全团队部署的插件，因为在内网wiki里它的介绍是：**进程监控**
+* **根因定位及确认**
+    * 试着关闭了该组件，抖动消失了
+    * 询问安全团队该插件是否有发送`SIGSTOP`的行为，得到的答复是没有。用`bpftrace`追踪了`do_signal`，也**并没有捕获到SIGSTOP信号**
+    * 进一步从安全团队了解到该插件会利用`/proc`伪文件系统定时扫描宿主机上所有进程的cpuset、comm、cwd等信息，需要排查具体是插件的哪个行为导致了抖动
+        * 安全团队修改代码，让插件记录每个扫描项的开始时间和结束时间，输出到日志中。这样数据库发生抖动后，我们只要对比扫描时间和抖动时间，就能锁定是哪个扫描项。
+        * 但好几天都没发生抖动，**看来获取时间以及输出日志破坏了抖动的触发场景**
+        * 不过从日志中我们发现读取`/proc/pid/environ`的耗时经常抖动至**几百ms**，非常可疑
+        * 还原并进行对比测试：去掉日志，把机器分为两组：第1组只扫描environ，第2组只去掉environ。第1组发生了抖动，而第2组则岁月静好
+        * 于是 **明确是读取`/proc/pid/environ`导致的抖动**。
+    * 但仍然疑点重重：扫描`/proc/pid/environ`为什么会导致抖动？扫描`environ`为什么会导致线程处于`T`状态？
+        * 既然没有证据表明有人发`SIGSTOP`，那么还能让这么多线程同时挂起的只有**锁**了
+        * 查询资料发现读取`/proc/pid/environ`序列文件时，会有锁
+            * 即 `mmap_sem`，里面是一个和VMA相关的读写锁：`struct rw_semaphore`。粒度很大，facebook的安全监控读environ的时候加mmap_sem读锁成功，然后由于时间片用完被调度出去了。而数据库运行过程中需要加写锁，就block住了，并且之后的读锁也都会被block，直到安全监控重新调度后释放了读锁。
+            * 对应内核代码：[proc base.c](https://elixir.bootlin.com/linux/v4.18/source/fs/proc/base.c#L887)
+            * **和上面 [Redis长尾延迟案例](#23-redis长尾延迟案例) 中读取`/proc/pid/smaps` 类似，都是读取proc文件系统内容加锁！**
+        * 尝试在测试环境复现一下
+            * 实现一个持续读取数据库进程environ的程序
+            * 利用cgroup给它CPU限额至一个较低的值（单核的3%）
+            * 结果：果然数据库频繁发生100ms以上的抖动，1分钟大概会出现2次。如果把CPU限额取消，即使该程序疯狂读取environ、跑满了CPU，数据库也没有任何抖动
+            * 找到了稳定复现的方式，问题就不难排查了
+    * 找哪个路径会对 `mmap_sem` 加写锁，利用perf-tools里的 `functrace` 很轻易的找到了`::write`会调用`down_write`
+        * `functrace`可以快速追踪到谁调用到了指定函数，很多地方会调用`down_write`，可以指定进程`./functrace -p 1216 down_write`
+        * 要查看完整调用栈的话则可以用`bpftrace`来追踪
+            * 到tracing文件系统里过滤`down_write`，没有tracepoint但可以追踪kprobe（/sys/kernel/tracing/available_filter_functions）
+            * bpftrace过滤pid追踪：`bpftrace -e 'kprobe:down_write /pid==1216/  {printf("comm:%s, \nkstack:%s\n", comm, kstack)}'`
+        * functrace结果中调用down_write的线程，恰好就是数据库的raft线程，它在落盘raft log时需要调用::write与::sync
+    * 还有一个问题没解决：为啥perf sched显示数据库线程是T状态切出的
+        * 写bpftrace脚本，追踪tracepoint：`sched:sched_switch`，以及kprobe：`finish_task_switch`、`prepare_to_wait_exclusive`
+        * 追踪到状态显示在这个内核版本是不对的，新内核中依旧修改了
+
+参考链接对应的sched跟踪信息：
+
+```sh
+$ perf sched latency
+...
+  :211677:211677        |    160.391 ms |     2276 | avg:    2.231 ms | max:  630.267 ms | max at: 1802765.259076 s
+  :211670:211670        |    137.200 ms |     2018 | avg:    2.356 ms | max:  591.592 ms | max at: 1802765.270541 s
+...
+
+$ perf sched script
+# 结果截取
+# tid 114把tid 115唤醒了（在075核上），但过了500+ms后，009核上的tid 112运行完才再次调度tid 115。
+# 这意味着009核出于某些原因一直不运行tid 115
+rpchandler   114 [011] 1802764.628809:       sched:sched_wakeup: rpchandler:211677 [120] success=1 CPU:075
+rpchandler   112 [009] 1802765.259076:       sched:sched_switch: rpchandler:211674 [120] T ==> rpchandler:211677 [120]
+rpchandler   115 [009] 1802765.259087: sched:sched_stat_runtime: comm=rpchandler pid=211677 runtime=12753 [ns] vruntime=136438477015677 [ns]
+```
+
+再往前看看009这个核在干嘛，发现一直在调度时间轮线程（每次TimeWheel `2us`，sleep时间`1ms`）：
+
+```sh
+ TimeWheel.Routi    43 [009] 1802765.162014: sched:sched_stat_runtime: comm=TimeWheel.Routi pid=210771 runtime=2655 [ns] vruntime=136438438256234 [ns]
+ TimeWheel.Routi    43 [009] 1802765.162015:       sched:sched_switch: TimeWheel.Routi:210771 [120] D ==> swapper/9:0 [120]
+         swapper     0 [009] 1802765.163067:       sched:sched_wakeup: TimeWheel.Routi:210771 [120] success=1 CPU:009
+         swapper     0 [009] 1802765.163069:       sched:sched_switch: swapper/9:0 [120] S ==> TimeWheel.Routi:210771 [120]
+ TimeWheel.Routi    43 [009] 1802765.163073: sched:sched_stat_runtime: comm=TimeWheel.Routi pid=210771 runtime=4047 [ns] vruntime=136438438260281 [ns]
+ TimeWheel.Routi    43 [009] 1802765.163074:       sched:sched_switch: TimeWheel.Routi:210771 [120] D ==> swapper/9:0 [120]
+         swapper     0 [009] 1802765.164129:       sched:sched_wakeup: TimeWheel.Routi:210771 [120] success=1 CPU:009
+         swapper     0 [009] 1802765.164131:       sched:sched_switch: swapper/9:0 [120] S ==> TimeWheel.Routi:210771 [120]
+ TimeWheel.Routi    43 [009] 1802765.164135: sched:sched_stat_runtime: comm=TimeWheel.Routi pid=210771 runtime=3616 [ns] vruntime=136438438263897 [ns]
+ TimeWheel.Routi    43 [009] 1802765.164137:       sched:sched_switch: TimeWheel.Routi:210771 [120] D ==> swapper/9:0 [120]
+         swapper     0 [009] 1802765.165187:       sched:sched_wakeup: TimeWheel.Routi:210771 [120] success=1 CPU:009
+         swapper     0 [009] 1802765.165189:       sched:sched_switch: swapper/9:0 [120] S ==> TimeWheel.Routi:210771 [120]
+```
+
+宿主机抓的sched事件：
+
+```sh
+rpchandler 211677 [067] 1889343.661328:       sched:sched_switch: rpchandler:211677 [120] T ==> swapper/67:0 [120]
+swapper     0 [067] 1889344.350873:       sched:sched_wakeup: rpchandler:211677 [120] success=1 CPU:067
+```
+
+```c
+// linux-5.10.10/fs/proc/base.c
+static const struct file_operations proc_environ_operations = {
+	.open		= environ_open,
+	.read		= environ_read,
+	.llseek		= generic_file_llseek,
+	.release	= mem_release,
+};
+```
 
 ### 2.5. eBPF辅助案例
 
@@ -411,8 +506,23 @@ PID     TID     COMM            FUNC
 
 看过的一些文章，先列举，前面可能略显杂乱。需要梳理总结，不断消化并融于实践当中。
 
-[Linux内核性能剖析的方法学和主要工具（上文）](https://zhuanlan.zhihu.com/p/538791061)  
-    盯着perf report里面排名第1，第2的整起来
+zStorage： 
+* [丝析发解丨zStorage 是如何保持性能稳步上升的?](https://www.modb.pro/db/1762660180899205120)
+    * 了解学习zStorage中看护性能指标的项目实践
+        * 近1年来，zStorage 三节点集群的`4KB随机读写`性能从`120万`IOPS稳步提升到了`210万`IOPS
+        * 为了追求极致性能，zStorage 数据面代码全部采用**标准C语言**编写
+    * zStorage 在`MR（Merge Request）`合入之后，对每个`MR`会做性能测试，采用`Jenkins`自动化测试流水线，自动选择MR、编译、打包、部署、性能测试、输出性能结果。每个MR的性能测试结果，都会长期保存，以供后续分析。
+    * 自动化措施
+        * 1、检查软硬件环境，排除常见问题。包括**IB网卡**、硬盘数量。
+        * 2、生成火焰图：比较不同`Merge Request`的火焰图，并可生成**差分火焰图**。查看哪些函数消耗了大量的CPU资源，还可用于观察**缓存未命中**等指标
+* [分布式存储系统性能调优 - zStorage性能进化历程概述](https://zhuanlan.zhihu.com/p/692175522)
+* [通过IPC指标诊断性能问题](https://zhuanlan.zhihu.com/p/3613097921)
+* [zStorage分布式存储系统的性能分析方法](https://www.zhihu.com/collection/331116627)
+    * 对 CPU、Memory、Disk、Network 分别进行测试
+    * perf 火焰图 ipc
+* [Linux C 性能优化实战（基于SPDK框架）](https://weibo.com/1202332555/KyDuKB3hY)
+
+公众号：极客重生
 
 讳疾忌医公众号：  
 * [为什么你的高并发锁优化做不好？大部份开发者不知的无锁编程陷阱](https://mp.weixin.qq.com/s/EoW1Y7n_SXAjZtGRtcCeVw)
@@ -422,21 +532,15 @@ PID     TID     COMM            FUNC
 * [同事写了个比蜗牛还慢的排序，我用3行代码让他崩溃](https://mp.weixin.qq.com/s/qqLw9iNtSRI77vCILDGDgQ)  
     * 从手写O(n²)到STL的O(nlogn)，从单线程到并行化，再到移动语义和内存优化
 
-[百度C++工程师的那些极限优化（内存篇）](https://mp.weixin.qq.com/s/wF4M2pqlVq7KljaHAruRug)
+[Linux内核性能剖析的方法学和主要工具（上文）](https://zhuanlan.zhihu.com/p/538791061)  
+    盯着perf report里面排名第1，第2的整起来
 
-[百度C++工程师的那些极限优化（并发篇）](https://mp.weixin.qq.com/s/0Ofo8ak7-UXuuOoD0KIHwA)
+百度Geek说公众号：  
+* [百度C++工程师的那些极限优化（内存篇）](https://mp.weixin.qq.com/s/wF4M2pqlVq7KljaHAruRug)
+* [百度C++工程师的那些极限优化（并发篇）](https://mp.weixin.qq.com/s/0Ofo8ak7-UXuuOoD0KIHwA)
 
-[codedump的网络日](https://www.codedump.info/)  
-    codedump的网络日志 分布式存储 系统编程 存储引擎
-
-zStorage： 
-* [丝析发解丨zStorage 是如何保持性能稳步上升的?](https://www.modb.pro/db/1762660180899205120)
-* [分布式存储系统性能调优 - zStorage性能进化历程概述](https://zhuanlan.zhihu.com/p/692175522)
-* [通过IPC指标诊断性能问题](https://zhuanlan.zhihu.com/p/3613097921)
-* [zStorage分布式存储系统的性能分析方法](https://www.zhihu.com/collection/331116627)
-    * 对 CPU、Memory、Disk、Network 分别进行测试
-    * perf 火焰图 ipc
-* [Linux C 性能优化实战（基于SPDK框架）](https://weibo.com/1202332555/KyDuKB3hY)
+[codedump的网络日志](https://www.codedump.info/)  
+* codedump的网络日志 分布式存储 系统编程 存储引擎
 
 [用 CPI 火焰图分析 Linux 性能问题](https://developer.aliyun.com/article/465499)
 
@@ -446,11 +550,127 @@ zStorage：
 
 `perf c2c record/report` 查看cacheline情况
 
-字节跳动sys tech的文章：
+字节跳动sys tech的文章：  
+* [DPDK内存碎片优化，性能最高提升30+倍!](https://mp.weixin.qq.com/s?__biz=Mzg3Mjg2NjU4NA==&mid=2247484462&idx=1&sn=406c59905ea57718018c602cba66f40e&chksm=cee9f259f99e7b4f7597eb6754367214a28f120c062c72c827f6e8c4225f9e54e4c65d4395d8&scene=21#wechat_redirect)
+* [DPDK Graph Pipeline框架简介与实现原理](https://mp.weixin.qq.com/s?__biz=Mzg3Mjg2NjU4NA==&mid=2247483974&idx=1&sn=25a198745ee4bec9755fe1f64f500dd8&chksm=cee9f431f99e7d27527c7a74c0fd2969c00cf904cd5a25d09dd9e2ba1adb1e2f1a3ced267940&scene=21#wechat_redirect)
 
-[DPDK内存碎片优化，性能最高提升30+倍!](https://mp.weixin.qq.com/s?__biz=Mzg3Mjg2NjU4NA==&mid=2247484462&idx=1&sn=406c59905ea57718018c602cba66f40e&chksm=cee9f259f99e7b4f7597eb6754367214a28f120c062c72c827f6e8c4225f9e54e4c65d4395d8&scene=21#wechat_redirect)
+### 3.2. 总体思路
 
-[DPDK Graph Pipeline框架简介与实现原理](https://mp.weixin.qq.com/s?__biz=Mzg3Mjg2NjU4NA==&mid=2247483974&idx=1&sn=25a198745ee4bec9755fe1f64f500dd8&chksm=cee9f431f99e7d27527c7a74c0fd2969c00cf904cd5a25d09dd9e2ba1adb1e2f1a3ced267940&scene=21#wechat_redirect)
+参考极客重生公众号中的梳理，总结得很好。可作为索引地图，在实践中按图索骥、查漏补缺。
 
-### 3.2. 思路
+1、单线
+
+* 消除冗余：代码重构，临时变量，数据结构和算法，池化（内存池、线程池、连接池、对象池）、inline，RVO，vDSO，COW延迟计算，零拷贝等
+* Cache优化：循环展开，local变量，cache对齐，内存对齐，预取，亲和性（绑核、独占），大页内存，内存池
+* 指令优化：-O2，乱序优化，分支预测，向量指令`SIMD`（MMX，SSE，AVX）
+* 硬件加速：DMA，网卡offload，加解密芯片，FPGA加速
+
+2、多线（并发优化）
+
+* 并行计算：流水线，超线程，多核，NUMA，GPU，多进程，多线程，多协程
+* 并行竞争优化：原子操作，锁与无锁，local线程/CPU设计
+* IO并行：多线程，多协程，非阻塞IO（epoll），异步IO（io_uring）
+* 并行通信：MPI，共享内存，Actor模型-channel，无锁队列
+
+3、整体（架构优化）
+
+* 数据库优化：索引优化，读写分离，数据分片，水平和垂直分库分表
+* 冷热分离：CDN优化，缓存优化
+* 水平扩展：无状态设计，负载均衡，分布式计算-MapReduce模型
+* 异步处理：消息队列，异步IO
+* 高性能框架：Netty（Java）、Nginx、libevent、libev等
+
+#### 3.2.1. 网络IO优化
+
+* 1、IO加速
+    * 内核旁路（Kernel Bypass）：让数据在**用户空间**和硬件设备之间直接进行传输和处理，**无需频繁地经过操作系统内核的干预**
+        * 向上offload：`DPDK`/`SPDK`，如 `F-Stack`框架（基于DPDK的开源高性能网络开发框架）
+        * 向下offload：`RDMA`
+    * 硬件
+        * FPGA（基于P4语言用于FPGA的编程）
+* 2、CPU并发优化
+    * 多进程、多线程、协程
+    * 多核编程，绑核独占
+    * 无锁、per CPU设计
+* 3、减少cache miss
+    * 预取、分支预测、亲和性、局部性原理
+    * 大页、TLB
+* 4、Linux网络系统优化
+    * 网卡offload优化：checksum、GRO、GSO
+        * `checksum`，将计算校验和的任务从CPU卸载到网卡，减轻 CPU 的负担
+        * `GRO`（Generic Receive Offload，通用接收卸载），**网卡**将多个较小的网络数据包合并成一个较大的数据包，再传给上层协议栈，减少处理包次数，降低中断频率。适用于**接收大量小数据包**的应用。
+        * `GSO`（Generic Segmentation Offload，通用分段卸载），**网卡**将较大的数据包在**发送端分割**成多个较小的数据包，并在**接收端重新组装**。可避免在发送端由CPU进行数据包分割，接收端也由网卡组装。
+    * 并行优化：RSS、RPS、RFS、aRFS、XPS、SO_REUSEPORT
+    * IO框架：select/poll/**epoll**/**io_uring**
+    * 内核调参
+        * 调整CPU亲和性（中断RSS、软中断RPS等）设置
+        * 调整驱动budget/backlog大小
+        * 调整TCP队列（等待队列，接收队列）大小
+            * SYN队列、accept队列（全连接队列）
+        * 调整sock缓冲区大小
+        * 调整TCP缓冲区大小
+5、减少重复操作
+    * 池化技术：内存池，线程池，连接池等
+    * 缓存技术
+    * 零拷贝优化
+
+#### 3.2.2. CPU性能优化
+
+* 1、指令优化
+    * 编译器优化，gcc优化选项如`-O2`（中等优化，相较于`-O1`、`-O3`更常用一些）
+    * 指令预取，分支预测，局部性原理
+* 2、算法优化
+    * 算法和数据结构优化。比如STL中不关注顺序则`unordered_map`优于`map`、数据量大时`O(nlogn)`的排序、`O(logn)`的查找算法
+* 3、并行优化
+    * 多线程、多协程：上下文切换的开销不同
+        * 可参考：[CPU及内存调度（一） -- 进程、线程、系统调用、协程上下文切换](https://xiaodongq.github.io/2025/03/09/context-switch/)）
+        * 量级参考：进程上下文切换2.7us到5.48us之间、线程上下文切换3.8us左右、系统调用200ns、协程切换120ns
+    * 异步处理：可避免程序因为等待而一直阻塞
+    * 锁优化优化：细粒度锁、无锁设计，CPU/Thread local（比如tcmalloc内存池）
+* 4、Cache优化
+    * Cache对齐：提高缓存命中率，善用局部性原理。比如C++结构体定义时，指定`alignas(64)`
+    * CPU绑定：提高CPU缓存命中率，减少跨CPU调度
+* 5、调度优化
+    * 优先级调整：`nice`调整进程优先级
+    * CPU独占：`taskset`命令 或者 `pthread_setaffinity_np`接口
+    * 中断负载均衡
+        * `irqbalance`在高吞吐环境效果不一定好，手动设置方式可了解：[网卡相关工具命令](https://xiaodongq.github.io/2025/04/14/handy-tools/#73-%E7%BD%91%E5%8D%A1%E7%9B%B8%E5%85%B3%E5%B7%A5%E5%85%B7%E5%91%BD%E4%BB%A4)
+* 6、亲和性优化
+    * 中断亲和：网卡硬中断（RSS）和软中断（RPS）均衡绑定处理中断的CPU
+        * 可以到`/proc/interrupts`里面过滤网卡设备，查看对应的中断号和中断处理的分布情况
+        * 还有bcc的`softirqs`查看中断分布、`trace`跟踪指定函数对应的中断处理CPU
+    * NUMA亲和性：多个node时，尽量让CPU只访问本地内存
+        * 比如Redis配置文件里面配置时，设置CPU亲和性范围就需要关注NUMA的分布
+
+#### 3.2.3. 内存性能优化
+
+* 1、减少内存动态分配
+    * 减少分配释放次数：内存池化，多线程场景考虑tcmalloc、jemalloc等内存分配器
+    * 增大大小：page分配、大页、减少TLB miss等
+* 2、内存分配优化
+    * 数据通路缓存：per CPU缓存
+    * 管理机制缓存：分级管理，比如tcmalloc中的前、中、后端
+* 3、减少内存
+    * 精细化调度体：比如协程替换线程，协程栈比线程栈小得多
+    * 控制内存分配：按需分配，减少内存泄漏
+* 4、算法优化
+    * bitmap、布隆过滤器、数据库索引等
+* 5、内存对齐
+    * cacheline对齐，提升缓存命中率
+
+#### 3.2.4. 硬盘IO优化
+
+* 1、提高写性能
+    * 顺序IO、Append-only
+    * 批量写入：LSM tree，如LevelDB
+* 2、提高读性能
+    * 顺序读
+    * 缓存：B+树索引，如MySQL的InnoDB存储引擎
+    * 零拷贝：如mmap
+* 3、硬盘优化
+    * 硬件加速，SSD替换HDD
+    * 调整预读块大小、硬盘队列长度
+* 4、软件IO加锁
+    * aio、io_uring、SPDK、NVME加速
+    * 调整IO调度算法
 

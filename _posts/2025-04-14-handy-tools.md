@@ -410,7 +410,15 @@ TX Push:        n/a
 
 * 理解编译器怎么处理代码的
 
-### 8.2. gdb工具：pwndbg
+### 8.2. 在线看内核代码：elixir.bootlin
+
+[elixir.bootlin](https://elixir.bootlin.com/linux/v5.10.236/source)
+
+支持函数及变量跳转，支持引用搜索，可灵活选择不同内核版本。
+
+可避免需要查看内核代码时，每次要去打开工程的麻烦。用VS Code的话挺耗资源的，而且每次打开还要等加载代码目录。
+
+### 8.3. gdb工具：pwndbg
 
 梳理内存分配器时了解到的工具，试了下功能，效果很好。除了覆盖原有的gdb命令，还会显示对应的汇编，配色效果很炫，后续若学习汇编可以用起来。
 
@@ -424,7 +432,7 @@ TX Push:        n/a
 
 ![pwndbg-case](/images/2025-04-15-pwndbg-case.png)
 
-### 8.3. 画图：draw.io 和 Excalidraw
+### 8.4. 画图：draw.io 和 Excalidraw
 
 * [Excalidraw](https://excalidraw.com/)
 * [draw.io](https://app.diagrams.net/)
