@@ -8,7 +8,7 @@ tags: [存储, IO]
 
 ## 1. 背景
 
-leveldb的学习梳理暂告一段落（还有不少东西没完结），继续看Linux存储IO栈。
+LevelDB的学习梳理暂告一段落（还有不少东西没完结），继续看Linux存储IO栈。
 
 上一篇：[Linux存储IO栈梳理（一） -- 存储栈全貌图](https://xiaodongq.github.io/2024/07/11/linux-storage-io-stack/) 中，看了一下总体存储协议栈，本篇看下VFS和文件系统相关的内核代码逻辑。
 

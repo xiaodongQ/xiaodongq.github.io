@@ -11,7 +11,7 @@ MIT6.824（2020）学习笔记，此为第一篇。
 有几个点促使自己近期行动起来：
 
 * TODO列表里，有一项是把Go和Rust捡起来能~~熟练~~使用，之前学过用过但是实践少，久一点不用就生疏了；
-* 梳理学习leveldb时，就把 [goleveldb](https://github.com/xiaodongQ/goleveldb) 和 [leveldb-rs](https://github.com/xiaodongQ/leveldb-rs) 放到TODO里了，准备通过工业级项目提升Go和Rust水平。但精力有限，死磕在leveldb上太久的话会有点缺乏正反馈，而且其他TODO会饿死；
+* 梳理学习LevelDB时，就把 [goleveldb](https://github.com/xiaodongQ/goleveldb) 和 [leveldb-rs](https://github.com/xiaodongQ/leveldb-rs) 放到TODO里了，准备通过工业级项目提升Go和Rust水平。但精力有限，死磕在LevelDB上太久的话会有点缺乏正反馈，而且其他TODO会饿死；
 * 最近一段时间来在下意识提升英语，当前阶段是先提升听力和阅读。在B站早早收藏过6.824只看了一丢丢，前段时间重看视频1尽量关字幕听原声，这种英语学习效果还可以；
 * TODO里本身就有6.824躺着，还有存储、分布式领域的经典论文，趁这个机会串起来。
 

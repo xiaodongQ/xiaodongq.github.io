@@ -1,10 +1,10 @@
 ---
-title: leveldb学习笔记（三） -- 日志结构实现
-categories: [存储和数据库, leveldb]
-tags: [存储, leveldb]
+title: LevelDB学习笔记（三） -- 日志结构实现
+categories: [存储和数据库, LevelDB]
+tags: [存储, LevelDB]
 ---
 
-leveldb学习笔记，本篇学习日志结构对应的实现。
+LevelDB学习笔记，本篇学习日志结构对应的实现。
 
 ## 1. 背景
 
@@ -22,7 +22,7 @@ leveldb学习笔记，本篇学习日志结构对应的实现。
 
 如上，为了避免断电、程序崩溃等异常导致丢数据，写memtable之前会先写日志。
 
-在leveldb中，有两个memory db，以及对应的两份日志文件。两个memory db即下面定义中的`mem_`和`imm_`；日志文件为`log_`，也会对应immutable memtable有个不可修改的log实例。
+在LevelDB中，有两个memory db，以及对应的两份日志文件。两个memory db即下面定义中的`mem_`和`imm_`；日志文件为`log_`，也会对应immutable memtable有个不可修改的log实例。
 
 ### 2.2. 日志文件初始化
 
@@ -44,7 +44,7 @@ class DBImpl : public DB {
 };
 ```
 
-上述`log_`和`logfile_`成员是在leveldb数据库`Open`时初始化的：
+上述`log_`和`logfile_`成员是在LevelDB数据库`Open`时初始化的：
 
 ```cpp
 // db/db_impl.cc

@@ -32,7 +32,7 @@ tags: [内存]
 
 ## 2. TCMalloc
 
-TCMalloc 最初由 `Sanjay Ghemawat` 和 `Paul Menage` 共同开发，作为 Google 性能工具库（Google Performance Tools，后更名为 gperftools）的一部分。关于`Sanjay Ghemawat`大佬，之前在 [leveldb学习笔记（一） -- 整体架构和基本操作](https://xiaodongq.github.io/2024/07/10/leveldb-learn-first/)）梳理学习时也介绍过，他和 `Jeff Dean` 合作开发了许多分布式系统基础架构（如 **MapReduce**、**Bigtable**、**Spanner** 等）。
+TCMalloc 最初由 `Sanjay Ghemawat` 和 `Paul Menage` 共同开发，作为 Google 性能工具库（Google Performance Tools，后更名为 gperftools）的一部分。关于`Sanjay Ghemawat`大佬，之前在 [LevelDB学习笔记（一） -- 整体架构和基本操作](https://xiaodongq.github.io/2024/07/10/leveldb-learn-first/)）梳理学习时也介绍过，他和 `Jeff Dean` 合作开发了许多分布式系统基础架构（如 **MapReduce**、**Bigtable**、**Spanner** 等）。
 
 说明：[google/tcmalloc](https://github.com/google/tcmalloc) 和 [gperftools](https://github.com/gperftools/gperftools) 两个仓库中都有TCMalloc的实现。为了便于扩展和适应Google的内部使用，单独分离出来了`google/tcmalloc`仓库；`gperftools`仓库里除了TCMalloc内存分配器，还有其他几个分析工具。具体可见：[TCMalloc and gperftools](https://google.github.io/tcmalloc/gperftools.html)。
 

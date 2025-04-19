@@ -1,22 +1,22 @@
 ---
-title: leveldb学习笔记（七） -- 布隆过滤器
-categories: [存储和数据库, leveldb]
-tags: [存储, leveldb]
+title: LevelDB学习笔记（七） -- 布隆过滤器
+categories: [存储和数据库, LevelDB]
+tags: [存储, LevelDB]
 ---
 
-leveldb学习笔记，本篇学习其布隆过滤器实现。
+LevelDB学习笔记，本篇学习其布隆过滤器实现。
 
 ## 1. 背景
 
-继续学习梳理leveldb中具体的流程，本篇来看下布隆过滤器实现。
+继续学习梳理LevelDB中具体的流程，本篇来看下布隆过滤器实现。
 
 之前学习记录中虽然有涉及但未展开：
 
-[leveldb学习笔记（二） -- 读写操作流程](https://xiaodongq.github.io/2024/07/20/leveldb-io-implement/)里面的读写流程，没有展开说明
+[LevelDB学习笔记（二） -- 读写操作流程](https://xiaodongq.github.io/2024/07/20/leveldb-io-implement/)里面的读写流程，没有展开说明
 
-[leveldb学习笔记（五） -- sstable实现](https://xiaodongq.github.io/2024/08/07/leveldb-sstable/)里提到`filter block`是基于布隆过滤器实现的。
+[LevelDB学习笔记（五） -- sstable实现](https://xiaodongq.github.io/2024/08/07/leveldb-sstable/)里提到`filter block`是基于布隆过滤器实现的。
 
-主要参考如下文章并映证leveldb代码：
+主要参考如下文章并映证LevelDB代码：
 
 * [漫谈 LevelDB 数据结构（二）：布隆过滤器（Bloom Filter）](https://www.qtmuniao.com/2020/11/18/leveldb-data-structures-bloom-filter/)
 * [leveldb-handbook bloomfilter](https://leveldb-handbook.readthedocs.io/zh/latest/bloomfilter.html)
@@ -25,7 +25,7 @@ leveldb学习笔记，本篇学习其布隆过滤器实现。
 
 ## 2. Why
 
-先看看leveldb为什么要用布隆过滤器？
+先看看LevelDB为什么要用布隆过滤器？
 
 对于 LevelDB 的一次读取操作，需要首先去 `memtable`、`immutable memtable` 查找，然后依次去`文件系统`(`sstable`文件)中各层查找。可以看出，相比写入操作，读取操作实在有点效率低下。我们这种客户端进行一次读请求，进入系统后被变成多次读请求的现象为**读放大**。
 
@@ -73,11 +73,11 @@ Bloom Filter的这种高效是有一定代价的：在判断一个元素是否�
 
 可进一步查看：[经典论文解读——布隆过滤器](https://cloud.tencent.com/developer/article/2255688)，有基本的概率论知识就可以看懂里面的参数和概率证明。（里面还提到几种优化点和对应论文、redis中的扩展实现、golang中的实现等）
 
-参考链接里提到`Murmur3`作为哈希函数，随机性很好。leveldb里自己实现的也是类murmur哈希(util/hash.cc中的`Hash`函数)
+参考链接里提到`Murmur3`作为哈希函数，随机性很好。LevelDB里自己实现的也是类murmur哈希(util/hash.cc中的`Hash`函数)
 
-## 4. leveldb中的布隆过滤器
+## 4. LevelDB中的布隆过滤器
 
-leveldb中利用布隆过滤器判断指定的key值是否存在于`sstable`中，若过滤器表示不存在，则该key一定不存在，由此加快了查找的效率。
+LevelDB中利用布隆过滤器判断指定的key值是否存在于`sstable`中，若过滤器表示不存在，则该key一定不存在，由此加快了查找的效率。
 
 ### 4.1. 调用链
 

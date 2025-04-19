@@ -1,14 +1,14 @@
 ---
-title: leveldb学习笔记（一） -- 整体架构和基本操作
-categories: [存储和数据库, leveldb]
-tags: [存储, leveldb]
+title: LevelDB学习笔记（一） -- 整体架构和基本操作
+categories: [存储和数据库, LevelDB]
+tags: [存储, LevelDB]
 ---
 
-leveldb学习笔记，本篇说明整体架构和基本操作，并进行代码验证。
+LevelDB学习笔记，本篇说明整体架构和基本操作，并进行代码验证。
 
 ## 1. 背景
 
-之前学习了一些网络的内容，本打算把网络相关TODO先了结完再去啃存储、CPU、内存等基础和相关领域内容，但扩展开的话点有点多，就先留部分坑了，穿插学习。换一点新的东西，先学习梳理下[leveldb](https://github.com/google/leveldb)这个优秀的存储引擎。
+之前学习了一些网络的内容，本打算把网络相关TODO先了结完再去啃存储、CPU、内存等基础和相关领域内容，但扩展开的话点有点多，就先留部分坑了，穿插学习。换一点新的东西，先学习梳理下[LevelDB](https://github.com/google/leveldb)这个优秀的存储引擎。
 
 这里先参考 [官网](https://github.com/google/leveldb) 和 [leveldb-handbook](https://leveldb-handbook.readthedocs.io/zh/latest/index.html)，并结合一些博客文章学习，自己再动手做些实验，以此为出发点正好把Linux内核存储栈、涉及的数据结构和算法带着场景再过一遍。
 
@@ -16,7 +16,7 @@ leveldb学习笔记，本篇说明整体架构和基本操作，并进行代码�
 
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
-## 2. leveldb说明和整体架构
+## 2. LevelDB说明和整体架构
 
 ### 2.1. 项目说明
 
@@ -38,19 +38,19 @@ LevelDB是一个由Google开源的、快速的键值存储库，提供了`string
 
 ### 2.2. 整体架构
 
-![leveldb 整体架构](/images/leveldb_arch.jpeg)
+![LevelDB 整体架构](/images/leveldb_arch.jpeg)
 
 LevelDB基于`LSM树（Log-Structured-Merge-Tree）`，翻译过来就是结构日志合并树。但是`LSM树`并不是一种严格意义上的树型数据结构，而是一种数据存储机制。
 
 下图跟上面类似，这里看LSM流程更直观一点：
 
-![leveldb LSM树和读写流程](/images/leveldb-lsm-tree.png)
+![LevelDB LSM树和读写流程](/images/leveldb-lsm-tree.png)
 
-下面介绍leveldb几个重要的构成部件：
+下面介绍LevelDB几个重要的构成部件：
 
 #### 2.2.1. memtable
 
-leveldb的一次写入操作并不是直接将数据刷新到磁盘文件，而是首先写入到内存中作为代替，memtable就是一个在内存中进行数据组织与维护的结构。
+LevelDB的一次写入操作并不是直接将数据刷新到磁盘文件，而是首先写入到内存中作为代替，memtable就是一个在内存中进行数据组织与维护的结构。
 
 #### 2.2.2. immutable memtable
 
@@ -58,25 +58,25 @@ memtable的容量到达阈值时，便会转换成一个不可修改的memtable�
 
 #### 2.2.3. log(journal)
 
-leveldb在写内存之前会首先将所有的写操作写到日志文件中，也就是log文件，`预写日志（WAL，Write-Ahead Logging）`。当写log、内存、immutable memtable等异常时，均可以通过日志文件进行恢复。
+LevelDB在写内存之前会首先将所有的写操作写到日志文件中，也就是log文件，`预写日志（WAL，Write-Ahead Logging）`。当写log、内存、immutable memtable等异常时，均可以通过日志文件进行恢复。
 
 #### 2.2.4. sstable
 
-内存中的数据达到一定容量，就需要将数据**持久化**到磁盘中。除了某些元数据文件，leveldb的数据主要都是通过`sstable`来进行存储。
+内存中的数据达到一定容量，就需要将数据**持久化**到磁盘中。除了某些元数据文件，LevelDB的数据主要都是通过`sstable`来进行存储。
 
-虽然在内存中，所有的数据都是按序排列的，但是当多个memetable数据持久化到磁盘后，对应的不同的sstable之间是存在交集的（*持久化后再写入的新数据顺序会有交叉*），在读操作时，需要对所有的sstable文件进行遍历，严重影响了读取效率。因此leveldb后台会“定期“整合这些sstable文件，该过程也称为 **`compaction`（合并）**。随着`compaction`的进行，sstable文件在逻辑上被分成若干层，由内存数据直接dump出来的文件称为`level 0`层文件，后期整合而成的文件为`level i` 层文件，**这也是leveldb这个名字的由来**。
+虽然在内存中，所有的数据都是按序排列的，但是当多个memetable数据持久化到磁盘后，对应的不同的sstable之间是存在交集的（*持久化后再写入的新数据顺序会有交叉*），在读操作时，需要对所有的sstable文件进行遍历，严重影响了读取效率。因此LevelDB后台会“定期“整合这些sstable文件，该过程也称为 **`compaction`（合并）**。随着`compaction`的进行，sstable文件在逻辑上被分成若干层，由内存数据直接dump出来的文件称为`level 0`层文件，后期整合而成的文件为`level i` 层文件，**这也是LevelDB这个名字的由来**。
 
-所有的sstable文件本身的内容是**不可修改的**，这种设计哲学为leveldb带来了许多优势，简化了很多设计。
+所有的sstable文件本身的内容是**不可修改的**，这种设计哲学为LevelDB带来了许多优势，简化了很多设计。
 
 #### 2.2.5. manifest
 
-leveldb中有个**版本（version）**的概念，一个版本中主要记录了每一层中所有文件的元数据，元数据包括（1）文件大小（2）最大key值（3）最小key值。该版本信息十分关键，除了在查找数据时，利用维护的每个文件的最大／小key值来加快查找，还在其中维护了一些进行compaction的统计值，来控制compaction的进行。
+LevelDB中有个**版本（version）**的概念，一个版本中主要记录了每一层中所有文件的元数据，元数据包括（1）文件大小（2）最大key值（3）最小key值。该版本信息十分关键，除了在查找数据时，利用维护的每个文件的最大／小key值来加快查找，还在其中维护了一些进行compaction的统计值，来控制compaction的进行。
 
-当每次`compaction`完成，leveldb都会创建一个新的`version`，创建规则：`versionNew = versionOld + versionEdit`，`versionEdit`指代的是基于旧版本的基础上，变化的内容。
+当每次`compaction`完成，LevelDB都会创建一个新的`version`，创建规则：`versionNew = versionOld + versionEdit`，`versionEdit`指代的是基于旧版本的基础上，变化的内容。
 
 **manifest文件就是用来记录这些versionEdit信息的。**一个versionEdit数据，会被编码成一条记录，写入manifest文件中。
 
-因为每次leveldb启动时，都会创建一个新的Manifest文件。因此数据目录可能会存在多个Manifest文件。Current则用来指出哪个Manifest文件才是我们关心的那个Manifest文件。
+因为每次LevelDB启动时，都会创建一个新的Manifest文件。因此数据目录可能会存在多个Manifest文件。Current则用来指出哪个Manifest文件才是我们关心的那个Manifest文件。
 
 #### 2.2.6. current
 
@@ -157,7 +157,7 @@ leveldb中有个**版本（version）**的概念，一个版本中主要记录�
 
 可以看到，成果物里面是没有一个服务端程序的。**LevelDB 没有设计成`C/S`模式，而是将数据库以库文件的形式提供给用户，运行时数据库需要和服务一起部署在同一台服务器上。**
 
-下面结合各gtest用例和测试工具，来了解下leveldb功能。
+下面结合各gtest用例和测试工具，来了解下LevelDB功能。
 
 ### 3.2. db_bench测试工具
 
@@ -230,7 +230,7 @@ readreverse :  0.663 micros/op;  166.9 MB/s
 
 跟着 `leveldb/doc/index.md`（也可见[doc/index.md](https://github.com/google/leveldb/blob/main/doc/index.md)） 的说明，写个简单[demo](https://github.com/xiaodongQ/prog-playground/blob/main/leveldb/test_leveldb.cpp)进行基本功能的试用。
 
-leveldb公共接口为`include/leveldb/*.h`，一般不需要再依赖其他涉及内部实现的头文件了。
+LevelDB公共接口为`include/leveldb/*.h`，一般不需要再依赖其他涉及内部实现的头文件了。
 
 这里先`make install`一下，把必要的头文件和库安装到系统路径，便于后面使用。
 
@@ -331,7 +331,7 @@ V???leveldb.BytewiseComparator??#       #
 
 ### 4.2. 基本读写
 
-leveldb提供3个基本操作来查询/修改：`Put`、`Delete`、`Get`
+LevelDB提供3个基本操作来查询/修改：`Put`、`Delete`、`Get`
 
 ```cpp
 void test_leveldb_rw()
@@ -464,7 +464,7 @@ get key: xdkey2 result:OK, value:test-atomic-update
 
 ### 4.4. Iteration
 
-leveldb的迭代器，用于遍历key。
+LevelDB的迭代器，用于遍历key。
 
 ```cpp
 void test_leveldb_iterator()
@@ -644,7 +644,7 @@ xdkey5:itv5
 
 ## 5. 小结
 
-学习了leveldb的整体架构和重要构成部件，对其功能做了基本的验证测试。后续进一步看其功能实现，以及重要的数据结构。
+学习了LevelDB的整体架构和重要构成部件，对其功能做了基本的验证测试。后续进一步看其功能实现，以及重要的数据结构。
 
 ## 6. 参考
 

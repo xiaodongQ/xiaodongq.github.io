@@ -8,7 +8,7 @@ Linux存储IO栈梳理学习
 
 ## 1. 背景
 
-最近从leveldb开始，梳理学习存储方面的内容。这里补充下Linux的存储栈，并贴一下CPU、磁盘、网络等的大概耗时体感图。
+最近从LevelDB开始，梳理学习存储方面的内容。这里补充下Linux的存储栈，并贴一下CPU、磁盘、网络等的大概耗时体感图。
 
 主要参考学习：[聊聊 Linux IO](https://www.0xffffff.org/2017/05/01/41-linux-io/)
 

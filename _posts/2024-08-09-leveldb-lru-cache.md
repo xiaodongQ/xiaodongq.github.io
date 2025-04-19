@@ -1,20 +1,20 @@
 ---
-title: leveldb学习笔记（六） -- LRU缓存
-categories: [存储和数据库, leveldb]
-tags: [存储, leveldb]
+title: LevelDB学习笔记（六） -- LRU缓存
+categories: [存储和数据库, LevelDB]
+tags: [存储, LevelDB]
 ---
 
-leveldb学习笔记，本篇学习其LRU缓存实现。
+LevelDB学习笔记，本篇学习其LRU缓存实现。
 
 ## 1. 背景
 
-继续学习梳理leveldb中具体的流程，本篇来看下LRU缓存实现。
+继续学习梳理LevelDB中具体的流程，本篇来看下LRU缓存实现。
 
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
-## 2. leveldb缓存说明
+## 2. LevelDB缓存说明
 
-leveldb中使用的缓存（cache）主要用于**读取**场景，使得读取热数据时尽量在缓存中命中，减少读取`sstable`文件导致的磁盘io。
+LevelDB中使用的缓存（cache）主要用于**读取**场景，使得读取热数据时尽量在缓存中命中，减少读取`sstable`文件导致的磁盘io。
 
 其使用了一种基于LRUcache（`Least Recently Used`）的缓存机制，用于缓存：
 

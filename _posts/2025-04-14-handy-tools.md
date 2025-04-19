@@ -16,13 +16,13 @@ pin: true
 
 ![协议示意图](/images/2024-05-29-protocol-diagram.png)
 
-设置路径：在wireshark中对照查看(**设置->Appearance->Layout->Pane3 选 Packet Diagram**)
+设置路径：在Wireshark中对照查看(**设置->Appearance->Layout->Pane3 选 Packet Diagram**)
 
 使用示例，看协议代码时head和图印证：[TCP半连接全连接（一） -- 全连接队列相关过程](https://xiaodongq.github.io/2024/05/18/tcp_connect/#63-%E6%8E%A5%E6%94%B6%E6%B5%81%E7%A8%8B)
 
 ### 1.2. TCP流统计图（TCP Stream Graphs）
 
-详情见：[TCP发送接收过程（一） -- Wireshark跟踪TCP流统计图](https://xiaodongq.github.io/2024/06/30/tcp-wireshark-tcp-graphs/)
+几个图的说明示例可见：[TCP发送接收过程（一） -- Wireshark跟踪TCP流统计图](https://xiaodongq.github.io/2024/06/30/tcp-wireshark-tcp-graphs/)
 
 ![TCP流图形tcptrace](/images/2024-07-01-wireshark-tcptrace.png)
 
@@ -62,9 +62,11 @@ pin: true
 
 ## 2. gperftools、火焰图
 
-各类火焰图：On-CPU、Off-CPU、Wakeup、Off-Wake。以及下面的 [Memory Leak and Growth火焰图](#33-memory-leak-and-growth火焰图)
+各类火焰图：On-CPU、Off-CPU、Wakeup、Off-Wake。
 
-[并发与异步编程（三） -- 性能分析工具：gperftools和火焰图](https://xiaodongq.github.io/2025/03/14/async-io-example-profile/)
+使用示例可见：[并发与异步编程（三） -- 性能分析工具：gperftools和火焰图](https://xiaodongq.github.io/2025/03/14/async-io-example-profile/)
+
+火焰图还有下面介绍的 [Memory Leak and Growth火焰图](#33-memory-leak-and-growth火焰图)。
 
 ## 3. 内存相关profile
 
@@ -84,11 +86,11 @@ pin: true
 
 ## 4. eBPF：bcc tools、bpftrace
 
-当前几个工具集里有些功能是重复的：`bcc tools`（也包括支持`CO-RE`的libbpf版本）、`bpftrace tools`，以平时使用的情况来看，原生安装的`bcc tools`/`bpftrace tools`通用性更好。自己归档的工具（[tools](https://github.com/xiaodongQ/prog-playground/tree/main/tools)）是基于较新的版本，里面有些实现要求更高的内核版本。
+当前几个工具集里有些功能是重复的：`bcc tools`（也包括支持`CO-RE`的libbpf版本）、`bpftrace tools`，以平时使用的情况来看，原生安装的`bcc tools`/`bpftrace tools`通用性更好。自己归档了一份工具便于统一使用（[tools](https://github.com/xiaodongQ/prog-playground/tree/main/tools)），是基于较新的版本，里面有些实现要求更高的内核版本。
 
 > 1）较高版本内核（比如5.10），可以用新工具：libbpf版本更小、更快
 >
-> 2）较低版本内核，用默认安装版本（比如`yum instal`），或者去github仓库下载对应版本
+> 2）较低版本内核，用默认安装版本（比如`yum install`），或者去github仓库下载对应版本
 {: .prompt-tip }
 
 比如`bitesize`的使用对比：
@@ -136,19 +138,19 @@ I/O size (bytes) histograms by process name:
 
 ![linux_kernel_event_bpf](/images/linux_kernel_event_bpf.png)  
 
-[eBPF学习实践系列（一） -- 初识eBPF](https://xiaodongq.github.io/2024/06/06/ebpf_learn/)
+[eBPF学习实践系列（一） -- 初识eBPF](https://xiaodongq.github.io/2024/06/06/ebpf_learn/#22-ebpf%E5%86%85%E6%A0%B8%E7%89%88%E6%9C%AC%E6%94%AF%E6%8C%81%E5%8F%8A%E5%AE%9E%E7%94%A8%E5%B7%A5%E5%85%B7) 里简要说明了下。
 
 ### 4.2. bcc tools
 
 ![bcc tools 2019](/images/bcc-tools-2019.png) 
 
-下面几篇博客做了一些介绍：
+下面几篇博客做了一些介绍和实验：
 
 * [eBPF学习实践系列（一） -- 初识eBPF](https://xiaodongq.github.io/2024/06/06/ebpf_learn/)
 * 网络相关：[eBPF学习实践系列（二） -- bcc tools网络工具集](https://xiaodongq.github.io/2024/06/10/bcc-tools-network/)
 * 内存相关：[CPU及内存调度（三） -- 内存问题定位工具和实验](https://xiaodongq.github.io/2025/04/02/memory-profiling-tools/#6-bcc-tools%E5%B7%A5%E5%85%B7)
 
-自行编译了bcc libbpf版本，工具归档在：[tools](https://github.com/xiaodongQ/prog-playground/tree/main/tools)
+自行编译了bcc libbpf版本，工具归档在：[tools](https://github.com/xiaodongQ/prog-playground/tree/main/tools)，其中的 bcc_libbpf-tools_bin_db5b63f.tar.xz 压缩包。基于 x86_64，gcc8.5.0，bcc commitid：db5b63ff876d3346021871e2189a354bfc6d510e，20250315才提交的，项目一直在更新，后续按需编译。
 
 ### 4.3. bpftrace
 
@@ -158,7 +160,7 @@ bpftrace提供的追踪类型：
 
 介绍和工具使用，可见：[eBPF学习实践系列（六） -- bpftrace学习和使用](https://xiaodongq.github.io/2024/06/28/ebpf-bpftrace-learn/)
 
-bpftrace-tools 自己也归档了一份便于统一使用：[tools](https://github.com/xiaodongQ/prog-playground/tree/main/tools)
+bpftrace-tools 自己也归档了一份便于统一使用：[tools](https://github.com/xiaodongQ/prog-playground/tree/main/tools)，其中的bpftrace-tools_v0.23.1。
 
 ### 4.4. 60s系列BPF版本
 
@@ -197,7 +199,7 @@ top
 
 ![perf-tools工具集](/images/perf-tools_2016.png)
 
-介绍可见：[eBPF学习实践系列（一） -- 初识eBPF](https://xiaodongq.github.io/2024/06/06/ebpf_learn/)。
+可了解：[eBPF学习实践系列（一） -- 初识eBPF](https://xiaodongq.github.io/2024/06/06/ebpf_learn/#222-perf-tools)。
 
 ### 5.1. perf使用示例
 
@@ -214,7 +216,7 @@ perf的使用，可以见Brendan Gregg大佬的网站：[perf Examples](https://
 
 ## 6. 源码阅读分析：calltree.pl 和 cpptree.pl
 
-有点像用户态的bpftrace+funcgraph，可以通过mode：0还是1控制查看的调用栈方向。
+追踪静态代码效果有点像用户态的bpftrace+funcgraph（追踪调用栈场景），可以通过mode：0还是1控制查看的调用栈方向。
 
 示例：  
 ![redis-replicaof-call-tree](/images/2025-03-30-redis-replicaof.png)

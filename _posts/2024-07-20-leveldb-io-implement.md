@@ -1,26 +1,26 @@
 ---
-title: leveldb学习笔记（二） -- 读写操作流程
-categories: [存储和数据库, leveldb]
-tags: [存储, leveldb]
+title: LevelDB学习笔记（二） -- 读写操作流程
+categories: [存储和数据库, LevelDB]
+tags: [存储, LevelDB]
 ---
 
-leveldb学习笔记，本篇学习其读写操作流程。
+LevelDB学习笔记，本篇学习其读写操作流程。
 
 ## 1. 背景
 
-[leveldb学习笔记（一） -- 整体架构和基本操作](https://xiaodongq.github.io/2024/07/10/leveldb-learn-first/)里做了基本介绍和简单demo功能测试，本篇看下对应的读写实现流程。
+[LevelDB学习笔记（一） -- 整体架构和基本操作](https://xiaodongq.github.io/2024/07/10/leveldb-learn-first/)里做了基本介绍和简单demo功能测试，本篇看下对应的读写实现流程。
 
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
 ## 2. UML类图
 
-根据代码，画一下leveldb相关类图，如下：
+根据代码，画一下LevelDB相关类图，如下：
 
 ![leveldb类图](/images/2024-07-21-leveldb-class-graph.svg)
 
 ## 3. 写操作流程
 
-leveldb对外提供的写入接口有：（1）`Put`（2）`Delete`两种。
+LevelDB对外提供的写入接口有：（1）`Put`（2）`Delete`两种。
 
 **这两种本质对应同一种操作，`Delete`操作同样会被转换成一个value为空的`Put`操作。**
 
@@ -59,7 +59,7 @@ Status DB::Delete(const WriteOptions& opt, const Slice& key) {
 
 ### 3.1. WriteBatch
 
-`WriteBatch`类中的成员变量只有一个：`std::string rep_;`。需要从这个看似简单的`string`成员来理解leveldb的数据组织结构。
+`WriteBatch`类中的成员变量只有一个：`std::string rep_;`。需要从这个看似简单的`string`成员来理解LevelDB的数据组织结构。
 
 ```cpp
 // include/leveldb/write_batch.h
@@ -112,7 +112,7 @@ void WriteBatch::Delete(const Slice& key) {
 
 append追加对应的操作后，此处开始写入数据库。
 
-里面很多内容值得好好学习一下：比如`std::deque`、leveldb自己封装的`MutexLock`和`port::CondVar`、单例类模板、生产者/消费者模型、各种线程安全保护手段等等，也是个学习实践现代C++的机会，学习记录直接在 [fork](https://github.com/xiaodongQ/leveldb) 的代码里添加注释。
+里面很多内容值得好好学习一下：比如`std::deque`、LevelDB自己封装的`MutexLock`和`port::CondVar`、单例类模板、生产者/消费者模型、各种线程安全保护手段等等，也是个学习实践现代C++的机会，学习记录直接在 [fork](https://github.com/xiaodongQ/leveldb) 的代码里添加注释。
 
 先看下`DBImpl::Writer`这个类（`DBImpl::Write`函数里会用到）
 
@@ -328,7 +328,7 @@ compaction压缩操作包含：
 
 每次压缩完成，就得到一个Version。Version创建规则：`versionNew = versionOld + VersionEdit`，其中`VersionEdit`记录相对上一个Version变化的内容，比如新增/删除哪些sstable文件、日志编号、操作seq number等。manifest文件用于记录`VersionEdit`数据。
 
-通过这些信息，leveldb便可以在启动时，基于一个空的version，不断apply这些记录，最终得到一个上次运行结束时的版本信息。
+通过这些信息，LevelDB便可以在启动时，基于一个空的version，不断apply这些记录，最终得到一个上次运行结束时的版本信息。
 
 manifest文件结构示意图：
 

@@ -1,10 +1,10 @@
 ---
-title: leveldb学习笔记（四） -- memtable结构实现
-categories: [存储和数据库, leveldb]
-tags: [存储, leveldb]
+title: LevelDB学习笔记（四） -- memtable结构实现
+categories: [存储和数据库, LevelDB]
+tags: [存储, LevelDB]
 ---
 
-leveldb学习笔记，本篇学习memtable结构实现，学习其基于的跳表实现细节。
+LevelDB学习笔记，本篇学习memtable结构实现，学习其基于的跳表实现细节。
 
 ## 1. 背景
 
@@ -85,7 +85,7 @@ leveldb学习笔记，本篇学习memtable结构实现，学习其基于的跳�
 
 ## 3. MemTable类定义
 
-leveldb中的`MemTable`是有序的，底层基于`跳表(skiplist)`实现。绝大多数操作（读／写）的时间复杂度均为`O(log n)`，有着与`平衡树`相媲美的操作效率，但是从实现的角度来说简单许多。
+LevelDB中的`MemTable`是有序的，底层基于`跳表(skiplist)`实现。绝大多数操作（读／写）的时间复杂度均为`O(log n)`，有着与`平衡树`相媲美的操作效率，但是从实现的角度来说简单许多。
 
 看下内存数据库memtable的定义，可看到`MemTable`中的具体类为：`SkipList<const char*, KeyComparator>`
 
@@ -108,7 +108,7 @@ class MemTable {
 
 ## 4. SkipList实现
 
-看下leveldb里面的跳表定义和大致实现。
+看下LevelDB里面的跳表定义和大致实现。
 
 ### 4.1. SkipList定义
 
@@ -344,7 +344,7 @@ bool SkipList<Key, Comparator>::KeyIsAfterNode(const Key& key, Node* n) const {
 
 这里讲一下上面`SkipList::Insert`插入中的创建`NewNode`新节点逻辑。
 
-leveldb中自行管理内存分配，并利用`Placement New`语法在指定内存上构造实例。
+LevelDB中自行管理内存分配，并利用`Placement New`语法在指定内存上构造实例。
 
 ```cpp
 // db/skiplist.h
@@ -413,7 +413,7 @@ bool SkipList<Key, Comparator>::Contains(const Key& key) const {
 
 ### 4.5. 遍历：迭代器
 
-利用内部类`Iterator`（`leveldb::SkipList::Iterator`）实现leveldb节点的遍历操作。
+利用内部类`Iterator`（`leveldb::SkipList::Iterator`）实现LevelDB节点的遍历操作。
 
 另外提供给用户的创建迭代器接口：`include/leveldb/db.h`中的`Iterator* NewIterator(const ReadOptions& options)`，也主要由此处的内部类实现。
 
@@ -528,7 +528,7 @@ inline void SkipList<Key, Comparator>::Iterator::SeekToLast() {
 }
 ```
 
-注意，此处`Iterator::Prev()`的实现，相比在节点中额外增加一个 prev 指针，leveldb使用从头开始的查找定位其 prev 节点。
+注意，此处`Iterator::Prev()`的实现，相比在节点中额外增加一个 prev 指针，LevelDB使用从头开始的查找定位其 prev 节点。
 
 > 该迭代器没有为每个节点增加一个额外的 prev 指针以进行反向迭代，而是用了选择从 head 开始查找。这也是一种用时间换空间的取舍。当然，其假设是前向遍历情况相对较少。
 
