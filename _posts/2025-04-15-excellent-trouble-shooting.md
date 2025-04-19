@@ -10,7 +10,7 @@ pin: true
 
 TODO List里面，收藏待看的文章已经不少了，有一类是觉得比较精彩的问题定位过程，还有一类是性能优化相关的文章，需要先还一些“技术债”了。
 
-本篇将这些文章内容做简要分析，作为索引供后续不定期翻阅。
+本篇将这些文章内容做简要分析，作为索引供后续不定期翻阅。另外，补充篇 [问题定位和性能优化案例集锦 -- 工具补充实验](https://xiaodongq.github.io/2025/04/18/excellent-trouble-shooting-tools/) 中会记录一些涉及的工具说明和实验记录。
 
 这里再说说 **知识效率** 和 **工程效率**（具体见：[如何在工作中学习](https://plantegg.github.io/2018/05/23/%E5%A6%82%E4%BD%95%E5%9C%A8%E5%B7%A5%E4%BD%9C%E4%B8%AD%E5%AD%A6%E4%B9%A0/)，里面讲得非常好）：
 
@@ -170,7 +170,7 @@ NIC statistics:
      ...
 ```
 
-网络队列、ring buffer查看相关命令示例见：[实用工具集索引](https://xiaodongq.github.io/2025/04/14/handy-tools/)
+网络队列、ring buffer查看相关命令示例见：[实用工具集索引 -- 网卡相关工具命令](https://xiaodongq.github.io/2025/04/14/handy-tools/#73-%E7%BD%91%E5%8D%A1%E7%9B%B8%E5%85%B3%E5%B7%A5%E5%85%B7%E5%91%BD%E4%BB%A4)
 
 另外发现博主的历史文章，也覆盖了之前看过的网络发送和接收文章翻译：
 
@@ -196,17 +196,32 @@ NIC statistics:
 * 定位
     * 基于现有指标缩小问题的范围，按可能性排查范围：业务请求 > 网络 > 系统 > 应用
         * 之前碰到过 `atop` 采集进程 `PSS` 导致延迟增加。此次停止所有 atop 之后，请求延迟消失。
-        * 先说结论，原因：线上部分机器部署的 atop 版本 默认启用了 `-R` 选项。**在 atop 读 /proc/${pid}/smaps 时，会遍历整个进程的页表，期间会持有内存页表的锁。如果在此期间进程发生虚拟内存地址分配，也需要获取锁，就需要等待锁释放。具体到应用层面就是请求耗时毛刺。**
+        * **先说结论**，原因：线上部分机器部署的 atop 版本 默认启用了 `-R` 选项。**在 atop 读 /proc/${pid}/smaps 时，会遍历整个进程的页表，期间会持有内存页表的锁。如果在此期间进程发生虚拟内存地址分配，也需要获取锁，就需要等待锁释放。具体到应用层面就是请求耗时毛刺。**
     * 根因分析。可以看看里面的手段思路
         * 了解`smaps`中的内容和文件更新原理，proc使用的文件类型是`seq_file`序列文件。
             * `smaps` 文件包含了每个进程的内存段的详细信息，包括但不限于各段的大小、权限、偏移量、设备号、inode 号以及最值得注意的——各段的 `PSS（Proportional Set Size，比例集大小）`和 `RSS（Resident Set Size，常驻集大小）`。（针对多进程共享内存的场景，`PSS`的物理内存统计比`RSS`更为准确）。
             * 关于序列文件，之前梳理netstat的实现流程中也涉及了。其读取proc文件系统的`/proc/net/tcp`就是用的序列文件，其简要流程可见：[分析netstat中的Send-Q和Recv-Q](https://xiaodongq.github.io/2024/05/27/netstat-code/#3-procnettcp%E6%96%87%E4%BB%B6%E6%9B%B4%E6%96%B0%E9%80%BB%E8%BE%91) 
-        * 进程耗时分2大部分：**用户空间** 和 **内核空间** 的耗时
+        * **耗时定位思路**说明：进程耗时分2大部分：**用户空间** 和 **内核空间** 的耗时
             * 在缺乏统计系统和百分位延时指标时，`用户空间`的耗时，可以使用bcc的 `funcslower`（示例实验见补充文章）
             * `内核空间`耗时，可选工具：
                 * bcc的`syscount`，syscount 并不能直接查看调用层级，但可以通过对比不同时间区间的延迟变化发现问题，可指定进程。
                 * `perf trace`：相较于 syscount 提供了 histogram 图，**可以直观的发现长尾问题**（示例实验见补充文章）
             * 然后，可进一步使用perf-tools的 `funcgraph` 定位到耗时异常的函数
+        * `smaps`序列文件对应 `seq_file` 的操作，由 `seq_operations` 定义读取进程数据的操作
+            * `pid_smaps_open`打开、`seq_read`读取
+            * 读取时，会调用`mmap_read_lock_killable`给整个`mm`结构体加锁，在读取结束时，m_stop会调用`mmap_read_unlock`解锁
+            * 上述用到的锁结构是`mmap_lock`，该**锁的粒度很大**，当进程发生 `VMA`（虚拟内存区） 操作都需要持有该锁，如内存分配和释放。
+                * 遍历 VMA 耗时：如果进程的内存比较大，就会长时间持有该锁，影响进程的内存管理。
+            * `syscount -L -i 30 -p $PID` 抓取问题前后`mmap`的耗时变化，**问题发生时mmap耗时 177 ms**
+                * `SYSCALL      COUNT        TIME (us)`
+                * `mmap          1           11.003` （时间点 [21:39:27]）
+                * `mmap          1       177477.938` （时间点 [21:40:14]）
+        * 其他追踪
+            * `perf trace -p $PID -s` 追踪、
+            * `funcgraph`追踪、
+            * `bpftrace -e 'tracepoint:mmap_lock:mmap_lock_start_locking /args->write == true/{ @[comm, kstack] = count();}'`
+                * 不需要记住，需要时`perf list`过滤查看具体的追踪点
+                * PS：自己4.18的内核环境里面，貌似没有`mmap_lock`这个tracepoint了
 
 看下自己机器上 smaps内容 和 maps内容的示例（更多一点的信息可以看本文的补充篇）：
 
@@ -244,18 +259,26 @@ Pss:               28692 kB
 
 [阴差阳错｜记一次深入内核的数据库抖动排查](https://zhuanlan.zhihu.com/p/14709946806?utm_campaign=shareopn&utm_medium=social&utm_psn=1889473112485106949&utm_source=wechat_session)
 
-问题：数据库核心业务1-2次抖动
+问题：
 
-* 不论读请求还是写请求，不管是处理用户请求的线程还是底层raft相关的线程，都hang住了数百毫秒
-* 慢请求日志里显示处理线程没有suspend，wall time很大，但真正耗费的CPU time[1]很小；且抖动发生时不论是容器还是宿主机，CPU使用率都非常低。
-* CPU绑核了，但还是抖动
-* 怀疑是内核调度的锅
+* 分布式关系型数据库（C++），一个集群有多个节点，跑在k8s上。这个业务各个pod所在的宿主机正好都只分配了1个pod，且已经做了CPU绑核处理，照理说应该非常稳定。
+    * 集群之所以进行CPU绑核，就是因为之前定位过另一个抖动问题：在未绑核的情况下，很容易触发cgroup限流（可了解 [Kubernetes迁移踩坑：CPU节流](https://zhuanlan.zhihu.com/p/60199662)）
+* 但每天都会发生1-2次抖动。现象是：不论读请求还是写请求，不管是处理用户请求的线程还是底层raft相关的线程，都hang住了数百毫秒
+* 慢请求日志里显示处理线程没有suspend，`wall time`很大，但真正耗费的`CPU time`很小；
+* 且抖动发生时不论是容器还是宿主机，CPU使用率都非常低。
+
+分析和定位：
+
+* 有了上次的踩坑经验（CPU绑核避免cgroup限流），这次第一时间就怀疑是内核调度的锅。
 * 写了一个简单的ticker，不停地干10ms活再sleep 10ms，一个loop内如果总耗时>25ms就认为发生了抖动，输出一些CPU、调度的信息。
-* 复现后利用`perf sched latency`看看各个线程的调度延迟以及时间点
+* 容器和宿主机、绑核和不绑核的各种组合场景运行，都有不同程度的抖动
+    * 其中 “ticker运行在容器内，绑核” 是最抖的，调度延迟经常>5ms，但抖动的频率远高于我们的数据库进程，而抖动幅度又远小于，还是不太相似。
+* 还是从应用进程入手，让GPT写了个脚本，在容器内不停地通过`perf sched`抓取操作系统的调度事件，然后等待抖动复现。
+    * 复现后利用`perf sched latency`看看各个线程的调度延迟以及时间点 （`perf sched`实验可见补充文章）
 * 进程发送了SIGSTOP
     * 同事很快锁定了其中一个由安全团队部署的插件，因为在内网wiki里它的介绍是：进程监控
     * 进一步从安全团队了解到该插件会利用/proc伪文件系统定时扫描宿主机上所有进程的cpuset、comm、cwd等信息，需要排查具体是插件的哪个行为导致了抖动
-* 利用https://github.com/brendangregg/perf-tools/tree/master里的`functrace`很轻易的找到了::write会调用down_write
+* 利用 perf-tools 里的 `functrace` 很轻易的找到了`::write`会调用`down_write`
 * **数据库里哪个路径需要加mmap_sem的写锁**
 
 ### 2.5. eBPF辅助案例
@@ -384,43 +407,42 @@ PID     TID     COMM            FUNC
 
 ## 3. 性能优化
 
+### 3.1. 一些参考文章
+
+看过的一些文章，先列举，前面可能略显杂乱。需要梳理总结，不断消化并融于实践当中。
+
 [Linux内核性能剖析的方法学和主要工具（上文）](https://zhuanlan.zhihu.com/p/538791061)  
     盯着perf report里面排名第1，第2的整起来
 
 讳疾忌医公众号：  
-[为什么你的高并发锁优化做不好？大部份开发者不知的无锁编程陷阱](https://mp.weixin.qq.com/s/EoW1Y7n_SXAjZtGRtcCeVw)
-
-* 分片锁：哈希均匀性与缓存对齐是关键
-* 无锁编程：CAS需警惕ABA，内存管理不可忽视
-* TLS：缓存行对齐是性能跃升的秘密武器
-
-[同事写了个比蜗牛还慢的排序，我用3行代码让他崩溃](https://mp.weixin.qq.com/s/qqLw9iNtSRI77vCILDGDgQ)  
-    从手写O(n²)到STL的O(nlogn)，从单线程到并行化，再到移动语义和内存优化
+* [为什么你的高并发锁优化做不好？大部份开发者不知的无锁编程陷阱](https://mp.weixin.qq.com/s/EoW1Y7n_SXAjZtGRtcCeVw)
+    * 分片锁：哈希均匀性与缓存对齐是关键
+    * 无锁编程：CAS需警惕ABA，内存管理不可忽视
+    * TLS：缓存行对齐是性能跃升的秘密武器
+* [同事写了个比蜗牛还慢的排序，我用3行代码让他崩溃](https://mp.weixin.qq.com/s/qqLw9iNtSRI77vCILDGDgQ)  
+    * 从手写O(n²)到STL的O(nlogn)，从单线程到并行化，再到移动语义和内存优化
 
 [百度C++工程师的那些极限优化（内存篇）](https://mp.weixin.qq.com/s/wF4M2pqlVq7KljaHAruRug)
 
 [百度C++工程师的那些极限优化（并发篇）](https://mp.weixin.qq.com/s/0Ofo8ak7-UXuuOoD0KIHwA)
 
+[codedump的网络日](https://www.codedump.info/)  
+    codedump的网络日志 分布式存储 系统编程 存储引擎
 
-https://zhuanlan.zhihu.com/p/692175522 分布式存储系统性能调优 - zStorage性能进化历程概述
-
-[丝析发解丨zStorage 是如何保持性能稳步上升的?](https://www.modb.pro/db/1762660180899205120)
-
-https://www.codedump.info/ codedump的网络日志 分布式存储 系统编程 存储引擎
-
-https://weibo.com/1202332555/KyDuKB3hY
-
-
-zStorage：小川  
+zStorage： 
+* [丝析发解丨zStorage 是如何保持性能稳步上升的?](https://www.modb.pro/db/1762660180899205120)
+* [分布式存储系统性能调优 - zStorage性能进化历程概述](https://zhuanlan.zhihu.com/p/692175522)
 * [通过IPC指标诊断性能问题](https://zhuanlan.zhihu.com/p/3613097921)
 * [zStorage分布式存储系统的性能分析方法](https://www.zhihu.com/collection/331116627)
     * 对 CPU、Memory、Disk、Network 分别进行测试
     * perf 火焰图 ipc
+* [Linux C 性能优化实战（基于SPDK框架）](https://weibo.com/1202332555/KyDuKB3hY)
 
 [用 CPI 火焰图分析 Linux 性能问题](https://developer.aliyun.com/article/465499)
 
 * CPI火焰图：[CPI Flame Graphs: Catching Your CPUs Napping](https://www.brendangregg.com/blog/2014-10-31/cpi-flame-graphs.html)
 * [震惊，用了这么多年的 CPU 利用率，其实是错的](https://mp.weixin.qq.com/s/KaDJ1EF5Y-ndjRv2iUO3cA)
+    * 译自上面贴过的Brendan Gregg大佬的这篇文章：[CPU Utilization is Wrong](https://www.brendangregg.com/blog/2017-05-09/cpu-utilization-is-wrong.html)
 
 `perf c2c record/report` 查看cacheline情况
 
@@ -429,4 +451,6 @@ zStorage：小川
 [DPDK内存碎片优化，性能最高提升30+倍!](https://mp.weixin.qq.com/s?__biz=Mzg3Mjg2NjU4NA==&mid=2247484462&idx=1&sn=406c59905ea57718018c602cba66f40e&chksm=cee9f259f99e7b4f7597eb6754367214a28f120c062c72c827f6e8c4225f9e54e4c65d4395d8&scene=21#wechat_redirect)
 
 [DPDK Graph Pipeline框架简介与实现原理](https://mp.weixin.qq.com/s?__biz=Mzg3Mjg2NjU4NA==&mid=2247483974&idx=1&sn=25a198745ee4bec9755fe1f64f500dd8&chksm=cee9f431f99e7d27527c7a74c0fd2969c00cf904cd5a25d09dd9e2ba1adb1e2f1a3ced267940&scene=21#wechat_redirect)
+
+### 3.2. 思路
 

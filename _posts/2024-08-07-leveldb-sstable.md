@@ -1,14 +1,14 @@
 ---
-title: leveldb学习笔记（五） -- sstable实现
-categories: [存储和数据库, leveldb]
-tags: [存储, leveldb]
+title: LevelDB学习笔记（五） -- sstable实现
+categories: [存储和数据库, LevelDB]
+tags: [存储, LevelDB]
 ---
 
-leveldb学习笔记，本篇学习sstable实现。
+LevelDB学习笔记，本篇学习sstable实现。
 
 ## 1. 背景
 
-继续学习梳理leveldb中具体的流程，本篇来看下sstable（`Sorted String Table`）实现。
+继续学习梳理LevelDB中具体的流程，本篇来看下sstable（`Sorted String Table`）实现。
 
 跟着 [leveldb-handbook sstable](https://leveldb-handbook.readthedocs.io/zh/latest/sstable.html) 映证代码进行学习梳理。
 
@@ -144,7 +144,7 @@ void DBImpl::MaybeScheduleCompaction() {
 
 上面若需要合并，则`env_->Schedule(&DBImpl::BGWork, this);`投递任务，其回调处理为`DBImpl::BGWork`。
 
-`env_->Schedule`里面基于mutex和条件变量实现了一个生产-消费者模型，leveldb自己包装了一层`std::mutex`和`std::condition_variable`。
+`env_->Schedule`里面基于mutex和条件变量实现了一个生产-消费者模型，LevelDB自己包装了一层`std::mutex`和`std::condition_variable`。
 
 ### 3.2. DBImpl::BGWork：合并回调函数
 
@@ -311,8 +311,8 @@ Status BuildTable(const std::string& dbname, Env* env, const Options& options,
 
 ![写入结构示意图](/images/sstable_logic.jpeg)
 
-* `data block` 中存储的数据是leveldb中的keyvalue键值对。
-    * 由于sstable中所有的keyvalue对都是严格按序存储的，为了节省存储空间，leveldb并不会为每一对keyvalue对都存储完整的key值，而是存储与上一个key非共享的部分，避免了key重复内容的存储。
+* `data block` 中存储的数据是LevelDB中的keyvalue键值对。
+    * 由于sstable中所有的keyvalue对都是严格按序存储的，为了节省存储空间，LevelDB并不会为每一对keyvalue对都存储完整的key值，而是存储与上一个key非共享的部分，避免了key重复内容的存储。
 * `filter block` 存储的是`data block`数据的一些过滤信息，这里基于`布隆过滤器`实现。
 * `meta index block`用来存储`filter block`在整个sstable中的索引信息。
 * `index block`用来存储所有`data block`的相关索引信息(与meta index block类似)。

@@ -372,7 +372,7 @@ intset *intsetNew(void) {
 
 Zset有序集合（Sorted Set） 的实现代码在`t_zset.c`文件中，结构则定义在`server.h`中，包括两个成员：哈希表和跳表。
 
-关于跳表，之前在LevelDB的memtable实现梳理中有做过说明：[leveldb学习笔记（四） -- memtable结构实现](https://xiaodongq.github.io/2024/08/02/leveldb-memtable-skiplist/)。
+关于跳表，之前在LevelDB的memtable实现梳理中有做过说明：[LevelDB学习笔记（四） -- memtable结构实现](https://xiaodongq.github.io/2024/08/02/leveldb-memtable-skiplist/)。
 
 ```c
 // redis/src/server.h

@@ -435,7 +435,7 @@ fn test_atomic() {
 }
 ```
 
-上面涉及的`Ordering::Relaxed`内存序（`std::sync::atomic`包中），在之前 [leveldb学习笔记（四） -- memtable结构实现](https://xiaodongq.github.io/2024/08/02/leveldb-memtable-skiplist)中也提到过C++中的"内存序说明"。
+上面涉及的`Ordering::Relaxed`内存序（`std::sync::atomic`包中），在之前 [LevelDB学习笔记（四） -- memtable结构实现](https://xiaodongq.github.io/2024/08/02/leveldb-memtable-skiplist)中也提到过C++中的"内存序说明"。
 
 编译器或处理器为了优化性能，可能会对执行指令重新排序，即`指令重排`，通过指定不同级别的内存序类型，可以进行重排限制和可见性控制。
 
