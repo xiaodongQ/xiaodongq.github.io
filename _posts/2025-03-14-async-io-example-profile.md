@@ -504,7 +504,129 @@ sysbench /usr/share/sysbench/oltp_read_write.lua \
 
 ![io-mysql](/images/io-mysql.svg)
 
-## 6. 小结
+## 6. 红蓝差分火焰图
+
+红蓝差分火焰图，可以对比前后火焰图的函数差异，参考：[Differential Flame Graphs](https://www.brendangregg.com/blog/2014-11-09/differential-flame-graphs.html)。
+
+火焰图步骤和说明：
+
+* 1）采集堆栈1
+* 2）再采集堆栈2
+* 3）基于堆栈2生成一个火焰图，所有的函数帧都会**以堆栈2为准**
+* 4）根据`堆栈2-堆栈1`的差值对上面的火焰图染色，如果2中出现的帧次数更多，则是**红色**，如果次数更少则是**蓝色**
+    * 红蓝颜色的**饱和度是表示差距大小**，颜色越深表示次数相差越大
+
+`difffolded.pl`为生成差分堆栈的脚本，选项和应用场景说明：
+
+* `-n` 格式化第一个堆栈文件中的计数，以和第2个堆栈文件匹配
+    * 如果不加该参数，那么在其他时间采集堆栈时，如果负载不一样，负载增加的话则所有堆栈都会显示红色，负载减少则都会显示蓝色
+    * 增加`-n`参数则会平衡第一个堆栈的采集内容，得到一个更全面的红蓝频谱
+    * **小结**：建议加上`-n`
+* `-x` 有些采集工具会包含十六进制的地址，加该选项会进行兼容
+    * 比如上面用libbpf-tools编译的`wakeuptime`，采集结果就是带了地址，而使用bcc tools的python版本则会自行处理这些地址
+* 另外，生成火焰图的`flamegraph.pl`脚本，`--negate`参数可以交换颜色，红蓝反过来。**使用场景说明**：
+    * 当第2次堆栈采集时，如果相比第一次部分业务或者负载没有了，则第2个堆栈里**根本没有这部分堆栈**，这时以第2个堆栈为准生成差分火焰图时，都不会有这部分蓝色的显示。
+    * 此时就可以以第一个堆栈文件为准（即生成差分堆栈时，交换文件顺序），然后生成火焰图时调转红蓝颜色，这样生成的火焰图就比较明显了，还是第2个堆栈里函数少则显示蓝色，第2个堆栈多则显示红色。
+    * **小结**：建议两种都生成一把，避免遗漏关键信息
+
+```sh
+[CentOS-root@xdlinux ➜ red-blue-diff git:(main) ✗ ]$ difffolded.pl -h
+USAGE: /home/workspace/FlameGraph/difffolded.pl [-hns] folded1 folded2 | flamegraph.pl > diff2.svg
+	    -h       # help message
+	    -n       # normalize sample counts
+	    -s       # strip hex numbers (addresses)
+See stackcollapse scripts for generating folded files.
+Also consider flipping the files and hues to highlight reduced paths:
+/home/workspace/FlameGraph/difffolded.pl folded2 folded1 | ./flamegraph.pl --negate > diff1.svg
+```
+
+### 6.1. 实验
+
+```sh
+# 1、采集1
+# stress -c 4 -m 2 -i 4
+perf record -F 99 -a -g sleep 30
+perf script > out.stack1
+
+# 2、采集2
+# stress -c 2 -m 6 -i 1
+perf record -F 99 -a -g sleep 30
+perf script > out.stack2
+
+# 3、折叠采集的两个堆栈
+stackcollapse-perf.pl out.stack1 > out.folded1 
+stackcollapse-perf.pl out.stack2 > out.folded2
+
+# 4、生成差分火焰图（实际使用时建议指定`-n`，时间跨度比较大时生成的对比更全面一点）
+# difffolded.pl -n out.folded1 out.folded2 | flamegraph.pl > red-blue-diff-flamegraph_based2.svg
+difffolded.pl out.folded1 out.folded2 | flamegraph.pl > red-blue-diff-flamegraph_based2.svg
+```
+
+生成的图如下：
+
+![red-blue-diff-flamegraph_based2](/images/red-blue-diff-flamegraph_based2.svg)
+
+分析：
+
+* 第2次`stress`加的压力，CPU更小（`-c 2`），内存更大（`-m 6`），io更小（`-i 1`）
+* 可看到
+    * 表示CPU压力的`__random`计算是蓝色，说明堆栈2中函数次数减少；
+    * 表示内存的`clear_page_erms`处理很深，说明此处增加了不少；
+    * 表示io的sync底部是浅红（**应该是要减少的？蓝色？**），但上面的 sync_fs_one_sb 是蓝色的（**只有一点点，不明显**），有减少
+        * 针对该情况，可使用下面的`--negate`，注意传给`difffolded.pl`两个堆栈文件的顺序是反的
+
+```sh
+# difffolded.pl 加 -n 选项
+difffolded.pl -n out.folded1 out.folded2 | flamegraph.pl > red-blue-diff-flamegraph_based2-n.svg
+
+# flamegraph.pl 加 --negate；且传给 difffolded.pl 的堆栈，第2个在前面！
+difffolded.pl out.folded2 out.folded1 | flamegraph.pl --negate > red-blue-diff-flamegraph_based1-negate.svg
+```
+
+red-blue-diff-flamegraph_based2-n.svg，和之前差别不大，因为2次：
+
+[red-blue-diff-flamegraph_based2-n.svg](/images/red-blue-diff-flamegraph_based2-n.svg)
+
+red-blue-diff-flamegraph_based1-negate.svg，**可以明显看到io相关函数次数的减少了**（红蓝还是表示相同含义）：
+
+[red-blue-diff-flamegraph_based1-negate.svg](/images/red-blue-diff-flamegraph_based1-negate.svg)
+
+### 6.2. 应用脚本
+
+将上面的内容提炼为脚本，供平常使用。生成两种差分火焰图，一个是默认方式：以堆栈2为基础，展示变化；一个是以堆栈1为基础，以防止堆栈2（比如代码优化后的程序）删除部分逻辑后，遗漏这部分差别。
+
+利用LLM生成（这部分工作最好基于推理来做，勾选“深度思考”，要不车轱辘话很磨人），完整脚本见：[gen_diff_flamegraph](https://github.com/xiaodongQ/prog-playground/tree/main/flamegraph_sample/red-blue-diff/gen_diff_flamegraph.sh)。
+
+```sh
+# 生成主对比图（新版本变化视图）
+echo -e "\033[34m▶ 生成主对比图（显示新版本的变化）...\033[0m"
+difffolded.pl -n $BASE_FILE $COMPARE_FILE | \
+flamegraph.pl --title "Differential $COMPARE_FILE vs $BASE_FILE" > diff_${COMPARE_FILE}_vs_${BASE_FILE}.svg
+ 
+# 生成互补视图（捕获旧版本特有内容）
+echo -e "\033[34m▶ 生成互补视图（避免遗漏基准版本的路径变化）...\033[0m"
+difffolded.pl -n $COMPARE_FILE $BASE_FILE | \
+flamegraph.pl --negate --title "Complementary $BASE_FILE vs $COMPARE_FILE" > diff_${BASE_FILE}_complement.svg
+```
+
+提示还是比较到位的，效果如下：
+
+![red-blue-diff-flame](/images/2025-04-19-red-blue-diff-flame.png)
+
+### 6.3. 应用场景：CPI火焰图
+
+差分火焰图的另一个应用场景是 **CPI火焰图**，可见：[CPI Flame Graphs: Catching Your CPUs Napping](https://www.brendangregg.com/blog/2014-10-31/cpi-flame-graphs.html)。
+
+背景：
+
+* `CPU利用率`并不能知道CPU在干嘛，因为CPU可能执行到一条指令就停下来等待资源了。从用户角度看，CPU还是在被使用状态，但是实际上，指令并没有有效地执行，CPU在忙等，**这种CPU利用率并不是有效的利用率**。
+* 要发现CPU在 busy 的时候实际上在干什么，最简单的方法就是测量平均`CPI`。`CPI`高说明运行每条指令用了更多的周期。这些多出来的周期里面，通常是由于流水线的停顿周期 (`Stalled Cycles`) 造成的，例如，等待内存读写。
+
+CPI火焰图，可以基于CPU火焰图，提供一个可视化的基于 `CPU利用率` 和 `CPI指标`，综合分析程序CPU执行效率的方案。
+
+具体可了解：[用 CPI 火焰图分析 Linux 性能问题](https://developer.aliyun.com/article/465499)，以及 [CPU Utilization is Wrong](https://www.brendangregg.com/blog/2017-05-09/cpu-utilization-is-wrong.html)。
+
+## 7. 小结
 
 准备异步demo实验，并进行性能分析，本篇先介绍了 gperftools 和 火焰图。实验了各类火焰图的生成简要分析，回顾了bcc/perf-tools等之前涉及的工具。
 
@@ -514,7 +636,7 @@ sysbench /usr/share/sysbench/oltp_read_write.lua \
 
 下一步进行异步编程并使用本篇工具分析。
 
-## 7. 参考
+## 8. 参考
 
 * [gperftools](https://github.com/gperftools/gperftools)
 * [FlameGraph GitHub](https://github.com/brendangregg/FlameGraph)
