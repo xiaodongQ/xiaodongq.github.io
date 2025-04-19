@@ -506,6 +506,8 @@ sysbench /usr/share/sysbench/oltp_read_write.lua \
 
 ## 6. 红蓝差分火焰图
 
+### 6.1. 介绍
+
 红蓝差分火焰图，可以对比前后火焰图的函数差异，参考：[Differential Flame Graphs](https://www.brendangregg.com/blog/2014-11-09/differential-flame-graphs.html)。
 
 火焰图步骤和说明：
@@ -540,7 +542,7 @@ Also consider flipping the files and hues to highlight reduced paths:
 /home/workspace/FlameGraph/difffolded.pl folded2 folded1 | ./flamegraph.pl --negate > diff1.svg
 ```
 
-### 6.1. 实验
+### 6.2. 实验
 
 ```sh
 # 1、采集1
@@ -591,7 +593,7 @@ red-blue-diff-flamegraph_based1-negate.svg，**可以明显看到io相关函数�
 
 [red-blue-diff-flamegraph_based1-negate.svg](/images/red-blue-diff-flamegraph_based1-negate.svg)
 
-### 6.2. 应用脚本
+### 6.3. 应用脚本
 
 将上面的内容提炼为脚本，供平常使用。生成两种差分火焰图，一个是默认方式：以堆栈2为基础，展示变化；一个是以堆栈1为基础，以防止堆栈2（比如代码优化后的程序）删除部分逻辑后，遗漏这部分差别。
 
@@ -613,9 +615,9 @@ flamegraph.pl --negate --title "Complementary $BASE_FILE vs $COMPARE_FILE" > dif
 
 ![red-blue-diff-flame](/images/2025-04-19-red-blue-diff-flame.png)
 
-### 6.3. 应用场景：CPI火焰图
+## 7. CPI火焰图
 
-差分火焰图的另一个应用场景是 **CPI火焰图**，可见：[CPI Flame Graphs: Catching Your CPUs Napping](https://www.brendangregg.com/blog/2014-10-31/cpi-flame-graphs.html)。
+差分火焰图的一个应用场景是 **CPI火焰图**，可见：[CPI Flame Graphs: Catching Your CPUs Napping](https://www.brendangregg.com/blog/2014-10-31/cpi-flame-graphs.html)。
 
 背景：
 
@@ -626,7 +628,13 @@ CPI火焰图，可以基于CPU火焰图，提供一个可视化的基于 `CPU利
 
 具体可了解：[用 CPI 火焰图分析 Linux 性能问题](https://developer.aliyun.com/article/465499)，以及 [CPU Utilization is Wrong](https://www.brendangregg.com/blog/2017-05-09/cpu-utilization-is-wrong.html)。
 
-## 7. 小结
+CPI 火焰图的生成**依赖以下两个关键 CPU 事件**：
+
+* `cpu_clk_unhalted.thread_p`：表示 CPU 运行的周期数
+* `resource_stalls.any`：表示流水线停顿的周期数（如内存访问延迟）
+* 说明：对于 Intel 处理器，可直接使用这些事件；AMD 处理器需替换为等效事件（如 ex_ret_stall.any）
+
+## 8. 小结
 
 准备异步demo实验，并进行性能分析，本篇先介绍了 gperftools 和 火焰图。实验了各类火焰图的生成简要分析，回顾了bcc/perf-tools等之前涉及的工具。
 
@@ -636,7 +644,7 @@ CPI火焰图，可以基于CPU火焰图，提供一个可视化的基于 `CPU利
 
 下一步进行异步编程并使用本篇工具分析。
 
-## 8. 参考
+## 9. 参考
 
 * [gperftools](https://github.com/gperftools/gperftools)
 * [FlameGraph GitHub](https://github.com/brendangregg/FlameGraph)
