@@ -587,11 +587,11 @@ difffolded.pl out.folded2 out.folded1 | flamegraph.pl --negate > red-blue-diff-f
 
 red-blue-diff-flamegraph_based2-n.svg，和之前差别不大，因为2次：
 
-[red-blue-diff-flamegraph_based2-n.svg](/images/red-blue-diff-flamegraph_based2-n.svg)
+![red-blue-diff-flamegraph_based2-n.svg](/images/red-blue-diff-flamegraph_based2-n.svg)
 
 red-blue-diff-flamegraph_based1-negate.svg，**可以明显看到io相关函数次数的减少了**（红蓝还是表示相同含义）：
 
-[red-blue-diff-flamegraph_based1-negate.svg](/images/red-blue-diff-flamegraph_based1-negate.svg)
+![red-blue-diff-flamegraph_based1-negate.svg](/images/red-blue-diff-flamegraph_based1-negate.svg)
 
 ### 6.3. 应用脚本
 
