@@ -579,11 +579,59 @@ zStorage介绍和相关文章：
 
 3、**[分布式存储系统性能调优-zStorage是如何将IOPS从100万提升到200万的？](https://zhuanlan.zhihu.com/p/675118524)**
 
-4、[zStorage分布式存储系统的性能分析方法](https://www.zhihu.com/collection/331116627)
-    * 对 CPU、Memory、Disk、Network 分别进行测试
-    * perf 火焰图 ipc
+* 1）编译优化：`LTO（Link Time Optimization）`、`PGO（Profile Guide Optimization）`
+* 2）CPU Cache miss优化：
+    * 使用jemalloc、并通过实现hook用于hugepage分配，减少TLB miss
+    * 精简数据结构大小、`__builtin_prefetch`数据预取（编译器内置函数，提示处理器预取数据），以降低L1/L2/LLC（末级缓存）miss
+    * 链表改造为数组，或者缓存上次查询到的信息，减少内存加载和cache miss
+* 3）负载均衡优化：充分软硬件组件，避免出现木桶效应。IO负载在各节点、链路、线程、网卡等上均衡。
+* 4）调试功能精简：去除不再需要的调试功能 或者 默认关闭并可动态打开。
+* 5）内存操作优化：减少不必要的内存分配；精简数据结构大小；热点字段重排，择时一次性预取到内存等。
+* 6）IO上下文切换优化：结合业务逻辑，尽量让IO能够“运行直到完成“，可以有效减少cache miss，提升性能。
+* 7）函数内联优化：频繁调用的小函数，如果没有被编译器自动内联的，可以考虑手动修改代码实现内联，例如改成宏。
+    * **实践证明：小函数内联是效果比较明显的一类优化**。
+* 8）SPDK空轮询优化：SPDK要100%占用CPU不断轮询注册的poller，需要审视哪些轮询是无意义，可以通过降低冷的链接、PG的轮询频率，达到降低CPU无效消耗的目的
+* 作者反馈该过程中1、3、4、6收益最大
 
-5、 [通过IPC指标诊断性能问题](https://zhuanlan.zhihu.com/p/3613097921)
+4、[zStorage分布式存储系统的性能分析方法](https://zhuanlan.zhihu.com/p/19978360313)  
+
+* 硬件性能评测：对于zStorage来讲（其他系统基本也离不开这几大件），影响性能的最主要的几个硬件是：**CPU**、**内存**、**网络**和**硬盘**。
+    * 传统软硬件中网络和硬盘是主要性能瓶颈（1ms-10ms级别），但近年来高速 NVMe SSD 硬盘和高速 RDMA 网卡迅猛发展，其性能提升速度远高于CPU和内存，**SSD硬盘和RDMA网卡响应时间已经可以达到小于10us级别**，此场景下CPU和内存的耗时已经不可忽视。
+        * 可了解 [Linux存储IO栈梳理（一） -- 存储栈全貌图](https://xiaodongq.github.io/2024/07/11/linux-storage-io-stack/#3-%E8%80%97%E6%97%B6%E4%BD%93%E6%84%9F) 中记录的一些耗时体感。
+    * 做性能分析时，CPU和内存需要结合起来看，CPU一般不会成为主要瓶颈，关注点还是在 **内存的带宽** 以及 **CPU缓存的命中率** 上。
+    * 可以在`性能符合预期`的实验室环境中，对这几个主要部件进行性能评测，形成一个`硬件的基准性能数据`。
+* 定位**硬盘**瓶颈
+    * 利用工具观察分析IO排队、时延。如iostat、或者开发类似文章中的自研ztrace工具
+    * IOPS是否均衡，和基准是否相符；平均时延和长尾时延；时延流程占比；硬盘使用率；
+* 定位CPU、内存瓶颈
+    * 同上述一样的道理，可以分析出性能瓶颈是否在**网络**上。如果我们排除了硬盘和网络的瓶颈，剩下的就只有 **CPU** 和 **内存** 了。
+    * 要确认是否是 CPU 和内存的瓶颈，参考作者找的点位：**只有执行代码流程，没有网络、硬盘、系统调用、锁、sleep 等操作**，避免网络、硬盘、上下文切换干扰。
+* 性能分析高频使用工具：perf
+    * 可以细致地分析各个函数的`CPU占比`、`缓存未命中百分比`、`分支预测失败百分比`，以及 `IPC（每个时钟周期执行的指令数）`等性能指标。
+    * 缓存和分支预测相关指标：`perf stat -e cpu-migrations,cache-references,cache-misses,instructions,cycles,L1-dcache-load-misses,L1-dcache-loads,L1-icache-load-misses,branch-load-misses,branch-loads xxx`
+
+5、火焰图和IPC，见：[通过IPC指标诊断性能问题](https://zhuanlan.zhihu.com/p/3613097921)
+
+* `IPC（Instructions Per Cycle）`是指每个周期的指令执行数，用于衡量处理器的执行效率。**IPC越高，表明处理器在相同频率下可以执行更多指令**。
+* 在现代高性能处理器中，每个时钟周期可以发射**4~6条指令**，因此在理想情况下，IPC可以达到`4~6`以上。
+    * 实际中难以达到，原因：数据依赖、缓存未命中（Cache Miss）、分支预测错误
+    * 因此，**较低的IPC意味着CPU执行效率低，CPU有大量时间处于停滞等待状态，无法有效利用硬件的峰值性能**。
+* 利用IPC指标可以体现的性能问题：
+    * 与基线做对比，初步诊断性能问题
+    * 节点间IPC差异过大问题：**节点负载不均衡**，同样可测量不同CPU核心间的IPC，如果差距过大，也可以反映**CPU核心间的负载不均衡**
+    * IPC增加，但是IOPS性能数据下降
+        * 表明CPU虽然在卖力地工作，但却做了许多无用功。该情况可以**perf采集，再生成差分火焰图**
+        * 各类火焰图示例，可见：[并发与异步编程（三） -- 性能分析工具：gperftools和火焰图](https://xiaodongq.github.io/2025/03/14/async-io-example-profile/)
+    * 两套不同环境下的IPC对比
+        * 不同架构，如Intel服务器 vs 海光
+        * 除了IPC，还可测量 `前端停顿周期（stalled-cycles-frontend）`（较高比例可能是指令获取的瓶颈） 和 `后端停顿周期（stalled-cycles-backend）`（高比例可能是执行单元等待数据的表现，通常与内存瓶颈相关）
+
+另外可以见（`CPI`即`Cycle Per Instructions`，倒数关系）：
+
+* [用 CPI 火焰图分析 Linux 性能问题](https://developer.aliyun.com/article/465499)
+    * 其中也涉及Brendan Gregg大佬的文章：[CPI Flame Graphs: Catching Your CPUs Napping](https://www.brendangregg.com/blog/2014-10-31/cpi-flame-graphs.html) 和 [CPU Utilization is Wrong](https://www.brendangregg.com/blog/2017-05-09/cpu-utilization-is-wrong.html)
+
+---
 
 公众号：极客重生
 
@@ -604,12 +652,6 @@ zStorage介绍和相关文章：
 
 [codedump的网络日志](https://www.codedump.info/)  
 * codedump的网络日志 分布式存储 系统编程 存储引擎
-
-[用 CPI 火焰图分析 Linux 性能问题](https://developer.aliyun.com/article/465499)
-
-* CPI火焰图：[CPI Flame Graphs: Catching Your CPUs Napping](https://www.brendangregg.com/blog/2014-10-31/cpi-flame-graphs.html)
-* [震惊，用了这么多年的 CPU 利用率，其实是错的](https://mp.weixin.qq.com/s/KaDJ1EF5Y-ndjRv2iUO3cA)
-    * 译自上面贴过的Brendan Gregg大佬的这篇文章：[CPU Utilization is Wrong](https://www.brendangregg.com/blog/2017-05-09/cpu-utilization-is-wrong.html)
 
 `perf c2c record/report` 查看cacheline情况
 
@@ -645,20 +687,20 @@ zStorage介绍和相关文章：
 
 #### 3.2.1. 网络IO优化
 
-* 1、IO加速
+* **1、IO加速**
     * 内核旁路（Kernel Bypass）：让数据在**用户空间**和硬件设备之间直接进行传输和处理，**无需频繁地经过操作系统内核的干预**
         * 向上offload：`DPDK`/`SPDK`，如 `F-Stack`框架（基于DPDK的开源高性能网络开发框架）
         * 向下offload：`RDMA`
     * 硬件
         * FPGA（基于P4语言用于FPGA的编程）
-* 2、CPU并发优化
+* **2、CPU并发优化**
     * 多进程、多线程、协程
     * 多核编程，绑核独占
     * 无锁、per CPU设计
-* 3、减少cache miss
+* **3、减少cache miss**
     * 预取、分支预测、亲和性、局部性原理
     * 大页、TLB
-* 4、Linux网络系统优化
+* **4、Linux网络系统优化**
     * 网卡offload优化：checksum、GRO、GSO
         * `checksum`，将计算校验和的任务从CPU卸载到网卡，减轻 CPU 的负担
         * `GRO`（Generic Receive Offload，通用接收卸载），**网卡**将多个较小的网络数据包合并成一个较大的数据包，再传给上层协议栈，减少处理包次数，降低中断频率。适用于**接收大量小数据包**的应用。
@@ -672,33 +714,33 @@ zStorage介绍和相关文章：
             * SYN队列、accept队列（全连接队列）
         * 调整sock缓冲区大小
         * 调整TCP缓冲区大小
-* 5、减少重复操作
+* **5、减少重复操作**
     * 池化技术：内存池，线程池，连接池等
     * 缓存技术
     * 零拷贝优化
 
 #### 3.2.2. CPU性能优化
 
-* 1、指令优化
+* **1、指令优化**
     * 编译器优化，gcc优化选项如`-O2`（中等优化，相较于`-O1`、`-O3`更常用一些）
     * 指令预取，分支预测，局部性原理
-* 2、算法优化
+* **2、算法优化**
     * 算法和数据结构优化。比如STL中不关注顺序则`unordered_map`优于`map`、数据量大时`O(nlogn)`的排序、`O(logn)`的查找算法
-* 3、并行优化
+* **3、并行优化**
     * 多线程、多协程：上下文切换的开销不同
         * 可参考：[CPU及内存调度（一） -- 进程、线程、系统调用、协程上下文切换](https://xiaodongq.github.io/2025/03/09/context-switch/)）
         * 量级参考：进程上下文切换2.7us到5.48us之间、线程上下文切换3.8us左右、系统调用200ns、协程切换120ns
     * 异步处理：可避免程序因为等待而一直阻塞
     * 锁优化优化：细粒度锁、无锁设计，CPU/Thread local（比如tcmalloc内存池）
-* 4、Cache优化
+* **4、Cache优化**
     * Cache对齐：提高缓存命中率，善用局部性原理。比如C++结构体定义时，指定`alignas(64)`
     * CPU绑定：提高CPU缓存命中率，减少跨CPU调度
-* 5、调度优化
+* **5、调度优化**
     * 优先级调整：`nice`调整进程优先级
     * CPU独占：`taskset`命令 或者 `pthread_setaffinity_np`接口
     * 中断负载均衡
         * `irqbalance`在高吞吐环境效果不一定好，手动设置方式可了解：[网卡相关工具命令](https://xiaodongq.github.io/2025/04/14/handy-tools/#73-%E7%BD%91%E5%8D%A1%E7%9B%B8%E5%85%B3%E5%B7%A5%E5%85%B7%E5%91%BD%E4%BB%A4)
-* 6、亲和性优化
+* **6、亲和性优化**
     * 中断亲和：网卡硬中断（RSS）和软中断（RPS）均衡绑定处理中断的CPU
         * 可以到`/proc/interrupts`里面过滤网卡设备，查看对应的中断号和中断处理的分布情况
         * 还有bcc的`softirqs`查看中断分布、`trace`跟踪指定函数对应的中断处理CPU
@@ -707,33 +749,33 @@ zStorage介绍和相关文章：
 
 #### 3.2.3. 内存性能优化
 
-* 1、减少内存动态分配
+* **1、减少内存动态分配**
     * 减少分配释放次数：内存池化，多线程场景考虑tcmalloc、jemalloc等内存分配器
     * 增大大小：page分配、大页、减少TLB miss等
-* 2、内存分配优化
+* **2、内存分配优化**
     * 数据通路缓存：per CPU缓存
     * 管理机制缓存：分级管理，比如tcmalloc中的前、中、后端
-* 3、减少内存
+* **3、减少内存**
     * 精细化调度体：比如协程替换线程，协程栈比线程栈小得多
     * 控制内存分配：按需分配，减少内存泄漏
-* 4、算法优化
+* **4、算法优化**
     * bitmap、布隆过滤器、数据库索引等
-* 5、内存对齐
+* **5、内存对齐**
     * cacheline对齐，提升缓存命中率
 
 #### 3.2.4. 硬盘IO优化
 
-* 1、提高写性能
+* **1、提高写性能**
     * 顺序IO、Append-only
     * 批量写入：LSM tree，如LevelDB
-* 2、提高读性能
+* **2、提高读性能**
     * 顺序读
     * 缓存：B+树索引，如MySQL的InnoDB存储引擎
     * 零拷贝：如mmap
-* 3、硬盘优化
+* **3、硬盘优化**
     * 硬件加速，SSD替换HDD
     * 调整预读块大小、硬盘队列长度
-* 4、软件IO加锁
+* **4、软件IO加锁**
     * aio、io_uring、SPDK、NVME加速
     * 调整IO调度算法
 

@@ -259,7 +259,7 @@ ESTAB 0      266148 [::ffff:192.168.1.62]:59606 [::ffff:10.12.152.253]:8008 user
 
 下面工具只是主要关注了2个硬盘相关字段，还有很多其他信息。工具放在这里备用，用的时候能第一时间想起来。
 
-lsblk、fdisk、smarctl、/sys/block文件系统、blockdev、lshw、hdparm
+lsblk、fdisk、smartctl、/sys/block文件系统、blockdev、lshw、hdparm
 
 1、查看扇区：
 
