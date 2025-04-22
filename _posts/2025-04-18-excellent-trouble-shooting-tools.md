@@ -605,6 +605,8 @@ Call Stack:
 [297488.582244] [consume_skb         ][napi_gro_receive_entry -> tcp_rcv_state_process] TCP: 192.168.1.4:61896 -> 192.168.1.150:8000 seq:3769012161, ack:0, flags:S latency: 0.123ms
 ```
 
+另外发现一个博主梳理nettrace源码的系列文章也可以看看：[Nettrace工具学习记录之流程梳理](https://blog.csdn.net/abobob/article/details/146094075)。这篇和其他文章里画的图风格也挺棒的，可以参考。（最近看东西发现CSDN上不少高质量博主和文章，下个油猴插件屏蔽糟糕的网站各种弹窗和提示）
+
 ## 6. kdump 和 crash
 
 1、kdump：
