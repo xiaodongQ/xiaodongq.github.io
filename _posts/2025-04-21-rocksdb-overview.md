@@ -13,23 +13,35 @@ tags: [存储, RocksDB]
 相关链接：
 
 * 仓库地址：[facebook/rocksdb](https://github.com/facebook/rocksdb/)
-* 文档：[RocksDB-Overview](https://github.com/facebook/rocksdb/wiki/RocksDB-Overview)
+* 文档：[RocksDB-Wiki](https://github.com/facebook/rocksdb/wiki) （右侧有很多内容分类）
 
 一些其他文章：
 
 * TiDB ⼀些关于 RocksDB 的博客：
-    - https://cn.pingcap.com/blog/?tag=RocksDB
-    - https://github.com/pingcap/blog/blob/master/rocksdb-in-tikv.md
-* CRDB 关于 RocksDB 的博客：
-    - https://www.cockroachlabs.com/blog/cockroachdb-on-rocksd/
-    - https://www.cockroachlabs.com/blog/pebble-rocksdb-kv-store/
+    - [TiDB博客 -- RocksDB标签](https://cn.pingcap.com/blog/?tag=RocksDB)
+    - [rocksdb-in-tikv](https://github.com/pingcap/blog/blob/master/rocksdb-in-tikv.md)
+* CockroachDB 关于 RocksDB 的博客：
+    - [Why we built CockroachDB on top of RocksDB](https://www.cockroachlabs.com/blog/cockroachdb-on-rocksd/)
+    - [Introducing Pebble: A RocksDB-inspired key-value store written in Go](https://www.cockroachlabs.com/blog/pebble-rocksdb-kv-store/)
 
-## 总体说明
+## 2. 总体说明
 
-RocksDB 由 Facebook 数据库工程团队开发和维护，建立在早期的 LevelDB 工作之上。采用日志结构的合并数据库 (`LSM`，`Log-Structured-Merge-Database`) 设计，在写放大因子 (`WAF`，`Write-Amplification-Factor`)、读放大因子 (`RAF`，`Read-Ampification-Factor`) 和空间放大因子 (`SAF`，`Space-Ampification-Factor`) 之间进行了灵活的权衡。
+RocksDB 由 Facebook 数据库工程团队开发和维护，建立在早期的 LevelDB 工作之上。提供了快速的键值存储功能，尤其适合在闪存上存储数据。采用日志结构合并数据库 (`LSM`，Log-Structured-Merge-Database) 设计，在写放大因子 (`WAF`，Write-Amplification-Factor)、读放大因子 (`RAF`，Read-Ampification-Factor) 和空间放大因子 (`SAF`，Space-Ampification-Factor) 之间进行了灵活的权衡。
 
-## 2. 小结
+* 以**C++库**的形式（内嵌数据库，没有独立进程），提供任意字节流大小（arbitrarily-sized byte）的键值存储、支持单点查询和范围查询、支持多种类型的ACID事务保证。
+* RocksDB在可定制性（customizability）和自适应性（self-adaptability）之间取得了平衡，可基于`SSDs`, `hard disks`, `ramfs`, 或 `remote storage`灵活配置；提供了多种压缩算法；并提供了一些用于生产支持和调试（production support and debugging）的优秀工具。
+* RocksDB初始代码基于 **leveldb 1.5** 进行fork，并借鉴了**HBase**的一些灵感，当然也有部分Facebook在开发RocksDB之前的一些代码和设计。
+* 详情可见：[RocksDB-Overview](https://github.com/facebook/rocksdb/wiki/RocksDB-Overview)
+
+RocksDB优点很多，但也有些缺点，上面提到在几个放大因素上做了权衡，其中一大问题就是**写放大**。每个RocksDB为了提高读性能，都会进行`Compaction`，而似这样的多份（一般3份）写入RocksDB，等于CPU消耗确定会*3，并且写放大由于提高了写的次数，即提高SSD的擦写次数，会显著减少SSD的寿命，提高系统的成本。可了解：[RocksDB的缺点](https://zhuanlan.zhihu.com/p/162052214)。
+
+RocksDB基本结构如下，即典型的LSM结构（也可见：[LevelDB学习笔记（一） -- 整体架构和基本操作](https://xiaodongq.github.io/2024/07/10/leveldb-learn-first)）：
+
+![rocksdb-constructs-lsm](/images/rocksdb-constructs-lsm.png)
 
 
-## 3. 参考
+## 3. 小结
+
+
+## 4. 参考
 
