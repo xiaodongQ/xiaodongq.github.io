@@ -232,7 +232,7 @@ TRACEPOINT_PROBE(raw_syscalls, sys_enter) {
 
 ### 3.2. funcslower 跟踪用户空间接口耗时
 
-> bcc 和 perf-tools 中都有`funcslower`，但是 perf-tools 中的功能更丰富一些。
+> bcc 和 perf-tools 中都有`funcslower`，但是 bcc 中的功能更丰富一些。
 {: .prompt-tip }
 
 #### 3.2.1. bcc和perf-tools中的 funcslower 说明
@@ -531,7 +531,81 @@ rpchandler   115 [009] 1802765.259087: sched:sched_stat_runtime: comm=rpchandler
          swapper     0 [009] 1802765.165189:       sched:sched_switch: swapper/9:0 [120] S ==> TimeWheel.Routi:210771 [120]
 ```
 
-## 5. kdump 和 crash
+## 5. nettrace
+
+腾讯开源的：[nettrace](https://github.com/OpenCloudOS/nettrace)，基于eBPF追踪网络包很方便，可以追踪netfilter对应的四表五链过程、丢包原因、运行在哪个CPU等。
+
+功能比较全面，而且兼容了一些低版本内核。另外也使用了一下cilium的 [pwru](https://github.com/cilium/pwru)，但感觉启动和停止的速度有点慢，自己用nettrace体验性更好点。
+
+```sh
+[CentOS-root@xdlinux ➜ nettrace-1.2.11-1.tl3.x86_64 ]$ ./nettrace -h
+nettrace: a tool to trace skb in kernel and diagnose network problem
+
+Usage:
+    -s, --saddr      filter source ip/ipv6 address
+    -d, --daddr      filter dest ip/ipv6 address
+    --addr           filter source or dest ip/ipv6 address
+    -S, --sport      filter source TCP/UDP port
+    -D, --dport      filter dest TCP/UDP port
+    -P, --port       filter source or dest TCP/UDP port
+    -p, --proto      filter L3/L4 protocol, such as 'tcp', 'arp'
+    ...
+    --diag           enable 'diagnose' mode
+    ...
+    --drop           skb drop monitor mode, for replace of 'droptrace'
+    ...
+```
+
+示例：
+
+```sh
+[CentOS-root@xdlinux ➜ nettrace-1.2.11-1.tl3.x86_64 ]$ ./nettrace -ptcp -P8000            
+WARN: DEBUG_INFO_BTF_MODULES not enabled, some infomation, such as nf_tables, maybe incorrect
+begin trace...
+***************** c0103f00 ***************
+[297786.410474] [napi_gro_receive_entry] TCP: 192.168.1.4:61952 -> 192.168.1.150:8000 seq:3349256003, ack:0, flags:S
+[297786.410499] [dev_gro_receive     ] TCP: 192.168.1.4:61952 -> 192.168.1.150:8000 seq:3349256003, ack:0, flags:S
+...
+[297786.410522] [nf_hook_slow        ] TCP: 192.168.1.4:61952 -> 192.168.1.150:8000 seq:3349256003, ack:0, flags:S *ipv4 in chain: PRE_ROUTING*
+[297786.410528] [nft_do_chain        ] TCP: 192.168.1.4:61952 -> 192.168.1.150:8000 seq:3349256003, ack:0, flags:S *iptables table:, chain:PREROUT*
+...
+[297786.410617] [ip_local_deliver    ] TCP: 192.168.1.4:61952 -> 192.168.1.150:8000 seq:3349256003, ack:0, flags:S
+[297786.410619] [nf_hook_slow        ] TCP: 192.168.1.4:61952 -> 192.168.1.150:8000 seq:3349256003, ack:0, flags:S *ipv4 in chain: INPUT*
+...
+[297786.410690] [tcp_v4_do_rcv       ] TCP: 192.168.1.4:61952 -> 192.168.1.150:8000 seq:3349256003, ack:0, flags:S
+[297786.410699] [tcp_rcv_state_process] TCP: 192.168.1.4:61952 -> 192.168.1.150:8000 seq:3349256003, ack:0, flags:S *TCP socket state has changed*
+[297786.410897] [consume_skb         ] TCP: 192.168.1.4:61952 -> 192.168.1.150:8000 seq:3349256003, ack:0, flags:S *packet is freed (normally)*
+```
+
+丢包追踪：
+
+```sh
+# --drop --drop-stack 只追踪丢包，同时打印堆栈
+[297732.940939] TCP: 192.168.1.4:61946 -> 192.168.1.150:8000 seq:3697503931, ack:2330213106, flags:AF *tcp_v4_rcv+0x48* *packet is dropped by kernel*
+Call Stack:
+    -> kfree_skb+0x73
+    -> kfree_skb+0x73
+    -> tcp_v4_rcv+0x48
+    ...
+    -> start_secondary+0x19b
+    -> secondary_startup_64_no_verify+0xc2
+```
+
+发包进程详情：
+
+```sh
+# --detail 则可打印发包进程对应的 CPU、网卡、进程号
+[297286.084747] [c0103f00][napi_gro_receive_entry][cpu:9  ][enp4s0][pid:0      ][swapper/9   ][ns:0] TCP: 192.168.1.4:61864 -> 192.168.1.150:8000 seq:1364142653, ack:0, flags:S
+```
+
+函数栈间时延：
+
+```sh
+# --latency 则可打印函数间的调用时延
+[297488.582244] [consume_skb         ][napi_gro_receive_entry -> tcp_rcv_state_process] TCP: 192.168.1.4:61896 -> 192.168.1.150:8000 seq:3769012161, ack:0, flags:S latency: 0.123ms
+```
+
+## 6. kdump 和 crash
 
 1、kdump：
 
