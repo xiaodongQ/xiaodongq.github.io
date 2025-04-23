@@ -13,7 +13,7 @@ tags: [Redis, 存储]
 相关参考：
 
 * [缓存和数据库一致性问题，看这篇就够了](https://mp.weixin.qq.com/s?__biz=MzIyOTYxNDI5OA==&mid=2247487312&idx=1&sn=fa19566f5729d6598155b5c676eee62d&chksm=e8beb8e5dfc931f3e35655da9da0b61c79f2843101c130cf38996446975014f958a6481aacf1&scene=178&cur_album_id=1699766580538032128#rd)
-* [Redis为什么变慢了？一文讲透如何排查Redis性能问题 | 万字长文](https://mp.weixin.qq.com/s?__biz=MzIyOTYxNDI5OA==&mid=2247484679&idx=1&sn=3273e2c9083e8307c87d13a441a267d7&chksm=e8beb2b2dfc93ba4c28c95fdcb62eefc529d6a4ca2b4971ad0493319adbf8348b318224bd3d9&scene=178&cur_album_id=1699766580538032128#rd)
+* [Redis为什么变慢了？一文讲透如何排查Redis性能问题](https://mp.weixin.qq.com/s?__biz=MzIyOTYxNDI5OA==&mid=2247484679&idx=1&sn=3273e2c9083e8307c87d13a441a267d7&chksm=e8beb2b2dfc93ba4c28c95fdcb62eefc529d6a4ca2b4971ad0493319adbf8348b318224bd3d9&scene=178&cur_album_id=1699766580538032128#rd)
 
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
