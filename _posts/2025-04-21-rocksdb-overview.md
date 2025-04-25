@@ -24,6 +24,9 @@ tags: [存储, RocksDB]
     - [Why we built CockroachDB on top of RocksDB](https://www.cockroachlabs.com/blog/cockroachdb-on-rocksd/)
     - [Introducing Pebble: A RocksDB-inspired key-value store written in Go](https://www.cockroachlabs.com/blog/pebble-rocksdb-kv-store/)
 
+> 后续准备梳理的ceph版本为：[ceph v17.2.8](https://github.com/ceph/ceph/tree/v17.2.8)，所以此处RocksDB的源码版本基于其对应的git子模块版本：[rocksdb v6.15.5](https://github.com/facebook/rocksdb/tree/v6.15.5) （源于子模块对应的RocksDB version头文件：[version.h]（https://github.com/ceph/rocksdb/blob/c540de6f709b66efd41436694f72d6f7986a325b/include/rocksdb/version.h）
+{: .prompt-info }
+
 ## 2. 总体说明
 
 RocksDB 由 Facebook 数据库工程团队开发和维护，建立在早期的 LevelDB 工作之上。提供了快速的键值存储功能，尤其适合在闪存上存储数据。采用日志结构合并数据库 (`LSM`，Log-Structured-Merge-Database) 设计，在写放大因子 (`WAF`，Write-Amplification-Factor)、读放大因子 (`RAF`，Read-Ampification-Factor) 和空间放大因子 (`SAF`，Space-Ampification-Factor) 之间进行了灵活的权衡。
@@ -39,9 +42,48 @@ RocksDB基本结构如下，即典型的LSM结构（也可见：[LevelDB学习�
 
 ![rocksdb-constructs-lsm](/images/rocksdb-constructs-lsm.png)
 
+说明：
 
-## 3. 小结
+* 写数据前先追加写`WAL`，而后写内存态的`Memtable`，一个`Memtable`满之后就成为不可写的`Immutable Memtable`
+* 从`L0`开始就是刷写到硬盘的`SST`文件，每层间进行`Compaction`合并
+
+简图如下（最近折腾了一下draw.io的配置，后续多画画图找找感觉）：
+
+![rocksdb_lsm_flow](/images/rocksdb_lsm_flow.svg)
+
+## 3. 编译
+
+按 INSTALL.md 里推荐的`make static_lib`以release模式编译静态库。编译出来的静态库很大，有**698MB**，`strip`后只有**8.6MB**了。
+
+```sh
+# Makefile编译
+[CentOS-root@xdlinux ➜ rocksdb-v6.15.5 git:(rocksdb-v6.15.5) ]$ make static_lib
+$DEBUG_LEVEL is 0
+  GEN      util/build_version.cc
+$DEBUG_LEVEL is 0
+  GEN      util/build_version.cc
+  CC       cache/cache.o
+...
+  CC       third-party/folly/folly/synchronization/WaitOptions.o
+  AR       librocksdb.a
+/usr/bin/ar: creating librocksdb.a
+
+# 大小有点大，698MB。。。
+[CentOS-root@xdlinux ➜ rocksdb-v6.15.5 git:(rocksdb-v6.15.5) ]$ ls -ltrh
+...
+-rw-r--r--  1 root root 698M Apr 25 19:10 librocksdb.a
+
+# strip后只有 8.6MB 了
+[CentOS-root@xdlinux ➜ rocksdb-v6.15.5 git:(rocksdb-v6.15.5) ]$ strip librocksdb.a
+[CentOS-root@xdlinux ➜ rocksdb-v6.15.5 git:(rocksdb-v6.15.5) ]$ ls -ltrh
+...
+-rw-r--r--  1 root root 8.6M Apr 25 20:16 librocksdb.a
+```
+
+## 4. 小结
 
 
-## 4. 参考
+## 5. 参考
 
+* [RocksDB-Wiki](https://github.com/facebook/rocksdb/wiki)
+* [facebook/rocksdb](https://github.com/facebook/rocksdb/)
