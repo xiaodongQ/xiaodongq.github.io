@@ -24,6 +24,7 @@ tags: [内存]
     * 仓库：[jemalloc](https://github.com/jemalloc/jemalloc)
     * [网站](https://jemalloc.net/)
     * [Jemalloc内存分配与优化实践](https://mp.weixin.qq.com/s/U3uylVKZ-FsMjdeX3lymog)
+    * [使用 jemalloc profile memory](https://www.jianshu.com/p/5fd2b42cbf3d)，作者 [唐刘](https://rustcc.cn/article?id=df8ec509-b76b-4969-8209-d42915f87526) 是TIDB的大佬，这是他的早期文章（2017）
 * mimalloc
     * 仓库：[mimalloc](https://github.com/microsoft/mimalloc)
 * [ptmalloc、tcmalloc与jemalloc对比分析](https://www.cyningsun.com/07-07-2018/memory-allocator-contrasts.html)

@@ -117,7 +117,7 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
 }
 ```
 
-其中涉及写日志的逻辑，`leveldb::log::Writer`实现写`journal`(日子)的writer：
+其中涉及写日志的逻辑，`leveldb::log::Writer`实现写`journal`(日志)的writer：
 
 ```cpp
 // db/log_writer.cc
