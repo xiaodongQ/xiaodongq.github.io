@@ -6,9 +6,9 @@ tags: [存储, RocksDB]
 ---
 
 
-## 1. 背景
+## 1. 引言
 
-前面梳理了基于LSM的LevelDB，本篇开始梳理学习RocksDB，后续进一步看将其作为存储引擎的Ceph等开源项目。
+[前面](https://xiaodongq.github.io/categories/leveldb/)梳理了基于LSM的<mark>LevelDB</mark>，本篇开始梳理学习RocksDB，后续进一步看将其作为存储引擎的Ceph等开源项目。
 
 相关链接：
 
