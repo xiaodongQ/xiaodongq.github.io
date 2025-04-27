@@ -31,7 +31,7 @@ tags: [存储, RocksDB]
 
 ### 2.1. 基本介绍
 
-RocksDB 由 Facebook 数据库工程团队开发和维护，建立在早期的 LevelDB 工作之上。提供了快速的键值存储功能，尤其适合在闪存上存储数据。采用日志结构合并数据库 (`LSM`，Log-Structured-Merge-Database) 设计，在写放大因子 (`WAF`，Write-Amplification-Factor)、读放大因子 (`RAF`，Read-Ampification-Factor) 和空间放大因子 (`SAF`，Space-Ampification-Factor) 之间进行了灵活的权衡。
+RocksDB 由 Facebook 数据库工程团队开发和维护，建立在早期的 LevelDB 工作之上。提供了快速的键值存储功能，尤其适合在闪存上存储数据。采用日志结构合并数据库 (`LSM`，Log-Structured-Merge-Database) 设计，在写放大因子 (`WAF`，Write-Amplification-Factor)、读放大因子 (`RAF`，Read-Ampification-Factor) 和空间放大因子 (`SAF`，Space-Ampification-Factor) 之间进行了灵活的权衡。（几种放大场景可了解：[深入 RocksDB 高性能的技术关键](https://mp.weixin.qq.com/s/40JnearOCVDaGbU7WpxB1g)）
 
 * 以**C++库**的形式（内嵌数据库，没有独立进程），提供任意字节流大小（arbitrarily-sized byte）的键值存储、支持单点查询和范围查询、支持多种类型的ACID事务保证。
 * RocksDB在可定制性（customizability）和自适应性（self-adaptability）之间取得了平衡，可基于`SSDs`, `hard disks`, `ramfs`, 或 `remote storage`灵活配置；提供了多种压缩算法；并提供了一些用于生产支持和调试（production support and debugging）的优秀工具。
@@ -425,7 +425,7 @@ get key:xdkey2, value:test12345
 
 对应的CMake规则文件如下。
 
-```makefile
+```cmake
 # CMakeLists.txt
 # 设置 CMake 最低版本要求
 cmake_minimum_required(VERSION 3.10)
@@ -541,3 +541,4 @@ RocksDB总体介绍和基本API使用，并对比了和LevelDB的大致区别。
 * [facebook/rocksdb](https://github.com/facebook/rocksdb/)
 * [LevelDB学习笔记（五） -- sstable实现](https://xiaodongq.github.io/2024/08/07/leveldb-sstable)
 * [Basic Operations](https://github.com/facebook/rocksdb/wiki/Basic-Operations)
+* [深入 RocksDB 高性能的技术关键](https://mp.weixin.qq.com/s/40JnearOCVDaGbU7WpxB1g)
