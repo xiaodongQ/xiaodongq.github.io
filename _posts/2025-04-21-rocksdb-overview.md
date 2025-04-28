@@ -547,7 +547,7 @@ TiKV中的部分概念和架构流程：
 ![tikv_architecture](/images/tikv_architecture.png)  
 [出处](https://github.com/pingcap/blog/blob/master/rocksdb-in-tikv.md)
 
-3、TiKV的数据复制基于`Raft`协议，简要过程：对于每个`write`请求，首先将写请求写到`<mark>Raft log</mark>`中，当日志状态是`committed`（在领导人将创建的日志条目复制到大多数的服务器上的时候，日志条目就会被提交）时，就应用（`apply`）Raft日志并向RocksDB写入数据（**<mark>data</mark>**）。
+3、TiKV的数据复制基于`Raft`协议，简要过程：对于每个`write`请求，首先将写请求写到 **<mark>Raft log</mark>**中，当日志状态是`committed`（在领导人将创建的日志条目复制到大多数的服务器上的时候，日志条目就会被提交）时，就应用（`apply`）Raft日志并向RocksDB写入数据（**<mark>data</mark>**）。
 
 ![tikv_architecture_raft_replica](/images/tikv_architecture_raft_replica.png)
 
