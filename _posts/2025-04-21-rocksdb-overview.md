@@ -87,7 +87,7 @@ LevelDB里面的SStable文件格式示意图如下（可见 [LevelDB学习笔记
 
 * 支持配置多线程Compaction
 * 避免停顿（Avoiding Stalls）
-    * 当所有后台compaction线程都在忙于处理合并，此时外部突发的大量`write`请求可能会快速写满memtable，进而导致新请求出现**停顿**，RocksDB支持配置一小组线程专门用于刷写memtable到硬盘
+    * 当所有后台compaction线程都在忙于处理合并，此时外部突发的大量`write`请求可能会快速写满MemTable，进而导致新请求出现**停顿**，RocksDB支持配置一小组线程专门用于刷写MemTable到硬盘
 * Block缓存（`Block Cache`）
     * 通过一个Block数据的**LRU缓存**来提升读取性能，支持两种缓存类型：`非压缩block` 和 `压缩block`。如果配置了压缩block缓存，一般会使用**直接IO**，以避免文件系统重复缓存数据（page cache）
 * Table缓存（`Table Cache`）
@@ -530,11 +530,40 @@ get key:xdkey2, value:test12345
 ====== end ======
 ```
 
-## 6. 小结
+## 6. TiDB 和 CockroachDB 中的RocksDB使用
+
+### 6.1. TiDB
+
+`TiDB`中的数据持久化存储基于<mark>`TiKV`</mark>， TiKV基于`Key-Value`模型，并提供有序遍历。TiKV的数据通过`RocksDB`进行保存（<mark>作为单机存储引擎</mark>），具体的数据落地由`RocksDB`负责。并且基于`Raft`来进行分布式节点上数据复制。下面来了解下TiKV的一些概念和架构。
+
+TiKV基于`Rust`实现，通过`FFI`（Foreign Function Interface）的方式直接调用`RocksDB`的**C语言API**。
+
+TiKV中的部分概念和架构流程：
+
+1、TiKV节点中的所有数据共享`2`个`RocksDB实例`：一个用于<mark>**存储数据**</mark>、另一个用于<mark>**存储Raft日志**</mark>。
+
+2、`Region`是一个逻辑概念，包含了一系列数据。每个`Region`有多个<mark>**副本（replica）**</mark>，保存在<mark>**多台机器**</mark>上以实现容灾冗余，所有这些副本组成了一个`Raft Group`。
+
+![tikv_architecture](/images/tikv_architecture.png)  
+[出处](https://github.com/pingcap/blog/blob/master/rocksdb-in-tikv.md)
+
+3、TiKV的数据复制基于`Raft`协议，简要过程：对于每个`write`请求，首先将写请求写到<mark>`Raft log`</mark>中，当日志状态是`committed`（在领导人将创建的日志条目复制到大多数的服务器上的时候，日志条目就会被提交）时，就应用（`apply`）Raft日志并向RocksDB写入数据（<mark>**data**</mark>）。
+
+![tikv_architecture_raft_replica](/images/tikv_architecture_raft_replica.png)
+
+### 6.2. CockroachDB
+
+`CockroachDB`中也使用`RocksDB`来作为单机存储引擎（2020.9之前），`CockroachDB`本身是基于`Go`开发的，通过`CGo`的方式来调用`RocksDB`。
+
+但是通过`CGo`会有部分性能损耗：每次调用需要`70ns`的开销，虽然单次不多，但是使用时会调用大量的RocksDB接口。
+
+所以2020年9月`CockroachDB`推出了Go实现的`Pebble`存储引擎，兼容`RocksDB`，用于替换它用到的`RocksDB`。可了解：[Introducing Pebble: A RocksDB-inspired key-value store written in Go](https://www.cockroachlabs.com/blog/pebble-rocksdb-kv-store/)。
+
+## 7. 小结
 
 RocksDB总体介绍和基本API使用，并对比了和LevelDB的大致区别。手动编写Makefile、`objcopy`剥离符号加强肌肉记忆，并对比更为现代的CMake使用。
 
-## 7. 参考
+## 8. 参考
 
 * [RocksDB-Wiki](https://github.com/facebook/rocksdb/wiki)
 * [RocksDB-Overview](https://github.com/facebook/rocksdb/wiki/RocksDB-Overview)
@@ -542,3 +571,7 @@ RocksDB总体介绍和基本API使用，并对比了和LevelDB的大致区别。
 * [LevelDB学习笔记（五） -- sstable实现](https://xiaodongq.github.io/2024/08/07/leveldb-sstable)
 * [Basic Operations](https://github.com/facebook/rocksdb/wiki/Basic-Operations)
 * [深入 RocksDB 高性能的技术关键](https://mp.weixin.qq.com/s/40JnearOCVDaGbU7WpxB1g)
+* [TiDB博客 -- RocksDB标签](https://cn.pingcap.com/blog/?tag=RocksDB)
+* [rocksdb-in-tikv](https://github.com/pingcap/blog/blob/master/rocksdb-in-tikv.md)
+* [Why we built CockroachDB on top of RocksDB](https://www.cockroachlabs.com/blog/cockroachdb-on-rocksd/)
+* [Introducing Pebble: A RocksDB-inspired key-value store written in Go](https://www.cockroachlabs.com/blog/pebble-rocksdb-kv-store/)
