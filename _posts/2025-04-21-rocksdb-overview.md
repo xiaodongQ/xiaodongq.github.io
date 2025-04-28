@@ -57,7 +57,7 @@ RocksDB基本结构如下，即典型的LSM结构（也可见：[LevelDB学习�
 
 ![rocksdb_lsm_flow](/images/rocksdb_lsm_flow.svg)
 
-RocksDB中的SST文件叫`BlockBasedTable`，具体可见：[Rocksdb BlockBasedTable Format](https://github.com/facebook/rocksdb/wiki/Rocksdb-BlockBasedTable-Format)。文件格式如下，相较于LevelDB里面的SStable文件格式，多了3、4、5对应的`compression dictionary block`、`range deletion block`、`stats block`。
+RocksDB中的SST文件叫`BlockBasedTable`，具体可见：[Rocksdb BlockBasedTable Format](https://github.com/facebook/rocksdb/wiki/Rocksdb-BlockBasedTable-Format)。文件格式如下，相较于LevelDB里面的SSTable文件格式，多了3、4、5对应的`compression dictionary block`、`range deletion block`、`stats block`。
 
 ```
 <beginning_of_file>
@@ -77,7 +77,7 @@ RocksDB中的SST文件叫`BlockBasedTable`，具体可见：[Rocksdb BlockBasedT
 <end_of_file>
 ```
 
-LevelDB里面的SStable文件格式示意图如下（可见 [LevelDB学习笔记（五） -- sstable实现](https://xiaodongq.github.io/2024/08/07/leveldb-sstable) 和 [leveldb-handbook](https://leveldb-handbook.readthedocs.io/zh/latest/sstable.html)）：
+LevelDB里面的SSTable文件格式示意图如下（可见 [LevelDB学习笔记（五） -- sstable实现](https://xiaodongq.github.io/2024/08/07/leveldb-sstable) 和 [leveldb-handbook](https://leveldb-handbook.readthedocs.io/zh/latest/sstable.html)）：
 
 ![SSTable文件结构示意图](/images/sstable_logic.jpeg)
 
@@ -100,7 +100,7 @@ LevelDB里面的SStable文件格式示意图如下（可见 [LevelDB学习笔记
 
 此处贴一下LLM对两者的部分对比：
 
-1、背景与开发
+**1、背景与开发**
 
 * LevelDB 由 Google 的 Jeff Dean 和 Sanjay Ghemawat 开发，`2011`年开源。
     * 设计目标是提供一个轻量级、高效的嵌入式存储引擎，适用于**单机场景**。
@@ -109,7 +109,7 @@ LevelDB里面的SStable文件格式示意图如下（可见 [LevelDB学习笔记
     * 面向**现代硬件**（多核 CPU、SSD）和**高并发场景**，强化了企业级需求。
     * 社区活跃，持续迭代更新，功能丰富
 
-2、核心差异
+**2、核心差异**
 
 （1）性能优化：
 
@@ -138,7 +138,7 @@ LevelDB里面的SStable文件格式示意图如下（可见 [LevelDB学习笔记
 
 兼容性：RocksDB 兼容 LevelDB 的 API，可以无缝替换 LevelDB。反向则不成立。
 
-小结：RocksDB 是 LevelDB 的“全面升级版”，在性能、功能和可扩展性上均有显著提升，尤其适合现代数据密集型应用。而 LevelDB 更适合轻量级场景或学习 LSM-Tree 的入门工具。
+**小结**：RocksDB 是 LevelDB 的“全面升级版”，在性能、功能和可扩展性上均有显著提升，尤其适合现代数据密集型应用。而 LevelDB 更适合轻量级场景或学习 LSM-Tree 的入门工具。
 
 ## 3. 编译
 
@@ -230,9 +230,9 @@ lrwxrwxrwx   1 root root   15 Apr 26 16:44 librocksdb.so -> librocksdb.so.6
 * 性能测试：`db_bench`
     * 使用方式见：[Performance-Benchmarks](https://github.com/facebook/rocksdb/wiki/Performance-Benchmarks)，`tools/benchmark.sh`会用到该bin
 
-## 4. db_bench 性能测试
+## 4. db_bench 性能测试工具
 
-使用 `tools/run_flash_bench.sh` 进行性能测试，其中会调用`benchmark.sh`，里面用到`db_bench`
+可使用 `tools/run_flash_bench.sh` 进行性能测试，其中会调用`benchmark.sh`，里面会用到`db_bench`工具。
 
 ```sh
 ./db_bench --benchmarks=fillseq --use_existing_db=0 --sync=0 --db=/tmp/rocksdb/ --wal_dir=/tmp/rocksdb/ --num=1073741824 --num_levels=6 --key_size=20 --value_size=400 --block_size=8192 --cache_size=1073741824 --cache_numshardbits=6 --compression_max_dict_bytes=0 --compression_ratio=0.5 --compression_type=none --level_compaction_dynamic_level_bytes=true --bytes_per_sync=8388608 --cache_index_and_filter_blocks=0 --pin_l0_filter_and_index_blocks_in_cache=1 --benchmark_write_rate_limit=0 --hard_rate_limit=3 --rate_limit_delay_max_milliseconds=1000000 --write_buffer_size=134217728 --target_file_size_base=134217728 --max_bytes_for_level_base=1073741824 --verify_checksum=1 --delete_obsolete_files_period_micros=62914560 --max_bytes_for_level_multiplier=8 --statistics=0 --stats_per_interval=1 --stats_interval_seconds=60 --histogram=1 --memtablerep=skip_list --bloom_bits=10 --open_files=-1 --level0_file_num_compaction_trigger=4 --level0_stop_writes_trigger=20 --max_background_compactions=16 --max_write_buffer_number=8 --max_background_flushes=7 --allow_concurrent_memtable_write=false --min_level_to_compress=0 --threads=1 --memtablerep=vector --allow_concurrent_memtable_write=false --disable_wal=1 --seed=1745662974 2>&1 | tee -a /tmp/output/benchmark_fillseq.wal_disabled.v400.log
@@ -282,7 +282,7 @@ Interval stall: 00:00:0.000 H:M:S, 0.0 percent
 
 wiki里有基本使用示例：[Basic Operations](https://github.com/facebook/rocksdb/wiki/Basic-Operations)。
 
-demo如下（代码也可见 [这里](https://github.com/xiaodongQ/prog-playground/tree/main/storage/rocksdb)）：
+写了个demo如下（完整代码也可见 [这里](https://github.com/xiaodongQ/prog-playground/tree/main/storage/rocksdb)）：
 
 ```cpp
 // test_rocksdb_ops.cpp
@@ -347,7 +347,7 @@ int main(int argc, char *argv[])
 
 ### 5.1. Makefile
 
-Makefile也贴一下，一些内建函数和通配符经常忘记，需要时不时敲一下加强印象，而后就用现代一些的CMake去做项目了：
+Makefile也贴一下，一些内建函数和通配符经常忘记，需要时不时敲一下加强印象，后续可以用更现代一些的CMake去做项目了：
 
 ```makefile
 MODE ?= debug
@@ -423,7 +423,7 @@ get key:xdkey2, value:test12345
 
 ### 5.2. CMake
 
-对应的CMake规则文件如下。
+对应的CMake规则文件如下：
 
 ```cmake
 # CMakeLists.txt
@@ -534,20 +534,20 @@ get key:xdkey2, value:test12345
 
 ### 6.1. TiDB
 
-`TiDB`中的数据持久化存储基于<mark>`TiKV`</mark>， TiKV基于`Key-Value`模型，并提供有序遍历。TiKV的数据通过`RocksDB`进行保存（<mark>作为单机存储引擎</mark>），具体的数据落地由`RocksDB`负责。并且基于`Raft`来进行分布式节点上数据复制。下面来了解下TiKV的一些概念和架构。
+`TiDB`中的数据持久化存储基于`TiKV`， TiKV基于`Key-Value`模型，并提供有序遍历。TiKV的数据通过`RocksDB`进行保存（<mark>作为单机存储引擎</mark>），具体的数据落地由`RocksDB`负责。并且基于`Raft`来进行分布式节点上数据复制。下面来了解下TiKV的一些概念和架构。
 
 TiKV基于`Rust`实现，通过`FFI`（Foreign Function Interface）的方式直接调用`RocksDB`的**C语言API**。
 
 TiKV中的部分概念和架构流程：
 
-1、TiKV节点中的所有数据共享`2`个`RocksDB实例`：一个用于<mark>**存储数据**</mark>、另一个用于<mark>**存储Raft日志**</mark>。
+1、TiKV节点中的所有数据共享`2`个`RocksDB实例`：一个用于 **<mark>存储数据</mark>**、另一个用于 **<mark>存储Raft日志</mark>**。
 
-2、`Region`是一个逻辑概念，包含了一系列数据。每个`Region`有多个<mark>**副本（replica）**</mark>，保存在<mark>**多台机器**</mark>上以实现容灾冗余，所有这些副本组成了一个`Raft Group`。
+2、`Region`是一个逻辑概念，包含了一系列数据。每个`Region`有多个 **<mark>副本（replica）</mark>**，保存在 **<mark>多台机器</mark>** 上以实现容灾冗余，所有这些副本组成了一个`Raft Group`。
 
 ![tikv_architecture](/images/tikv_architecture.png)  
 [出处](https://github.com/pingcap/blog/blob/master/rocksdb-in-tikv.md)
 
-3、TiKV的数据复制基于`Raft`协议，简要过程：对于每个`write`请求，首先将写请求写到<mark>`Raft log`</mark>中，当日志状态是`committed`（在领导人将创建的日志条目复制到大多数的服务器上的时候，日志条目就会被提交）时，就应用（`apply`）Raft日志并向RocksDB写入数据（<mark>**data**</mark>）。
+3、TiKV的数据复制基于`Raft`协议，简要过程：对于每个`write`请求，首先将写请求写到`<mark>Raft log</mark>`中，当日志状态是`committed`（在领导人将创建的日志条目复制到大多数的服务器上的时候，日志条目就会被提交）时，就应用（`apply`）Raft日志并向RocksDB写入数据（**<mark>data</mark>**）。
 
 ![tikv_architecture_raft_replica](/images/tikv_architecture_raft_replica.png)
 
