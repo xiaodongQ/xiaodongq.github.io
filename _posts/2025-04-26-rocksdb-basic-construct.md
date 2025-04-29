@@ -17,8 +17,6 @@ tags: [存储, RocksDB]
 > 介绍可见：[MemTable](https://github.com/facebook/rocksdb/wiki/MemTable)
 {: .prompt-info }
 
-RocksDB中的`MemTable`基于**跳表**实现。
-
 `MemTable`同时提供`读`和`写`服务。
 
 1、**读取数据**时会先从MemTable读取，因为内存中的数据最新，没查找到才去查询`SST`文件；
@@ -28,10 +26,32 @@ RocksDB中的`MemTable`基于**跳表**实现。
 * MemTable会根据配置的大小和数量来决定什么时候`flush`到磁盘上。一旦 MemTable 达到配置的大小，旧的 MemTable 和 WAL 都会变成`不可变`的状态（即immutable MemTable），然后会重新分配新的 MemTable 和 WAL 用来写入数据，旧的 MemTable 则会被 flush 到`SSTable`文件中，即`L0`层的数据。
 * 任何时间点，都**只有一个活跃的MemTable** 和 **0个或多个immutable MemTable**
 
+RocksDB中的`MemTable`基于**跳表**实现。
+
 ### 2.2. SST文件
 
 > 介绍可见：[Rocksdb BlockBasedTable Format](https://github.com/facebook/rocksdb/wiki/Rocksdb-BlockBasedTable-Format)
 {: .prompt-info }
+
+Rocksdb中的SST结构：
+
+```sh
+<beginning_of_file>
+[data block 1]
+[data block 2]
+...
+[data block N]
+[meta block 1: filter block]                  (see section: "filter" Meta Block)
+[meta block 2: index block]
+[meta block 3: compression dictionary block]  (see section: "compression dictionary" Meta Block)
+[meta block 4: range deletion block]          (see section: "range deletion" Meta Block)
+[meta block 5: stats block]                   (see section: "properties" Meta Block)
+...
+[meta block K: future extended block]  (we may add more meta blocks in the future)
+[metaindex block]
+[Footer]                               (fixed size; starts at file_size - sizeof(Footer))
+<end_of_file>
+```
 
 ### 2.3. 日志（Journal）
 
@@ -191,9 +211,86 @@ Status DBImpl::WriteImpl(const WriteOptions& write_options,
   if (w.state == WriteThread::STATE_PARALLEL_MEMTABLE_WRITER) {
     ...
   }
+  ...
+  // 上面第一次JoinBatchGroup里，会设置 `STATE_GROUP_LEADER`
+  assert(w.state == WriteThread::STATE_GROUP_LEADER);
+  ...
+  if (!two_write_queues_ || !disable_memtable) {
+    // 写前预处理，是否需要切WAL、切MemTable、flush数据到磁盘
+    status = PreprocessWrite(write_options, &need_log_sync, &write_context);
+    ...
+  }
+  ...
+  // 获取WAL写日志实例
+  log::Writer* log_writer = logs_.back().writer;
+  ...
+  if (status.ok()) {
+    auto stats = default_cf_internal_stats_;
+    stats->AddDBStats(InternalStats::kIntStatsNumKeysWritten, total_count,
+    if (!two_write_queues_) {
+      if (status.ok() && !write_options.disableWAL) {
+        PERF_TIMER_GUARD(write_wal_time);
+        // 写WAL
+        io_s = WriteToWAL(write_group, log_writer, log_used, need_log_sync,
+                          need_log_dir_sync, last_sequence + 1);
+      }
+    } else {
+      if (status.ok() && !write_options.disableWAL) {
+        PERF_TIMER_GUARD(write_wal_time);
+        // 并发写WAL
+        io_s = ConcurrentWriteToWAL(write_group, log_used, &last_sequence,
+                                    seq_inc);
+      }
+      ...
+    }
+    ...
+  }
+  if (status.ok()) {
+    // 写MemTable
+    if (!parallel) {
+      // w.sequence will be set inside InsertInto
+      w.status = WriteBatchInternal::InsertInto(xxx); // 参数很多，略
+    } else {
+      write_group.last_sequence = last_sequence;
+      // 设置w.state `STATE_PARALLEL_MEMTABLE_WRITER`
+      write_thread_.LaunchParallelMemTableWriters(&write_group);
+      in_parallel_group = true;
+      if (w.ShouldWriteToMemtable()) {
+        ...
+        w.status = WriteBatchInternal::InsertInto(xxx); // 参数很多，略
+      }
+    }
+    ...
+  }
+  ...
 }
 ```
 
+### 3.3. 代码流程图
+
+上述流程如下：
+
+![rocksdb-WriteImpl](/images/rocksdb-WriteImpl.svg)
+
+### 3.4. 状态机流转
+
+Writer对应的`w.state`状态机更新，看下调用到的几个位置，暂时只关注下`DBImpl::WriteImpl`中的流程：
+
+```sh
+[MacOS-xd@qxd ➜ rocksdb_v6.15.5 git:(rocksdb-v6.15.5) ✗ ]$ calltree.pl 'SetState' 'DBImpl::WriteImpl' 1 1 3
+  
+  SetState
+  ├── WriteThread::JoinBatchGroup	[vim db/write_thread.cc +379]
+  │   ├── DBImpl::WriteImpl	[vim db/db_impl/db_impl_write.cc +68]
+  │   └── DBImpl::WriteImplWALOnly	[vim db/db_impl/db_impl_write.cc +664]
+  ├── WriteThread::LaunchParallelMemTableWriters	[vim db/write_thread.cc +586]
+  │   └── DBImpl::WriteImpl	[vim db/db_impl/db_impl_write.cc +68]
+  ├── WriteThread::ExitAsBatchGroupFollower	[vim db/write_thread.cc +616]
+  │   └── DBImpl::WriteImpl	[vim db/db_impl/db_impl_write.cc +68]
+  └── WriteThread::ExitAsBatchGroupLeader	[vim db/write_thread.cc +628]
+      ├── DBImpl::WriteImpl	[vim db/db_impl/db_impl_write.cc +68]
+      └── DBImpl::WriteImplWALOnly	[vim db/db_impl/db_impl_write.cc +664]
+```
 
 ## 4. 番外：vscode切换clangd插件
 
@@ -231,9 +328,12 @@ Caused by:
 
 ## 5. 小结
 
+RocksDB中的几个核心组件，并梳理写流程中相应的操作。
 
 ## 6. 参考
 
 * [RocksDB-Wiki](https://github.com/facebook/rocksdb/wiki)
 * [facebook/rocksdb](https://github.com/facebook/rocksdb/)
 * [Journal](https://github.com/facebook/rocksdb/wiki/Journal)
+* [MemTable](https://github.com/facebook/rocksdb/wiki/MemTable)
+* [Rocksdb BlockBasedTable Format](https://github.com/facebook/rocksdb/wiki/Rocksdb-BlockBasedTable-Format)
