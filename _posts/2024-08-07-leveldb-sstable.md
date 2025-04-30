@@ -14,7 +14,116 @@ LevelDB学习笔记，本篇学习sstable实现。
 
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
-## 2. memtable 转换处理
+## 2. SStable文件格式
+
+**物理结构**：一个sstable文件按照**固定大小**进行块划分，默认每个**块（block）**的大小为`4KB`，block中除了存储数据外，还存储了`压缩类型`和`CRC校验码`（用于校验数据+压缩类型）两个辅助字段。
+
+**逻辑结构**总体示意图如下：
+
+![leveldb-sstable-overview](/images/leveldb-sstable-overview.svg)  
+[出处](https://leveldb-handbook.readthedocs.io/zh/latest/sstable.html)，在此基础上添加说明
+
+* 1、`data block` 中存储的数据是LevelDB中的keyvalue键值对。
+    * 由于sstable中所有的keyvalue对都是严格按序存储的，为了节省存储空间，LevelDB并不会为每一对keyvalue对都存储完整的key值，而是存储与上一个key非共享的部分，避免了key重复内容的存储。
+* 2、`filter block` 存储的是`data block`数据的一些过滤信息，这里基于`布隆过滤器`实现。
+* 3、`meta index block`用来存储`filter block`在整个sstable中的索引信息。
+* 4、`index block`用来存储所有`data block`的相关索引信息(与meta index block类似)。
+* 5、`footer`大小固定，为48字节，用来存储`meta index block`与`index block`在sstable中的索引信息，另外尾部还会存储一个magic word，内容为：“`http://code.google.com/p/leveldb/`”字符串sha1哈希的前8个字节。
+
+1~5还是block数据，也遵照上述的物理结构，block里会包含压缩类型和CRC校验码。
+
+下面简要看下逻辑结构的各部分内容组成，详情可参考原链接的说明：[leveldb-handbook sstable](https://leveldb-handbook.readthedocs.io/zh/latest/sstable.html)
+
+### 2.1. data block结构
+
+data block结构见上述总体示意图。
+
+block相关结构定义在`BlockBuilder`中：
+
+```cpp
+// table/block_builder.h
+class BlockBuilder {
+  ...
+ private:
+  const Options* options_;
+  std::string buffer_;              // Destination buffer
+  std::vector<uint32_t> restarts_;  // Restart points
+  int counter_;                     // Number of entries emitted since restart
+  bool finished_;                   // Has Finish() been called?
+  std::string last_key_;
+}
+```
+
+上图对应操作则可见`BlockBuilder::Add`：
+
+```cpp
+// table/block_builder.cc
+void BlockBuilder::Add(const Slice& key, const Slice& value) {
+  ...
+  // Add "<shared><non_shared><value_size>" to buffer_
+  PutVarint32(&buffer_, shared);
+  PutVarint32(&buffer_, non_shared);
+  PutVarint32(&buffer_, value.size());
+
+  // Add string delta to buffer_ followed by value
+  buffer_.append(key.data() + shared, non_shared);
+  buffer_.append(value.data(), value.size());
+
+  // Update state
+  last_key_.resize(shared);
+  last_key_.append(key.data() + shared, non_shared);
+  assert(Slice(last_key_) == key);
+  counter_++;
+}
+```
+
+### 2.2. filter block结构
+
+filter block中存储的数据包含两部分：`过滤数据` 和 `索引数据`。
+
+* `filter i offset`表示第`i`个`filter data`在整个filter block中的起始偏移量
+* `filter offset's offset`表示`filter block的索引数据`在filter block中的偏移量
+* **读取流程**：先读取`filter offset's offset` -> 而后依次读取`filter i offset` -> 再根据这些offset读取`filter data`
+* `Base Lg`默认值为`11`，表示每`2KB`的数据，创建一个新的过滤器来存放过滤数据。
+
+结构定义：
+
+```cpp
+// table/filter_block.h
+class FilterBlockBuilder {
+  ...
+  const FilterPolicy* policy_;
+  std::string keys_;             // Flattened key contents
+  std::vector<size_t> start_;    // Starting index in keys_ of each key
+  // 布隆过滤器数据
+  std::string result_;           // Filter data computed so far
+  std::vector<Slice> tmp_keys_;  // policy_->CreateFilter() argument
+  std::vector<uint32_t> filter_offsets_;
+};
+```
+
+```cpp
+// table/filter_block.cc
+void FilterBlockBuilder::AddKey(const Slice& key) {
+  Slice k = key;
+  start_.push_back(keys_.size());
+  keys_.append(k.data(), k.size());
+}
+```
+
+### 2.3. meta index block结构
+
+`meta index block`中只存储一条记录：`filter block`在sstable中的索引信息序列化后的内容。
+
+### 2.4. index block结构
+
+`index block`用来存储所有`data block`的相关索引信息，包含多条记录，示意图见上面的总体示意图。
+
+### 2.5. footer结构
+
+footer大小固定，为`48`字节，用来存储`meta index block`与`index block`在sstable中的索引信息，另外尾部还会存储一个magic word。
+
+## 3. memtable 转换处理
 
 前面讲写流程时没展开`MakeRoomForWrite`看，对应的`memtable`写`sstable`的转换就在该接口中。先简单贴下写接口。
 
@@ -113,11 +222,11 @@ Status DBImpl::MakeRoomForWrite(bool force) {
 }
 ```
 
-## 3. memtable 合并写 sstable
+## 4. memtable 合并写 sstable
 
 继续看`MaybeScheduleCompaction`
 
-### 3.1. MaybeScheduleCompaction：新增合并任务
+### 4.1. MaybeScheduleCompaction：新增合并任务
 
 ```cpp
 // db/db_impl.cc
@@ -146,7 +255,7 @@ void DBImpl::MaybeScheduleCompaction() {
 
 `env_->Schedule`里面基于mutex和条件变量实现了一个生产-消费者模型，LevelDB自己包装了一层`std::mutex`和`std::condition_variable`。
 
-### 3.2. DBImpl::BGWork：合并回调函数
+### 4.2. DBImpl::BGWork：合并回调函数
 
 ```cpp
 // db/db_impl.cc
@@ -215,7 +324,7 @@ void DBImpl::CompactMemTable() {
 }
 ```
 
-### 3.3. DBImpl::WriteLevel0Table：写sstable
+### 4.3. DBImpl::WriteLevel0Table：写sstable
 
 ```cpp
 // db/db_impl.cc
@@ -255,7 +364,7 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
 
 上面`BuildTable`中负责根据迭代器依次写入key-value数据，最后(见下面小节)写入`filter block`、`meta index block`、`Write index block`、`Write footer`等信息。
 
-## 4. BuildTable 函数
+### 4.4. BuildTable 函数
 
 ```cpp
 // db/builder.cc
@@ -305,22 +414,11 @@ Status BuildTable(const std::string& dbname, Env* env, const Options& options,
 }
 ```
 
-### 4.1. 写入结构示意图
+### 4.5. 代码印证上述示意图
 
-上述对应写入结构示意图：
+上述的sstable结构示意图：
 
-![写入结构示意图](/images/sstable_logic.jpeg)
-
-* `data block` 中存储的数据是LevelDB中的keyvalue键值对。
-    * 由于sstable中所有的keyvalue对都是严格按序存储的，为了节省存储空间，LevelDB并不会为每一对keyvalue对都存储完整的key值，而是存储与上一个key非共享的部分，避免了key重复内容的存储。
-* `filter block` 存储的是`data block`数据的一些过滤信息，这里基于`布隆过滤器`实现。
-* `meta index block`用来存储`filter block`在整个sstable中的索引信息。
-* `index block`用来存储所有`data block`的相关索引信息(与meta index block类似)。
-* `footer`大小固定，为48字节，用来存储`meta index block`与`index block`在sstable中的索引信息，另外尾部还会存储一个magic word，内容为："`http://code.google.com/p/leveldb/`"字符串sha1哈希的前8个字节。
-
-这里有不少巧妙的设计，具体参考原链接的说明：[leveldb-handbook sstable](https://leveldb-handbook.readthedocs.io/zh/latest/sstable.html)
-
-### 4.2. 代码印证上述示意图
+![逻辑结构示意图](/images/sstable_logic.jpeg)
 
 代码中依次写入`filter block`、`meta index block`、`Write index block`、`Write footer`等信息。
 
