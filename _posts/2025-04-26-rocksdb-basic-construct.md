@@ -26,14 +26,180 @@ tags: [存储, RocksDB]
 * MemTable会根据配置的大小和数量来决定什么时候`flush`到磁盘上。一旦 MemTable 达到配置的大小，旧的 MemTable 和 WAL 都会变成`不可变`的状态（即immutable MemTable），然后会重新分配新的 MemTable 和 WAL 用来写入数据，旧的 MemTable 则会被 flush 到`SSTable`文件中，即`L0`层的数据。
 * 任何时间点，都**只有一个活跃的MemTable** 和 **0个或多个immutable MemTable**
 
-RocksDB中的`MemTable`基于**跳表**实现。
+RocksDB中的`MemTable`基于**跳表**实现，可见之前梳理LevelDB时的说明：[跳表](https://xiaodongq.github.io/2024/08/02/leveldb-memtable-skiplist/#2-%E8%B7%B3%E8%A1%A8)。
+
+`MemTable`类定义：
+
+```cpp
+// db/memtable.h
+class MemTable {
+ public:
+  // key比较器
+  struct KeyComparator : public MemTableRep::KeyComparator {
+    ...
+  };
+
+  // MemTables are reference counted.  The initial reference count
+  // is zero and the caller must call Ref() at least once.
+  // first key is inserted into the memtable.
+  // MemTable 通过引用计数，需要调用 Ref()
+  // 构造函数，并禁用拷贝构造和赋值构造。
+  explicit MemTable(const InternalKeyComparator& comparator,
+                    const ImmutableCFOptions& ioptions,
+                    const MutableCFOptions& mutable_cf_options,
+                    WriteBufferManager* write_buffer_manager,
+                    SequenceNumber earliest_seq, uint32_t column_family_id);
+  // No copying allowed
+  MemTable(const MemTable&) = delete;
+  MemTable& operator=(const MemTable&) = delete;
+
+  // Do not delete this MemTable unless Unref() indicates it not in use.
+  ~MemTable();
+
+  // Increase reference count.
+  // REQUIRES: external synchronization to prevent simultaneous
+  // operations on the same MemTable.
+  void Ref() { ++refs_; }
+
+  // Drop reference count.
+  // If the refcount goes to zero return this memtable, otherwise return null.
+  // REQUIRES: external synchronization to prevent simultaneous
+  // operations on the same MemTable.
+  MemTable* Unref() {
+    --refs_;
+    assert(refs_ >= 0);
+    if (refs_ <= 0) {
+      return this;
+    }
+    return nullptr;
+  }
+  ...
+
+  // 增加记录
+  bool Add(SequenceNumber seq, ValueType type, const Slice& key,
+           const Slice& value, bool allow_concurrent = false,
+           MemTablePostProcessInfo* post_process_info = nullptr,
+           void** hint = nullptr);
+  // 查找记录
+  bool Get(const LookupKey& key, std::string* value, Status* s,
+           MergeContext* merge_context,
+           SequenceNumber* max_covering_tombstone_seq, SequenceNumber* seq,
+           const ReadOptions& read_opts, ReadCallback* callback = nullptr,
+           bool* is_blob_index = nullptr, bool do_merge = true) {
+    return Get(key, value, /*timestamp=*/nullptr, s, merge_context,
+               max_covering_tombstone_seq, seq, read_opts, callback,
+               is_blob_index, do_merge);
+  }
+  ...
+
+ private:
+  ...
+  KeyComparator comparator_;
+  const ImmutableMemTableOptions moptions_;
+  int refs_;
+  const size_t kArenaBlockSize;
+  AllocTracker mem_tracker_;
+  ConcurrentArena arena_;
+  std::unique_ptr<MemTableRep> table_;
+  std::unique_ptr<MemTableRep> range_del_table_;
+  std::atomic_bool is_range_del_table_empty_;
+  // Total data size of all data inserted
+  std::atomic<uint64_t> data_size_;
+  std::atomic<uint64_t> num_entries_;
+  std::atomic<uint64_t> num_deletes_;
+  ...
+};
+```
+
+如上所述，新创建的MemTable需要至少调用一次`Ref()`增加引用计数，可见`SwitchMemtable`切换MemTable流程：
+
+```cpp
+// db/db_impl/db_impl_write.cc
+Status DBImpl::SwitchMemtable(ColumnFamilyData* cfd, WriteContext* context) {
+  // 外部持锁
+  mutex_.AssertHeld();
+  WriteThread::Writer nonmem_w;
+  std::unique_ptr<WritableFile> lfile;
+  log::Writer* new_log = nullptr;
+  MemTable* new_mem = nullptr;
+  IOStatus io_s;
+  ...
+  // 持久化恢复状态到
+  Status s = WriteRecoverableState();
+  ...
+  // 之前有WAL则创建新的WAL日志
+  bool creating_new_log = !log_empty_;
+  ...
+  // 创建WAL前先解锁
+  mutex_.Unlock();
+  if (creating_new_log) {
+    // 创建新的WAL日志
+    io_s = CreateWAL(new_log_number, recycle_log_number, preallocate_block_size,
+                     &new_log);
+    if (s.ok()) {
+      s = io_s;
+    }
+  }
+  if (s.ok()) {
+    SequenceNumber seq = versions_->LastSequence();
+    // 创建新的MemTable
+    new_mem = cfd->ConstructNewMemtable(mutable_cf_options, seq);
+    context->superversion_context.NewSuperVersion();
+  }
+  ROCKS_LOG_INFO(immutable_db_options_.info_log,
+                 "[%s] New memtable created with log file: #%" PRIu64
+                 ". Immutable memtables: %d.\n",
+                 cfd->GetName().c_str(), new_log_number, num_imm_unflushed);
+  // 上述创建完新的WAL和MemTable，加锁继续后续处理
+  mutex_.Lock();
+  ...
+  // 增加MemTable的引用计数
+  new_mem->Ref();
+  cfd->SetMemtable(new_mem);
+  ...
+}
+```
+
+调用到`SwitchMemtable`的流程：
+
+```sh
+[MacOS-xd@qxd ➜ rocksdb_v6.15.5 git:(rocksdb-v6.15.5) ✗ ]$ calltree.pl 'SwitchMemtable' '' 1 1 3
+  
+  SwitchMemtable
+  ├── DBImpl::FlushMemTable	[vim db/db_impl/db_impl_compaction_flush.cc +1697]
+  │   ├── DBImpl::ResumeImpl	[vim db/db_impl/db_impl.cc +306]
+  │   ├── DBImpl::CancelAllBackgroundWork	[vim db/db_impl/db_impl.cc +445]
+  │   ├── DBImpl::IngestExternalFiles	[vim db/db_impl/db_impl.cc +4323]
+  │   ├── DBImpl::CompactRange	[vim db/db_impl/db_impl_compaction_flush.cc +782]
+  │   ├── DBImpl::Flush	[vim db/db_impl/db_impl_compaction_flush.cc +1478]
+  │   ├── DBImpl::TEST_FlushMemTable	[vim db/db_impl/db_impl_debug.cc +126]
+  │   ├── DBImpl::TEST_FlushMemTable	[vim db/db_impl/db_impl_debug.cc +141]
+  │   └── DBImpl::GetLiveFiles	[vim db/db_filesnapshot.cc +26]
+  ├── DBImpl::AtomicFlushMemTables	[vim db/db_impl/db_impl_compaction_flush.cc +1819]
+  │   ├── DBImpl::ResumeImpl	[vim db/db_impl/db_impl.cc +306]
+  │   ├── DBImpl::CancelAllBackgroundWork	[vim db/db_impl/db_impl.cc +445]
+  │   ├── DBImpl::IngestExternalFiles	[vim db/db_impl/db_impl.cc +4323]
+  │   ├── DBImpl::CompactRange	[vim db/db_impl/db_impl_compaction_flush.cc +782]
+  │   ├── DBImpl::Flush	[vim db/db_impl/db_impl_compaction_flush.cc +1478]
+  │   ├── DBImpl::Flush	[vim db/db_impl/db_impl_compaction_flush.cc +1497]
+  │   ├── DBImpl::TEST_AtomicFlushMemTables	[vim db/db_impl/db_impl_debug.cc +146]
+  │   └── DBImpl::GetLiveFiles	[vim db/db_filesnapshot.cc +26]
+  ├── DBImpl::SwitchWAL	[vim db/db_impl/db_impl_write.cc +1253]
+  │   ├── DBImpl::PreprocessWrite	[vim db/db_impl/db_impl_write.cc +903]
+  │   └── DBImpl::TEST_SwitchWAL	[vim db/db_impl/db_impl_debug.cc +25]
+  ├── DBImpl::HandleWriteBufferFull	[vim db/db_impl/db_impl_write.cc +1348]
+  │   └── DBImpl::PreprocessWrite	[vim db/db_impl/db_impl_write.cc +903]
+  ├── DBImpl::ScheduleFlushes	[vim db/db_impl/db_impl_write.cc +1605]
+  │   └── DBImpl::PreprocessWrite	[vim db/db_impl/db_impl_write.cc +903]
+  └── DBImpl::TEST_SwitchMemtable	[vim db/db_impl/db_impl_debug.cc +105]
+```
 
 ### 2.2. SST文件
 
 > 介绍可见：[Rocksdb BlockBasedTable Format](https://github.com/facebook/rocksdb/wiki/Rocksdb-BlockBasedTable-Format)
 {: .prompt-info }
 
-Rocksdb中的SST结构：
+RocksDB中的SST结构：
 
 ```sh
 <beginning_of_file>
@@ -52,6 +218,70 @@ Rocksdb中的SST结构：
 [Footer]                               (fixed size; starts at file_size - sizeof(Footer))
 <end_of_file>
 ```
+
+SST的`Compaction`合并操作，由`DBImpl::BackgroundCompaction`负责处理，看下调用栈，具体逻辑本篇暂不展开。
+
+如下所示，调用链为：`DBImpl::BGWorkCompaction`或`DBImpl::BGWorkBottomCompaction` -> `BackgroundCallCompaction` -> `BackgroundCompaction`
+
+```sh
+[MacOS-xd@qxd ➜ rocksdb_v6.15.5 git:(rocksdb-v6.15.5) ✗ ]$ calltree.pl 'BackgroundCompaction' '' 1 1 4
+  
+  BackgroundCompaction
+  └── DBImpl::BackgroundCallCompaction	[vim db/db_impl/db_impl_compaction_flush.cc +2503]
+      ├── DBImpl::BGWorkCompaction	[vim db/db_impl/db_impl_compaction_flush.cc +2295]
+      └── DBImpl::BGWorkBottomCompaction	[vim db/db_impl/db_impl_compaction_flush.cc +2307]
+```
+
+这里看下`BGWorkCompaction`的调用时机（其实`BGWorkBottomCompaction`也是在`BackgroundCompaction`中设置的回调函数），包含<mark>两个场景</mark>：
+
+* 1、`MaybeScheduleFlushOrCompaction` 判断是否需要compaction
+* 2、`RunManualCompaction` 手动触发
+
+```cpp
+// db/db_impl/db_impl_compaction_flush.cc
+// 判断是否需compaction
+void DBImpl::MaybeScheduleFlushOrCompaction() {
+  ...
+  env_->Schedule(&DBImpl::BGWorkCompaction, ca, Env::Priority::LOW, this,
+                 &DBImpl::UnscheduleCompactionCallback);
+  ...
+}
+
+// 手动触发compaction
+Status DBImpl::RunManualCompaction( xxx ) {
+  ...
+  env_->Schedule(&DBImpl::BGWorkCompaction, ca, thread_pool_pri, this,
+                 &DBImpl::UnscheduleCompactionCallback);
+  ...
+}
+```
+
+很多操作都会调用到`MaybeScheduleFlushOrCompaction`：
+
+```sh
+[MacOS-xd@qxd ➜ rocksdb_v6.15.5 git:(rocksdb-v6.15.5) ✗ ]$ calltree.pl 'MaybeScheduleFlushOrCompaction' '' 1 1 2
+  
+  MaybeScheduleFlushOrCompaction
+  ├── DBImpl::ResumeImpl	[vim db/db_impl/db_impl.cc +306]
+  ├── DBImpl::ReleaseSnapshot	[vim db/db_impl/db_impl.cc +3004]
+  ├── DBImpl::CompactRange	[vim db/db_impl/db_impl_compaction_flush.cc +782]
+  ├── DBImpl::CompactFilesImpl	[vim db/db_impl/db_impl_compaction_flush.cc +1058]
+  ├── DBImpl::ContinueBackgroundWork	[vim db/db_impl/db_impl_compaction_flush.cc +1268]
+  ├── DBImpl::FlushMemTable	[vim db/db_impl/db_impl_compaction_flush.cc +1697]
+  ├── DBImpl::AtomicFlushMemTables	[vim db/db_impl/db_impl_compaction_flush.cc +1819]
+  ├── DBImpl::BackgroundCallFlush	[vim db/db_impl/db_impl_compaction_flush.cc +2423]
+  ├── DBImpl::BackgroundCallCompaction	[vim db/db_impl/db_impl_compaction_flush.cc +2503]
+  ├── DBImpl::BackgroundCompaction	[vim db/db_impl/db_impl_compaction_flush.cc +2619]
+  ├── DBImpl::InstallSuperVersionAndScheduleWork	[vim db/db_impl/db_impl_compaction_flush.cc +3255]
+  ├── DBImpl::SwitchWAL	[vim db/db_impl/db_impl_write.cc +1253]
+  ├── DBImpl::HandleWriteBufferFull	[vim db/db_impl/db_impl_write.cc +1348]
+  ├── DBImpl::ScheduleFlushes	[vim db/db_impl/db_impl_write.cc +1605]
+  └── DBImpl::SuggestCompactRange	[vim db/db_impl/db_impl_experimental.cc +23]
+```
+
+手动触发compaction可由用户手动触发，或者一些工具中触发：
+
+![manual-compaction](/images/2025-04-30-manual-compaction.png)
 
 ### 2.3. 日志（Journal）
 
@@ -266,6 +496,40 @@ Status DBImpl::WriteImpl(const WriteOptions& write_options,
 }
 ```
 
+`WriteBatchInternal::InsertInto`逻辑：
+
+```cpp
+// db/write_batch.cc
+Status WriteBatchInternal::InsertInto(
+    WriteThread::Writer* writer, SequenceNumber sequence,
+    ColumnFamilyMemTables* memtables, FlushScheduler* flush_scheduler,
+    TrimHistoryScheduler* trim_history_scheduler,
+    bool ignore_missing_column_families, uint64_t log_number, DB* db,
+    bool concurrent_memtable_writes, bool seq_per_batch, size_t batch_cnt,
+    bool batch_per_txn, bool hint_per_batch) {
+#ifdef NDEBUG
+  (void)batch_cnt;
+#endif
+  // 到此函数表示需要写MemTable
+  assert(writer->ShouldWriteToMemtable());
+  MemTableInserter inserter(
+      sequence, memtables, flush_scheduler, trim_history_scheduler,
+      ignore_missing_column_families, log_number, db,
+      concurrent_memtable_writes, nullptr /*has_valid_writes*/, seq_per_batch,
+      batch_per_txn, hint_per_batch);
+  SetSequence(writer->batch, sequence);
+  inserter.set_log_number_ref(writer->log_ref);
+  // 进行写入
+  Status s = writer->batch->Iterate(&inserter);
+  assert(!seq_per_batch || batch_cnt != 0);
+  assert(!seq_per_batch || inserter.sequence() - sequence == batch_cnt);
+  if (concurrent_memtable_writes) {
+    inserter.PostProcess();
+  }
+  return s;
+}
+```
+
 ### 3.3. 代码流程图
 
 上述流程如下：
@@ -274,7 +538,7 @@ Status DBImpl::WriteImpl(const WriteOptions& write_options,
 
 ### 3.4. 状态机流转
 
-Writer对应的`w.state`状态机更新，看下调用到的几个位置，暂时只关注下`DBImpl::WriteImpl`中的流程：
+Writer对应的`w.state`状态机更新由`WriteThread::SetState`负责，看下调用到的几个位置，暂时只关注下`DBImpl::WriteImpl`中的流程：
 
 ```sh
 [MacOS-xd@qxd ➜ rocksdb_v6.15.5 git:(rocksdb-v6.15.5) ✗ ]$ calltree.pl 'SetState' 'DBImpl::WriteImpl' 1 1 3
