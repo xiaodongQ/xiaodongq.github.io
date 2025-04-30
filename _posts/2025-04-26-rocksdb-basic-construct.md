@@ -221,7 +221,7 @@ RocksDB中的SST结构：
 <end_of_file>
 ```
 
-SST的`Compaction`合并操作，由`DBImpl::BackgroundCompaction`负责处理，看下调用栈，具体逻辑本篇暂不展开。
+SST的`Compaction`合并操作，由`DBImpl::BackgroundCompaction`负责处理（最终调用到`DBImpl::FlushMemTableToOutputFile`），看下调用栈，具体逻辑本篇暂不展开。
 
 如下所示，调用链为：`DBImpl::BGWorkCompaction`或`DBImpl::BGWorkBottomCompaction` -> `BackgroundCallCompaction` -> `BackgroundCompaction`
 
