@@ -32,6 +32,7 @@ tags: [存储, RocksDB]
 * [z_stand -- RocksDB相关博客文章](https://vigourtyy-zhg.blog.csdn.net/category_10058454.html)
     * 作者对RocksDB的一些模块梳理和公开论文笔记值得一看，可作为后续参考
 * [Rocksdb加SPDK改善吞吐能力建设](https://chenxu14.github.io/2021/02/04/rocksdb-perfomance-improve.html)
+    * 暂不展开，Ceph中再看
 * [从 C++20 协程，到 Asio 的协程适配](https://www.bluepuni.com/archives/cpp20-coroutine-and-asio-coroutine)
     * PS：发现之前也看过该博主相关文章，[梳理存储io栈](https://xiaodongq.github.io/2024/08/26/linux-io-stack-block/) 时看过的 [Linux 内核的 blk-mq（Block IO 层多队列）机制](https://www.bluepuni.com/archives/linux-blk-mq/)
 * 还是上面博客中的一些文章
@@ -278,17 +279,17 @@ rocksdb.block.cache.index.miss COUNT : 0
 
 #### 3.2.1. 系统指标达到饱和
 
-一些场景下性能受到限制是由于 **<mark>系统指标达到饱和</mark>**了，但又是非预期的情况，调优时需要判断这些指标是否使用率偏高
+一些场景下性能受到限制是由于 **<mark>系统指标达到饱和</mark>**了，但又是非预期的情况，调优时需要判断这些指标是否使用率偏高。
 
-* **硬盘写入带宽**，RocksDB的`compaction`过程会写SST到硬盘，写入时可能超出硬盘驱动器的负载表现为**写入停滞/延迟（Write Stall）**，还可能导致**读取变慢**
-    * Perf context的`read`相关指标，会显示当前是否有<mark>过多</mark>SST文件在读取，出现时考虑对`compaction`进行调优
-* **硬盘读取IOPS**，注意硬件的持续稳定`IOPS`规格，常常会比硬件厂商提供的spec规格**更低**。建议使用工具（如`fio`）或系统指标进行基准规格测试。
-    * 如果IOPS达到硬件规格的饱和值，则检查`compaction`
+* **硬盘写入带宽**：RocksDB的`compaction`过程会写SST到硬盘，写入时可能超出硬盘驱动器的负载能力，表现为**写入停滞/延迟（Write Stall）**，还可能导致**读取变慢**。
+    * Perf Context的`read`相关指标，会显示当前是否有<mark>过多</mark>SST文件在读取，出现时考虑对`compaction`进行调优
+* **硬盘读取IOPS**：注意，硬件能一直持续的稳定`IOPS`规格常常会比硬件厂商提供的spec规格**更低**。建议使用工具（如`fio`）或系统指标进行基准规格测试。
+    * 如果IOPS已达到硬件基准规格的饱和值，则去检查`compaction`
     * 并尝试提高`block cache`的缓存命中率
-    * 问题的可能原因，有一些不同的因素：读取的索引、过滤器、大block，处理的方式也不一样
-* **CPU**，通常受`compaction`的读取路径影响
-    * 有很多会影响CPU的选项，比如：compaction, compression, bloom filters, block size
-* **Space**（空间），在技术上一般不是瓶颈，但是当系统指标未达到饱和、性能足够好且已经几乎填满SSD空间时，通常会说性能受到空间的瓶颈影响。
+    * 问题的可能原因：读取的索引、过滤器、大block，不同原因处理的方式也不一样
+* **CPU**：通常受`compaction`的读取路径影响
+    * 有很多会影响CPU的参数选项，比如：compaction, compression, bloom filters, block size
+* **Space**（空间）：在技术上一般不是瓶颈，但是当系统指标未达到饱和、RocksDB性能足够好且已经几乎填满SSD空间时，通常会说性能受到空间的瓶颈影响。
     * 空间效率的调优，可见：[Space Tuning](https://github.com/facebook/rocksdb/wiki/Space-Tuning)
 
 #### 3.2.2. 放大因子
@@ -297,20 +298,20 @@ rocksdb.block.cache.index.miss COUNT : 0
 
 应该优化哪种放大因素，有时是比较明显的，但有时又不明显，无论哪种情况，**<mark>compaction</mark>**都是三者间做`trade-off`的关键因素。
 
-1、**写放大**：写入数据库的数据大小 vs 写入磁盘的数据大小，比如写`10MB/s`到数据库，但写入硬盘`30MB/s`，则写放大是`3`倍。
+**1、写放大**：写入数据库的数据大小 vs 写入磁盘的数据大小，比如写`10MB/s`到数据库，但写入硬盘`30MB/s`，则写放大是`3`倍。
 
 观察写放大的2种方式：
 * 1）`DB::GetProperty("rocksdb.stats", &stats)` 获取
 * 2）自行计算：硬盘带宽（`iostat`统计） 除以 数据库写入速率
 
-2、**读放大**：每次查询时硬盘的读取数据量，比如单次查询需要5个page，则读放大是`5`倍。
+**2、读放大**：每次查询时硬盘的读取数据量，比如单次查询需要5个page，则读放大是`5`倍。
 
-* 逻辑读：从缓存读取，RocksDB的`block cache` 或者 操作系统的`page cache`
+* 逻辑读：从缓存读取，RocksDB的 `block cache` 或者 操作系统的 `page cache`
 * 物理读：从硬盘读
 
-3、**空间放大**：数据库文件在硬盘上的大小 和 数据大小 的比值，比如插入`10MB`数据到数据库，但硬盘上用了`100MB`，则空间放大为`10`倍。
+**3、空间放大**：数据库文件在硬盘上的大小 和 数据大小 的比值，比如插入`10MB`数据到数据库，但硬盘上用了`100MB`，则空间放大为`10`倍。
 
-* 通常需要设置一个硬性的空间使用限制，避免写爆硬盘（HDD或者SSD或者内存态），可见 [Space Tuning](https://github.com/facebook/rocksdb/wiki/Space-Tuning) 中减小空间放大的调优指导
+* 通常需要设置一个硬性的空间使用限制，避免写爆空间（HDD或者SSD或者内存态），可见 [Space Tuning](https://github.com/facebook/rocksdb/wiki/Space-Tuning) 中减小空间放大的调优指导
 
 #### 3.2.3. 系统未达饱和但RocksDB慢
 
@@ -325,10 +326,15 @@ rocksdb.block.cache.index.miss COUNT : 0
     * 有时没什么问题，但用户只希望读取延迟更低
     * 可通过 [Perf Context and IO Stats Context](https://github.com/facebook/rocksdb/wiki/Perf-Context-and-IO-Stats-Context) 检查每次的查询状态（query status），看是CPU 还是 I/O比较耗费时间，再调整相应选项
 
-还有其他因素，暂不展开。
+还有一些其他因素，暂不展开，后续可见参考链接。
 
 ## 4. 小结
 
+梳理了RocksDB官方博客的一些文章，包括：索引SST文件以提升查找性能、减少锁竞争、异步IO优化读性能，并简单实验查看了RocksDB统计信息。
+
+并梳理学习RocksDB调优指南，分析了一些性能问题场景的可能原因和调优思路。
+
+文章中涉及的一些机制当前未深入梳理代码实现，包括其中的协程和io_uring使用，TODO。
 
 ## 5. 参考
 
