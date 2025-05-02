@@ -33,7 +33,7 @@ RocksDB中的`MemTable`基于**跳表**实现，可见之前梳理LevelDB时的�
 `MemTable`类定义：
 
 ```cpp
-// db/memtable.h
+// rocksdb_v6.15.5/db/memtable.h
 class MemTable {
  public:
   // key比较器
@@ -116,7 +116,7 @@ class MemTable {
 如上所述，新创建的MemTable需要至少调用一次`Ref()`增加引用计数，可见`SwitchMemtable`切换MemTable流程：
 
 ```cpp
-// db/db_impl/db_impl_write.cc
+// rocksdb_v6.15.5/db/db_impl/db_impl_write.cc
 Status DBImpl::SwitchMemtable(ColumnFamilyData* cfd, WriteContext* context) {
   // 外部持锁
   mutex_.AssertHeld();
@@ -240,7 +240,7 @@ SST的`Compaction`合并操作，由`DBImpl::BackgroundCompaction`负责处理�
 * 2、`RunManualCompaction` 手动触发
 
 ```cpp
-// db/db_impl/db_impl_compaction_flush.cc
+// rocksdb_v6.15.5/db/db_impl/db_impl_compaction_flush.cc
 // 判断是否需compaction
 void DBImpl::MaybeScheduleFlushOrCompaction() {
   ...
@@ -331,11 +331,12 @@ rocksdb_v6.15.5/db/db_impl
 函数声明：
 
 ```cpp
-// db/db_impl/db_impl.h
+// rocksdb_v6.15.5/db/db_impl/db_impl.h
 class DBImpl : public DB {
   // 此处using用于将基类中所有Put的重载函数（基类里有多个Put函数）引入派生类DBImpl，避免在派生类中被隐藏。
   // 使用派生类时也可以使用其他基类里的Put重载函数。
   using DB::Put;
+  // ColumnFamily列族特性支持数据分类管理（存储、设置不同TTL、不同压缩算法）、多租户隔离等
   virtual Status Put(const WriteOptions& options,
                      ColumnFamilyHandle* column_family, const Slice& key,
                      const Slice& value) override;
@@ -358,7 +359,7 @@ class DBImpl : public DB {
 `DBImpl::Put`实现如下：调用栈`DBImpl::Put` -> `DB::Put` -> `DBImpl::Write`（基类中的`Write`是纯虚函数）
 
 ```cpp
-// db/db_impl/db_impl_write.cc
+// rocksdb_v6.15.5/db/db_impl/db_impl_write.cc
 Status DBImpl::Put(const WriteOptions& o, ColumnFamilyHandle* column_family,
                    const Slice& key, const Slice& val) {
   // 调用基类中的 DB::Put 实现
@@ -405,7 +406,7 @@ Status DBImpl::Write(const WriteOptions& write_options, WriteBatch* my_batch) {
 还是看代码跟踪流程：
 
 ```cpp
-// db/db_impl/db_impl_write.cc
+// rocksdb_v6.15.5/db/db_impl/db_impl_write.cc
 // 暂时关注前2个参数，其他参数都是默认零值（其中bool都是false）
 Status DBImpl::WriteImpl(const WriteOptions& write_options,
                          WriteBatch* my_batch, WriteCallback* callback,
@@ -501,7 +502,7 @@ Status DBImpl::WriteImpl(const WriteOptions& write_options,
 `WriteBatchInternal::InsertInto`逻辑：
 
 ```cpp
-// db/write_batch.cc
+// rocksdb_v6.15.5/db/write_batch.cc
 Status WriteBatchInternal::InsertInto(
     WriteThread::Writer* writer, SequenceNumber sequence,
     ColumnFamilyMemTables* memtables, FlushScheduler* flush_scheduler,
