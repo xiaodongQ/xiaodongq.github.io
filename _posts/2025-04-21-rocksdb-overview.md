@@ -25,6 +25,8 @@ tags: [存储, RocksDB]
     - [Introducing Pebble: A RocksDB-inspired key-value store written in Go](https://www.cockroachlabs.com/blog/pebble-rocksdb-kv-store/)
 
 > 后续准备梳理的ceph版本为：[ceph v17.2.8](https://github.com/ceph/ceph/tree/v17.2.8)，所以此处RocksDB的源码版本基于其对应的git子模块版本：[rocksdb v6.15.5](https://github.com/facebook/rocksdb/tree/v6.15.5) （源于子模块对应的RocksDB version头文件：[version.h](https://github.com/ceph/rocksdb/blob/c540de6f709b66efd41436694f72d6f7986a325b/include/rocksdb/version.h)
+> 
+> 202505更新：当前ceph的main分支使用的`rocksdb v7.9.2`版本，由于RocksDB官网博客中的部分特性说明在v6.15.5中还未包含，比如异步io、协程，另外7.9之后的版本还有一些针对云原生、AI等场景的优化特性。后续切换分支走读，文章中的代码路径中会带上相应的分支标识。
 {: .prompt-info }
 
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
@@ -85,16 +87,24 @@ LevelDB里面的SSTable文件格式示意图如下（可见 [LevelDB学习笔记
 
 ### 2.3. 特性
 
-具体见上面的 RocksDB-Overview 参考链接，这里只列出几个特性。
+具体见上面的 [RocksDB-Overview](https://github.com/facebook/rocksdb/wiki/RocksDB-Overview) 参考链接，这里只列出几个特性。
 
+* **<mark>列族（Column Family）</mark>**
+    * 允许在同一个数据库实例中对数据进行逻辑上的`分组`管理（逻辑分区），未指定列族时默认情况创建的数据库在名为`default`的列族中。
+    * 每个`Column Family`有自己的Memtable和SST文件集合；可以为每个`Column Family`设置不同的配置选项；也可以单独`flush`/`compact`；支持跨`Column Family`批量更新
+    * **使用场景**：数据分类存储、不同TTL设置、不同压缩策略设置、多租户隔离
+* **<mark>事务支持</mark>**，支持乐观（Optimistic）和悲观（Pessimistic）模式，具体可见 [Transactions](https://github.com/facebook/rocksdb/wiki/Transactions)
+* **<mark>前缀迭代器（Prefix Iterator）</mark>**，支持按前缀扫描键值对，可以显著提高前缀查询的性能。
+    * 允许用户只迭代具有特定前缀的键，而不需要扫描整个键空间。
+    * **使用场景**：多租户系统中按租户ID查询、社交网络中按用户ID查询所有相关内容、时序数据中按时间前缀查询
 * 支持配置多线程Compaction
-* 避免停顿（Avoiding Stalls）
-    * 当所有后台compaction线程都在忙于处理合并，此时外部突发的大量`write`请求可能会快速写满MemTable，进而导致新请求出现**停顿**，RocksDB支持配置一小组线程专门用于刷写MemTable到硬盘
+* 避免停顿（Avoiding Stalls）（停滞、阻塞）
+    * 当所有后台compaction线程都在忙于处理合并，此时外部突发的大量`write`请求可能会快速写满MemTable，进而导致新请求出现**停顿**（停滞、阻塞），RocksDB支持配置一小组线程专门用于刷写MemTable到硬盘
 * Block缓存（`Block Cache`）
     * 通过一个Block数据的**LRU缓存**来提升读取性能，支持两种缓存类型：`非压缩block` 和 `压缩block`。如果配置了压缩block缓存，一般会使用**直接IO**，以避免文件系统重复缓存数据（page cache）
 * Table缓存（`Table Cache`）
     * 缓存打开的`sstfile`文件（即sstable）
-* IO控制
+* 用户IO控制配置
     * 允许用户配置和SST文件不同的IO读写方式，用户IO可以配置成直接IO，让RocksDB来完全控制cache，比如定期进行批量sync
 * 此外，还有 合并过滤（Compaction Filter）、只读模式、数据压缩、支持多个嵌入式数据库 等
 
