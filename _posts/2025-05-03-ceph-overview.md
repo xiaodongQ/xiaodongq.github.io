@@ -10,14 +10,14 @@ tags: [存储, Ceph]
 
 开始梳理`Ceph`，结合分布式存储的工作经验，加深并补充技能树。`Ceph`用`RocksDB`作为存储引擎，趁此机会也看下`RocksDB`在工业级项目中的实践和调优效果。
 
-**说明**：基于版本 **<mark>17.2.8</mark>（`Quincy`）**，自己的仓库fork了一份代码 [ceph-v17.2.8)](https://github.com/xiaodongQ/ceph/tree/ceph-v17.2.8) 用于标注学习。
+**说明**：基于版本 **<mark>17.2.8</mark>（`Quincy`）**，fork一份 [ceph-v17.2.8](https://github.com/xiaodongQ/ceph/tree/ceph-v17.2.8) 的代码用于标注学习。
 
 参考链接：
 
 * [Ceph Document -- quincy](https://docs.ceph.com/en/quincy/)
     * [Intro to Ceph](https://docs.ceph.com/en/quincy/start/)
     * [Architecture](https://docs.ceph.com/en/quincy/architecture/)
-* [ceph-v17.2.8)](https://github.com/xiaodongQ/ceph/tree/ceph-v17.2.8)
+* [ceph-v17.2.8](https://github.com/xiaodongQ/ceph/tree/ceph-v17.2.8)源码
 * 各版本时间线说明：[ceph-releases-index](https://docs.ceph.com/en/latest/releases/#ceph-releases-index)
 
 ## 2. 总体介绍
@@ -60,7 +60,7 @@ LLM提供的各个版本代号和部分关键特性，下面也贴一下作了�
     * 改进OSD故障检测机制，优化心跳超时。
     * 支持RGW元数据离线重塑。
 * `Luminous` (`12.2.z`)，`L`，第12个大版本
-    * 2017年10月（**<mark>首个LTS版本</mark>**）
+    * 2017年10月
     * **<mark>BlueStore</mark>**：默认的OSD后端存储，直接管理裸盘，支持数据校验与压缩（zlib/snappy/LZ4）。
     * ceph-mgr：新增管理守护进程，提供REST API、Prometheus/Zabbix监控插件。
     * 支持10,000 OSD的大规模集群，优化CRUSH规则自动化。
@@ -88,55 +88,69 @@ LLM提供的各个版本代号和部分关键特性，下面也贴一下作了�
     * v18.2.6（截至2025年4月）
     * 支持Zstandard（zstd）压缩算法优化性能。
     * 引入**AI**驱动的负载均衡策略。
-* 未来版本，重点关注AI集成与边缘计算场景支持。
 
 ### 2.2. Ceph集群构成
 
-具体见：[Intro to Ceph](https://docs.ceph.com/en/quincy/start/)
+具体见：[Intro to Ceph](https://docs.ceph.com/en/quincy/start/)。
 
 一个Ceph存储集群中需要：
 
 * 1、至少一个`Ceph Monitor daemon`（Monitor）
-    * **`ceph-mon` daemon服务**，维护集群状态的map信息，包括`monitor map`、`manager map`、`OSD map`、`MDS map` 和 `CRUSH map`，这些map状态是后台服务（daemon）间相互通信的关键信息。Monitor还负责管理daemon和客户端之间的身份验证。
-    * 一般至少需要<mark>3</mark>个`ceph-mon`来保持冗余和**高可用**
+    * **`ceph-mon` daemon服务**，维护集群状态的map信息，包括`monitor map`、`manager map`、`OSD map`、`MDS map` 和 `CRUSH map`，这些map状态是守护进程/后台服务（daemon）间相互通信的关键信息。Monitor还负责管理daemon和客户端之间的身份验证。
+    * 一般至少需要 <mark>3个</mark> `ceph-mon`来保持冗余和**高可用**
 * 2、至少一个`Ceph Manager daemon`（Manager）
     * **`ceph-mgr` daemon服务**，负责跟踪运行时指标（metrics）和集群的当前状态，包括存储利用率、性能指标和系统负载。
     * Manager服务还提供了基于python的模块，包括一个`web面板`（Ceph Dashboard）和`REST API`
         * 可见：[Ceph Dashboard](https://docs.ceph.com/en/quincy/mgr/dashboard/#mgr-dashboard)
-    * 一般至少需要<mark>2</mark>个`ceph-mgr`来保持高可用
+    * 一般至少需要 <mark>2个</mark> `ceph-mgr`来保持高可用
         * 最佳实践：对于每个`Monitor`，都运行一个`Manager`，但这不是必须的
-* 3、大于等于副本个数的`OSD（Ceph Object Storage Daemon）`
+* 3、大于等于副本个数的`OSD（Ceph Object Storage Daemon / Object Storage Device）`
     * **`ceph-osd` daemon服务**，负责数据存储，处理数据复制、恢复和重新负载，并提供一些监控信息给Monitor和Manager
         * OSD除了会检查自己的状态，还会通过心跳检查其他OSD的状态，并上报给Monitor。
-    * 一般至少需要<mark>3</mark>个`ceph-osd`来保持冗余和高可用
+    * 一般至少需要 <mark>3个</mark> `ceph-osd`来保持冗余和高可用
+    * 单独使用`OSD`可能指代物理或者逻辑存储单元，不过Ceph社区一般用作指代`Object Storage Daemon`，可了解：[term-Ceph-OSD](https://docs.ceph.com/en/quincy/glossary/#term-Ceph-OSD) 和 [term-OSD](https://docs.ceph.com/en/quincy/glossary/#term-OSD)。
 * 4、另外，如果要使用`文件存储`（Ceph File System），则还需要`MDS（Ceph Metadata Server）`
     * **`ceph-mds` daemon服务**，存储文件系统需要的元数据信息，MDS服务允许CephFS用户运行基本命令，如`ls`、`find`等等。
 
-### 2.3. 架构示意
+### 2.3. Ceph架构
 
 具体见：[Architecture](https://docs.ceph.com/en/quincy/architecture/)
 
+#### 2.3.1. 架构示意图
+
 Ceph可以在一个单一系统中同时提供**对象**、**块** 和 **文件存储**。
 
-架构如下：
+架构示意图如下：
 
 ![ceph-architecture](/images/ceph-architecture.png)
 
-#### RADOS
+1、**Ceph客户端**（Ceph Client）：任何可以访问`Ceph存储集群`（Ceph Storage Cluster）的Ceph组件。包括`RADOSGW`对象存储（Ceph Object Gateway）、`RBD`块存储（Ceph Block Device）、`CephFS`文件存储（Ceph File System），以及相应的库，也包括`内核模块` 和 `FUSE`（Filesystems in USERspace）。也可以是基于`librados`的自定义实现。
 
-底层存储引擎称作`RADOS（Relaible Autonomic Distributed Object Store）`（意译：可靠自管理分布式对象存储），负责数据存储、复制和故障恢复。Ceph基于`RADOS`提供<mark>可无限扩展（infinitely scalable）</mark>的存储集群。
+2、`Ceph存储集群`从`Ceph客户端`接收数据，并存储成`RADOS objects`，每个`object`对象都存储在一个`Object Storage Device`（也简称`OSD`，跟上面`Daemon`按场景转换理解）上面。默认的 `BlueStore` 存储后端以单一的、类似数据库的方式（monolithic, database-like fashion）存储对象。
 
-`RADOS`了解可见：
-* 作者`Sage Weil`对`RADOS`简要介绍的博客：[The RADOS distributed object store](https://ceph.io/en/news/blog/2009/the-rados-distributed-object-store/)。
-* 详尽解释则可见 **<mark>RADOS论文</mark>**：[RADOS: A Scalable, Reliable Storage Service for Petabyte-scale Storage Clusters](https://ceph.io/assets/pdfs/weil-rados-pdsw07.pdf)。
+3、Ceph的扩展性和高可用通过 `客户端` 和 `OSDs` 直接交互来避免单点故障，其中使用`CRUSH`算法，下面小节单独说明。
 
-2、Ceph的上层特性则基于`librados`来访问Ceph存储集群。
+#### 2.3.2. RADOS 存储引擎
 
-#### CRUSH
+底层存储引擎称为`RADOS（Relaible Autonomic Distributed Object Store）`（意译：可靠的自管理分布式对象存储），负责数据存储、复制和故障恢复。Ceph基于`RADOS`提供<mark>可无限扩展（infinitely scalable）</mark>的存储集群。
 
-3、Ceph以 **<mark>对象（object）</mark>**的形式将数据存储在**逻辑存储池**（logical storage pools）中。
+Ceph的上层特性则基于`librados`来访问Ceph存储集群。
 
-存储集群的 **客户端** 和 **OSD** 通过 **`CRUSH（Controlled Replication Under Scalable Hashing）`** 算法（意译：可扩展哈希控制下的数据分布算法），计算数据的位置信息：哪个`PG（placement group，放置组）`应该包含object，哪个`OSD`应该用于存储该`PG`。`CRUSH`算法使Ceph存储集群能够动态扩展、重新平衡和动态恢复。
+`RADOS`进一步了解可见：
+
+1、作者`Sage Weil`对`RADOS`简要介绍的博客：[The RADOS distributed object store](https://ceph.io/en/news/blog/2009/the-rados-distributed-object-store/)。
+* RADOS提供的底层存储抽象相对比较简单：
+    * 1）数据的存储单元是`对象（object）`，每个object有一个名称，和少量有名属性，以及可变长度的数据负载。
+    * 2）`objects`存储在对象池（`object pools`）中，每个pool都有一个名称，并且形成不同的对象命名空间（object namespace）。此外还有少量参数：定义副本级别（比如2副本、3副本等）、描述副本存储分布情况的映射规则（比如副本在哪个机架）。
+    * 3）存储集群包含一些数量的`存储服务`，或`OSD`（object storage daemons/devices），且组合集群可存储任意数量的`pools`对象池。
+
+2、详尽说明则可见 **<mark>RADOS论文</mark>**：[RADOS: A Scalable, Reliable Storage Service for Petabyte-scale Storage Clusters](https://ceph.io/assets/pdfs/weil-rados-pdsw07.pdf)。
+
+#### 2.3.3. CRUSH 算法
+
+Ceph以 **<mark>对象（object）</mark>**的形式将数据存储在**逻辑存储池**（logical storage pools）中。
+
+存储集群的 **客户端** 和 **OSD** 通过 **`CRUSH（Controlled Replication Under Scalable Hashing）`** 算法（意译：可扩展哈希控制下的数据分布算法），计算数据的位置信息：object应该归属于哪个`PG（placement group，放置组）`，哪个`OSD`应该用于存储该`PG`。`CRUSH`算法使Ceph存储集群能够动态扩展、重新平衡和动态恢复。
 
 * 客户端和OSD使用`CRUSH`算法计算数据位置，意味着不存在中心化查找的瓶颈。
 * **<mark>CRUSH论文</mark>**：[CRUSH: Controlled, Scalable, Decentralized Placement of Replicated Data](https://ceph.com/assets/pdfs/weil-crush-sc06.pdf)
@@ -148,4 +162,5 @@ Ceph可以在一个单一系统中同时提供**对象**、**块** 和 **文件�
 
 * [Ceph Document](https://docs.ceph.com/en/reef/)
 * [Ceph Git仓库](https://github.com/ceph/ceph)
+* [Ceph History](https://en.wikipedia.org/wiki/Ceph_(software)#History)
 * LLM
