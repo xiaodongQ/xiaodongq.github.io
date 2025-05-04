@@ -3,7 +3,6 @@ title: 实用工具集索引
 description: 统一记录工具和小技巧，便于随时查找和使用
 categories: [工具和命令, HandyTools]
 tags: [Wireshark, eBPF, bcc, ss, bpftrace]
-pin: true
 ---
 
 一些工具和小技巧，有时候要去翻历史博客或者重新搜索，此处进行归档索引，便于随时查找和使用。
