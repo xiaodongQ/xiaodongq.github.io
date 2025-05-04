@@ -10,7 +10,12 @@ pin: true
 
 TODO List里面，收藏待看的文章已经不少了，有一类是觉得比较精彩的问题定位过程，还有一类是性能优化相关的文章，需要先还一些“技术债”了。
 
-本篇将这些文章内容做简要分析，**作为索引供后续不定期翻阅**。另外，补充篇 [问题定位和性能优化案例集锦 -- 工具补充实验](https://xiaodongq.github.io/2025/04/18/excellent-trouble-shooting-tools/) 中会记录一些涉及的工具说明和实验记录。
+本篇将这些文章内容做简要分析，**作为索引供后续不定期翻阅**。
+
+**<mark>另外：</mark>**
+
+* **<mark>1、</mark>**补充篇 [问题定位和性能优化案例集锦 -- 工具补充实验](https://xiaodongq.github.io/2025/04/18/excellent-trouble-shooting-tools/) 中会记录一些涉及的工具说明和实验记录。
+* **<mark>2、</mark>**[实用工具集索引](https://xiaodongq.github.io/2025/04/14/handy-tools/) 中，则统一归档一些工具，便于索引使用。
 
 这里再说说 **知识效率** 和 **工程效率**（具体见：[如何在工作中学习](https://plantegg.github.io/2018/05/23/%E5%A6%82%E4%BD%95%E5%9C%A8%E5%B7%A5%E4%BD%9C%E4%B8%AD%E5%AD%A6%E4%B9%A0/)，里面讲得非常好）：
 
