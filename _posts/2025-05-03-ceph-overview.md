@@ -131,11 +131,11 @@ LLM提供的各个版本代号和部分关键特性，下面也贴一下作了�
 
 ![ceph-osd-data-replication](/images/ceph-osd-data-replication.png)
 
-### 2.3. Ceph架构
+## 3. Ceph架构
 
 具体见：[Architecture](https://docs.ceph.com/en/quincy/architecture/)
 
-#### 2.3.1. 架构示意图
+### 3.1. 架构示意图
 
 Ceph可以在一个单一系统中同时提供**对象**、**块** 和 **文件存储**。
 
@@ -159,7 +159,7 @@ Ceph可以在一个单一系统中同时提供**对象**、**块** 和 **文件�
 Ceph文件存储的示意：  
 ![ceph-cephfs-architecture](/images/ceph-cephfs-architecture.png)
 
-#### 2.3.2. RADOS 存储引擎
+### 3.2. RADOS 存储引擎
 
 底层存储引擎称为`RADOS（Relaible Autonomic Distributed Object Store）`（意译：可靠的自管理分布式对象存储），负责数据存储、复制和故障恢复。Ceph基于`RADOS`提供<mark>可无限扩展（infinitely scalable）</mark>的存储集群。
 
@@ -176,7 +176,7 @@ Ceph的上层特性则基于`librados`来访问Ceph存储集群。
 
 2、详尽说明则可见 **<mark>RADOS论文</mark>**：[RADOS: A Scalable, Reliable Storage Service for Petabyte-scale Storage Clusters](https://ceph.io/assets/pdfs/weil-rados-pdsw07.pdf)。
 
-#### 2.3.3. CRUSH算法：扩展性和高可用
+### 3.3. CRUSH算法：扩展性和高可用
 
 Ceph以 **<mark>对象（object）</mark>**的形式将数据存储在**逻辑存储池**（logical storage pools）中。
 
@@ -190,7 +190,7 @@ Ceph以 **<mark>对象（object）</mark>**的形式将数据存储在**逻辑�
 * Ceph`客户端`需要先和`Monitor`通信，获取当前集群的`Cluster Map`副本，用于数据读取和写入。
 * `CRUSH`需要依赖`Cluster Map`信息进行RADOS的object位置计算。
 
-#### 2.3.4. 论文说明
+### 3.4. 论文说明
 
 参考：[Ceph论文简介](https://tobegit3hub1.gitbooks.io/ceph_from_scratch/content/architecture/papers.html)
 
@@ -209,12 +209,9 @@ Ceph以 **<mark>对象（object）</mark>**的形式将数据存储在**逻辑�
 
 另外，官网上也列出了 **<mark>Ceph相关的论文和出版书籍</mark>**：[Publications About Ceph](https://ceph.io/en/news/publications/)，上述论文链接都可以在此处找到。
 
-## 3. 部署
-
-
-
 ## 4. 小结
 
+本篇介绍了`Ceph`项目的背景，并梳理学习了基本的Ceph架构，集群组成、核心概念等。后续进行实际操作和相关代码流程走读分析。
 
 ## 5. 参考
 
