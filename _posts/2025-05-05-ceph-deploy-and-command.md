@@ -46,9 +46,17 @@ usage: cephadm [-h] [--image IMAGE] [--docker] [--data-dir DATA_DIR]
                ...
 ```
 
-### 2.2. 部署Ceph
+`cephadm`中集成了编排接口（`orchestration interface`）来管理Ceph集群。
 
-部署（需要依赖时间同步：`chrony`或者传统的`ntpd`，CentOS8默认使用`chrony`）：
+具体Python脚本内容可见：[cephadm](https://github.com/xiaodongQ/prog-playground/blob/main/storage/ceph/cephadm)。
+
+### 2.2. 部署Ceph集群
+
+使用cephadm部署集群，命令：`cephadm bootstrap --mon-ip *<mon-ip>*`。
+
+* 需要依赖时间同步：`chrony`或者传统的`ntpd`，CentOS8默认使用`chrony`
+* 命令会在本地主机创建一个monitor和manager、生成一个ssh key、创建一个配置文件`/etc/ceph/ceph.conf`、创建`/etc/ceph/ceph.client.admin.keyring`
+* 具体操作内容和进一步的选项功能，可见：[running-the-bootstrap-command](https://docs.ceph.com/en/quincy/cephadm/install/#running-the-bootstrap-command)
 
 ```sh
 [CentOS-root@xdlinux ➜ ~ ]$ ./cephadm --verbose bootstrap --mon-ip 192.168.1.150 
@@ -83,6 +91,13 @@ Please consider enabling telemetry to help improve Ceph:
     ceph telemetry on
 ```
 
+上面部署过程的完整输出，可见：[cephadm_bootstrap.log](https://github.com/xiaodongQ/prog-playground/blob/main/storage/ceph/cephadm_bootstrap.log)。
+
+`docker ps`可看到部署的集群中：
+* 包含一个`monitor`和一个`manager`，
+* 同时还部署了`node_exporter`、`prometheus`和`grafana`进行状态收集展示。
+* 还可以选择开启telemetry分布式链路跟踪。
+
 ```sh
 [CentOS-root@xdlinux ➜ ~ ]$ docker ps
 CONTAINER ID   IMAGE                                     COMMAND                  CREATED          STATUS          PORTS     NAMES
@@ -95,14 +110,132 @@ ec87bf5e542b   quay.io/ceph/ceph:v17                     "/usr/bin/ceph-mgr -…
 955ad744813e   quay.io/ceph/ceph:v17                     "/usr/bin/ceph-mon -…"   21 minutes ago   Up 21 minutes             ceph-616bc616-2a08-11f0-86a6-1c697af53932-mon-xdlinux
 ```
 
-### 2.3. 登录面板
+### 2.3. Dashboard 和 Grafana
+
+上面部署完成后，可登录对应的Dashboard，账号信息打印在上面的部署过程当中。
 
 ![ceph-dashboard](/images/2025-05-06-ceph-dashboard.png)
 
-## 3. 小结
+另外还部署了Grafana，包含了默认的一些面板：
 
-## 4. 参考
+![ceph-grafana](/images/2025-05-06-ceph-grafana.png)
 
-* [Ceph Document](https://docs.ceph.com/en/reef/)
+主机详情面板：
+
+![ceph-grafana-host-detail](/images/2025-05-06-ceph-grafana-host.png)
+
+### 2.4. Ceph Cli 命令操作
+
+开启 `ceph` 客户端命令操作，有几种方法。
+
+* 方式1、使用 `cephadm shell` 命令进入容器，而后执行客户端命令
+    * 也可以直接：`cephadm shell -- ceph -s`，但是每次会很慢
+* 方式2、安装`ceph-common`
+    * 添加源`cephadm add-repo --release quincy`，而后`cephadm install ceph-common`
+
+一些命令：
+
+* 确认`ceph`命令已安装：`ceph -v`
+* 确认`ceph`命令连接到了集群并查看状态：`ceph status`
+* Adding Hosts：`ceph orch host label add *<host>* _admin`
+* Adding additional MONs：`ceph orch daemon add mon *<host1:ip-or-network1>`
+    * 具体见[Deploying additional monitors](https://docs.ceph.com/en/quincy/cephadm/services/mon/#deploying-additional-monitors)
+* Adding Storage：`ceph orch apply osd --all-available-devices`
+
+#### 2.4.1. cephadm shell方式
+
+```sh
+# 执行cephadm shell，此处加--verbose显示详情
+[CentOS-root@xdlinux ➜ ~ ]$ ./cephadm --verbose shell
+--------------------------------------------------------------------------------
+cephadm ['--verbose', 'shell']
+Using default config /etc/ceph/ceph.conf
+...
+Using container info for daemon 'mon'
+Using ceph image with id '259b35566514' and tag 'v17' created on 2024-11-26 08:45:38 +0800 CST
+quay.io/ceph/ceph@sha256:a0f373aaaf5a5ca5c4379c09da24c771b8266a09dc9e2181f90eacf423d7326f
+...
+# 最后会创建并进入一个容器
+[ceph: root@xdlinux /]#
+
+# 在容器里可以使用ceph客户端命令
+[ceph: root@xdlinux /]# ceph -v
+ceph version 17.2.8 (f817ceb7f187defb1d021d6328fa833eb8e943b3) quincy (stable)
+[ceph: root@xdlinux /]# ceph -s
+  cluster:
+    id:     616bc616-2a08-11f0-86a6-1c697af53932
+    health: HEALTH_WARN
+            OSD count 0 < osd_pool_default_size 3
+ 
+  services:
+    mon: 1 daemons, quorum xdlinux (age 13h)
+    mgr: xdlinux.wfcgil(active, since 13h)
+    osd: 0 osds: 0 up, 0 in
+ 
+  data:
+    pools:   0 pools, 0 pgs
+    objects: 0 objects, 0 B
+    usage:   0 B used, 0 B / 0 B avail
+    pgs:
+# -h 可看到支持很多命令
+[ceph: root@xdlinux /]# ceph -h
+...
+```
+
+#### 2.4.2. 安装ceph-common
+
+`cephadm shell`每次进入容器再使用`ceph`客户端相关命令，比较麻烦，且宿主机目录和容器中存在隔离，还是在宿主机安装一下`ceph-common`。
+
+CentOS已经不再维护了，之前也已经更改为了阿里云的yum源，但是`cephadm add-repo --release quincy`还是报错了。后面还是得把系统重装一下，换成其他系统。
+
+```sh
+[CentOS-root@xdlinux ➜ ~ ]$ ./cephadm add-repo --release quincy
+unable to fetch repo metadata: <HTTPError 404: 'Not Found'>
+ERROR: failed to fetch repository metadata. please check the provided parameters are correct and try again
+```
+
+## 3. 使用Ceph
+
+见：[using-ceph](https://docs.ceph.com/en/quincy/cephadm/install/#using-ceph)
+
+### 3.1. 创建OSD
+
+由于自己的PC环境是在一块SSD上装了双系统，暂时无法使用单独的硬盘或分区来创建OSD，此处<mark>使用目录作为OSD（无需分区）</mark> （参考LLM）。
+
+```sh
+[CentOS-root@xdlinux ➜ ~ ]$ mkdir /var/lib/ceph/osd/ceph-0 -p
+```
+
+### 3.2. 对象存储
+
+具体见：[cephadm-deploy-rgw](https://docs.ceph.com/en/quincy/cephadm/services/rgw/#cephadm-deploy-rgw)
+
+继续在上述`cephadm shell`进入的客户端容器里，使用`ceph`客户端命令进行集群操作。
+
+简单创建名为`foo`的rgw对象网关（默认会创建2个daemon守护进程）：`ceph orch apply rgw foo`
+
+```sh
+# ceph客户端对应的容器中
+[ceph: root@xdlinux /]# ceph orch apply rgw foo
+Scheduled rgw.foo update...
+```
+
+可看到宿主机上创建的2个`radosgw`容器：
+
+```sh
+# 宿主机上
+[CentOS-root@xdlinux ➜ ceph git:(main) ]$ docker ps
+CONTAINER ID   IMAGE                                     COMMAND                  CREATED          STATUS          PORTS     NAMES
+18a1c01bf48d   quay.io/ceph/ceph                         "/usr/bin/radosgw -n…"   4 minutes ago    Up 4 minutes              ceph-616bc616-2a08-11f0-86a6-1c697af53932-rgw-foo-xdlinux-yeqiep
+c124e7c56c48   quay.io/ceph/ceph                         "/usr/bin/radosgw -n…"   4 minutes ago    Up 4 minutes              ceph-616bc616-2a08-11f0-86a6-1c697af53932-rgw-foo-xdlinux-bsojzq
+...
+```
+
+## 4. 小结
+
+## 5. 参考
+
+* [Ceph Document -- quincy](https://docs.ceph.com/en/quincy/)
+* [Installing Ceph](https://docs.ceph.com/en/quincy/install/)
 * [Ceph Git仓库](https://github.com/ceph/ceph)
 * LLM
