@@ -194,6 +194,8 @@ unable to fetch repo metadata: <HTTPError 404: 'Not Found'>
 ERROR: failed to fetch repository metadata. please check the provided parameters are correct and try again
 ```
 
+简单调研了下，初步选择是：`Rocky Linux`或`Ubuntu LTS`，包先都下载了，先试试`Rocky Linux`。
+
 ## 3. 使用Ceph
 
 见：[using-ceph](https://docs.ceph.com/en/quincy/cephadm/install/#using-ceph)
@@ -203,8 +205,10 @@ ERROR: failed to fetch repository metadata. please check the provided parameters
 由于自己的PC环境是在一块SSD上装了双系统，暂时无法使用单独的硬盘或分区来创建OSD，此处<mark>使用目录作为OSD（无需分区）</mark> （参考LLM）。
 
 ```sh
-[CentOS-root@xdlinux ➜ ~ ]$ mkdir /var/lib/ceph/osd/ceph-0 -p
+[CentOS-root@xdlinux ➜ ~ ]$ mkdir -p /var/lib/ceph/osd/ceph-0
 ```
+
+TODO：等换了系统再来。
 
 ### 3.2. 对象存储
 
@@ -228,6 +232,142 @@ Scheduled rgw.foo update...
 CONTAINER ID   IMAGE                                     COMMAND                  CREATED          STATUS          PORTS     NAMES
 18a1c01bf48d   quay.io/ceph/ceph                         "/usr/bin/radosgw -n…"   4 minutes ago    Up 4 minutes              ceph-616bc616-2a08-11f0-86a6-1c697af53932-rgw-foo-xdlinux-yeqiep
 c124e7c56c48   quay.io/ceph/ceph                         "/usr/bin/radosgw -n…"   4 minutes ago    Up 4 minutes              ceph-616bc616-2a08-11f0-86a6-1c697af53932-rgw-foo-xdlinux-bsojzq
+...
+```
+
+### 3.3. 一些管理命令
+
+具体见：[cephadm/host-management](https://docs.ceph.com/en/quincy/cephadm/host-management/)、[cephadm/services](https://docs.ceph.com/en/quincy/cephadm/services/)，此处仅试用下少数命令。
+
+**1、主机管理：**
+
+* `ceph orch host ls` 查看主机信息
+
+```sh
+[ceph: root@xdlinux /]# ceph orch host ls --detail
+HOST     ADDR           LABELS  STATUS  VENDOR/MODEL                            CPU      RAM     HDD  SSD        NIC  
+xdlinux  192.168.1.150  _admin          LENOVO TianYi510Pro-14ACN (90RX0051CD)  8C/128T  31 GiB  -    1/512.1GB  2    
+1 hosts in cluster
+```
+
+**2、服务管理：**
+
+* `ceph orch ls` 查看编排器（orchestrator）已知的服务列表
+    * `ceph orch ls --export` 导出yaml格式，可以用于`ceph orch apply -i`
+* 查看daemons状态：`ceph orch ps`
+
+```sh
+[ceph: root@xdlinux /]# ceph orch ls
+NAME                       PORTS        RUNNING  REFRESHED  AGE  PLACEMENT  
+alertmanager               ?:9093,9094      1/1  17s ago    23h  count:1    
+crash                                       1/1  17s ago    23h  *          
+grafana                    ?:3000           1/1  17s ago    23h  count:1    
+mgr                                         1/2  17s ago    23h  count:2    
+mon                                         1/5  17s ago    23h  count:5    
+node-exporter              ?:9100           1/1  17s ago    23h  *          
+osd.all-available-devices                     0  -          9h   *          
+prometheus                 ?:9095           1/1  17s ago    23h  count:1    
+rgw.foo                    ?:80             0/2  17s ago    9h   count:2
+```
+
+* 部署daemon：`ceph orch apply <service-name>` 或 `ceph orch apply -i file.yaml`
+    * 部署服务是，需要知道到哪些主机部署daemons，以及部署几个。比如：
+        * `ceph orch apply mon "host1,host2,host3"`
+        * `ceph orch apply prometheus --placement="host1 host2 host3"` 显式指定
+    * 为了避免混淆，建议使用yaml指定放置规则（placement specification）
+
+file.yaml 示例：
+
+```yaml
+service_type: mon
+placement:
+  hosts:
+   - host1
+   - host2
+   - host3
+```
+
+* 不同服务命令示例
+    * monitor：`ceph orch daemon add mon newhost1:10.1.2.123`
+    * osd：`ceph orch device ls`
+    * rgw：`ceph orch apply rgw foo`
+    * cephfs：`ceph fs status`
+        * `ceph fs volume create xdfs` 创建文件系统
+    * nfs：`ceph nfs cluster ls`
+    * ...
+
+```sh
+# `ceph fs volume create xdfs` 创建文件系统后，编排器会自动创建MDS
+[CentOS-root@xdlinux ➜ ~ ]$ docker ps
+CONTAINER ID   IMAGE                                     COMMAND                  CREATED          STATUS          PORTS     NAMES
+8af21cee0bc4   quay.io/ceph/ceph                         "/usr/bin/ceph-mds -…"   2 minutes ago    Up 2 minutes              ceph-616bc616-2a08-11f0-86a6-1c697af53932-mds-xdfs-xdlinux-enyulk
+7d02ba5f4146   quay.io/ceph/ceph                         "/usr/bin/ceph-mds -…"   2 minutes ago    Up 2 minutes              ceph-616bc616-2a08-11f0-86a6-1c697af53932-mds-xdfs-xdlinux-rrgraq
+```
+
+**3、跟踪`cephadm`日志打印**
+
+```sh
+# 设置日志等级，默认是info
+[ceph: root@xdlinux /]# ceph config set mgr mgr/cephadm/log_to_cluster_level debugug
+[ceph: root@xdlinux /]# ceph -W cephadm --watch-debug
+cluster:
+    id:     616bc616-2a08-11f0-86a6-1c697af53932
+    health: HEALTH_WARN
+            2 failed cephadm daemon(s)
+            Reduced data availability: 1 pg inactive
+            OSD count 0 < osd_pool_default_size 3
+...
+2025-05-06T23:34:28.445677+0000 mgr.xdlinux.wfcgil [DBG]  mgr option ssh_config_file = None
+2025-05-06T23:34:28.446521+0000 mgr.xdlinux.wfcgil [DBG]  mgr option device_cache_timeout = 1800
+...
+```
+
+**4、`cephadm`命令**
+
+```sh
+# 查看服务
+[CentOS-root@xdlinux ➜ ~ ]$ ./cephadm ls
+[
+    {
+        "style": "cephadm:v1",
+        "name": "mon.xdlinux",
+        "fsid": "616bc616-2a08-11f0-86a6-1c697af53932",
+        "systemd_unit": "ceph-616bc616-2a08-11f0-86a6-1c697af53932@mon.xdlinux",
+        "enabled": true,
+        "state": "running",
+        "service_name": "mon",
+        "memory_request": null,
+        "memory_limit": null,
+        "ports": [],
+        "container_id": "955ad744813e3f6fa4ceebb98b4ff7b12e7c7eff0aa15f33aae47c175ab96895",
+        "container_image_name": "quay.io/ceph/ceph:v17",
+        "container_image_id": "259b3556651452e4de35111bd226d7a17fe902360c7e9e49a4e5da686ffb71c1",
+        "container_image_digests": [
+            "quay.io/ceph/ceph@sha256:a0f373aaaf5a5ca5c4379c09da24c771b8266a09dc9e2181f90eacf423d7326f"
+        ],
+        "memory_usage": 380423372,
+        "cpu_percentage": "0.32%",
+        "version": "17.2.8",
+        "started": "2025-05-05T23:27:25.733655Z",
+        "created": "2025-05-05T23:27:23.127578Z",
+        "deployed": "2025-05-05T23:27:22.769568Z",
+        "configured": "2025-05-05T23:29:29.845014Z"
+    },
+    {
+        "style": "cephadm:v1",
+        "name": "mgr.xdlinux.wfcgil",
+        ...
+    },
+    ...
+]
+
+# 查看具体服务日志
+[CentOS-root@xdlinux ➜ ~ ]$ ./cephadm logs --name mon.xdlinux
+Inferring fsid 616bc616-2a08-11f0-86a6-1c697af53932
+-- Logs begin at Sat 2025-04-19 08:02:16 CST, end at Wed 2025-05-07 07:41:36 CST. --
+May 06 07:27:23 xdlinux systemd[1]: Started Ceph mon.xdlinux for 616bc616-2a08-11f0-86a6-1c697>
+May 06 07:27:23 xdlinux bash[105457]: debug 2025-05-05T23:27:23.287+0000 7f1dace9c8c0  0 set u>
+May 06 07:27:23 xdlinux bash[105457]: debug 2025-05-05T23:27:23.287+0000 7f1dace9c8c0  0 ceph >
 ...
 ```
 

@@ -156,8 +156,11 @@ Ceph可以在一个单一系统中同时提供**对象**、**块** 和 **文件�
 
 ![ceph-client-architecture](/images/ceph-client-architecture.png)
 
-Ceph文件存储的示意：  
+CephFS文件存储的架构示意：  
 ![ceph-cephfs-architecture](/images/ceph-cephfs-architecture.png)
+
+CephFS流程示意：  
+![cephfs-architecture](/images/cephfs-architecture.svg)
 
 ### 3.2. RADOS 存储引擎
 
