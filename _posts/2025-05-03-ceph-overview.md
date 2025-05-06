@@ -215,7 +215,7 @@ Ceph以 **<mark>对象（object）</mark>**的形式将数据存储在**逻辑�
 
 ## 5. 参考
 
-* [Ceph Document](https://docs.ceph.com/en/reef/)
+* [Ceph Document -- quincy](https://docs.ceph.com/en/quincy/)
 * [Ceph Git仓库](https://github.com/ceph/ceph)
 * [Ceph History](https://en.wikipedia.org/wiki/Ceph_(software)#History)
 * LLM
