@@ -159,9 +159,6 @@ Ceph可以在一个单一系统中同时提供**对象**、**块** 和 **文件�
 CephFS文件存储的架构示意：  
 ![ceph-cephfs-architecture](/images/ceph-cephfs-architecture.png)
 
-CephFS流程示意：  
-![cephfs-architecture](/images/cephfs-architecture.svg)
-
 ### 3.2. RADOS 存储引擎
 
 底层存储引擎称为`RADOS（Relaible Autonomic Distributed Object Store）`（意译：可靠的自管理分布式对象存储），负责数据存储、复制和故障恢复。Ceph基于`RADOS`提供<mark>可无限扩展（infinitely scalable）</mark>的存储集群。
