@@ -626,6 +626,10 @@ qdisc netem 8002: dev enp4s0 root refcnt 2 limit 1000 loss 10%
 [root@desktop-mme7h3a ➜ /root ]$ tc qdisc show 
 ```
 
+## 202505更新
+
+`CentOS 8`很多源缺失，系统重装为 `Rocky Linux`。
+
 ## 5. 小结
 
 折腾了一下LVM操作，又重新装了一次机。

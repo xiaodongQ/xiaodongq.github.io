@@ -78,7 +78,9 @@ sh -c "$(curl -fsSL https://raw.githubusercontent.com/robbyrussell/oh-my-zsh/mas
 PROMPT='[%{$fg_bold[red]%}➜ %{$fg_bold[green]%}%p%{$fg[cyan]%}%d %{$fg_bold[blue]%}$(git_prompt_info)%{$fg_bold[blue]%}% %{$reset_color%}]$ '
 # 把 c 改为 d，c 表示当前目录，d 表示绝对路径，另外在末尾增加了一个「 > 」
 #PROMPT='%{$fg_bold[red]%}➜ %{$fg_bold[green]%}%p%{$fg[cyan]%}%d %{$fg_bold[blue]%}$(git_prompt_info)%{$fg_bold[blue]%}% %{$reset_color%}>'
-#PROMPT='%{$fg_bold[red]%}➜ %{$fg_bold[green]%}%p %{$fg[cyan]%}%c %{$fg_bold[blue]%}$(git_prompt_info)%{$fg_bold[blue]%} % %{$reset_color%}'
+# 洋红，绿，当前目录
+PROMPT='[%{$fg_bold[magenta]%}➜ %p%{$fg[green]%}%c %{$fg_bold[blue]%}$(git_prompt_info)%{$fg_bold[blue]%}% %{$reset_color%}]$ '
+# hostnamectl hostname xdlinux 可设置主机名
 ```
 
 ### 主题
@@ -102,7 +104,7 @@ oh my zsh 项目提供了完善的插件体系，相关的文件在~/.oh-my-zsh/
 ```sh
     如果是 Linux，去下载 autojump 的最新版本，比如：
 
-    git clone git://github.com/joelthelion/autojump.git
+    git clone https://github.com/wting/autojump.git
     解压缩后进入目录，执行
 
     ./install.py
