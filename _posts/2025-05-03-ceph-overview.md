@@ -10,14 +10,16 @@ tags: [存储, Ceph]
 
 开始梳理`Ceph`，结合分布式存储的工作经验，加深并补充技能树。`Ceph`用`RocksDB`作为存储引擎，趁此机会也看下`RocksDB`在工业级项目中的实践和调优效果。
 
-**说明**：基于版本 **<mark>17.2.8</mark>（`Quincy`）**，fork一份 [ceph-v17.2.8](https://github.com/xiaodongQ/ceph/tree/ceph-v17.2.8) 的代码用于标注学习。
+**说明**：~~基于版本 **<mark>17.2.8</mark>（`Quincy`）**，fork一份 [ceph-v17.2.8](https://github.com/xiaodongQ/ceph/tree/ceph-v17.2.8) 的代码用于标注学习。~~  
+基于当前最新的发布版本 **<mark>19.2.2</mark>**（`Squid`），看tag里已经有`v20.0.0`了。基于`tag v19.2.2`建个分支：[ceph-v19.2.2](https://github.com/xiaodongQ/ceph/tree/ceph-v19.2.2)。
 
 参考链接：
 
-* [Ceph Document -- quincy](https://docs.ceph.com/en/quincy/)
+* [Ceph Document -- Quincy](https://docs.ceph.com/en/quincy/)
     * [Intro to Ceph](https://docs.ceph.com/en/quincy/start/)
     * [Architecture](https://docs.ceph.com/en/quincy/architecture/)
-* [ceph-v17.2.8](https://github.com/xiaodongQ/ceph/tree/ceph-v17.2.8)源码
+    * 说明：本文中的内容参考基于`Quincy`版本的文档（原理一样的），后续使用`Squid`版本。
+* [ceph-v19.2.2](https://github.com/xiaodongQ/ceph/tree/ceph-v19.2.2)源码
 * 各版本时间线说明：[ceph-releases-index](https://docs.ceph.com/en/latest/releases/#ceph-releases-index)
 
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
@@ -90,6 +92,8 @@ LLM提供的各个版本代号和部分关键特性，下面也贴一下作了�
     * v18.2.6（截至2025年4月）
     * 支持Zstandard（zstd）压缩算法优化性能。
     * 引入**AI**驱动的负载均衡策略。
+* `Squid` (`19.2.2`)
+    * v19.2.2（截至2025年4月）
 
 ### 2.2. Ceph集群构成
 
@@ -215,7 +219,8 @@ Ceph以 **<mark>对象（object）</mark>**的形式将数据存储在**逻辑�
 
 ## 5. 参考
 
-* [Ceph Document -- quincy](https://docs.ceph.com/en/quincy/)
+* [Ceph Document -- Quincy](https://docs.ceph.com/en/quincy/)
+* [Ceph Document -- Squid](https://docs.ceph.com/en/squid/)
 * [Ceph Git仓库](https://github.com/ceph/ceph)
 * [Ceph History](https://en.wikipedia.org/wiki/Ceph_(software)#History)
 * LLM
