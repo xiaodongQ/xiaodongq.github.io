@@ -10,6 +10,10 @@ tags: [存储, Ceph]
 
 上篇梳理了Ceph的基本架构和流程，本篇进行集群部署，并梳理学习Ceph相关的命令和状态、进行实践印证。
 
+> 部分操作基于`Quincy`的文档。系统重装为了Rocky Linux release 9.5 (Blue Onyx)，后续使用Ceph `v19.2.2`新版本：`Squid`。  
+> 内核版本：5.14.0-503.14.1；容器：默认使用podman，`yum install docker`会安装一个能使用docker的适配脚本，实际还是调用到podman。
+{: .prompt-warning }
+
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
 ## 2. 安装和部署
@@ -49,6 +53,65 @@ usage: cephadm [-h] [--image IMAGE] [--docker] [--data-dir DATA_DIR]
 `cephadm`中集成了编排接口（`orchestration interface`）来管理Ceph集群。
 
 具体Python脚本内容可见：[cephadm](https://github.com/xiaodongQ/prog-playground/blob/main/storage/ceph/cephadm)。
+
+---
+
+更新Rocky Linux系统后，获取一些资源就比较丝滑了，直接安装`cephadm`对应的包即可。
+
+```sh
+[root@xdlinux ➜ workspace ]$ dnf search release-ceph
+Last metadata expiration check: 0:58:54 ago on Thu 08 May 2025 08:12:24 PM CST.
+================================= Name Matched: release-ceph ==================================
+centos-release-ceph-pacific.noarch : Ceph Pacific packages from the CentOS Storage SIG
+                                   : repository
+centos-release-ceph-quincy.noarch : Ceph Quincy packages from the CentOS Storage SIG repository
+centos-release-ceph-reef.noarch : Ceph Reef packages from the CentOS Storage SIG repository
+centos-release-ceph-squid.noarch : Ceph Squid packages from the CentOS Storage SIG repository
+
+[root@xdlinux ➜ workspace ]$ nf install --assumeyes cephadm
+Last metadata expiration check: 2:44:54 ago on Thu 08 May 2025 08:12:24 PM CST.
+Dependencies resolved.
+===============================================================================================
+ Package                               Architecture   Version             Repository      Size
+===============================================================================================
+Installing:
+ centos-release-ceph-squid             noarch         1.0-1.el9           extras         7.3 k
+Installing dependencies:
+ centos-release-storage-common         noarch         2-5.el9             extras         8.4 k
+...
+
+[root@xdlinux ➜ workspace ]$ dnf install --assumeyes cephadm
+CentOS-9-stream - Ceph Squid                                   138 kB/s |  95 kB     00:00    
+Dependencies resolved.
+===============================================================================================
+ Package          Architecture    Version                     Repository                  Size
+===============================================================================================
+Installing:
+ cephadm          noarch          2:19.2.2-1.el9s             centos-ceph-squid          346 k
+
+Transaction Summary
+===============================================================================================
+Install  1 Package
+...
+Installed:
+  cephadm-2:19.2.2-1.el9s.noarch                                                               
+
+Complete!
+```
+
+`cephadm -h`执行报错`ModuleNotFoundError: No module named 'jinja2'`，另外需要再安装下`yum install python-jinja2`。
+
+而后可以用了：
+
+```sh
+[root@xdlinux ➜ ~ ]$ cephadm -h
+usage: cephadm [-h] [--image IMAGE] [--docker] [--data-dir DATA_DIR] [--log-dir LOG_DIR]
+               [--logrotate-dir LOGROTATE_DIR] [--sysctl-dir SYSCTL_DIR]
+               [--unit-dir UNIT_DIR] [--verbose] [--log-dest {file,syslog}]
+               [--timeout TIMEOUT] [--retry RETRY] [--env ENV] [--no-container-init]
+               [--no-cgroups-split]
+...
+```
 
 ### 2.2. 部署Ceph集群
 
@@ -196,19 +259,144 @@ ERROR: failed to fetch repository metadata. please check the provided parameters
 
 简单调研了下，初步选择是：`Rocky Linux`或`Ubuntu LTS`，包先都下载了，先试试`Rocky Linux`。
 
+---
+
+更新Rocky Linux系统后，安装`ceph-common`。参考 [enable-ceph-cli](https://docs.ceph.com/en/squid/cephadm/install/#enable-ceph-cli)。
+
+```sh
+[root@xdlinux ➜ prog-playground git:(main) ]$ cephadm add-repo --release squid
+Writing repo to /etc/yum.repos.d/ceph.repo...
+Enabling EPEL...
+Completed adding repo.
+
+[root@xdlinux ➜ prog-playground git:(main) ]$ cephadm install ceph-common
+Installing packages ['ceph-common']...
+```
+
+宿主机可以直接执行`ceph`客户端命令了：
+
+```sh
+[root@xdlinux ➜ prog-playground git:(main) ]$ ceph -s  
+  cluster:
+    id:     75ab91f2-2c23-11f0-8e6f-1c697af53932
+    health: HEALTH_WARN
+            OSD count 0 < osd_pool_default_size 3
+ 
+  services:
+    mon: 1 daemons, quorum xdlinux (age 16m)
+    mgr: xdlinux.qnvoyl(active, since 14m)
+    osd: 0 osds: 0 up, 0 in
+ 
+  data:
+    pools:   0 pools, 0 pgs
+    objects: 0 objects, 0 B
+    usage:   0 B used, 0 B / 0 B avail
+    pgs: 
+```
+
 ## 3. 使用Ceph
 
 见：[using-ceph](https://docs.ceph.com/en/quincy/cephadm/install/#using-ceph)
 
 ### 3.1. 创建OSD
 
-由于自己的PC环境是在一块SSD上装了双系统，暂时无法使用单独的硬盘或分区来创建OSD，此处<mark>使用目录作为OSD（无需分区）</mark> （参考LLM）。
+由于自己的PC环境是在一块SSD上装了双系统，暂时无法使用单独的硬盘或分区来创建OSD，此处<mark>使用目录作为OSD（无需分区）</mark>，参考LLM给的思路：
+
+* 创建专用目录
+    * mkdir /var/lib/ceph/osd/ceph-0
+* 挂载目录（可选）
+    * mount --bind /path/to/storage /var/lib/ceph/osd/ceph-0
+* 部署OSD
+    * ceph-volume lvm prepare --data /var/lib/ceph/osd/ceph-0
+    * ceph-volume lvm activate 0  # 根据生成的OSD ID调整
+
+~~TODO：等换了系统再来。~~
+
+---
+
+更新Rocky Linux系统后操作，安装一下`ceph-volume`。
 
 ```sh
-[CentOS-root@xdlinux ➜ ~ ]$ mkdir -p /var/lib/ceph/osd/ceph-0
+[root@xdlinux ➜ ~ ]$ dnf install ceph-volume
+Last metadata expiration check: 0:14:15 ago on Fri 09 May 2025 12:02:03 AM CST.
+Dependencies resolved.
+========================================================================================================
+ Package                         Architecture      Version             Repository                  Size
+========================================================================================================
+Installing:
+ ceph-volume                     noarch            2:19.2.2-1.el9s     centos-ceph-squid          292 k
+Installing dependencies:
+ ceph-base                       x86_64            2:19.2.2-1.el9s     centos-ceph-squid          5.2 M
+ ceph-osd                        x86_64            2:19.2.2-1.el9s     centos-ceph-squid           16 M
+ ceph-selinux                    x86_64            2:19.2.2-1.el9s     centos-ceph-squid           26 k
+ python3-packaging               noarch            20.9-5.el9          appstream                   69 k
+ python3-pyparsing               noarch            2.4.7-9.el9         baseos                     150 k
+ qatlib                          x86_64            24.02.0-1.el9_4     appstream                  220 k
+ qatzip-libs                     x86_64            1.2.0-1.el9_4       appstream                   46 k
+Installing weak dependencies:
+ qatlib-service                  x86_64            24.02.0-1.el9_4     appstream                   35 k
+
+Transaction Summary
+========================================================================================================
+Install  9 Packages
+
+Total download size: 22 M
+Installed size: 81 M
+Is this ok [y/N]:
 ```
 
-TODO：等换了系统再来。
+创建目录而后用`ceph-volume`部署OSD，还是报错了：
+
+```sh
+[root@xdlinux ➜ ~ ]$ ceph-volume lvm prepare --data /var/lib/ceph/osd/ceph-0
+ stderr: blkid: error: /var/lib/ceph/osd/ceph-0: Invalid argument
+ stderr: Unknown device "/var/lib/ceph/osd/ceph-0": No such device
+Running command: /usr/bin/ceph-authtool --gen-print-key
+Running command: /usr/bin/ceph-authtool --gen-print-key
+Running command: /usr/bin/ceph --cluster ceph --name client.bootstrap-osd --keyring /var/lib/ceph/bootstrap-osd/ceph.keyring -i - osd new 4b37544e-c2f2-432f-9d87-a4a843bf28d0
+...
+```
+
+调整方式：通过文件虚拟块设备
+
+* 创建虚拟磁盘文件，truncate -s 200M /ceph-osd.img  # 大小根据需求调整
+* 挂载为 Loop 设备，losetup /dev/loop0 /ceph-osd.img
+* 使用 LVM 模式部署
+    * ceph-volume lvm prepare --data /dev/loop0
+    * ceph-volume lvm activate 0
+
+第3步报错：
+
+```sh
+[root@xdlinux ➜ ~ ]$ ceph-volume lvm prepare --data /dev/loop0
+Running command: /usr/bin/ceph-authtool --gen-print-key
+Running command: /usr/bin/ceph-authtool --gen-print-key
+Running command: /usr/bin/ceph --cluster ceph --name client.bootstrap-osd --keyring /var/lib/ceph/bootstrap-osd/ceph.keyring -i - osd new a1fce513-b3c9-4d76-9555-68c4d3cec23b
+ stderr: 2025-05-09T00:26:50.493+0800 7f4d6b23d640 -1 auth: unable to find a keyring on /var/lib/ceph/bootstrap-osd/ceph.keyring: (2) No such file or directory
+ ...
+ stderr: 2025-05-09T00:26:50.495+0800 7f4d68fb2640 -1 monclient(hunting): handle_auth_bad_method server allowed_methods [2] but i only support [1]
+ stderr: 2025-05-09T00:26:50.495+0800 7f4d6b23d640 -1 monclient: authenticate NOTE: no keyring found; disabled cephx authentication
+ stderr: [errno 13] RADOS permission denied (error connecting to the cluster)
+-->  RuntimeError: Unable to create a new OSD id
+```
+
+```sh
+[root@xdlinux ➜ ~ ]$ ceph auth get-or-create client.bootstrap-osd mon 'allow profile bootstrap-osd' \
+  -o /var/lib/ceph/bootstrap-osd/ceph.keyring
+[root@xdlinux ➜ ~ ]$ chown ceph:ceph /var/lib/ceph/bootstrap-osd/ceph.keyring
+[root@xdlinux ➜ ~ ]$ chmod 0600 /var/lib/ceph/bootstrap-osd/ceph.keyring
+[root@xdlinux ➜ ~ ]$ 
+[root@xdlinux ➜ ~ ]$ ceph-volume lvm prepare --data /dev/loop0 --cluster ceph
+Running command: /usr/bin/ceph-authtool --gen-print-key
+Running command: /usr/bin/ceph-authtool --gen-print-key
+Running command: /usr/bin/ceph --cluster ceph --name client.bootstrap-osd --keyring /var/lib/ceph/bootstrap-osd/ceph.keyring -i - osd new 2f3d84e3-4559-4f8a-916c-7323c96ab908
+--> Was unable to complete a new OSD, will rollback changes
+Running command: /usr/bin/ceph --cluster ceph --name client.bootstrap-osd --keyring /var/lib/ceph/bootstrap-osd/ceph.keyring osd purge-new osd.0 --yes-i-really-mean-it
+ stderr: purged osd.0
+-->  RuntimeError: Unable to find any LV for zapping OSD: 0
+```
+
+好吧，折腾几次都不行，单台PC机器不带盘想骚操作部署OSD有点费劲。暂时不折腾了（TODO）。
 
 ### 3.2. 对象存储
 
@@ -373,9 +561,11 @@ May 06 07:27:23 xdlinux bash[105457]: debug 2025-05-05T23:27:23.287+0000 7f1dace
 
 ## 4. 小结
 
+基于`cephadm`安装部署ceph集群。使用`CentOS 8.5`有些资源无法获取了，所以自己PC的Linux切换为了`Rocky Linux 9.5`，效率提升不少。
+
 ## 5. 参考
 
-* [Ceph Document -- quincy](https://docs.ceph.com/en/quincy/)
-* [Installing Ceph](https://docs.ceph.com/en/quincy/install/)
+* [Ceph Document -- Quincy](https://docs.ceph.com/en/quincy/)
+* [Ceph Document -- Squid](https://docs.ceph.com/en/squid/)
 * [Ceph Git仓库](https://github.com/ceph/ceph)
 * LLM
