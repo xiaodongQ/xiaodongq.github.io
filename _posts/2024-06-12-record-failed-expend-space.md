@@ -628,7 +628,17 @@ qdisc netem 8002: dev enp4s0 root refcnt 2 limit 1000 loss 10%
 
 ## 202505更新
 
-`CentOS 8`很多源缺失，系统重装为 `Rocky Linux`。
+`CentOS 8`很多源缺失，系统重装为 `Rocky Linux`（Rocky Linux release 9.5）。
+
+内核版本：`5.14.0-503.14.1`。容器则使用了`podman`。
+
+```sh
+[root@xdlinux ➜ ~ ]$ cat /etc/system-release
+Rocky Linux release 9.5 (Blue Onyx)
+
+[root@xdlinux ➜ ~ ]$ uname -a
+Linux xdlinux 5.14.0-503.14.1.el9_5.x86_64 #1 SMP PREEMPT_DYNAMIC Fri Nov 15 12:04:32 UTC 2024 x86_64 x86_64 x86_64 GNU/Linux
+```
 
 ## 5. 小结
 
