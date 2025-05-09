@@ -14,6 +14,9 @@ tags: [TCP, Wireshark, 接收缓冲区]
 
 * 参考本篇进行实验：[TCP性能和发送接收窗口、Buffer的关系](https://plantegg.github.io/2019/09/28/%E5%B0%B1%E6%98%AF%E8%A6%81%E4%BD%A0%E6%87%82TCP--%E6%80%A7%E8%83%BD%E5%92%8C%E5%8F%91%E9%80%81%E6%8E%A5%E6%94%B6Buffer%E7%9A%84%E5%85%B3%E7%B3%BB/)
     * 实验来自 [知识星球 -- 实验动起来 BDP和buffer、RT的关系](https://wx.zsxq.com/group/15552551584552/topic/181428425525182)。
+    * 下面是其他人做的实验，呈现方式挺好，可参考。
+    * [Packet capture experiment 1](https://yishenggong.com/2023/04/11/packet-capture-experiment-1-packet-delay-loss-duplicate-corrupt-out-of-order-and-bandwidth-limit/)
+    * [Packet capture experiment 2](https://yishenggong.com/2023/04/15/packet-capture-experiment-2-send-receive-buffer/)
 * [TCP传输速度案例分析](https://plantegg.github.io/2021/01/15/TCP%E4%BC%A0%E8%BE%93%E9%80%9F%E5%BA%A6%E6%A1%88%E4%BE%8B%E5%88%86%E6%9E%90/)
 * [TCP 拥塞控制对数据延迟的影响](https://www.kawabangga.com/posts/5181)
 * [TCP 长连接 CWND reset 的问题分析](https://www.kawabangga.com/posts/5217)
@@ -77,14 +80,42 @@ tags: [TCP, Wireshark, 接收缓冲区]
 
 ## 3. 实验说明
 
-**环境和操作说明：**
+### 3.1. 环境和步骤说明
 
-* 服务端：PC机，Rocky Linux系统，`python -m http.server`起http服务，监听8000端口
-* 客户端：Mac笔记本，`curl`请求下载文件
+自己本地只有一个Mac笔记本和Rocky Linux系统的PC，对MacOS的内核网络控制不熟悉，还是尽量模拟生产环境中的Linux间通信，起ECS进行实验。
 
-服务端发送接收窗口相关内核参数默认值（**可通过<mark>man tcp</mark>进行查看各选项含义和功能**）：
+起2个阿里云ECS（2核2G）：
+* 系统：Rocky Linux release 9.5 (Blue Onyx)
+* 内核：5.14.0-503.35.1.el9_5.x86_64
+
+网速基准：TCP 2.1Gbps左右
 
 ```sh
+# TCP
+[root@iZbp169scc1yz2vwe6mp31Z ~]# iperf3 -c 172.16.58.147
+Connecting to host 172.16.58.147, port 5201
+[  5] local 172.16.58.146 port 56178 connected to 172.16.58.147 port 5201
+[ ID] Interval           Transfer     Bitrate         Retr  Cwnd
+...
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-10.00  sec  2.56 GBytes  2.20 Gbits/sec  87452             sender
+[  5]   0.00-10.22  sec  2.56 GBytes  2.15 Gbits/sec                  receiver
+```
+
+步骤说明：
+* 服务端：`python -m http.server`起http服务，监听8000端口
+    * dd一个文件用于测试：`dd if=/dev/zero of=test.dat bs=1G count=2`
+* 客户端：`curl`请求下载文件
+* 抓包：
+    * `tcpdump -i any port 8000 -s 100 -w normal_client.cap -v`
+    * 只看客户端（网络路径比较简单，抓包差别不大，只看一边即可）~~先两端都抓包对比下，服务端也抓包：`tcpdump -i any port 8000 -s 100 -w normal_server.cap -v`~~
+
+自己的PC服务端发送接收窗口相关内核参数默认值（**可通过<mark>man tcp</mark>进行查看各选项含义和功能**）：
+
+```sh
+# ECS里则把TCP和UDP的内存配置降低了，其他一样
+# net.ipv4.tcp_mem = 18951        25271   37902
+# net.ipv4.udp_mem = 37905        50542   75810
 [root@xdlinux ➜ tmpdir ]$ sysctl -a|grep mem
 # 每个socket接缓冲区的默认值，字节
 net.core.rmem_default = 212992
@@ -120,17 +151,27 @@ net.ipv4.udp_rmem_min = 4096
 net.ipv4.udp_wmem_min = 4096
 ```
 
-刚装的Rocky Linux，用的是`firewall-cmd`管理防火墙（iptables -nL看不到，不大习惯），把客户端ip加下白名单：
-
-```sh
-firewall-cmd --permanent --zone=public --add-rich-rule='rule family="ipv4" source address="192.168.1.0/24" accept'
-firewall-cmd --reload
-```
-
-**实验用例：**
+### 3.2. 实验用例
 
 * 1、正常curl下载文件，抓包用作对比
-* 2、修改服务端的发送窗口为最小值：4096，一个page size
+* 2、修改**服务端的发送窗口**为最小值：4096，即一个page size；**客户端不变**
+    * 服务端：`sysctl -w net.ipv4.tcp_wmem="4096 4096 4096"`
+* 3、**服务端不变**；修改**客户端的接收窗口**为4096
+    * 客户端：`sysctl -w net.ipv4.tcp_rmem="4096 4096 4096"`
+
+### 3.3. 结果
+
+用例1：默认参数：
+
+![bdp-case-normal-param](/images/bdp-case-normal-param.svg)
+
+用例2：服务端的发送窗口4096字节
+
+![bdp-case-normal-param](/images/bdp-case-server-swnd4096.svg)
+
+用例3：客户端的接收窗口4096字节
+
+![bdp-case-normal-param](/images/bdp-case-client-rwnd4096.svg)
 
 
 
