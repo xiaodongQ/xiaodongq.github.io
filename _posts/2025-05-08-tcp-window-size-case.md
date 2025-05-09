@@ -60,7 +60,6 @@ tags: [TCP, Wireshark, 接收缓冲区]
     * 在 **<mark>Export Info</mark>**中查看重传统计表
     * 找到第一个重传包，根据其`Seq`**找原始包**，可以直接在`SEQ/ACK analysis`中跳转到原始包。
     * 如下图所示，对应的原始包是`No为46`的包，其在途字节数为`908`，即此时的网络拥塞点。
-        * 之前实验的[抓包文件](/images/srcfiles/scp-overmss-smss1460-dmss100.pcapng) 
 * 该方法不一定很精确，但很有参考意义。
 
 拥塞点估算示例：  
@@ -80,7 +79,7 @@ tags: [TCP, Wireshark, 接收缓冲区]
 
 ## 3. 实验说明
 
-### 3.1. 环境和步骤说明
+### 3.1. 环境和步骤
 
 自己本地只有一个Mac笔记本和Rocky Linux系统的PC，对MacOS的内核网络控制不熟悉，还是尽量模拟生产环境中的Linux间通信，起ECS进行实验。
 
@@ -104,18 +103,22 @@ Connecting to host 172.16.58.147, port 5201
 
 步骤说明：
 * 服务端：`python -m http.server`起http服务，监听8000端口
-    * dd一个文件用于测试：`dd if=/dev/zero of=test.dat bs=1G count=2`
+    * `dd`一个2GB文件用于测试：`dd if=/dev/zero of=test.dat bs=1G count=2`
 * 客户端：`curl`请求下载文件
+    * `curl "http://xxx:8000/test.dat" --output test.dat`
 * 抓包：
     * `tcpdump -i any port 8000 -s 100 -w normal_client.cap -v`
-    * 只看客户端（网络路径比较简单，抓包差别不大，只看一边即可）~~先两端都抓包对比下，服务端也抓包：`tcpdump -i any port 8000 -s 100 -w normal_server.cap -v`~~
+    * 先两端都抓包对比下，服务端也抓包：`tcpdump -i any port 8000 -s 100 -w normal_server.cap -v`
+    * 下面只看客户端（网络路径比较简单，抓包差别不大，只看一边即可）
 
-自己的PC服务端发送接收窗口相关内核参数默认值（**可通过<mark>man tcp</mark>进行查看各选项含义和功能**）：
+自己PC的Rocky Linux发送接收窗口相关参数默认值（**可通过<mark>man tcp</mark>查看各选项含义和功能**）：
 
 ```sh
-# ECS里则把TCP和UDP的内存配置降低了，其他一样
+# ECS里则把下面两项：TCP和UDP的内存配置降低了，其他一样
 # net.ipv4.tcp_mem = 18951        25271   37902
 # net.ipv4.udp_mem = 37905        50542   75810
+
+# 本地PC
 [root@xdlinux ➜ tmpdir ]$ sysctl -a|grep mem
 # 每个socket接缓冲区的默认值，字节
 net.core.rmem_default = 212992
@@ -153,15 +156,15 @@ net.ipv4.udp_wmem_min = 4096
 
 ### 3.2. 实验用例
 
-* 1、正常curl下载文件，抓包用作对比
+* 1、保持默认参数正常curl下载文件，抓包用作基准对比
 * 2、修改**服务端的发送窗口**为最小值：4096，即一个page size；**客户端不变**
     * 服务端：`sysctl -w net.ipv4.tcp_wmem="4096 4096 4096"`
 * 3、**服务端不变**；修改**客户端的接收窗口**为4096
     * 客户端：`sysctl -w net.ipv4.tcp_rmem="4096 4096 4096"`
 
-### 3.3. 结果
+### 3.3. 结果及分析
 
-用例1：默认参数：
+用例1：默认参数
 
 ![bdp-case-normal-param](/images/bdp-case-normal-param.svg)
 
@@ -169,7 +172,7 @@ net.ipv4.udp_wmem_min = 4096
 
 ![bdp-case-normal-param](/images/bdp-case-server-swnd4096.svg)
 
-用例3：客户端的接收窗口4096字节
+用例3：客户端的接收窗口4096字节。很慢且抓包太大，手动打断了下载
 
 ![bdp-case-normal-param](/images/bdp-case-client-rwnd4096.svg)
 
