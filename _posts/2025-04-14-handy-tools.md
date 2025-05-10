@@ -59,6 +59,12 @@ tags: [Wireshark, eBPF, bcc, ss, bpftrace]
     * 当前在网络中未被确认的数据量（单位为字节）
     * 指发送方已经发送但尚未接收到 ACK 确认的数据量，反映了网络中正在传输的未确认数据量，是衡量 TCP 拥塞控制的重要指标
 
+### 1.4. 优化当前行背景颜色
+
+默认情况下，当前行展示不大明显，可以如下设置。
+
+![wireshark-current-line-backcolor](/images/wireshark-current-line-backcolor.png)
+
 ## 2. gperftools、火焰图
 
 各类火焰图：On-CPU、Off-CPU、Wakeup、Off-Wake。
