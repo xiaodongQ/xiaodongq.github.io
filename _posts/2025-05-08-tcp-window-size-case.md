@@ -14,7 +14,7 @@ tags: [TCP, Wireshark, 接收缓冲区]
 
 * 参考本篇进行实验：[TCP性能和发送接收窗口、Buffer的关系](https://plantegg.github.io/2019/09/28/%E5%B0%B1%E6%98%AF%E8%A6%81%E4%BD%A0%E6%87%82TCP--%E6%80%A7%E8%83%BD%E5%92%8C%E5%8F%91%E9%80%81%E6%8E%A5%E6%94%B6Buffer%E7%9A%84%E5%85%B3%E7%B3%BB/)
     * 实验来自 [知识星球 -- 实验动起来 BDP和buffer、RT的关系](https://wx.zsxq.com/group/15552551584552/topic/181428425525182)。
-    * 下面是其他人做的实验，呈现方式挺好，可参考。
+    * 下面是其他星友做的实验，呈现方式挺好，可参考。
     * [Packet capture experiment 1](https://yishenggong.com/2023/04/11/packet-capture-experiment-1-packet-delay-loss-duplicate-corrupt-out-of-order-and-bandwidth-limit/)
     * [Packet capture experiment 2](https://yishenggong.com/2023/04/15/packet-capture-experiment-2-send-receive-buffer/)
 * [TCP传输速度案例分析](https://plantegg.github.io/2021/01/15/TCP%E4%BC%A0%E8%BE%93%E9%80%9F%E5%BA%A6%E6%A1%88%E4%BE%8B%E5%88%86%E6%9E%90/)
@@ -71,7 +71,6 @@ tags: [TCP, Wireshark, 接收缓冲区]
 
 * 公式：`BDP (bits)=带宽 (bps) * 往返时延 (RTT, 秒)`
     * 如：带宽1Gbps（即万兆）、RTT为50ms，则 `BDP = 10^9 * 0.05 = 5*10^7 = 6.25MB`
-    * 试下`LaTeX`语法：\text{BDP} = \(10^9 \times 0.05 = 5 \times 10^7\) bits = \text{6.25MB}
 * 和**在途字节数**的关系：`BDP`是链路的理论容量，`在途字节数`是实时传输中的数据量。
     * 若`在途字节数 == BDP`，说明链路被完全填满，可达到最大吞吐量
     * 若`在途字节数 < BDP`，链路未充分利用
@@ -87,7 +86,7 @@ tags: [TCP, Wireshark, 接收缓冲区]
 * 系统：Rocky Linux release 9.5 (Blue Onyx)
 * 内核：5.14.0-503.35.1.el9_5.x86_64
 
-网速基准：TCP 2.1Gbps左右
+网速基准：TCP 2.1Gbps左右（此处是突发流量，起的ECS类型`ecs.e-c1m1.large`对应弹性网卡，基础带宽0.2Gbps/最高2Gbps，[阿里云规格说明](https://help.aliyun.com/zh/ecs/user-guide/overview-of-instance-families?spm=a2c4g.11186623.0.0.33e71202l8hhcj#e)）
 
 ```sh
 # TCP
@@ -108,8 +107,7 @@ Connecting to host 172.16.58.147, port 5201
     * `curl "http://xxx:8000/test.dat" --output test.dat`
 * 抓包：
     * `tcpdump -i any port 8000 -s 100 -w normal_client.cap -v`
-    * 先两端都抓包对比下，服务端也抓包：`tcpdump -i any port 8000 -s 100 -w normal_server.cap -v`
-    * 下面只看客户端（网络路径比较简单，抓包差别不大，只看一边即可）
+    * 先两端都抓包对比下，服务端抓包：`tcpdump -i any port 8000 -s 100 -w normal_server.cap -v`
 
 自己PC的Rocky Linux发送接收窗口相关参数默认值（**可通过<mark>man tcp</mark>查看各选项含义和功能**）：
 
@@ -164,19 +162,56 @@ net.ipv4.udp_wmem_min = 4096
 
 ### 3.3. 结果及分析
 
-用例1：默认参数
+在不同环境实验过，对于硬件配置、负载不同的客户端和服务端，两端抓包可能相差会比较大，比如：接收端处理不过来，发送端多次重传。所以此处把两端的包还是都对比下。
 
-![bdp-case-normal-param](/images/bdp-case-normal-param.svg)
+#### 3.3.1. 用例1：默认参数
 
-用例2：服务端的发送窗口4096字节
+客户端抓包：  
+![bdp-case-normal-param-clientside](/images/bdp-case-normal-param-clientside.svg)
 
-![bdp-case-normal-param](/images/bdp-case-server-swnd4096.svg)
+服务端抓包：  
+![bdp-case-normal-param-clientside](/images/bdp-case-normal-param-serverside.svg)
 
-用例3：客户端的接收窗口4096字节。很慢且抓包太大，手动打断了下载
+**分析：**
 
-![bdp-case-normal-param](/images/bdp-case-client-rwnd4096.svg)
+* 两种`Time/Sequence`图中，由于发生了Seq回绕，导致Seq出现断层。
+    * 在Windows上的Wireshark中，右键切换`Relative/Absolute Sequence Number`可以展示成正常递增的图形。但是Mac上试了下好像没生效，可能Wireshark兼容没做好，暂不纠结。
+* 由于两台ECS配置一样，两侧抓包的内容差异不太大
 
+#### 3.3.2. 用例2：服务端的发送窗口4096字节
 
+客户端抓包：  
+![bdp-case-server-swnd4096-clientside](/images/bdp-case-server-swnd4096-clientside.svg)
+
+服务端抓包：  
+![bdp-case-server-swnd4096-serverside](/images/bdp-case-server-swnd4096-serverside.svg)
+
+**分析：**
+
+1、查看窗口规模图，客户端接收窗口是比较大的，但服务端受限于发送窗口，发送数据量一直在`376`和`65160`之间交替。
+* 但是客户端下载还是比较快的，可以正常下载完成。
+* 服务端发送时，只要收到客户端Ack，就可以向发送缓冲区填充数据进行发送；而用例3限制客户端接收缓冲区，处理完数据后还**需要一个`RTT`的时间**，等服务端发数据过来。
+
+2、跟踪一个包展开查看详情，时间序列和RTT：  
+![server-swnd4096-timeseq-detail](/images/bdp-case-server-swnd4096-timeseq-detail.svg)
+
+3、跟踪一个包展开查看详情，窗口规模：  
+![server-swnd4096-windscaling-detail](/images/bdp-case-server-swnd4096-windscaling-detail.svg)
+
+#### 3.3.3. 用例3：客户端的接收窗口4096字节
+
+很慢且抓包太大，手动打断了下载。
+
+客户端抓包：  
+![client-rwnd4096_clientside](/images/bdp-case-client-rwnd4096_clientside.svg)
+
+服务端抓包：  
+![client-rwnd4096_serverside](/images/bdp-case-client-rwnd4096_serverside.svg)
+
+**分析：**
+
+* 下载特别慢。`RTT`图中，RTT基本都在`0.17ms`及以上，客户端接收窗口限制在`500~1050字节`。
+    * 相对而言，用例2中RTT差不多，但是客户端接收窗口则在`2.5~3.5MB`，能够迅速发送数据
 
 ## 4. 小结
 
