@@ -39,7 +39,7 @@ tags: [TCP, Wireshark, 接收缓冲区]
 **在途字节数（`Bytes in flight`）**：发送方已发送出去，但是尚未接收到ACK确认的字节数（正在链路上传输的数据）。`在途字节数`如果超出网络的承载能力，会出现丢包重传。
 
 **如何计算在途字节数？**
-* TCP传输过程中，由于客户端和服务端的网络包可能是不同的顺序，所以最好两端都进行抓包，并从 **<mark>数据发送方</mark>**（TODO验证）抓到的包分析在途字节数。
+* TCP传输过程中，由于客户端和服务端的网络包可能是不同的顺序，所以最好两端都进行抓包，并从 **<mark>数据发送方</mark>**（TODO待验证对比）抓到的包分析在途字节数。
 * 计算方式：`在途字节数 = Seq + Len - Ack`（Wireshark中提供的`SEQ/ACK analysis`功能会自动计算）
 * TCP协议中，由发送窗口动态控制，跟`cwnd`拥塞窗口和`rwnd`接收窗口也有关系。
 
@@ -191,6 +191,8 @@ net.ipv4.tcp_moderate_rcvbuf = 1
 
 在不同环境实验过，对于硬件配置、负载不同的客户端和服务端，两端抓包可能相差会比较大，比如：接收端处理不过来，发送端多次重传。所以此处把两端的包还是都对比下。
 
+下述抓包文件做了归档，可见：[ecs_bdp_case](https://github.com/xiaodongQ/assets_archive/tree/main/ecs_bdp_case)。
+
 #### 3.3.1. 用例1：默认参数
 
 下载速度，`121MB/s`：
@@ -229,23 +231,23 @@ tcp   ESTAB  0  4170240    172.16.58.147:8000  172.16.58.146:59178  users:(("pyt
     * 10.49到10.75之间都没有发包，且10.49s之前的一批包的RTT都在210ms以上
     * 对应到`Time/Sequence`中则是几个平顶，未传输数据。**这段时间客户端没有进行ack**。吞吐量也收到了影响。
 
-##### 3.3.1.1. 定位RTT尖刺
+#### 3.3.2. 定位用例1中RTT尖刺
 
-针对上述RTT的尖刺问题，来看下10.49s这次的RTT尖刺：服务端一直发包，直到Window Full，等到客户端应答了，应答了个ZeroWindow
+针对上述RTT的尖刺问题，来看下10.49s这次的RTT尖刺：服务端一直发包，直到Window Full，等到客户端应答了，应答了个ZeroWindow。
 
 ![bdp-case-rtt-sharp](/images/bdp-case-rtt-sharp.svg)
 
-推断是客户端没给应答或者应答慢，可能是客户端下载的数据需要落硬盘操作，影响了应答处理。
+推断是客户端没给应答或者应答慢，可能是客户端下载的数据需要落硬盘操作（**page cache刷写**），影响了应答处理。
 
-重新实验进行确认：使用`strace`或者`perf strace`追踪系统调用，确认是否有硬盘相关耗时操作。
+重新实验进行确认：使用`strace`或者`perf strace`追踪系统调用，确认是否有文件系统、硬盘相关耗时操作。
 * 但是注意`strace`会拖慢程序处理，可能影响实验结果。
-* `perf strace`在ECS里试了下没抓到客户端的统计信息（TODO待确认）
+* `perf strace`在ECS里试了下没抓到客户端curl的统计信息（TODO待确认）
 
-1、开始搞错了，追踪了服务端http服务的系统调用。但也能看到是发送给客户端耗时久，需要追踪客户端确认原因。
+1、开始搞错了，追踪了服务端http服务的系统调用。但也能看到是发送给客户端耗时久，从服务端看不到具体细节，需要追踪客户端确认原因。
 
 ![rtt-sharp-strace-server](/images/bdp-case-rtt-sharp-strace-server.svg)
 
-服务端`perf strace`没看到什么有效信息：
+服务端`perf strace`跟踪http服务没看到什么有效信息：
 
 ```sh
 [root@iZbp169scc1yz2vwe6mp30Z ~]# perf trace -p 39428 -s
@@ -265,11 +267,11 @@ tcp   ESTAB  0  4170240    172.16.58.147:8000  172.16.58.146:59178  users:(("pyt
    getsockname            1      0     0.004     0.004     0.004     0.004      0.00%
 ```
 
-2、追踪客户端
+2、追踪客户端，重新实验
 
 ```sh
 # strace追踪，可看到慢了挺多
-[root@iZbp169scc1yz2vwe6mp31Z ~]# strace -o strace_client.log -Ttt -yy curl 172.16.58.147:8000/test.dat --output rcv.dat
+[root@iZbp169scc1yz2vwe6mp31Z ~]# strace -o shot-rtt-sharp2-strace_client.log -Ttt -yy curl 172.16.58.147:8000/test.dat --output rcv.dat
   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
                                  Dload  Upload   Total   Spent    Left  Speed
 100 2048M  100 2048M    0     0  50.8M      0  0:00:40  0:00:40 --:--:-- 51.0M
@@ -278,11 +280,13 @@ tcp   ESTAB  0  4170240    172.16.58.147:8000  172.16.58.146:59178  users:(("pyt
 [root@iZbp169scc1yz2vwe6mp31Z ~]# tcpdump -i any port 8000 -s 100 -w shot-rtt-sharp2-normal_clientside_2.cap -v
 ```
 
-跟踪抓包和`strace`，可看到第一个最大耗时的还是创建文件，后续的尖刺确实如猜测是写文件的较久耗时。
+跟踪抓包和`strace`（完整文件可见[这里](https://github.com/xiaodongQ/assets_archive/blob/main/ecs_bdp_case/shot-rtt-sharp2-strace_client.log)），可看到第一个最大耗时的还是创建文件，后续的尖刺确实如猜测是写文件的较久耗时。
+
+* 主要是写文件进入page cache，达到一定条件后刷脏页，增加IO延迟进而影响上层IO卡顿。（这也是`libaio`或`io_uring`的一个优势，分离I/O操作与主线程，可减小对上层应用的影响）
 
 ![shot-rtt-sharp2-strace_client](/images/bdp-case-shot-rtt-sharp2-strace_client.svg)
 
-作为对比，过滤下strace结果中的`recvfrom`，一般在2ms左右，偶尔会有`10ms`左右的尖刺，和RTT是一致的。
+作为对比，过滤下strace结果中的`recvfrom`（从服务端收包），间隔一般在`2ms`左右，偶尔会有`10ms`左右的尖刺，和RTT图是一致的。
 
 ```sh
 [MacOS-xd@qxd ➜ ecs_case ]$ grep recvfrom shot-rtt-sharp2-strace_client.log
@@ -296,7 +300,7 @@ tcp   ESTAB  0  4170240    172.16.58.147:8000  172.16.58.146:59178  users:(("pyt
 ...
 ```
 
-#### 3.3.2. 用例2：服务端的发送窗口4096字节
+#### 3.3.3. 用例2：服务端的发送窗口4096字节
 
 下载速度稍慢，`111MB/s`，影响较小：
 
@@ -330,15 +334,17 @@ tcp   ESTAB  0  65160  172.16.58.147:8000   172.16.58.146:43830  users:(("python
 
 1、查看窗口规模图，客户端接收窗口是比较大的，而服务端受限于发送窗口，发送数据量一直在`376`和`65160`之间交替。
 * 但是客户端下载还是比较快的，可以正常下载完成。
-* 服务端发送时，只要收到客户端Ack，就可以向发送缓冲区填充数据进行发送；而用例3限制客户端接收缓冲区，处理完数据后还**需要一个`RTT`的时间**，等服务端发数据过来。
+* 服务端发送时，只要收到客户端Ack，就可以向发送缓冲区填充数据（内存级别操作的间隔）进行发送；而用例3限制客户端接收缓冲区，客户端处理完数据后还**需要一个`RTT`的时间**，才能等服务端发数据过来。
 
-2、跟踪一个包展开查看详情，时间序列和RTT：  
+2、跟踪一个包结合各个图，展开查看详情，时间序列和RTT：  
+* 间隔一段时间就会有一段时间的平顶，10ms左右。如案例1中的尖刺分析所述，此处应该也是写文件时偶尔碰到的刷盘耗时。
+
 ![server-swnd4096-timeseq-detail](/images/bdp-case-server-swnd4096-timeseq-detail.svg)
 
 3、跟踪一个包展开查看详情，窗口规模：  
 ![server-swnd4096-windscaling-detail](/images/bdp-case-server-swnd4096-windscaling-detail.svg)
 
-#### 3.3.3. 用例3：客户端的接收窗口4096字节
+#### 3.3.4. 用例3：客户端的接收窗口4096字节
 
 下载很慢，`5.21MB/s`。且抓包太大，手动打断了下载。
 
@@ -376,9 +382,9 @@ tcp   ESTAB  0  17160  172.16.58.147:8000  172.16.58.146:41276  users:(("python"
 
 ## 4. 小结
 
-实验验证对比了默认情况、限制服务端发送窗口、限制客户端接收窗口三种情况的数据传输情况。
+实验验证对比了默认参数、限制服务端发送窗口、限制客户端接收窗口三种情况的数据传输。
 
-另外很多细节暂未深入，后续可结合eBPF跟踪跟踪内存不足的情况，如tracepoint：`sock_exceed_buf_limit`，几个参考链接值得多回顾学习。
+另外很多细节暂未深入，后续可结合perf、eBPF跟踪一些事件。比如内存不足的情况，如tracepoint：`sock_exceed_buf_limit`，几个参考链接值得多回顾学习。
 
 下一步结合`tc`模拟不同网络情况，进行实验对比。
 
@@ -388,5 +394,7 @@ tcp   ESTAB  0  17160  172.16.58.147:8000  172.16.58.146:41276  users:(("python"
 * [TCP传输速度案例分析](https://plantegg.github.io/2021/01/15/TCP%E4%BC%A0%E8%BE%93%E9%80%9F%E5%BA%A6%E6%A1%88%E4%BE%8B%E5%88%86%E6%9E%90/)
 * [TCP 拥塞控制对数据延迟的影响](https://www.kawabangga.com/posts/5181)
 * [TCP 长连接 CWND reset 的问题分析](https://www.kawabangga.com/posts/5217)
+* [有关 MTU 和 MSS 的一切](https://www.kawabangga.com/posts/4983)
+* [Packet capture experiment 2](https://yishenggong.com/2023/04/15/packet-capture-experiment-2-send-receive-buffer/)
 * 《Wireshark网络分析的艺术》
 * LLM
