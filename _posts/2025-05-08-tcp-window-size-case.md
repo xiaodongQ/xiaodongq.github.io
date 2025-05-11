@@ -28,7 +28,7 @@ tags: [TCP, Wireshark, 接收缓冲区]
 * [云网络丢包故障定位全景指南](https://www.modb.pro/db/199920)
     * 极客重生公众号作者，前面的博客中也有部分内容索引到作者的文章，干货挺多，后续梳理学习其他历史文章
 * [[译] RFC 1180：朴素 TCP/IP 教程（1991）](https://arthurchiao.art/blog/rfc1180-a-tcp-ip-tutorial-zh/)
-    * 自己之前也梳理画过图了：[RFC1180学习笔记](https://xiaodongq.github.io/2023/05/10/rfc1180-tcpip-tutorial/)
+    * 之前也简单画图梳理过：[RFC1180学习笔记](https://xiaodongq.github.io/2023/05/10/rfc1180-tcpip-tutorial/)
 
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
@@ -39,7 +39,7 @@ tags: [TCP, Wireshark, 接收缓冲区]
 **在途字节数（`Bytes in flight`）**：发送方已发送出去，但是尚未接收到ACK确认的字节数（正在链路上传输的数据）。`在途字节数`如果超出网络的承载能力，会出现丢包重传。
 
 **如何计算在途字节数？**
-* TCP传输过程中，由于客户端和服务端的网络包可能是不同的顺序，所以最好两端都进行抓包，并从 **<mark>数据发送方</mark>** 抓到的包分析在途字节数。
+* TCP传输过程中，由于客户端和服务端的网络包可能是不同的顺序，所以最好两端都进行抓包，并从 **<mark>数据发送方</mark>**（TODO验证）抓到的包分析在途字节数。
 * 计算方式：`在途字节数 = Seq + Len - Ack`（Wireshark中提供的`SEQ/ACK analysis`功能会自动计算）
 * TCP协议中，由发送窗口动态控制，跟`cwnd`拥塞窗口和`rwnd`接收窗口也有关系。
 
@@ -56,16 +56,33 @@ tags: [TCP, Wireshark, 接收缓冲区]
 **如何在Wireshark中找到拥塞点？**
 
 * 从Wireshark中找到一连串**重传包**中的<mark>第一个</mark>，再根据重传包的`Seq`找到 **<mark>原始包</mark>**，最后查看原始包发送时刻的**在途字节数**。
+    * `SEQ/Ack analysis`结果里的`This frame is a (suspected) retransmission`，
 * 具体步骤：
     * 在 **<mark>Export Info</mark>**中查看重传统计表
-    * 找到第一个重传包，根据其`Seq`**找原始包**，可以直接在`SEQ/ACK analysis`中跳转到原始包。
+    * 找到第一个重传包，根据其`Seq`**找原始包**
+        * 根据过滤条件查找，如：`tcp.seq == 3684862270`，可以**在TCP详情中对`Sequence Number`右键 -> `Apply As Filter` -> `Selected`**自动设置过滤条件。
+        * 也可以直接在`SEQ/ACK analysis`中跳转到原始包。（会找到Ack
     * 如下图所示，对应的原始包是`No为46`的包，其在途字节数为`908`，即此时的网络拥塞点。
 * 该方法不一定很精确，但很有参考意义。
 
 拥塞点估算示例：  
 ![wireshark-find-retran-seq](/images/wireshark-find-retran-seq.png)
 
-### 2.3. 带宽时延积（BDP）
+### 2.3. Expert重传包说明
+
+Wireshark的`Expert Infomation`信息中分析统计了各个包类型的分类。对于重传类型：`This frame is a (suspected) retransmission`，有时统计的信息中，Seq和原始包并不相同，但是也统计为了重传，造成一些迷惑。此处进行解释说明。
+
+如下图所示：  
+![expert-retransmission-statistic](/images/expert-retransmission-statistic.svg)
+
+说明：
+
+* 1、`18895~18911`号包都显示是`18888`号包的重传包，是由于Wireshark发现`18888`号包的`Seq+Len`对应的载荷范围，和上述那些包中`Seq+Len`对应的 **<mark>载荷范围有重叠</mark>**，所以**标记为了本包的重传**。
+    * 发送方只收到部分分段的Ack时，也会触发未确认部分的超时重传（RTO）
+* 2、由于`18888`号包的载荷65160远远超过`MTU`（一般1500），所以TCP层一般会自动分段传输，拆成多个segment。
+    * 但因为`TSO（TCP Segment Offload）`机制的存在，**<mark>会将拆包的工作offload到网卡来负责</mark>**，所以从内核侧看就是发了大包到网卡，会超过`MTU`。可进一步参考了解：[有关 MTU 和 MSS 的一切](https://www.kawabangga.com/posts/4983)。
+
+### 2.4. 带宽时延积（BDP）
 
 **带宽时延积`BDP（Bandwidth-Delay Product）`**：`带宽 (bps)` 和 `往返时延 (RTT, 秒)`的乘积，衡量在特定带宽和往返时延（RTT）下，网络链路上可同时传输的最大数据量。
 
@@ -152,6 +169,16 @@ net.ipv4.udp_rmem_min = 4096
 net.ipv4.udp_wmem_min = 4096
 ```
 
+另外还有：
+* 接收缓冲区buffer自动调节开关：`tcp_moderate_rcvbuf`（发送则没有开关，默认开启）
+* `tcp_adv_win_scale`，用于手动指定了`SO_RCVBUF`时，内核分配buffer大小实际是2倍，并从中分出`1 / (2^tcp_adv_win_scale)`来作为**乱序报文缓存**以及**metadata**。具体见上述“TCP性能和发送接收窗口、Buffer的关系”参考链接。
+
+```sh
+[root@xdlinux ➜ bdp_case ]$ sysctl -a|grep -E "adv_win|moderate"
+net.ipv4.tcp_adv_win_scale = 1
+net.ipv4.tcp_moderate_rcvbuf = 1
+```
+
 ### 3.2. 实验用例
 
 * 1、保持默认参数正常curl下载文件，抓包用作基准对比
@@ -166,6 +193,28 @@ net.ipv4.udp_wmem_min = 4096
 
 #### 3.3.1. 用例1：默认参数
 
+下载速度，`121MB/s`：
+
+```sh
+# 客户端curl下载
+[root@iZbp169scc1yz2vwe6mp31Z ~]# curl 172.16.58.147:8000/test.dat --output rcv.dat
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100 2048M  100 2048M    0     0   121M      0  0:00:16  0:00:16 --:--:--  106M
+
+# 客户端查看（截取一次，缩进略有调整）
+[root@iZbp169scc1yz2vwe6mp31Z ~]# ss -ianp -om|grep -A1 8000
+tcp   ESTAB  2688024 0  172.16.58.146:59178  172.16.58.147:8000  users:(("curl",pid=39404,fd=5)) timer:(keepalive,56sec,0)
+         skmem:(r3126272,rb3214380,t0,tb87040,f3072,w0,o0,bl0,d75) ts sack 
+         cubic wscale:7,7 rto:201 rtt:0.291/0.149 ato:40 mss:1448 pmtu:1500 rcvmss:1448 advmss:1448 cwnd:10 bytes_sent:90 bytes_acked:91 bytes_received:711673808 segs_out:6357 segs_in:492761 data_segs_out:1 data_segs_in:492759 send 398075601bps lastsnd:3021 lastrcv:5 lastack:5 pacing_rate 796151200bps delivery_rate 67348832bps delivered:2 app_limited rcv_rtt:0.918 rcv_space:977400 rcv_ssthresh:2417445 minrtt:0.172 snd_wnd:31872
+
+# 服务端查看（截取一次）
+[root@iZbp169scc1yz2vwe6mp30Z ~]# ss -ianp -om|grep -A1 8000
+tcp   ESTAB  0  4170240    172.16.58.147:8000  172.16.58.146:59178  users:(("python",pid=37559,fd=4)) timer:(on,003ms,0)
+         skmem:(r0,rb131072,t0,tb4194304,f1024,w4254720,o0,bl0,d0) ts sack 
+         cubic wscale:7,7 rto:202 rtt:1.307/0.769 ato:40 mss:1448 pmtu:1500 rcvmss:536 advmss:1448 cwnd:1018 ssthresh:192 bytes_sent:1052453816 bytes_retrans:271224 bytes_acked:1051874168 bytes_received:90 segs_out:728851 segs_in:9206 data_segs_out:728850 data_segs_in:1 send 9022579954bps lastsnd:2 lastrcv:5803 lastack:3 pacing_rate 10822955560bps delivery_rate 2855697808bps delivered:728637 busy:5789ms rwnd_limited:5372ms(92.8%) unacked:214 retrans:0/240 dsack_dups:240 rcv_space:14600 rcv_ssthresh:31820 notsent:3861816 minrtt:0.17 snd_wnd:308992
+```
+
 客户端抓包：  
 ![bdp-case-normal-param-clientside](/images/bdp-case-normal-param-clientside.svg)
 
@@ -179,6 +228,28 @@ net.ipv4.udp_wmem_min = 4096
 * 由于两台ECS配置一样，两侧抓包的内容差异不太大
 
 #### 3.3.2. 用例2：服务端的发送窗口4096字节
+
+下载速度稍慢，`111MB/s`，影响较小：
+
+```sh
+# 客户端curl下载
+[root@iZbp169scc1yz2vwe6mp31Z ~]# curl 172.16.58.147:8000/test.dat --output rcv.dat
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100 2048M  100 2048M    0     0   111M      0  0:00:18  0:00:18 --:--:--  114M
+
+# 客户端查看（截取一次）
+[root@iZbp169scc1yz2vwe6mp31Z ~]# ss -ianp -om|grep -A1 8000
+tcp   ESTAB  1448   0   172.16.58.146:43830  172.16.58.147:8000 users:(("curl",pid=39336,fd=5)) timer:(keepalive,46sec,0)
+         skmem:(r2816,rb5633575,t0,tb87040,f1280,w0,o0,bl0,d11) ts sack 
+         cubic wscale:7,7 rto:201 rtt:0.328/0.162 ato:40 mss:1448 pmtu:1500 rcvmss:1448 advmss:1448 cwnd:10 bytes_sent:90 bytes_acked:91 bytes_received:1733822072 segs_out:68289 segs_in:1216988 data_segs_out:1 data_segs_in:1216986 send 353170732bps lastsnd:13499 pacing_rate 705534824bps delivery_rate 54641504bps delivered:2 app_limited rcv_rtt:6.014 rcv_space:1751720 rcv_ssthresh:4812120 minrtt:0.212 snd_wnd:31872
+
+# 服务端查看（截取一次）
+[root@iZbp169scc1yz2vwe6mp30Z ~]# ss -ianp -om|grep -A1 8000
+tcp   ESTAB  0  65160  172.16.58.147:8000   172.16.58.146:43830  users:(("python",pid=37559,fd=4)) timer:(on,003ms,0)
+         skmem:(r0,rb131072,t0,tb4096,f3192,w66440,o0,bl0,d0) ts sack 
+         cubic wscale:7,7 rto:201 rtt:0.271/0.033 ato:40 mss:1448 pmtu:1500 rcvmss:536 advmss:1448 cwnd:113 ssthresh:106 bytes_sent:1445870120 bytes_retrans:15056 bytes_acked:1445789904 bytes_received:90 segs_out:1014861 segs_in:56878 data_segs_out:1014860 data_segs_in:1 send 4830228782bps lastrcv:10919 pacing_rate 5793602208bps delivery_rate 48468616bps delivered:1014816 busy:9156ms rwnd_limited:72ms(0.8%) sndbuf_limited:1ms(0.0%) unacked:45 retrans:0/11 dsack_dups:11 rcv_space:14600 rcv_ssthresh:31820 minrtt:0.136 snd_wnd:4812160
+```
 
 客户端抓包：  
 ![bdp-case-server-swnd4096-clientside](/images/bdp-case-server-swnd4096-clientside.svg)
@@ -200,7 +271,27 @@ net.ipv4.udp_wmem_min = 4096
 
 #### 3.3.3. 用例3：客户端的接收窗口4096字节
 
-很慢且抓包太大，手动打断了下载。
+下载很慢，`5.21MB/s`。且抓包太大，手动打断了下载。
+
+```sh
+# 客户端curl下载，时间预估需要6min31s
+[root@iZbp169scc1yz2vwe6mp31Z ~]# curl 172.16.58.147:8000/test.dat --output rcv.dat
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+ 23 2048M   23  475M    0     0  5350k      0  0:06:31  0:01:31  0:05:00 5457k
+
+# 客户端查看（截取一次）
+[root@iZbp169scc1yz2vwe6mp31Z ~]# ss -ianp -om|grep -A1 8000
+tcp   ESTAB  0  0 172.16.58.146:41276  172.16.58.147:8000  users:(("curl",pid=39411,fd=5)) timer:(keepalive,49sec,0)
+         skmem:(r0,rb4096,t0,tb87040,f0,w0,o0,bl0,d1) ts sack 
+         cubic wscale:7,2 rto:201 rtt:0.317/0.134 ato:40 mss:1448 pmtu:1500 rcvmss:520 advmss:1448 cwnd:10 bytes_sent:90 bytes_acked:91 bytes_received:60902608 segs_out:96347 segs_in:117124 data_segs_out:1 data_segs_in:117122 send 365425868bps lastsnd:10675 pacing_rate 730275800bps delivery_rate 30324600bps delivered:2 app_limited busy:1ms rcv_rtt:0.192 rcv_space:2600 rcv_ssthresh:1040 minrtt:0.308 snd_wnd:31872
+
+# 服务端查看（截取一次）
+[root@iZbp169scc1yz2vwe6mp30Z ~]# ss -ianp -om|grep -A1 8000
+tcp   ESTAB  0  17160  172.16.58.147:8000  172.16.58.146:41276  users:(("python",pid=37559,fd=4)) timer:(on,003ms,0)
+         skmem:(r0,rb131072,t0,tb87040,f2040,w59400,o0,bl0,d0) ts sack 
+         cubic wscale:2,7 rto:201 rtt:0.221/0.044 ato:40 mss:520 pmtu:1500 rcvmss:520 advmss:1448 cwnd:10 bytes_sent:39834288 bytes_retrans:520 bytes_acked:39832728 bytes_received:90 segs_out:76606 segs_in:63558 data_segs_out:76605 data_segs_in:1 send 188235294bps lastrcv:7011 pacing_rate 374985912bps delivery_rate 42448976bps delivered:76604 busy:7011ms rwnd_limited:7011ms(100.0%) unacked:2 retrans:0/1 dsack_dups:1 rcv_space:14600 rcv_ssthresh:31820 notsent:16120 minrtt:0.13 snd_wnd:1040
+```
 
 客户端抓包：  
 ![client-rwnd4096_clientside](/images/bdp-case-client-rwnd4096_clientside.svg)
