@@ -1,5 +1,5 @@
 ---
-title: TCP发送接收过程（二） -- 实验观察TCP性能和窗口、Buffer的关系
+title: TCP发送接收过程（二） -- 实验观察TCP性能和窗口、Buffer的关系（上）
 description: 通过实验观察TCP性能和窗口、Buffer的关系，并用Wireshark跟踪TCP Stream Graphs。
 categories: [网络, TCP]
 tags: [TCP, Wireshark, 接收缓冲区]
@@ -192,6 +192,12 @@ net.ipv4.tcp_moderate_rcvbuf = 1
 在不同环境实验过，对于硬件配置、负载不同的客户端和服务端，两端抓包可能相差会比较大，比如：接收端处理不过来，发送端多次重传。所以此处把两端的包还是都对比下。
 
 下述抓包文件做了归档，可见：[ecs_bdp_case](https://github.com/xiaodongQ/assets_archive/tree/main/ecs_bdp_case)。
+
+总体说明：
+
+统计信息如下，也可见[google sheets](https://docs.google.com/spreadsheets/d/1SG0V5ygZeVAdyh-l7ujIFNO1s35t-eLJ-4bzGB1powQ/edit?usp=sharing)。
+
+![bdp-case-statistic](/images/2025-05-12-bdp-case-statistic.png)
 
 #### 3.3.1. 用例1：默认参数
 
