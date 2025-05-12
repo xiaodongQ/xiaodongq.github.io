@@ -193,9 +193,7 @@ net.ipv4.tcp_moderate_rcvbuf = 1
 
 下述抓包文件做了归档，可见：[ecs_bdp_case](https://github.com/xiaodongQ/assets_archive/tree/main/ecs_bdp_case)。
 
-总体说明：
-
-统计信息如下，也可见[google sheets](https://docs.google.com/spreadsheets/d/1SG0V5ygZeVAdyh-l7ujIFNO1s35t-eLJ-4bzGB1powQ/edit?usp=sharing)。
+总体统计信息如下，也可见[google sheets](https://docs.google.com/spreadsheets/d/1SG0V5ygZeVAdyh-l7ujIFNO1s35t-eLJ-4bzGB1powQ/edit?usp=sharing)。
 
 ![bdp-case-statistic](/images/2025-05-12-bdp-case-statistic.png)
 
