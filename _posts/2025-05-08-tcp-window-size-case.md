@@ -61,7 +61,7 @@ tags: [TCP, Wireshark, 接收缓冲区]
     * 在 **<mark>Export Info</mark>**中查看重传统计表
     * 找到第一个重传包，根据其`Seq`**找原始包**
         * 根据过滤条件查找，如：`tcp.seq == 3684862270`，可以**在TCP详情中对`Sequence Number`右键 -> `Apply As Filter` -> `Selected`**自动设置过滤条件。
-        * 也可以直接在`SEQ/ACK analysis`中跳转到原始包。（会找到Ack
+        * 也可以直接在`SEQ/ACK analysis`中跳转到原始包。
     * 如下图所示，对应的原始包是`No为46`的包，其在途字节数为`908`，即此时的网络拥塞点。
 * 该方法不一定很精确，但很有参考意义。
 
@@ -70,7 +70,7 @@ tags: [TCP, Wireshark, 接收缓冲区]
 
 ### 2.3. Expert重传包说明
 
-Wireshark的`Expert Infomation`信息中分析统计了各个包类型的分类。对于重传类型：`This frame is a (suspected) retransmission`，有时统计的信息中，Seq和原始包并不相同，但是也统计为了重传，造成一些迷惑。此处进行解释说明。
+Wireshark的`Expert Infomation`信息中分析统计了各个包类型的分类。对于重传类型：`This frame is a (suspected) retransmission`，有时统计的信息中，Seq和原始包并不相同，但是也统计为了重传，此处做下解释说明。
 
 如下图所示：  
 ![expert-retransmission-statistic](/images/expert-retransmission-statistic.svg)
@@ -193,7 +193,7 @@ net.ipv4.tcp_moderate_rcvbuf = 1
 
 下述抓包文件做了归档，可见：[ecs_bdp_case](https://github.com/xiaodongQ/assets_archive/tree/main/ecs_bdp_case)。
 
-总体统计信息如下，也可见[google sheets](https://docs.google.com/spreadsheets/d/1SG0V5ygZeVAdyh-l7ujIFNO1s35t-eLJ-4bzGB1powQ/edit?usp=sharing)。
+总体统计信息如下，也可见：[google sheets](https://docs.google.com/spreadsheets/d/1SG0V5ygZeVAdyh-l7ujIFNO1s35t-eLJ-4bzGB1powQ/edit?usp=sharing)。
 
 ![bdp-case-statistic](/images/2025-05-12-bdp-case-statistic.png)
 
@@ -243,15 +243,15 @@ tcp   ESTAB  0  4170240    172.16.58.147:8000  172.16.58.146:59178  users:(("pyt
 
 推断是客户端没给应答或者应答慢，可能是客户端下载的数据需要落硬盘操作（**page cache刷写**），影响了应答处理。
 
-重新实验进行确认：使用`strace`或者`perf strace`追踪系统调用，确认是否有文件系统、硬盘相关耗时操作。
+重新实验进行确认：使用`strace`或者`perf trace`追踪系统调用，确认是否有文件系统、硬盘相关耗时操作。
 * 但是注意`strace`会拖慢程序处理，可能影响实验结果。
-* `perf strace`在ECS里试了下没抓到客户端curl的统计信息（TODO待确认）
+* `perf trace`在ECS里试了下没抓到客户端curl的统计信息（TODO待确认）
 
 1、开始搞错了，追踪了服务端http服务的系统调用。但也能看到是发送给客户端耗时久，从服务端看不到具体细节，需要追踪客户端确认原因。
 
 ![rtt-sharp-strace-server](/images/bdp-case-rtt-sharp-strace-server.svg)
 
-服务端`perf strace`跟踪http服务没看到什么有效信息：
+服务端`perf trace`跟踪http服务没看到什么有效信息：
 
 ```sh
 [root@iZbp169scc1yz2vwe6mp30Z ~]# perf trace -p 39428 -s
@@ -284,13 +284,13 @@ tcp   ESTAB  0  4170240    172.16.58.147:8000  172.16.58.146:59178  users:(("pyt
 [root@iZbp169scc1yz2vwe6mp31Z ~]# tcpdump -i any port 8000 -s 100 -w shot-rtt-sharp2-normal_clientside_2.cap -v
 ```
 
-跟踪抓包和`strace`（完整文件可见[这里](https://github.com/xiaodongQ/assets_archive/blob/main/ecs_bdp_case/shot-rtt-sharp2-strace_client.log)），可看到第一个最大耗时的还是创建文件，后续的尖刺确实如猜测是写文件的较久耗时。
+跟踪抓包和`strace`（完整文件可见[这里](https://github.com/xiaodongQ/assets_archive/blob/main/ecs_bdp_case/shot-rtt-sharp2-strace_client.log)），可看到第一个最大耗时的还是创建文件，消耗了`116ms`，此时网络尖刺有`40+ms`（**但无法得出就是因为文件操作才导致了尖刺的结论**）。
 
-* 主要是写文件进入page cache，达到一定条件后刷脏页，增加IO延迟进而影响上层IO卡顿。（这也是`libaio`或`io_uring`的一个优势，分离I/O操作与主线程，可减小对上层应用的影响）
+* `write`久主要是写文件进入page cache，达到一定条件后刷脏页，增加IO延迟进而影响上层IO卡顿。（这也是`libaio`或`io_uring`的一个优势，分离I/O操作与主线程，可减小对上层应用的影响）
 
 ![shot-rtt-sharp2-strace_client](/images/bdp-case-shot-rtt-sharp2-strace_client.svg)
 
-作为对比，过滤下strace结果中的`recvfrom`（从服务端收包），间隔一般在`2ms`左右，偶尔会有`10ms`左右的尖刺，和RTT图是一致的。
+过滤下strace结果中的`recvfrom`（从服务端收包），间隔一般在`2ms`左右，偶尔会有`10ms`左右的尖刺，和RTT图是一致的。
 
 ```sh
 [MacOS-xd@qxd ➜ ecs_case ]$ grep recvfrom shot-rtt-sharp2-strace_client.log
@@ -303,6 +303,59 @@ tcp   ESTAB  0  4170240    172.16.58.147:8000  172.16.58.146:59178  users:(("pyt
 21:16:06.223302 recvfrom(5<TCP:[172.16.58.146:56690->172.16.58.147:8000]>, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 102400      , 0, NULL, NULL) = 102400 <0.000089>
 ...
 ```
+
+找几个间隔久的情况。在RTT图上表现为一个`10ms`的尖刺，对应的前后时间如下，中间以及上下附近 **<mark>都没有</mark>**`write`比较久的记录，其他系统调用也没有延时高的情况。光从`strace`信息里看不出来什么原因导致的突刺。（**TODO 后续再尝试定位**）
+
+```sh
+21:16:06.206901 recvfrom(5<TCP:[172.16.58.146:56690->172.16.58.147:8000]>, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 102400, 0, NULL, NULL) = 102400 <0.000104>
+# 中间也没有write耗时较久的情况，基本在0.03ms左右，长的也只有0.1ms
+21:16:06.207069 write(6</root/rcv.dat>, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 4096 <0.000038>
+21:16:06.207155 write(6</root/rcv.dat>, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 12288) = 12288 <0.000033>
+...
+21:16:06.208667 poll([{fd=5<TCP:[172.16.58.146:56690->172.16.58.147:8000]>, events=POLLIN|POLLPRI|POLLRDNORM|POLLRDBAND}], 1, 0) = 1 ([{fd=5, revents=POLLIN|POLLRDNORM}]) <0.000029>
+# 接收数据
+21:16:06.208835 recvfrom(5<TCP:[172.16.58.146:56690->172.16.58.147:8000]>, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 102400, 0, NULL, NULL) = 102400 <0.000108>
+# 写文件，但没有耗时较久的情况，长一些的也只有0.1ms
+21:16:06.209008 write(6</root/rcv.dat>, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 4096 <0.000040>
+21:16:06.209101 write(6</root/rcv.dat>, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 12288) = 12288 <0.000035>
+21:16:06.209182 write(6</root/rcv.dat>, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 4096 <0.000138>
+21:16:06.209366 write(6</root/rcv.dat>, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 12288) = 12288 <0.000040>
+21:16:06.209456 write(6</root/rcv.dat>, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 4096 <0.000140>
+21:16:06.209665 write(6</root/rcv.dat>, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 12288) = 12288 <0.000044>
+21:16:06.209854 write(6</root/rcv.dat>, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 4096 <0.000032>
+21:16:06.209934 write(6</root/rcv.dat>, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 12288) = 12288 <0.000034>
+21:16:06.210015 write(6</root/rcv.dat>, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 4096 <0.000031>
+21:16:06.210095 write(6</root/rcv.dat>, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 12288) = 12288 <0.000038>
+21:16:06.210180 write(6</root/rcv.dat>, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 4096 <0.000032>
+21:16:06.210258 write(6</root/rcv.dat>, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 12288) = 12288 <0.000035>
+21:16:06.210338 write(6</root/rcv.dat>, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 4096 <0.000035>
+# 这里看起来是curl在终端打印统计信息，基本都在0.02ms左右，耗时都很短
+21:16:06.210436 write(2</dev/pts/3<char 136:3>>, "\r", 1) = 1 <0.000031>
+21:16:06.210509 write(2</dev/pts/3<char 136:3>>, " ", 1) = 1 <0.000034>
+21:16:06.210616 write(2</dev/pts/3<char 136:3>>, "1", 1) = 1 <0.000012>
+21:16:06.210675 write(2</dev/pts/3<char 136:3>>, "5", 1) = 1 <0.000036>
+...
+21:16:06.218121 write(2</dev/pts/3<char 136:3>>, "4", 1) = 1 <0.000029>
+21:16:06.218247 write(2</dev/pts/3<char 136:3>>, "8", 1) = 1 <0.000022>
+21:16:06.218305 write(2</dev/pts/3<char 136:3>>, ".", 1) = 1 <0.000024>
+21:16:06.218396 write(2</dev/pts/3<char 136:3>>, "6", 1) = 1 <0.000023>
+21:16:06.218464 write(2</dev/pts/3<char 136:3>>, "M", 1) = 1 <0.000012>
+21:16:06.218544 rt_sigaction(SIGPIPE, {sa_handler=SIG_IGN, sa_mask=[PIPE], sa_flags=SA_RESTORER|SA_RESTART, sa_restorer=0x7f908423e730}, NULL, 8) = 0 <0.000031>
+21:16:06.218655 poll([{fd=5<TCP:[172.16.58.146:56690->172.16.58.147:8000]>, events=POLLIN}, {fd=3<UNIX-STREAM:[185295->185296]>, events=POLLIN}], 2, 1000) = 1 ([{fd=5, revents=POLLIN}]) <0.000045>
+21:16:06.218807 rt_sigaction(SIGPIPE, NULL, {sa_handler=SIG_IGN, sa_mask=[PIPE], sa_flags=SA_RESTORER|SA_RESTART, sa_restorer=0x7f908423e730}, 8) = 0 <0.000021>
+21:16:06.218997 rt_sigaction(SIGPIPE, {sa_handler=SIG_IGN, sa_mask=[PIPE], sa_flags=SA_RESTORER|SA_RESTART, sa_restorer=0x7f908423e730}, NULL, 8) = 0 <0.000033>
+21:16:06.219098 poll([{fd=5<TCP:[172.16.58.146:56690->172.16.58.147:8000]>, events=POLLIN|POLLPRI|POLLRDNORM|POLLRDBAND}], 1, 0) = 1 ([{fd=5, revents=POLLIN|POLLRDNORM}]) <0.000040>
+# 下一次接收
+21:16:06.219204 recvfrom(5<TCP:[172.16.58.146:56690->172.16.58.147:8000]>, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 102400, 0, NULL, NULL) = 102400 <0.000238>
+21:16:06.219518 write(6</root/rcv.dat>, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 4096) = 4096 <0.000045>
+```
+
+`strace`追踪后，虽然知道会拖慢curl下载，但之前忘记看`Window Scaling`图了，**接收窗口已经满了！**。
+
+![bdp-sharp-rtt-part](/images/bdp-sharp-rtt-part.svg)
+
+此次strace没加`-f`追踪子进程，strace自身的的`-o`输出也要写文件，是否是`write`影响，本小节暂没有明确结论，本篇篇幅已经比较长了，后续再尝试定位。（**TODO**）
+* 收获教训：**后续定位问题时需要记得先结合各个图综合看下**。
 
 #### 3.3.3. 用例2：服务端的发送窗口4096字节
 
