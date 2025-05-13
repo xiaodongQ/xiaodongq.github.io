@@ -34,7 +34,7 @@ tags: [TCP, Wireshark, 接收缓冲区]
 `tc`的操作依赖 **<mark>3个核心组件</mark>**：
 
 * **`qdisc`（queueing discipline）**，**<mark>队列规则</mark>**，决定了数据包如何排队和发送
-    * 支持多种规则，如 `pfifo`（pure First In, First Out queue）、`pfifo_fast`（默认规则）、`htb`、`tbf`、`fifo`
+    * 支持多种规则，如 `pfifo`（pure First In, First Out queue）、`pfifo_fast`（默认规则）、`htb`、`tbf`（token buffer filter，令牌桶过滤器）、`fifo`
     * qdisc是一个整流器/整形器（shaper），可以包含多个`class`，不同`class`可以应用不同的策略。
     * qdisc对外暴露两个回调接口`enqueue`和`dequeue`，分别用于数据包入队和数据包出队，而具体的排队算法实现则在qdisc内部隐藏。
         * 不同的`qdisc`实现在Linux内核中实现为不同的**内核模块**，在系统的内核模块目录里可以查看前缀为`sch_`的模块。
@@ -110,6 +110,27 @@ tc qdisc del dev enp4s0 root
 tc qdisc ls
 tc class ls
 tc filter ls
+# 查看统计信息
+tc -s qdisc show dev enp4s0
+tc -s class show dev enp4s0
+```
+
+```sh
+# root，表示将此队列规则（qdisc）添加到接口的根节点（即所有流量的默认路径）
+# `handle 1:` 为该 qdisc 分配句柄 1:，后续的子规则可通过此句柄引用（例如 parent 1:）
+# netem，使用 netem（网络模拟器）工具，用于模拟网络延迟、丢包、重排序等特性
+# reorder 25% 50%：25% 的数据包会被随机重排序（即数据包的顺序被打乱），50% 表示重排序的最大延迟
+tc qdisc add dev bond0 root handle 1: netem delay 10ms reorder 25% 50% loss 0.2%
+# `parent 1:` 表示此 qdisc 是之前 netem qdisc（句柄 1:）的子节点。
+    # netem 会先处理流量，再传递给 tbf
+# `handle 2:` 为该 qdisc 分配句柄 2:，用于后续管理或调试。
+# tbf，使用 tbf（token buffer filter，令牌桶过滤器）算法，用于 限制带宽 和 控制突发流量。
+# rate 1mbit，将带宽限制为 1 Mbps
+# burst 32kbit，允许突发流量的最大值为 32 Kbit（即短时间内的瞬时流量可超过 1 Mbps，但总和不能超过 rate × latency + burst）。
+    # 突发流量的计算公式：burst = rate × (latency + burst_time)
+# latency 10ms，设置 最大延迟为 10ms，即数据包在队列中等待的时间不能超过 10ms
+    # 该参数与 tbf 的令牌桶机制结合，用于控制流量整形的精度
+tc qdisc add dev bond0 parent 1: handle 2: tbf rate 1mbit burst 32kbit latency 10ms
 ```
 
 ## 3. 实验说明
