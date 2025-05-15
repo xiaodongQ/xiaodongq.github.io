@@ -83,7 +83,7 @@ tags: [TCP, Wireshark, 接收缓冲区]
 一个网络接口有**两个默认的qdisc锚点（挂载点）**，<mark>入方向</mark>的锚点叫做`ingress`, <mark>出方向</mark>叫做`root`。
 * 入方向的`ingress`功能比较有限，不能挂载其他的`class`，只是做为`Classifier-Action`机制的挂载点。
 
-`qdisc`和`class`的 **<mark>标识符</mark>**叫做`handle`, 它是一个32位的整数，分为`major`和`minor`两部分，各占16位，表达方式为`:m:n`, **<mark>m或n省略时，表示0</mark>**。
+`qdisc`和`class`的 **<mark>标识符</mark>**叫做`handle`（下面会用到）, 它是一个32位的整数，分为`major`和`minor`两部分，各占16位，表达方式为`:m:n`, **<mark>m或n省略时，表示0</mark>**。
 * `m:0`一般表示`qdisc`
 * 对于`class`：`minor`一般从`1`开始，`major`则用它所挂载qdisc的major号
 * `root qdisc`的`handle`一般使用`1:0`表示，`ingress`一般使用`ffff:0`表示。
@@ -209,12 +209,12 @@ tc qdisc add dev bond0 parent 1: handle 2: tbf rate 1mbit burst 32kbit latency 1
 
 这里先解释说明上述的`reorder`用法：`tc qdisc add dev enp4s0 root netem delay 100ms reorder 99% 10%`
 
-网上和LLM找的说法好几个都不同，直接看`man tc-netem`：
+直接看下`man tc-netem`：
 * 用法：`REORDERING := reorder PERCENT [ CORRELATION ] [ gap DISTANCE ]`
     * 且使用reorder时必须指定`delay`选项
-* gap说明
+* gap参数说明
     * 示例1：`reorder 25% 50% gap 5` （假设指定`delay 10ms`）
-        * 前4个（`gap-1`）包**延迟**10ms发送（相对于第gap个包），剩下的一个包`25%`的概率**立即**发送；每`gap`个包**重复该过程**。（相关性见下面说明）
+        * 前4个（`gap-1`）包**延迟**10ms发送，剩下的一个包有`25%`的概率**立即**发送；每`gap`个包**重复该过程**。（相关性参数见下面的说明）
         * 或者说剩下的那个包有`75%`的概率**延迟**发送
     * 示例2：`reorder 25% 50%`
         * `25%`的包**立即**发送，剩下的包**延迟**10ms发送
@@ -224,7 +224,7 @@ tc qdisc add dev bond0 parent 1: handle 2: tbf rate 1mbit burst 32kbit latency 1
     * 若前一个包乱序，下一个包的乱序概率会变为 `1% + (100% - 1%) * 10% = 10.9%`
     * 若前一个包未乱序，下一个包的乱序概率会变为 `1% * (1 - 10%) = 0.9%`
     * delay、loss、reorder、corrupt等都支持相关性设置
-    * `0%`表示完全独立（默认）；`100%`则跟上一个状态完全相同：概率`1% + (100% - 1%)*100% = 100%`（一般不允许100%极端设置）
+    * `0%`表示完全独立（默认）；`100%`则跟上一个状态完全相同：概率`1% + (100% - 1%)*100% = 100%`（一般不会设置100%）
 
 ```sh
 # man tc-netem
@@ -263,18 +263,18 @@ netem OPTIONS
 
 **先贴下实验结论：**
 
-| 用例                                                    | 结果                         | ping表现                       |
-| ------------------------------------------------------- | ---------------------------- | ------------------------------ |
-| 1、reorder 80% delay 50ms                               | delay 50ms reorder 80% gap 1 | 接近20%概率延迟（10次出现2次） |
-| 2、delay 50ms reorder 80%                               | delay 50ms reorder 80% gap 1 | 表现同上                       |
-| 3、reorder 80% gap 5 delay 50ms (gap 5放最后面效果一样) | delay 50ms reorder 80% gap 5 | 5次出现4次延迟，1次不延迟      |
-| 4、delay 50ms reorder 80% gap 5                         | delay 50ms reorder 80% gap 5 | 同上                           |
-| 5、reorder 80% gap 8 delay 50ms                         | delay 50ms reorder 80% gap 8 | 8次出现7次延迟，1次不延迟      |
+| 用例                            | 结果                         | ping表现                       |
+| ------------------------------- | ---------------------------- | ------------------------------ |
+| 1、reorder 80% delay 50ms       | delay 50ms reorder 80% gap 1 | 接近20%概率延迟（10次出现2次） |
+| 2、delay 50ms reorder 80%       | delay 50ms reorder 80% gap 1 | 表现同上                       |
+| 3、reorder 80% gap 5 delay 50ms | delay 50ms reorder 80% gap 5 | 5次出现4次延迟，1次不延迟      |
+| 4、delay 50ms reorder 80% gap 5 | delay 50ms reorder 80% gap 5 | 同上                           |
+| 5、reorder 80% gap 8 delay 50ms | delay 50ms reorder 80% gap 8 | 8次出现7次延迟，1次不延迟      |
 
 说明：
-* 上述表格，用例列中省略了共同的`tc qdisc add dev eth0 root netem`；结果列中则省略了`qdisc netem 800d: root refcnt 2 limit 1000`
-* 可看到不管`reorder`和`delay`的顺序如何，表现相同。并不会出现LLM说的基础延迟再叠加乱序包延迟的情况（乱序包2倍延迟）。
-* `gap`非默认值1时，近似会出现固定的`gap-1`次延迟，剩余一次则根据设置的比例作为非延迟的概率（比例表示立即发送的概率）
+* 上述表格，用例列中省略了共同的`tc qdisc add dev eth0 root netem`；结果列中则省略了前面的`qdisc netem 800d: root refcnt 2 limit 1000`
+* 可看到不管`reorder`和`delay`的顺序如何，表现相同 (`gap 5`顺序也可以调整) 。并不会出现LLM说的基础延迟再叠加乱序包延迟的情况（乱序包2倍延迟）。
+* `gap`非默认值1时，近似会出现固定的`gap-1`次延迟，剩余一次则根据设置的比例作为立即发送的概率。
 
 下面是步骤和部分结果信息，完整信息可见：[tc_reorder_ping_test.md](https://github.com/xiaodongQ/prog-playground/blob/main/network/bdp_tc_experiment/tc_reorder_ping_test.md)。
 
@@ -330,7 +330,7 @@ qdisc netem 800e: root refcnt 2 limit 1000 delay 50ms reorder 80% gap 1
 
 客户端ping，出现延迟50ms概率是低的，接近20%，同上。
 
-3、case3：delay在reorder后面，gap 5
+3、case3：delay在reorder后面，并设置`gap 5`
 
 ```sh
 [root@iZbp1dkjrwztxfyf6vufrvZ ~]# tc qdisc del dev eth0 root
@@ -354,8 +354,7 @@ qdisc netem 8011: root refcnt 2 limit 1000 delay 50ms reorder 80% gap 5
 qdisc netem 800f: root refcnt 2 limit 1000 delay 50ms reorder 80% gap 5
 ```
 
-客户端看，基本是3~4个50ms延迟后（和`gap-1`对应），出现不延迟。按5个icmp看，有1次不延迟（20%几率不延迟，即80%几率延迟）。
-* **且不会出现包有`100ms`延迟**。
+客户端看，基本是3~4个50ms延迟后（和`gap-1`对应），出现不延迟的icmp包。按5个icmp看，有1次不延迟（20%几率不延迟，即80%几率延迟）。**且不会出现包有`100ms`延迟**。
 
 5、`tc qdisc add dev eth0 root netem reorder 80% gap 8 delay 50ms`
 
@@ -478,7 +477,7 @@ tcpdump -i any port $PORT -s 100 -v -w $CAPTURE_FILE
 
 ### 4.1. 结果汇总
 
-暂时统计客户端侧抓包。
+暂时只统计客户端侧抓包。
 
 ![tc-case-statistic](/images/tc-case-statistic.png)
 
