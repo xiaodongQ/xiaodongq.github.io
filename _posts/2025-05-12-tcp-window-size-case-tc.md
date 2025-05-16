@@ -179,30 +179,30 @@ tc qdisc add dev bond0 parent 1: handle 2: tbf rate 1mbit burst 32kbit latency 1
 **具体用例：**
 
 * 0、基准用例。直接复用上篇默认参数的场景结果即可，不用重复实验
-* 1、`tc`叠加客户端延时：`2ms`
+* 1、tc叠加客户端延时：`2ms`
     * `tc qdisc add dev enp4s0 root netem delay 2ms`
-* 2、`tc`叠加客户端延时：`100ms`
+* 2、tc叠加客户端延时：`100ms`
     * `tc qdisc change dev enp4s0 root netem delay 100ms`（之前已有规则，修改参数即可）
-* 3、`tc`模拟服务端丢包：`1%`
+* 3、tc模拟服务端丢包：`1%`
     * `tc qdisc add dev enp4s0 root netem loss 1%`（需要先清理之前的规则再添加新规则）
-* 4、`tc`模拟服务端丢包：`10%`
+* 4、tc模拟服务端丢包：`10%`
     * `tc qdisc change dev enp4s0 root netem loss 10%`
-* 5、`tc`模拟服务端包重复：`1%`
+* 5、tc模拟服务端包重复：`1%`
     * `tc qdisc add dev enp4s0 root netem duplicate 1%`
-* 6、`tc`模拟服务端包重复：`10%`
+* 6、tc模拟服务端包重复：`10%`
     * `tc qdisc change dev enp4s0 root netem duplicate 10%`
-* 7、`tc`模拟服务端包损坏：`1%`
+* 7、tc模拟服务端包损坏：`1%`
     * `tc qdisc add dev enp4s0 root netem corrupt 1%` 
-* 8、`tc`模拟服务端包损坏：`10%`
+* 8、tc模拟服务端包损坏：`10%`
     * `tc qdisc change dev enp4s0 root netem corrupt 10%`
-* 9、`tc`模拟服务端包乱序：`1%`的包比例乱序、delay 100ms、相关性 10%
+* 9、tc模拟服务端包乱序：`1%`的包比例乱序、delay 100ms、相关性 10%
     * `tc qdisc add dev enp4s0 root netem delay 100ms reorder 99% 10%`
-* 10、`tc`模拟服务端包乱序：`20%`的包比例乱序、delay 100ms、相关性 10%
+* 10、tc模拟服务端包乱序：`20%`的包比例乱序、delay 100ms、相关性 10%
     * `tc qdisc change dev enp4s0 root netem delay 100ms reorder 80% 10%`
-* 11、`tc`限制服务端带宽：`50MBps`（即400Mbps）
+* 11、tc限制服务端带宽：`50MBps`（即400Mbps）
     * `tc qdisc add dev enX0 root tbf rate 400mbit burst 10mbit latency 10ms`
     * 可以`ll /lib/modules/5.14.0-503.40.1.el9_5.x86_64/kernel/net/sched/sch_*`看到有`sch_tbf.ko.xz`模块
-* 12、`tc`限制服务端带宽：`1MBps`
+* 12、tc限制服务端带宽：`1MBps`
     * `tc qdisc add dev enX0 root tbf rate 8mbit burst 200kbit latency 10ms`
 
 #### 3.2.1. tc reorder用法说明
@@ -263,7 +263,7 @@ netem OPTIONS
 
 **先贴下实验结论：**
 
-| 用例                            | 结果                         | ping表现                       |
+| 用例                            | tc结果                       | ping表现                       |
 | ------------------------------- | ---------------------------- | ------------------------------ |
 | 1、reorder 80% delay 50ms       | delay 50ms reorder 80% gap 1 | 接近20%概率延迟（10次出现2次） |
 | 2、delay 50ms reorder 80%       | delay 50ms reorder 80% gap 1 | 表现同上                       |
