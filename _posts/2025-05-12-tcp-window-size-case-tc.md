@@ -8,7 +8,7 @@ tags: [TCP, Wireshark, 接收缓冲区]
 
 ## 1. 引言
 
-上篇进行了基本的TCP发送接收窗口调整实验，实际情况中则可能会碰到网络丢包、网络延迟、乱序等各种情况，本篇借助`tc`进行异常情况模拟，观察TCP发送接收的表现。
+[上篇](https://xiaodongq.github.io/2025/05/08/tcp-window-size-case/)进行了基本的TCP发送接收窗口调整实验，实际情况中则可能会碰到网络丢包、网络延迟、乱序等各种情况，本篇借助`tc`进行异常情况模拟，观察TCP发送接收的表现。
 
 ## 2. tc说明
 
@@ -48,7 +48,7 @@ tags: [TCP, Wireshark, 接收缓冲区]
 **使用步骤：**
 
 * 1、为网络设备 **<mark>创建一个qdisc</mark>**
-    * qdisc需要附着（attach）到某个网络接口
+    * qdisc需要附着/挂载（attach）到某个网络接口
 * 2、**<mark>创建流量类别（class）</mark>**，并附着（attach）到`qdisc`
 * 3、**<mark>创建filter</mark>**，并attach到`qdisc`
 * 4、另外 **<mark>可以给filter添加action</mark>**，比如将选中的包丢弃（drop）
@@ -59,7 +59,7 @@ tags: [TCP, Wireshark, 接收缓冲区]
 
 **简要处理过程说明：**
 
-* 父对象（`qdisc`或`class`）的`enqueue`回调被调用时，其上挂载的`filter`会依次调用，直到一个`filter`匹配成功；
+* 父对象（`qdisc`或`class`）的`enqueue`回调被调用时，其上挂载的`filter`会依次调用，直到一个`filter`匹配成功（若filter上还添加了action则执行action）；
 * 然后将数据包入队到`filter`所指向的`class`，具体实现则是调用`class`所配置的`qdisc`的`enqueue`函数；
 * 没有成功匹配`filter`的数据包则分类到默认的`class`中。
 
@@ -69,12 +69,12 @@ tags: [TCP, Wireshark, 接收缓冲区]
 **扩展阅读**：[Linux-Traffic-Control-Classifier-Action-Subsystem-Architecture.pdf](https://people.netfilter.org/pablo/netdev0.1/papers/Linux-Traffic-Control-Classifier-Action-Subsystem-Architecture.pdf)，介绍了`TC Classifier-Action`子系统的架构。
 
 * 可了解到其和`netfilter`的位置关系：数据流入 -> `ingress TC` -> `netfilter` -> `egress TC` -> 数据流出。见下图示意。
-* 关于`netfilter`可见 [TCP发送接收过程（三） -- 学习netfilter和iptables](https://xiaodongq.github.io/2024/07/05/netfilter-iptables-learn/) 中的学习梳理。另外看了下当前`Rocky Linux`环境的`firewalld`防火墙后端，也默认`nftables`了（弃用了`iptables`）：`FirewallBackend=nftables`。
+* 关于`netfilter`可见 [TCP发送接收过程（三） -- 学习netfilter和iptables](https://xiaodongq.github.io/2024/07/05/netfilter-iptables-learn/) 中的学习梳理。另外看了下当前自己`Rocky Linux`环境的`firewalld`防火墙后端，也默认`nftables`了（弃用了`iptables`）：`FirewallBackend=nftables`。
 
 ![linux-tc-netfilter-datapath](/images/linux-tc-netfilter-datapath.png)  
 [出处](https://people.netfilter.org/pablo/netdev0.1/papers/Linux-Traffic-Control-Classifier-Action-Subsystem-Architecture.pdf)
 
-之前看netfilter时的数据流也可以看到`tc qdisc`的位置：  
+之前看netfilter时的数据流示意图也可以看到`tc qdisc`的位置：  
 ![netfilter各hook点和控制流](/images/netfilter-packet-flow.svg)  
 [出处 Wikipedia](https://upload.wikimedia.org/wikipedia/commons/3/37/Netfilter-packet-flow.svg)
 
@@ -83,12 +83,12 @@ tags: [TCP, Wireshark, 接收缓冲区]
 一个网络接口有**两个默认的qdisc锚点（挂载点）**，<mark>入方向</mark>的锚点叫做`ingress`, <mark>出方向</mark>叫做`root`。
 * 入方向的`ingress`功能比较有限，不能挂载其他的`class`，只是做为`Classifier-Action`机制的挂载点。
 
-`qdisc`和`class`的 **<mark>标识符</mark>**叫做`handle`（下面会用到）, 它是一个32位的整数，分为`major`和`minor`两部分，各占16位，表达方式为`:m:n`, **<mark>m或n省略时，表示0</mark>**。
+`qdisc`和`class`的 **<mark>标识符</mark>**叫做`handle`（下面示例会用到）, 它是一个32位的整数，分为`major`和`minor`两部分，各占16位，表达方式为`:m:n`，**<mark>m或n省略时，表示0</mark>**。
 * `m:0`一般表示`qdisc`
 * 对于`class`：`minor`一般从`1`开始，`major`则用它所挂载qdisc的major号
 * `root qdisc`的`handle`一般使用`1:0`表示，`ingress`一般使用`ffff:0`表示。
 
-> 下面`tc`用到的`netem`需要先安装加载 `sch_netem` 内核模块（`yum install kernel-modules-extra`确认内核小版本也是一致的、`modprobe sch_netem`）。  
+> 下面`tc`用到的`netem`需要先安装加载 `sch_netem` 内核模块（`yum install kernel-modules-extra`，需确认内核小版本也是一致的、`modprobe sch_netem`）。  
 > [之前](https://xiaodongq.github.io/2024/06/10/bcc-tools-network/#381-tc%E6%A8%A1%E6%8B%9F) 实验bcc网络工具时就踩过坑了，所以本次安装Rocky Linux时/boot分区分的空间足够大。
 {: .prompt-warning }
 
@@ -157,7 +157,7 @@ tc qdisc add dev bond0 parent 1: handle 2: tbf rate 1mbit burst 32kbit latency 1
 * 系统：Rocky Linux release 9.5 (Blue Onyx)
 * 内核：5.14.0-503.35.1.el9_5.x86_64
 * 注意需要`yum install kernel-modules-extra`、`modprobe sch_netem`以使用`netem`
-    * 安装的内核小版本不一样，需要`dnf update`升级下内核到`5.14.0-503.40.1.el9_5`，并重启
+    * ECS里安装的内核小版本不一样，需要`dnf update`升级下内核到`5.14.0-503.40.1.el9_5`，并重启
 
 **步骤说明：**
 
@@ -202,12 +202,12 @@ tc qdisc add dev bond0 parent 1: handle 2: tbf rate 1mbit burst 32kbit latency 1
 * 11、tc限制服务端带宽：`50MBps`（即400Mbps）
     * `tc qdisc add dev enX0 root tbf rate 400mbit burst 10mbit latency 10ms`
     * 可以`ll /lib/modules/5.14.0-503.40.1.el9_5.x86_64/kernel/net/sched/sch_*`看到有`sch_tbf.ko.xz`模块
-* 12、tc限制服务端带宽：`1MBps`
+* 12、tc限制服务端带宽：`1MBps`（即8Mbps）
     * `tc qdisc add dev enX0 root tbf rate 8mbit burst 200kbit latency 10ms`
 
 #### 3.2.1. tc reorder用法说明
 
-这里先解释说明上述的`reorder`用法：`tc qdisc add dev enp4s0 root netem delay 100ms reorder 99% 10%`
+这里先解释说明上述的`reorder`用法：`tc qdisc add dev enp4s0 root netem delay 100ms reorder 99% 10%`。
 
 直接看下`man tc-netem`：
 * 用法：`REORDERING := reorder PERCENT [ CORRELATION ] [ gap DISTANCE ]`
@@ -259,7 +259,7 @@ netem OPTIONS
 
 #### 3.2.2. tc reorder和delay先后顺序
 
-实验方式：在服务端增加`reorder`对应qdisc，并在客户端ping进行观察。
+实验方式：在服务端增加`reorder`对应的qdisc，并在客户端ping进行观察延时情况。
 
 **这里只贴下实验结论：**
 
@@ -273,7 +273,7 @@ netem OPTIONS
 
 说明：
 * 上述表格，用例列中省略了共同的`tc qdisc add dev eth0 root netem`；结果列中则省略了前面的`qdisc netem 800d: root refcnt 2 limit 1000`
-* 可看到不管`reorder`和`delay`的顺序如何，表现相同 (`gap 5`顺序也可以调整) 。并不会出现LLM说的基础延迟再叠加乱序包延迟的情况（乱序包2倍延迟）。
+* 可看到**不管`reorder`和`delay`的顺序如何，表现相同** (`gap 5`顺序也可以调整) 。并不会出现LLM说的 “基础延迟再叠加乱序包延迟的情况（乱序包出现2倍延迟）”。
 * `gap`非默认值1时，近似会出现固定的`gap-1`次延迟，剩余一次则根据设置的比例作为立即发送的概率。
 
 步骤和完整结果信息可见：[tc_reorder_ping_test.md](https://github.com/xiaodongQ/prog-playground/blob/main/network/bdp_tc_experiment/tc_reorder_ping_test.md)。
@@ -286,9 +286,9 @@ tc命令和抓包都按脚本选项的形式输入，便于分情况测试。
 * 将下述测试脚本在客户端、服务都放一份。
 * 手动选择对应的选项、以及抓包选项；而后触发下载，下载结束或者打断后，ctrl+c打断抓包，完成一条用例测试。
 
-1、tc命令输入。完整脚本内容可见：[tc_command.sh](https://github.com/xiaodongQ/prog-playground/blob/main/network/bdp_tc_experiment/tc_command.sh)。
+**1、tc命令输入。**完整脚本内容可见：[tc_command.sh](https://github.com/xiaodongQ/prog-playground/blob/main/network/bdp_tc_experiment/tc_command.sh)。
 
-case1、case2在客户端执行；其他在服务端执行。不同规则会先做清理再新增。
+case1、case2在客户端执行；其他case在服务端执行。不同规则脚本会先做清理再新增。
 
 ```sh
 [root@iZbp1dkjrwztxfyf6vufrvZ ~]# sh tc_command.sh 
@@ -336,7 +336,7 @@ execute_choice() {
 }
 ```
 
-2、抓包命令输入。完整脚本内容可见：[capture.sh](https://github.com/xiaodongQ/prog-playground/blob/main/network/bdp_tc_experiment/capture.sh)。
+**2、抓包命令输入。**完整脚本内容可见：[capture.sh](https://github.com/xiaodongQ/prog-playground/blob/main/network/bdp_tc_experiment/capture.sh)。
 
 抓包：客户端执行`sh capture.sh cli 1`、服务端执行`sh capture.sh server 1`。
 
@@ -398,13 +398,14 @@ tcpdump -i any port $PORT -s 100 -v -w $CAPTURE_FILE
 说明：
 * 下述`RTT`是按分布最多区间大概估算的值，仅做对比参考（**计算BDP应该动态取指定时间点的RTT**）。
 * 按上篇所述，实验的带宽按`2Gbps`作为基准。
+* 下面小节中的多场景对比图均为`svg`图片，可在新标签打开查看大图。
 
 暂时只统计客户端侧抓包。
 
 ![tc-case-statistic](/images/tc-case-statistic.png)
 
-总体分析：
-* 1、本实验中，服务端**丢包**、**包损坏**、**包乱序**出现**概率高**（如`10%`）时，对客户端下载影响特别大，客户端**网络延时**影响次之；
+**总体分析：**
+* 1、本实验中，服务端**丢包**、**包损坏**、**包乱序**出现**概率高**时（如`10%`），对客户端下载影响特别大，客户端**网络延时**影响次之；
     * 少量异常（`1%`）则有轻微速度下滑，TCP能容忍该部分异常。
 * 2、服务端**包重复**，对下载影响并不大，就算达到`10%`也差不多；
 * 3、限制服务端带宽能有效限制下载速度（当然）。
@@ -441,42 +442,50 @@ tcpdump -i any port $PORT -s 100 -v -w $CAPTURE_FILE
 
 分析：
 * 从各个用例的`Time/Sequence`中，都能看到开始时`斜率`由高到低，对应**慢启动->拥塞避免**过程。
-* **客户端延时**时，数据发送速度（</mark>斜率</mark>）受到影响，延时越大斜率越小。
+* **客户端延时**场景，数据发送速度（<mark>斜率</mark>）受到影响，延时越大斜率越小。
     * 从图中可看出，基准场景`10s`位置时大概发了`1.3GB`数据；`delay 2ms`场景大概`1.2GB`左右；`delay 10ms`则只有`400MB`不到。
 * 服务端**丢包**场景
     * `1%`场景可看到`10s`发了 **`2.4GB`**（嗯？重新打开抓包文件看，只有 **`1.2GB`**，形状是一样的，只有纵坐标数值不同，~~**TODO待确认**~~）
-        * 同样的情况在**5_duplicate-1_cli.cap**里也出现了。
-        * 经过对比确认：右键切换`Relative/Absolute Sequence Number`后，纵坐标有变化，上面总图中的`3_loss-1_cli.cap`和`5_duplicate-1_cli.cap`是需要切换到相对Seq才便于查看实际发送数据量。但是相对和绝对Seq没有明显区分，只能**以纵坐标从0到第一次数字之间的刻度个数来分辨**，两个数字刻度间均匀则为相对Seq。
+        * 同样的情况在 `5_duplicate-1_cli.cap`包重复场景 里也出现了。
+        * 经过对比确认：右键切换`Relative/Absolute Sequence Number`后，纵坐标有变化，上面总图中的`3_loss-1_cli.cap`和`5_duplicate-1_cli.cap`是需要<mark>切换到相对Seq</mark>才便于查看实际发送数据量。但是相对和绝对Seq从界面没有明显区分，只能**以纵坐标从0到第一次数字之间的刻度个数来分辨**，两个数字刻度间均匀则为相对Seq。
         * 所以10s对应的实际数据量是`1.2GB`。
     * 丢包`10%`时，由于丢包严重，出现了很多<mark>水平的棕线</mark>，很大一部分原因是由于丢包导致ACK未收到。
 
 ![wireshark-relative-absolute-seq](/images/wireshark-relative-absolute-seq.png)
 
-* 服务端**包重复**，`1%`和上面丢包场景所述的一样，切换相对Seq后可看到10s发送数据量大概在`1.2GB`，和基准场景`1.3GB`相差不大。`10%`场景从Time/Seq看数据发送速度也差不多。
+* 服务端**包重复**，`1%`和上面**丢包**场景所述的一样，切换相对Seq后可看到10s发送数据量大概在`1.2GB`，和基准场景`1.3GB`相差不大。`10%`场景从Time/Seq看数据发送速度也差不多。
 * 服务端**包损坏严重**时，ACK线基本水平，Seq也发不动了。
 * 服务端**乱序**，`1%`时Seq线比较正常，`20%`时，`10s`只发了`2MB`数据（切换相对Seq查看）。
 * 限制服务端**带宽**，图形比较稳定，接收窗口一直在Seq线的上面。
 
-来放大图形看一些细节。
+**来放大图形看一些细节。**
 
-1）`客户端延时 2ms`场景，可看到慢启动过程。
+1）`客户端延时 2ms`场景，可看下**慢启动**过程。
 
 ![tcp-slow-start](/images/2025-05-17-tcp-slow-start.png)
 
-2）从`客户端延时 100ms`场景截取一段来观察下接收窗口变化。
-* 由于客户端加了`delay 100ms`，其ACK应答在`100.05ms`左右，应答之后，客户端的接收窗口才上升
+2）从`客户端延时 100ms`场景截取一段来观察下 **<mark>接收窗口变化</mark>**。
+* 由于客户端加了`delay 100ms`，其ACK应答在`100.05ms`左右，ACK应答之后，客户端的接收窗口才跟着上升
+    * 数据发送受接收窗口限制；作为对比，基准场景的接收窗口则完全足够，绿线都在蓝点上面。
+* `11856`和`11865`号包之间，服务端都没有发送数据（TCP Len为0），都是客户端的ACK，RTT在`100ms`左右，对应在Time/Seq图则是<mark>向上的棕线</mark>。
 
 ![tc-case-delay100ms-ana](/images/tc-case-delay100ms-ana.svg)
 
-3）`服务端丢包 10%`场景，看下<mark>丢包图形细节</mark>。
+3）`服务端丢包 10%`场景，看下 **<mark>丢包图形细节</mark>**。
 
 * **红色的线表示`SACK（Selective ACK，选择性确认）`**，表示这一段Sequence Number已经收到了，再配合棕色线的ACK，那么发送端就会知道，在<mark>中间这段空挡的包丢了</mark>（红色线和黄色线纵向的空白）。
     * `SACK`允许接收方告诉发送方哪些数据块已经成功接收，这样发送方就可以只重传丢失的部分，而不是整个窗口的数据。
-    * 蓝色的线就是表示又重新传输了一遍，如下图所示。
+    * 蓝色的线表示又重新传输了一遍，如下图所示。
+* 放大查看蓝色方框那部分图形。`红色线SACK`和`棕色线`之间的那部分丢包，SACK机制**择机处理**重传。
+    * 查看这个重传包对应的具体包信息，可见此处是`fast retransmission`。
 
 ![wireshark-tcp-sack](/images/wireshark-tcp-sack.svg)
 
-4）`服务端包乱序 20%`场景，可看到多次`SACK`和`Dup ACK`，如下所示看下<mark>Dup ACK图形对应关系</mark>。
+4）`服务端包乱序 20%`场景，可看到多次`SACK`和`Dup ACK`，如下所示看下 **<mark>Dup ACK和图形对应关系</mark>**。
+
+* 看下ACK（`棕线`）**停滞**的那部分图形，中间大概间隔了`50ms`。有大量`SACK`红线，但这些红色和ACK线有一段相同的**缺口**，表示这部分包一直没收到，通知服务端 **<mark>需要重传</mark>**。
+    * 红线表示的包，可以看下抓包详情进行对应。
+    * 高度相同的那些`SACK`对应到`Dup ACK`，每个都有编号，可看到最后是`Dup ACK #10`，所以`1个原始Dup+10个Dup`共11个，和图形是一致的。
 
 ![wireshark-tcp-dupack](/images/wireshark-tcp-dupack.svg)
 
@@ -486,8 +495,8 @@ tcpdump -i any port $PORT -s 100 -v -w $CAPTURE_FILE
 
 分析：
 * 基准情况下，客户端接收窗口一直在上面，最大有`5MB`左右。（蓝线和绿线的比例尺是一致的）
-* **客户端延时**大时（`100ms`），`Byte in fight`在途字节数一直较高，没怎么下来过。
-    * 在途数据基本打满客户端接收缓冲区，`3~4MB`
+* **客户端延时**比较大时（`100ms`），`Byte in fight`在途字节数一直较高，没怎么下来过。
+    * 在途数据基本打满客户端接收缓冲区，图上在途数据在`3~4MB`左右。
     * 上篇提到过
         * 网络基准带宽`2Gbps`
         * BDP需要动态计算。若RTT为`101ms`则BDP为`2Gbps * 101/1000 / 8 = 25MB`；若RTT为`2ms`则BDP为`0.125MB`。
@@ -495,7 +504,7 @@ tcpdump -i any port $PORT -s 100 -v -w $CAPTURE_FILE
     * 从上述结果汇总表中可看到，相对于其他场景，`window full`的比例`0.5%`和`0.99%`还是算高的（基准场景也不低）。
 * 服务端**丢包**，接收窗口都不是瓶颈
 * 服务端**包重复**，接收窗口也够用
-* 服务端**包损坏**时，客户端接收窗口`2.2MB`，而在途数据量有时在`6.5MB~9MB`左右，还超出了接收窗口（Why? **TODO分析**）
+* 服务端**包损坏**时，客户端接收窗口`2.2MB`，而在途数据量有时在`6.5MB~9MB`左右，还超出了接收窗口（Why? **<mark>TODO分析</mark>**）
 * 服务端**乱序**，接收窗口也够用
 * 限制服务端**带宽**，接收窗口也够用，在途数据受限明显
 
