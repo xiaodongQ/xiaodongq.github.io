@@ -298,7 +298,7 @@ Installing packages ['ceph-common']...
 
 见：[using-ceph](https://docs.ceph.com/en/quincy/cephadm/install/#using-ceph)
 
-### 3.1. 创建OSD
+### 3.1. 创建OSD（单机实验失败）
 
 由于自己的PC环境是在一块SSD上装了双系统，暂时无法使用单独的硬盘或分区来创建OSD，此处<mark>使用目录作为OSD（无需分区）</mark>，参考LLM给的思路：
 
@@ -559,11 +559,99 @@ May 06 07:27:23 xdlinux bash[105457]: debug 2025-05-05T23:27:23.287+0000 7f1dace
 ...
 ```
 
-## 4. 小结
+## 4. cephadm部署的一些细节
+
+`cephadm bootstrap`部署集群时：
+
+* 若不指定`--data-dir`，则数据目录默认在`/var/lib/ceph`
+* 若不指定`--log-dir`，则日志目录在`/var/log/ceph`
+* 若不指定`--unit-dir`，则`systemd`的unit文件在`/etc/systemd/system`
+* 也可以通过添加`--docker`选项（不加则默认false），表示用docker替换podman
+* （可`man cephadm`查看）
+
+基于上述部署好的集群（没包含OSD），来看下一些细节。
+
+### 4.1. 配置文件
+
+上面cephadm部署时提到过，默认会创建`/etc/ceph/ceph.conf`配置文件，当前集群中的内容如下：
+
+```sh
+[root@xdlinux ➜ ceph ]$ cat /etc/ceph/ceph.conf 
+# minimal ceph.conf for 75ab91f2-2c23-11f0-8e6f-1c697af53932
+[global]
+	fsid = 75ab91f2-2c23-11f0-8e6f-1c697af53932
+	mon_host = [v2:192.168.1.150:3300/0,v1:192.168.1.150:6789/0]
+```
+
+**`fsid（File System Identifier）`是ceph集群的`全局唯一标识符（UUID）`**。每个集群有唯一的fdid，用于区分同一网络中的不同集群，所有集群组件（monitor、）都通过fsid确认集群归属。
+
+`ceph -s`也可看到该fsid：
+
+```sh
+[root@xdlinux ➜ ceph ]$ ceph -s
+  cluster:
+    id:     75ab91f2-2c23-11f0-8e6f-1c697af53932
+    health: HEALTH_WARN
+            cephadm background work is paused
+            OSD count 0 < osd_pool_default_size 3
+  ...
+```
+
+cephadm部署一个`daemon`（守护/后台进程）时，会按下述优先级顺序匹配配置文件，使用第一个匹配到的文件：
+
+* `-c`显式指定
+* 如果用`--name`指定了具体的`daemon`服务名称，则会找`/var/lib/ceph/<fsid>/<daemon-name>/config`文件
+    * 比如：` /var/lib/ceph/75ab91f2-2c23-11f0-8e6f-1c697af53932/mon.xdlinux/config`，内容见下面的cat。
+
+```sh
+# man cephadm
+    When starting the shell, cephadm looks for configuration in the following order.  Only the first values found are used:
+
+    1. An explicit, user provided path to a config file (-c/--config option)
+
+    2. Config file for daemon specified with --name parameter (/var/lib/ceph/<fsid>/<daemon-name>/config)
+
+    3. /var/lib/ceph/<fsid>/config/ceph.conf if it exists
+
+    4. The config file for a mon daemon (/var/lib/ceph/<fsid>/mon.<mon-id>/config) if it exists
+
+    5. Finally: fallback to the default file /etc/ceph/ceph.conf
+```
+
+```sh
+[root@xdlinux ➜ ceph ]$ cat /var/lib/ceph/75ab91f2-2c23-11f0-8e6f-1c697af53932/mon.xdlinux/config
+# minimal ceph.conf for 75ab91f2-2c23-11f0-8e6f-1c697af53932
+[global]
+	fsid = 75ab91f2-2c23-11f0-8e6f-1c697af53932
+	mon_host = [v2:192.168.1.150:3300/0,v1:192.168.1.150:6789/0]
+[mon.xdlinux]
+public network = 192.168.1.0/24
+```
+
+### 4.2. 数据目录
+
+查看数据目录：
+
+```sh
+[root@xdlinux ➜ ceph ]$ ll /var/lib/ceph
+total 4.0K
+drwx------. 14  472 root 4.0K May  8 23:58 75ab91f2-2c23-11f0-8e6f-1c697af53932
+drwxr-x---.  2 ceph ceph    6 Apr 11 23:46 bootstrap-mds
+drwxr-x---.  2 ceph ceph    6 Apr 11 23:46 bootstrap-mgr
+drwxr-x---.  2 ceph ceph   26 May  9 00:30 bootstrap-osd
+drwxr-x---.  2 ceph ceph    6 Apr 11 23:46 bootstrap-rbd
+drwxr-x---.  2 ceph ceph    6 Apr 11 23:46 bootstrap-rbd-mirror
+drwxr-x---.  2 ceph ceph    6 Apr 11 23:46 bootstrap-rgw
+drwxr-x---.  3 ceph ceph   20 May  9 00:18 crash
+drwxr-x---.  3 ceph ceph   20 Apr 11 23:46 osd
+drwxr-x---.  2 ceph ceph    6 Apr 11 23:46 tmp
+```
+
+## 5. 小结
 
 基于`cephadm`安装部署ceph集群。使用`CentOS 8.5`有些资源无法获取了，所以自己PC的Linux切换为了`Rocky Linux 9.5`，效率提升不少。
 
-## 5. 参考
+## 6. 参考
 
 * [Ceph Document -- Quincy](https://docs.ceph.com/en/quincy/)
 * [Ceph Document -- Squid](https://docs.ceph.com/en/squid/)
