@@ -17,7 +17,7 @@ Ceph`对象存储`包含一个`Ceph存储集群`和一个`对象网关`（Ceph O
 * **Ceph存储集群**：如前面 [Ceph集群构成](https://xiaodongq.github.io/2025/05/03/ceph-overview/#22-ceph%E9%9B%86%E7%BE%A4%E6%9E%84%E6%88%90) 中所述，一个Ceph存储集群中至少包含`monitor`、`manager`、`osd`，文件存储则还包含`mds`。
 * **对象网关**：构建在`librados`之上，通过`radosgw`守护进程提供服务，为应用程序提供对象存储`RESTful API`，用于操作Ceph存储集群。
 
-支持两种接口，两者共享一个命名空间（namespace），意味着一类接口写的数据可以通过另一类接口读取。
+Ceph支持两种对象存储接口，两者共享一个命名空间（namespace），意味着一类接口写的数据可以通过另一类接口读取。
 
 * `S3`兼容接口，Amazon S3 RESTful API
 * `Swift`兼容接口，OpenStack Swift API
@@ -40,7 +40,7 @@ Ceph`对象存储`包含一个`Ceph存储集群`和一个`对象网关`（Ceph O
 
 > 详情可见：[S3 API Reference](https://docs.aws.amazon.com/AmazonS3/latest/API/Type_API_Reference.html)。
 
-S3 API包含`操作`（actions/operations）和`数据类型`（data types），并组织成了 **`3`部分**：
+S3 API包含`操作`（actions/operations）和`数据类型`（data types）两部分，并组织成了 **`3`个集合**：
 * `Amazon S3`，定义了`bucket`和`object`层级的API操作
 * `Amazon S3 Control`，定义了管理其他S3资源的API操作
 * `Amazon S3 on Outposts`，可以扩展AWS到用户本地环境
@@ -105,7 +105,7 @@ S3 API包含`操作`（actions/operations）和`数据类型`（data types），
     Server: AmazonS3
 ```
 
-**下载object**：`GetObject`
+* **下载object**：`GetObject`
     * 指定object的完整key名
     * [GetObject](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html)
 
@@ -148,9 +148,9 @@ S3 API包含`操作`（actions/operations）和`数据类型`（data types），
 
 ### 3.2. S3 SDK
 
-通过上面的SDK链接可看到支持多种编程语言的SDK，比如`C++`、`Go`、`Java`、`JS`、`Rust`等等，这里简单看下 [C++ SDK](https://sdk.amazonaws.com/cpp/api/LATEST/root/html/index.html)。
+通过上面的S3 SDK链接可看到支持多种编程语言的SDK，比如`C++`、`Go`、`Java`、`JS`、`Rust`等等，这里简单看下 [C++ SDK](https://sdk.amazonaws.com/cpp/api/LATEST/root/html/index.html)。
 
-基于CMake构建，C++标准需`>= C++11`。使用C++ SDK的示例，可见：[example_code](https://github.com/awsdocs/aws-doc-sdk-examples/tree/main/cpp/example_code)。
+`C++`的S3 SDK基于CMake构建，C++标准需`>= C++11`。使用C++ SDK的示例，可见：[example_code](https://github.com/awsdocs/aws-doc-sdk-examples/tree/main/cpp/example_code)。
 
 比如：[put_object.cpp](https://github.com/awsdocs/aws-doc-sdk-examples/blob/main/cpp/example_code/s3/put_object.cpp)
 
@@ -201,11 +201,27 @@ int main(int argc, char* argv[])
 }
 ```
 
-## 4. 小结
+## 4. Swift对象存储
+
+> 详情可见：[Introduction to Object Storage](https://docs.openstack.org/swift/latest/admin/objectstorage-intro.html)，以及[Object Storage API](https://docs.openstack.org/api-ref/object-store/index.html#)
+
+`OpenStack`对象存储（也称`Swift`）是一个高可用、分布式、最终一致性的对象存储，通过`REST（Representational State Transfer） API`进行创建、修改、获取对象和元数据。
+
+* 创建容器：`PUT /v1/{account}/{container}`
+    * 示例：创建名为`steven`的container时不带元数据，`curl -i $publicURL/steven -X PUT -H "Content-Length: 0" -H "X-Auth-Token: $token"`
+* 创建对象：`PUT /v1/{account}/{container}/{object}`
+    * 示例：向名为`janeausten`的container中创建`helloworld.txt`对象，`url -i $publicURL/janeausten/helloworld.txt -X PUT -d "Hello" -H "Content-Type: text/html; charset=UTF-8" -H "X-Auth-Token: $token"`
 
 
-## 5. 参考
+
+
+## 5. 小结
+
+
+## 6. 参考
 
 * [Ceph Object Gateway](https://docs.ceph.com/en/squid/radosgw/#object-gateway)
 * [Ceph Git仓库](https://github.com/ceph/ceph)
+* [Amazon Simple Storage Service](https://docs.aws.amazon.com/AmazonS3/latest/API/Welcome.html)
+* [Introduction to Object Storage -- Swift](https://docs.openstack.org/swift/latest/admin/objectstorage-intro.html)
 * LLM
