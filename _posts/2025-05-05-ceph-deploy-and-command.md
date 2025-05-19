@@ -559,7 +559,7 @@ May 06 07:27:23 xdlinux bash[105457]: debug 2025-05-05T23:27:23.287+0000 7f1dace
 ...
 ```
 
-## 4. cephadm部署的一些细节
+## 4. cephadm集群环境信息
 
 `cephadm bootstrap`部署集群时：
 
@@ -569,7 +569,7 @@ May 06 07:27:23 xdlinux bash[105457]: debug 2025-05-05T23:27:23.287+0000 7f1dace
 * 也可以通过添加`--docker`选项（不加则默认false），表示用docker替换podman
 * （可`man cephadm`查看）
 
-基于上述部署好的集群（没包含OSD），来看下一些细节。
+基于上述部署好的集群（没包含OSD），来看下一些环境细节信息。
 
 ### 4.1. 配置文件
 
@@ -645,6 +645,38 @@ drwxr-x---.  2 ceph ceph    6 Apr 11 23:46 bootstrap-rgw
 drwxr-x---.  3 ceph ceph   20 May  9 00:18 crash
 drwxr-x---.  3 ceph ceph   20 Apr 11 23:46 osd
 drwxr-x---.  2 ceph ceph    6 Apr 11 23:46 tmp
+```
+
+### 4.3. 代码container目录
+
+Ceph代码中，container目录用于构建容器，可看到当前版本默认使用`podman`来构建容器。
+
+```sh
+# ceph-v19.2.2/container/build.sh
+...
+podman build --pull=newer --squash -f $CFILE -t build.sh.output \
+    --build-arg FROM_IMAGE=${FROM_IMAGE:-quay.io/centos/centos:stream9} \
+    --build-arg CEPH_SHA1=${CEPH_SHA1} \
+    --build-arg CEPH_GIT_REPO=${CEPH_GIT_REPO} \
+    --build-arg CEPH_REF=${BRANCH:-main} \
+    --build-arg OSD_FLAVOR=${FLAVOR:-default} \
+    --build-arg CI_CONTAINER=${CI_CONTAINER:-default} \
+    --secret=id=prerelease_creds,src=./prerelease.secret.txt \
+    2>&1 
+image_id=$(podman image ls localhost/build.sh.output --format '{{.ID}}')
+vars="$(podman inspect -f '{{printf "export CEPH_CONTAINER_ARCH=%v" .Architecture}}' ${image_id})
+...
+```
+
+默认容器镜像则基于`centos:stream9`。
+
+```dockerfile
+# ceph-v19.2.2/container/Containerfile
+ARG FROM_IMAGE="quay.io/centos/centos:stream9"
+FROM $FROM_IMAGE
+...
+dnf install -y --setopt=install_weak_deps=False --setopt=skip_missing_names_on_install=False --enablerepo=crb $(cat packages.txt)
+...
 ```
 
 ## 5. 小结
