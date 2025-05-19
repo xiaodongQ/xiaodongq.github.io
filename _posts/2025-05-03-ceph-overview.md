@@ -10,6 +10,8 @@ tags: [存储, Ceph]
 
 开始梳理`Ceph`，结合分布式存储的工作经验，加深并补充技能树。`Ceph`用`RocksDB`作为存储引擎，趁此机会也看下`RocksDB`在工业级项目中的实践和调优效果。
 
+Ceph提供了很全面的分布式存储功能，包括对象、文件、块，并支持很多特性，可以作为一个很好的入口，由点及面扩展梳理各类存储功能、`RocksDB`、`纠删码`、`SPDK/DPDK`、`Prometheus`、`OpenTelemetry分布式链路跟踪`、`K8S`等等的实际应用。
+
 **说明**：~~基于版本 **<mark>17.2.8</mark>（`Quincy`）**，fork一份 [ceph-v17.2.8](https://github.com/xiaodongQ/ceph/tree/ceph-v17.2.8) 的代码用于标注学习。~~  
 基于当前最新的发布版本 **<mark>19.2.2</mark>**（`Squid`），看tag里已经有`v20.0.0`了。基于`tag v19.2.2`建个分支：[ceph-v19.2.2](https://github.com/xiaodongQ/ceph/tree/ceph-v19.2.2)。
 
