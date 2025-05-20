@@ -10,7 +10,9 @@ tags: [存储, Ceph]
 
 前面梳理了Ceph的基本架构，并简单搭建了Ceph集群。现在进入到代码层，对Ceph功能进行进一步深入，本篇梳理 **<mark>对象存储</mark>**，并跟踪梳理代码处理流程。
 
-## 2. Ceph对象存储介绍
+## 2. 对象存储说明
+
+### 2.1. Ceph对象存储架构
 
 Ceph`对象存储`包含一个`Ceph存储集群`和一个`对象网关`（Ceph Object Gateway）。
 
@@ -25,7 +27,7 @@ Ceph支持两种对象存储接口，两者共享一个命名空间（namespace�
 ![ceph-object-storage](/images/ceph-object-storage.png)  
 [出处](https://docs.ceph.com/en/squid/radosgw/)
 
-## 3. S3对象存储
+### 2.2. S3对象存储
 
 > 详情可见：[Amazon Simple Storage Service](https://docs.aws.amazon.com/AmazonS3/latest/API/Welcome.html)。
 
@@ -36,7 +38,7 @@ Ceph支持两种对象存储接口，两者共享一个命名空间（namespace�
 * 1、使用 [AWS SDKs](https://aws.amazon.com/cn/developer/tools/?nc1=f_dr) 来发送请求，SDK客户端会根据用户提供的`access keys`来进行校验。如果没有其他更好的理由，**一般都使用`AWS SDKs`方式**。
 * 2、使用 `AWS CLI` 来触发S3 API。
 
-### 3.1. S3 API
+#### 2.2.1. S3 API
 
 > 详情可见：[S3 API Reference](https://docs.aws.amazon.com/AmazonS3/latest/API/Type_API_Reference.html)。
 
@@ -146,7 +148,7 @@ S3 API包含`操作`（actions/operations）和`数据类型`（data types）两
     </ListAllMyBucketsResult>
 ```
 
-### 3.2. S3 SDK
+#### 2.2.2. S3 SDK
 
 通过上面的S3 SDK链接可看到支持多种编程语言的SDK，比如`C++`、`Go`、`Java`、`JS`、`Rust`等等，这里简单看下 [C++ SDK](https://sdk.amazonaws.com/cpp/api/LATEST/root/html/index.html)。
 
@@ -201,7 +203,7 @@ int main(int argc, char* argv[])
 }
 ```
 
-## 4. Swift对象存储
+### 2.3. Swift对象存储
 
 > 详情可见：[Introduction to Object Storage](https://docs.openstack.org/swift/latest/admin/objectstorage-intro.html)，以及[Object Storage API](https://docs.openstack.org/api-ref/object-store/index.html#)
 
@@ -212,13 +214,17 @@ int main(int argc, char* argv[])
 * 创建对象：`PUT /v1/{account}/{container}/{object}`
     * 示例：向名为`janeausten`的container中创建`helloworld.txt`对象，`url -i $publicURL/janeausten/helloworld.txt -X PUT -d "Hello" -H "Content-Type: text/html; charset=UTF-8" -H "X-Auth-Token: $token"`
 
+## 3. Ceph对象存储代码流程
 
 
 
-## 5. 小结
 
 
-## 6. 参考
+
+## 4. 小结
+
+
+## 5. 参考
 
 * [Ceph Object Gateway](https://docs.ceph.com/en/squid/radosgw/#object-gateway)
 * [Ceph Git仓库](https://github.com/ceph/ceph)
