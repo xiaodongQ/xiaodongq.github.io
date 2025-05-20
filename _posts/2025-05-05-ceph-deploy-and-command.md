@@ -68,7 +68,8 @@ centos-release-ceph-quincy.noarch : Ceph Quincy packages from the CentOS Storage
 centos-release-ceph-reef.noarch : Ceph Reef packages from the CentOS Storage SIG repository
 centos-release-ceph-squid.noarch : Ceph Squid packages from the CentOS Storage SIG repository
 
-[root@xdlinux ➜ workspace ]$ nf install --assumeyes cephadm
+
+[root@xdlinux ➜ workspace ]$ dnf install centos-release-ceph-squid.noarch
 Last metadata expiration check: 2:44:54 ago on Thu 08 May 2025 08:12:24 PM CST.
 Dependencies resolved.
 ===============================================================================================
@@ -396,7 +397,7 @@ Running command: /usr/bin/ceph --cluster ceph --name client.bootstrap-osd --keyr
 -->  RuntimeError: Unable to find any LV for zapping OSD: 0
 ```
 
-好吧，折腾几次都不行，单台PC机器不带盘想骚操作部署OSD有点费劲。暂时不折腾了（TODO）。
+好吧，折腾几次都不行，单台PC机器不带盘想骚操作部署OSD有点费劲。~~暂时不折腾了（TODO）~~ 下面小节在ECS里申请网盘进行实验，另外一个思路是插U盘/移动硬盘是否能在本地做为块设备部署OSD。
 
 ### 3.2. 对象存储
 
@@ -679,11 +680,142 @@ dnf install -y --setopt=install_weak_deps=False --setopt=skip_missing_names_on_i
 ...
 ```
 
-## 5. 小结
+## 5. ECS部署Ceph OSD
+
+上面在自己的PC单机上简单部署Ceph环境，但是没有硬盘，没法起OSD，此处用阿里云ECS搭建下环境。
+
+### 5.1. ECS Ceph源配置
+
+ECS中默认的Ceph yum源无法访问，切换源到阿里镜像站的Ceph源：[Ceph镜像](https://developer.aliyun.com/mirror/ceph?spm=a2c6h.13651102.0.0.73ee1b11o4Rxad)。**注意：需要<mark>将公网地址转换为ECS VPC网络访问地址</mark>**
+
+将[Ceph 官方安装教程](https://docs.ceph.com/en/latest/install/get-packages/#rhel)里面的`https://download.ceph.com`替换为`http://mirrors.cloud.aliyuncs.com`（<mark>ECS内部网络访问</mark>，如果是公网则是`https`的`mirrors.aliyun.com/ceph`）。替换且设置相应版本后配置如下，后续ECS可复用。
+
+```sh
+# ceph.repo
+[ceph]
+name=Ceph packages for x86_64
+baseurl=http://mirrors.cloud.aliyuncs.com/ceph/rpm-19.2.2/el9/x86_64
+enabled=1
+priority=2
+gpgcheck=1
+gpgkey=http://mirrors.cloud.aliyuncs.com/ceph/keys/release.asc
+
+[ceph-noarch]
+name=Ceph noarch packages
+baseurl=http://mirrors.cloud.aliyuncs.com/ceph/rpm-19.2.2/el9/noarch
+enabled=1
+priority=2
+gpgcheck=1
+gpgkey=http://mirrors.cloud.aliyuncs.com/ceph/keys/release.asc
+
+[ceph-source]
+name=Ceph source packages
+baseurl=http://mirrors.cloud.aliyuncs.com/ceph/rpm-19.2.2/el9/SRPMS
+enabled=0
+priority=2
+gpgcheck=1
+gpgkey=http://mirrors.cloud.aliyuncs.com/ceph/keys/release.asc
+```
+
+而后：
+
+```sh
+# 不使用下述方式，其安装的Ceph源无法在ECS里访问
+# dnf search release-ceph
+# dnf install centos-release-ceph-squid.noarch
+
+# 而是使用上述阿里Ceph源
+dnf makecache
+# 而后就可以安装cephadm
+dnf install cephadm
+```
+
+### 5.2. ECS部署Ceph及OSD
+
+上面安装了`cephadm`，而后跟本地机器步骤一样进行部署。
+
+碰到问题：容器镜像仓库无法访问。给ECS分配一个公网地址。
+
+```sh
+# 部署集群
+cephadm bootstrap --verbose --mon-ip 172.16.58.146
+
+# 安装ceph-common
+[root@iZbp1220m9p46a8lph9nzqZ ~]# cephadm add-repo --release squid
+Writing repo to /etc/yum.repos.d/ceph.repo...
+Enabling EPEL...
+Completed adding repo.
+[root@iZbp1220m9p46a8lph9nzqZ ~]# cephadm install ceph-common
+Installing packages ['ceph-common']...
+```
+
+使用`ceph shell`，查看集群信息：
+
+```sh
+[ceph: root@iZbp1220m9p46a8lph9nzqZ /]# ceph -s
+  cluster:
+    id:     7250d0b6-3584-11f0-b128-00163e1bd532
+    health: HEALTH_WARN
+            OSD count 0 < osd_pool_default_size 3
+ 
+  services:
+    mon: 1 daemons, quorum iZbp1220m9p46a8lph9nzqZ (age 68s)
+    mgr: iZbp1220m9p46a8lph9nzqZ.pjmagh(active, since 44s)
+    osd: 0 osds: 0 up, 0 in
+ 
+  data:
+    pools:   0 pools, 0 pgs
+    objects: 0 objects, 0 B
+    usage:   0 B used, 0 B / 0 B avail
+    pgs:
+```
+
+对可用的设备自动创建OSD：
+
+```sh
+# 
+[ceph: root@iZbp1220m9p46a8lph9nzqZ /]# ceph orch apply osd --all-available-devices
+Scheduled osd.all-available-devices update...
+
+# 可看到OSD已经起来了
+[ceph: root@iZbp1220m9p46a8lph9nzqZ /]# ceph orch ls
+NAME                       PORTS        RUNNING  REFRESHED  AGE  PLACEMENT  
+alertmanager               ?:9093,9094      1/1  19s ago    23m  count:1    
+ceph-exporter                               1/1  19s ago    23m  *          
+crash                                       1/1  19s ago    23m  *          
+grafana                    ?:3000           1/1  19s ago    23m  count:1    
+mgr                                         1/2  19s ago    23m  count:2    
+mon                                         1/5  19s ago    23m  count:5    
+node-exporter              ?:9100           1/1  19s ago    23m  *          
+osd.all-available-devices                     1  19s ago    41s  *          
+prometheus                 ?:9095           1/1  19s ago    23m  count:1
+
+# 查看设备，只是提示容量不够（配了20GB网盘）
+[ceph: root@iZbp1220m9p46a8lph9nzqZ /]# ceph orch device ls
+HOST                     PATH      TYPE  DEVICE ID              SIZE  AVAILABLE  REFRESHED  REJECT REASONS                                                           
+iZbp1220m9p46a8lph9nzqZ  /dev/vdb  hdd   bp1dtgg3k4srphwzy12x  20.0G  No         3m ago     Has a FileSystem, Insufficient space (<10 extents) on vgs, LVM detected 
+```
+
+提示容量不够，扩容到40G，可看到OSD已经自动对齐成功创建了lvm：
+
+```sh
+[root@iZbp1220m9p46a8lph9nzqZ ~]# lsblk
+NAME          MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+vda           253:0    0   20G  0 disk 
+├─vda1        253:1    0    1M  0 part 
+├─vda2        253:2    0  100M  0 part /boot/efi
+└─vda3        253:3    0 19.9G  0 part /var/lib/containers/storage/overlay
+                                       /
+vdb           253:16   0   40G  0 disk 
+└─ceph--4247718d--2e18--48cf--ae0e--28eefcfeea83-osd--block--a21b0a4e--bb1c--4a47--ac65--91cc8f99624d
+              252:0    0   20G  0 lvm 
+```
+
+## 6. 小结
 
 基于`cephadm`安装部署ceph集群。使用`CentOS 8.5`有些资源无法获取了，所以自己PC的Linux切换为了`Rocky Linux 9.5`，效率提升不少。
 
-## 6. 参考
+## 7. 参考
 
 * [Ceph Document -- Quincy](https://docs.ceph.com/en/quincy/)
 * [Ceph Document -- Squid](https://docs.ceph.com/en/squid/)
