@@ -216,13 +216,57 @@ int main(int argc, char* argv[])
 
 ## 3. Ceph对象存储代码流程
 
+rgw的入口在`rgw_main.cc`中。
 
+```cpp
+// ceph-v19.2.2/src/rgw/rgw_main.cc
+// 相对于17.2.x，main代码的组织简洁了很多，之前版本main函数有好几百行
+int main(int argc, char *argv[])
+{
+  ...
+  auto cct = rgw_global_init(&defaults, args, CEPH_ENTITY_TYPE_CLIENT,
+                             CODE_ENVIRONMENT_DAEMON, flags);
 
+  DoutPrefix dp(cct.get(), dout_subsys, "rgw main: ");
+  rgw::AppMain main(&dp);
 
+  main.init_frontends1(false /* nfs */);
+  // 根据配置绑定numa亲和性
+  main.init_numa();
+  ...
+  // 定时器初始化
+  init_timer.init();
+  ...
+  common_init_finish(g_ceph_context);
+  // 初始化异步信号的处理器（其中是一个线程，利用poll轮询检测32个信号注册的读事件）
+  init_async_signal_handler();
+  // 注册部分信号和对应处理函数
+  register_async_signal_handler(SIGHUP, rgw::signal::sighup_handler);
+  register_async_signal_handler(SIGTERM, rgw::signal::handle_sigterm);
+  register_async_signal_handler(SIGINT, rgw::signal::handle_sigterm);
+  ...
+  main.init_perfcounters();
+  // 初始化DNS、curl、http客户端和kmip秘钥管理
+  main.init_http_clients();
 
+  r = main.init_storage();
+  ...
+  // 初始化s3、swift对应的rest api
+  main.cond_init_apis();
+  main.init_ldap();
+  main.init_opslog();
+  main.init_tracepoints();
+  main.init_lua();
+  r = main.init_frontends2(nullptr /* RGWLib */);
+  ...
+  rgw::signal::wait_shutdown();
+  ...
+}
+```
 
 ## 4. 小结
 
+简单梳理Ceph对象存储，跟踪main函数流程。
 
 ## 5. 参考
 
@@ -230,4 +274,6 @@ int main(int argc, char* argv[])
 * [Ceph Git仓库](https://github.com/ceph/ceph)
 * [Amazon Simple Storage Service](https://docs.aws.amazon.com/AmazonS3/latest/API/Welcome.html)
 * [Introduction to Object Storage -- Swift](https://docs.openstack.org/swift/latest/admin/objectstorage-intro.html)
+* [浅析开源项目之Ceph](https://zhuanlan.zhihu.com/p/360355168)
+* [解读RGW中request的处理流程](https://cloud.tencent.com/developer/article/1032838)
 * LLM

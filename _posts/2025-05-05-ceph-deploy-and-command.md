@@ -796,7 +796,7 @@ HOST                     PATH      TYPE  DEVICE ID              SIZE  AVAILABLE 
 iZbp1220m9p46a8lph9nzqZ  /dev/vdb  hdd   bp1dtgg3k4srphwzy12x  20.0G  No         3m ago     Has a FileSystem, Insufficient space (<10 extents) on vgs, LVM detected 
 ```
 
-提示容量不够，扩容到40G，可看到OSD已经自动对齐成功创建了lvm：
+提示容量不够，扩容到40G，可看到OSD已经自动对其成功创建了lvm：
 
 ```sh
 [root@iZbp1220m9p46a8lph9nzqZ ~]# lsblk
