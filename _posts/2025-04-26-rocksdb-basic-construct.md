@@ -593,6 +593,8 @@ Caused by:
     No such file or directory (os error 2)
 ```
 
+针对Makefile管理的项目，可以通过`compiledb`来生成`compile_commands.json`，若环境无法完整编译，可以：`compiledb -n make` 只生成json文件。
+
 ## 5. 小结
 
 RocksDB中的几个核心组件，并梳理写流程中相应的操作。

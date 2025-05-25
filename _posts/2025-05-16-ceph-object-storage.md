@@ -216,6 +216,10 @@ int main(int argc, char* argv[])
 
 ## 3. Ceph对象存储代码流程
 
+为了便于代码查看和跳转，为clangd生成`compile_commands.json`。MacOS上很多依赖安装有点问题，当前在linux上生成后再替换路径。
+
+### 3.1. main函数入口
+
 rgw的入口在`rgw_main.cc`中。
 
 ```cpp
@@ -224,10 +228,15 @@ rgw的入口在`rgw_main.cc`中。
 int main(int argc, char *argv[])
 {
   ...
+  // 入参转换为vector
+  auto args = argv_to_vec(argc, argv);
+  ...
+  // 全局初始化，其中会分配ceph上下文类`CephContext`并初始化、并设置实例指针到 g_ceph_context 全局变量
   auto cct = rgw_global_init(&defaults, args, CEPH_ENTITY_TYPE_CLIENT,
                              CODE_ENVIRONMENT_DAEMON, flags);
 
   DoutPrefix dp(cct.get(), dout_subsys, "rgw main: ");
+  // rgw的主服务类
   rgw::AppMain main(&dp);
 
   main.init_frontends1(false /* nfs */);
