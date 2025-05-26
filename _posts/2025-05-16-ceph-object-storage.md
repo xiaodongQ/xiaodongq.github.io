@@ -216,7 +216,7 @@ int main(int argc, char* argv[])
 
 ## 3. Ceph对象存储代码流程
 
-为了便于代码查看和跳转，为clangd生成`compile_commands.json`。MacOS上很多依赖安装有点问题，当前在linux上生成后再替换路径。
+为了便于代码查看和跳转，为clangd生成`compile_commands.json`（电脑快用9年了，cpptools跑起来风扇就呼呼响）。自己在MacOS上很多依赖安装有不少问题，折腾了挺久，在linux上生成后再替换路径可以勉强使用。
 
 ### 3.1. main函数入口
 
@@ -239,6 +239,7 @@ int main(int argc, char *argv[])
   // rgw的主服务类
   rgw::AppMain main(&dp);
 
+  // RGW 的前端（Frontend）负责处理客户端的请求：监听网络端口、处理HTTP/HTTPS请求、路由请求到后端的 RADOS 存储集群
   main.init_frontends1(false /* nfs */);
   // 根据配置绑定numa亲和性
   main.init_numa();
@@ -266,6 +267,7 @@ int main(int argc, char *argv[])
   main.init_opslog();
   main.init_tracepoints();
   main.init_lua();
+  // 里面包含了RGW前端具体初始化操作
   r = main.init_frontends2(nullptr /* RGWLib */);
   ...
   rgw::signal::wait_shutdown();
