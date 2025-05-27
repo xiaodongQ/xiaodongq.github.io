@@ -1,5 +1,5 @@
 ---
-title: Ceph学习笔记（三） -- Ceph对象存储
+title: Ceph学习笔记（三） -- 对象存储
 description: 梳理Ceph对象存储和相关流程。
 categories: [存储和数据库, Ceph]
 tags: [存储, Ceph]
@@ -275,9 +275,279 @@ int main(int argc, char *argv[])
 }
 ```
 
+`AppMain`主服务类（该类的成员函数实现在`rgw_appmain.cc`中）：
+
+```cpp
+// ceph-v19.2.2/src/rgw/rgw_main.h
+class AppMain {
+  bool have_http_frontend{false};
+  // 前端是否包含nfs类型
+  bool nfs{false};
+
+  // 支持多个前端
+  std::vector<RGWFrontend*> fes;
+  std::vector<RGWFrontendConfig*> fe_configs;
+  ...
+  // rest请求处理类
+  RGWREST rest;
+  std::unique_ptr<rgw::lua::Background> lua_background;
+  std::unique_ptr<rgw::auth::ImplicitTenants> implicit_tenant_context;
+  // 调度
+  std::unique_ptr<rgw::dmclock::SchedulerCtx> sched_ctx;
+  // 限流
+  std::unique_ptr<ActiveRateLimiter> ratelimiter;
+  std::map<std::string, std::string> service_map_meta;
+  ...
+  // 日志处理
+  const DoutPrefixProvider* dpp;
+  RGWProcessEnv env;
+  ...
+public:
+  AppMain(const DoutPrefixProvider* dpp);
+  ...
+};
+```
+
+### 3.2. 客户端HTTP请求管理类
+
+由`RGWHTTPManager`类负责客户端HTTP请求的处理，其初始化流程为：`main` -> `main.init_http_clients();` -> `rgw_http_client_init`，其中会创建`RGWHTTPManager`实例。
+
+`init_http_clients`：
+
+```cpp
+// ceph-v19.2.2/src/rgw/rgw_appmain.cc
+void rgw::AppMain::init_http_clients()
+{
+  rgw_init_resolver();
+  rgw::curl::setup_curl(fe_map);
+  rgw_http_client_init(dpp->get_cct());
+  rgw_kmip_client_init(*new RGWKMIPManagerImpl(dpp->get_cct()));
+} /* init_http_clients */
+```
+
+其中的`rgw_http_client_init`：
+
+```cpp
+// ceph-v19.2.2/src/rgw/rgw_http_client.cc
+void rgw_http_client_init(CephContext *cct)
+{
+  curl_global_init(CURL_GLOBAL_ALL);
+  rgw_http_manager = new RGWHTTPManager(cct);
+  rgw_http_manager->start();
+}
+```
+
+来看下`RGWHTTPManager`类的几个关键处理，其中包含了 **<mark>async</mark>**异步处理框架，`RGWCompletionManager`中则基于 **<mark>协程</mark>**实现，后续进行详细梳理，本篇暂不展开。
+
+```cpp
+// ceph-v19.2.2/src/rgw/rgw_http_client.h
+class RGWHTTPManager {
+  ...
+  CephContext *cct;
+  // 完成的io请求管理类，其中基于协程实现
+  RGWCompletionManager *completion_mgr;
+  ...
+  // start()中会创建线程，并由该指针指向线程
+  ReqsThread *reqs_thread = nullptr;
+  ...
+public:
+  RGWHTTPManager(CephContext *_cct, RGWCompletionManager *completion_mgr = NULL);
+  ~RGWHTTPManager();
+  
+  // 启动管理类，其中会创建线程
+  int start();
+  void stop();
+
+  // 对外接口，向本类新增客户端请求
+  int add_request(RGWHTTPClient *client);
+  int remove_request(RGWHTTPClient *client);
+  int set_request_state(RGWHTTPClient *client, RGWHTTPRequestSetState state);
+};
+```
+
+### 3.3. RADOS前端初始化
+
+main流程中的`main.init_frontends1` 和 `main.init_frontends2` 负责RADOS前端（负责处理客户端请求）的初始化。前者只进行相关配置，后者进行监听等具体逻辑。
+
+`init_frontends2`是`AppMain`类的成员函数，main函数中调用时传参为`nullptr`：`r = main.init_frontends2(nullptr /* RGWLib */);`。
+
+来看下`init_frontends2`的简要流程：
+
+```cpp
+// ceph-v19.2.2/src/rgw/rgw_appmain.cc
+int rgw::AppMain::init_frontends2(RGWLib* rgwlib)
+{
+  ...
+  // 可能支持多个前端，对每个前端配置进行初始化
+  std::map<std::string, std::unique_ptr<RGWFrontendConfig> > fe_def_map;
+  for (auto& f : frontends_def) {
+    RGWFrontendConfig *config = new RGWFrontendConfig(f);
+    int r = config->init();
+    ...
+  }
+  ...
+  // 对AppMain类的`RGWREST rest;`成员注册客户自定义头
+  rest.register_x_headers(g_conf()->rgw_log_http_headers);
+  // 初始化调度上下文、限流器
+  sched_ctx.reset(new rgw::dmclock::SchedulerCtx{dpp->get_cct()});
+  ratelimiter.reset(new ActiveRateLimiter{dpp->get_cct()});
+  ratelimiter->start();
+  ...
+  int fe_count = 0;
+  for (multimap<string, RGWFrontendConfig *>::iterator fiter = fe_map.begin();
+       fiter != fe_map.end(); ++fiter, ++fe_count) {
+    RGWFrontendConfig *config = fiter->second;
+    string framework = config->get_framework();
+    ...
+    RGWFrontend* fe = nullptr;
+    // 针对不同前端对应的框架，分别进行不同的实例化
+    if (framework == "loadgen") {
+        fe = new RGWLoadGenFrontend(env, config);
+    }
+    else if (framework == "beast") {
+      need_context_pool();
+      fe = new RGWAsioFrontend(env, config, *sched_ctx, *context_pool);
+    }
+    else if (framework == "rgw-nfs") {
+      fe = new RGWLibFrontend(env, config);
+      if (rgwlib) {
+        rgwlib->set_fe(static_cast<RGWLibFrontend*>(fe));
+      }
+    }
+    ...
+    dout(0) << "starting handler: " << fiter->first << dendl;
+    // 前端处理类初始化
+    int r = fe->init();
+    if (r < 0) {
+      derr << "ERROR: failed initializing frontend" << dendl;
+      return -r;
+    }
+    // 前端处理类启动
+    r = fe->run();
+    ...
+  }
+  ...
+}
+```
+
+当前Ceph版本（19.2.2）中，默认前端是`beast`，下面是`rgw.yaml.in`配置文件中对rgw前端的说明。默认`beast`，端口`7480`。
+
+```yaml
+# ceph-v19.2.2/src/common/options/rgw.yaml.in
+- name: rgw_frontends
+  type: str
+  level: basic
+  desc: RGW frontends configuration
+  long_desc: A comma delimited list of frontends configuration. Each configuration
+    contains the type of the frontend followed by an optional space delimited set
+    of key=value config parameters.
+  fmt_desc: Configures the HTTP frontend(s). The configuration for multiple
+    frontends can be provided in a comma-delimited list. Each frontend
+    configuration may include a list of options separated by spaces,
+    where each option is in the form "key=value" or "key". See
+    `HTTP Frontends`_ for more on supported options.
+  default: beast port=7480
+  services:
+  - rgw
+  with_legacy: true
+- name: rgw_frontend_defaults
+  type: str
+  level: advanced
+  desc: RGW frontends default configuration
+  long_desc: A comma delimited list of default frontends configuration.
+  default: beast ssl_certificate=config://rgw/cert/$realm/$zone.crt ssl_private_key=config://rgw/cert/$realm/$zone.key
+  services:
+  - rgw
+```
+
+### 3.4. beast前端：RGWAsioFrontend
+
+上节可知rgw默认的前端处理类为：`RGWAsioFrontend`。
+
+```cpp
+// ceph-v19.2.2/src/rgw/rgw_asio_frontend.h
+class RGWAsioFrontend : public RGWFrontend {
+  class Impl;
+  std::unique_ptr<Impl> impl;
+public:
+  RGWAsioFrontend(RGWProcessEnv& env, RGWFrontendConfig* conf,
+		  rgw::dmclock::SchedulerCtx& sched_ctx,
+		  boost::asio::io_context& io_context);
+  ~RGWAsioFrontend() override;
+
+  int init() override;
+  int run() override;
+  void stop() override;
+  void join() override;
+
+  void pause_for_new_config() override;
+  void unpause_with_new_config() override;
+};
+```
+
+头文件中隐藏了实现细节，都在内部实现类`Impl`中，从对应的源文件可看到，实际还是基于父类`AsioFrontend`的实现。
+
+```cpp
+// ceph-v19.2.2/src/rgw/rgw_asio_frontend.cc
+class RGWAsioFrontend::Impl : public AsioFrontend {
+ public:
+  Impl(RGWProcessEnv& env, RGWFrontendConfig* conf,
+       rgw::dmclock::SchedulerCtx& sched_ctx,
+       boost::asio::io_context& context)
+    : AsioFrontend(env, conf, sched_ctx, context) {}
+};
+```
+
+此处简单分析`init`，其他接口详情后续实际使用时再跟踪代码。可看到`init`负责对配置中的端口和地址进行监听，并起协程进行循环`accept`处理。
+
+```cpp
+// ceph-v19.2.2/src/rgw/rgw_asio_frontend.cc
+int AsioFrontend::init()
+{
+  boost::system::error_code ec;
+  auto& config = conf->get_config_map();
+  ...
+  auto ports = config.equal_range("port");
+  // 可能监听多个端口
+  for (auto i = ports.first; i != ports.second; ++i) {
+    auto port = parse_port(i->second.c_str(), ec);
+    ...
+    listeners.back().endpoint.port(port);
+  }
+  // 可能多个endpoints
+  auto endpoints = config.equal_range("endpoint");
+  for (auto i = endpoints.first; i != endpoints.second; ++i) {
+    ...
+    listeners.back().endpoint = endpoint;
+  }
+  // 是否禁用nagle
+  auto nodelay = config.find("tcp_nodelay");
+  ...
+  // 开始监听
+  for (auto& l : listeners) {
+    l.acceptor.open(l.endpoint.protocol(), ec);
+    ...
+    l.acceptor.set_option(tcp::acceptor::reuse_address(true));
+    l.acceptor.bind(l.endpoint, ec);
+    ...
+    l.acceptor.listen(max_connection_backlog);
+    // 创建协程，用于处理循环accept
+    boost::asio::spawn(context,
+      [this, &l] (boost::asio::yield_context yield) mutable {
+        accept(l, yield);
+      }, bind_cancellation_slot(l.signal.slot(),
+             bind_executor(context, boost::asio::detached)));
+
+    ldout(ctx(), 4) << "frontend listening on " << l.endpoint << dendl;
+    socket_bound = true;
+  }
+  ...
+}
+```
+
 ## 4. 小结
 
-简单梳理Ceph对象存储，跟踪main函数流程。
+梳理Ceph对象存储，简单跟踪main函数流程。
 
 ## 5. 参考
 
