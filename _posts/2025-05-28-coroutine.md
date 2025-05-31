@@ -1,6 +1,6 @@
 ---
-title: 实现一个简易协程
-description: 梳理协程相关机制，并实践实现一个简易协程。
+title: 协程梳理实践（一） -- 实现一个简易协程
+description: 梳理协程相关机制，并跟踪sylar开源项目的协程实现。
 categories: [并发与异步编程]
 tags: [协程, 异步编程]
 ---
@@ -24,6 +24,8 @@ tags: [协程, 异步编程]
     * [boost.coroutine2](https://www.boost.org/doc/libs/latest/libs/coroutine2/doc/html/index.html)
     * [libco](https://github.com/Tencent/libco)，腾讯开源的协程栈，广泛用于微信中
     * [libgo](https://github.com/yyzybb537/libgo)，C++实现的Go风格协程库
+
+*说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
 ## 2. 协程基础
 
@@ -57,7 +59,7 @@ tags: [协程, 异步编程]
 
 ## 3. 协程库实现结构
 
-基于`sylar`中的协程库实现来学习协程栈的结构原理。
+基于`sylar`中的协程库实现来学习协程栈的结构原理，下述梳理展示的代码基本都出自[coroutine-lib](https://github.com/youngyangyang04/coroutine-lib)中的解析示例。
 
 ### 3.1. ucontext_t 用户上下文
 
@@ -285,9 +287,94 @@ m_cb(cb), m_runInScheduler(run_in_scheduler)
 }
 ```
 
+### 3.4. 协程调度
+
+非对称模式下，借助**协程调度器**来调度执行各协程。注意：⼀个线程同⼀时刻只能运⾏⼀个协程。
+
+协程调度也可以采用类似进程调度算法，常见的进程调度算法：
+
+* 先来先服务（`FCFS, First-Come-First-Served`），按进程到达就绪队列的顺序分配CPU
+* 最短作业优先（`SJF, Shortest Job First`），优先调度预计执行时间最短的进程
+* 优先级调度（`Priority Scheduling`），按进程优先级分配CPU，优先级高的先执行
+* 时间片轮转（`RR, Round Robin`），每个进程分配一个固定时间片（如10ms），时间片用完则强制切换到下一个就绪进程，进程未完成则重新排队
+* 公平共享调度（`Fair Share Scheduling`），按用户或组分配CPU资源（如用户A占50%，用户B占30%）
+* 多级队列调度（`Multilevel Queue`），将就绪队列分为多个子队列（如前台交互队列、后台批处理队列），每个队列可配置不同调度算法
+* 实时调度算法，如最早截止时间优先（EDF, Earliest Deadline First）
+
+下面是一个最简单的调度算法实现：先来先服务`FCFS`，添加协程和执行调度。
+
+```cpp
+// coroutine-lib/fiber_lib/2fiber/test.cpp
+class Scheduler
+{
+public:
+    // 添加协程调度任务
+    void schedule(std::shared_ptr<Fiber> task)
+    {
+        m_tasks.push_back(task);
+    }
+    
+    // 执行调度任务
+    void run()
+    {
+        std::cout << " number " << m_tasks.size() << std::endl;
+
+        std::shared_ptr<Fiber> task;
+        // 调度策略：FIFO
+        auto it = m_tasks.begin();
+        while(it!=m_tasks.end())
+        {
+            // 迭代器本身也是指针
+            task = *it;
+            // 由主协程切换到子协程，子协程函数运行完毕后自动切换到主协程
+            task->resume();
+            it++;
+        }
+        m_tasks.clear();
+    }
+private:
+    // 任务队列
+    std::vector<std::shared_ptr<Fiber>> m_tasks;
+}
+```
+
+使用：创建协程并加入协程调度器，而后开始调度。
+
+```cpp
+// coroutine-lib/fiber_lib/2fiber/test.cpp
+int main()
+{
+    // 初始化当前线程的主协程
+    Fiber::GetThis();
+
+    // 创建调度器
+    Scheduler sc;
+
+    // 添加调度任务（任务和子协程绑定）
+    for(auto i=0;i<20;i++)
+    {
+        // 创建子协程
+          // 使用共享指针自动管理资源 -> 过期后自动释放子协程创建的资源
+          // bind函数 -> 绑定函数和参数用来返回一个函数对象
+        std::shared_ptr<Fiber> fiber = std::make_shared<Fiber>(std::bind(test_fiber, i), 0, false);
+        sc.schedule(fiber);
+    }
+
+    // 执行调度任务
+    sc.run();
+
+    return 0;
+}
+```
+
 ## 4. 小结
 
+梳理学习协程基础原理，并走读[coroutine-lib](https://github.com/youngyangyang04/coroutine-lib)仓库中关于[sylar](https://github.com/sylar-yin/sylar)的协程实现代码。
+
+本篇先覆盖简易协程的实现，上述有不少参考链接内容的梳理在后续篇幅中再进行展开。
 
 ## 5. 参考
 
-
+* [coroutine-lib](https://github.com/youngyangyang04/coroutine-lib)
+* [sylar开源项目 -- 协程模块](https://www.midlane.top/wiki/pages/viewpage.action?pageId=10060957)
+* LLM
