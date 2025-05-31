@@ -61,6 +61,9 @@ tags: [协程, 异步编程]
 
 基于`sylar`中的协程库实现来学习协程栈的结构原理，下述梳理展示的代码基本都出自[coroutine-lib](https://github.com/youngyangyang04/coroutine-lib)中的解析示例。
 
+其中协程类为`Fiber`，简要思维导图如下：  
+![sylar_fiber_coroutine](/images/sylar_fiber_coroutine.svg)
+
 ### 3.1. ucontext_t 用户上下文
 
 其中的协程实现依赖 `ucontext_t`（user context）来保存和获取**用户上下文**，相关结构体定义和4个API如下，可通过`man`查看。
@@ -132,7 +135,8 @@ struct _libc_fpstate
 sylar里的协程实现是**非对称协程**，并且是**有栈协程**。且保证子协程不能创建新的协程，只和主协程进行相互切换。
 
 下面是协程类定义：
-* 协程状态简化为3种：就绪`READY`、运行`RUNNING`、结束`TERM`
+* `coroutine-lib`相对sylar里面，协程状态简化为了3种：就绪`READY`、运行`RUNNING`、结束`TERM`
+    * sylar中则有6种状态：初始状态`INIT`、暂停`HOLD`、执行中`EXEC`、结束`TERM`、可执行`READY`、异常`EXCEPT`
 * 协程栈默认128KB（Fiber带参构造中，不指定`stacksize`时，会申请`128000`字节空间作为协程栈）
 * 操作：`yield()`挂起、`resume()`恢复；
 
