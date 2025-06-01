@@ -13,9 +13,12 @@ tags: [协程, 异步编程]
 相关参考：
 
 * 代码随想录的协程库项目：[coroutine-lib](https://github.com/youngyangyang04/coroutine-lib)。并进行[fork](https://github.com/xiaodongQ/coroutine-lib)。
+* [从零开始重写sylar C++高性能分布式服务器框架](https://www.midlane.top/wiki/pages/viewpage.action?pageId=10060952)
+    * [协程模块](https://www.midlane.top/wiki/pages/viewpage.action?pageId=10060957)
+    * [协程调度模块](https://www.midlane.top/wiki/pages/viewpage.action?pageId=10060963)
+    * [IO协程调度模块](https://www.midlane.top/wiki/pages/viewpage.action?pageId=10061031)
 * [协程Part1-boost.Coroutine.md](https://www.cnblogs.com/pokpok/p/16932735.html)
     * 说明：[boost.coroutine](https://www.boost.org/doc/libs/latest/libs/coroutine/doc/html/coroutine/overview.html)已经被标记为`已过时（deprecated）`了，不过可以从中学习理解协程的基本原理，新的协程实现为 [boost.coroutine2](https://www.boost.org/doc/libs/latest/libs/coroutine2/doc/html/index.html)。
-* [sylar开源项目 -- 协程模块](https://www.midlane.top/wiki/pages/viewpage.action?pageId=10060957)
 * 以及在[RocksDB学习笔记（三） -- RocksDB中的一些特性设计和高性能相关机制](https://xiaodongq.github.io/2025/04/30/rocksdb-performance-mechanism/)中未展开的几篇协程相关参考文章
     * [实现一个简单的协程](https://www.bluepuni.com/archives/implements-coroutine/)
     * [从无栈协程，到 Asio 的协程实现](https://www.bluepuni.com/archives/stackless-coroutine-and-asio-coroutine/)
@@ -57,7 +60,7 @@ tags: [协程, 异步编程]
     * 无栈协程：不需独立的执行栈，上下文信息放在公共内存
     * 调用栈示意，可了解：[有栈协程与无栈协程](https://mthli.xyz/stackful-stackless/)
 
-## 3. 协程库实现结构
+## 3. 协程实现
 
 基于`sylar`中的协程库实现来学习协程栈的结构原理，下述梳理展示的代码基本都出自[coroutine-lib](https://github.com/youngyangyang04/coroutine-lib)中的解析示例。
 
@@ -214,6 +217,8 @@ public:
 };
 ```
 
+#### 3.2.1. enable_shared_from_this 说明
+
 此处的 `std::enable_shared_from_this` 模板类用法需要重点说明一下：
 
 `std::enable_shared_from_this` 模板类允许通过 `shared_from_this()`成员函数来从当前实例获取`shared_ptr`智能指针。
@@ -291,7 +296,7 @@ m_cb(cb), m_runInScheduler(run_in_scheduler)
 }
 ```
 
-### 3.4. 协程调度
+### 3.4. 基本协程调度
 
 非对称模式下，借助**协程调度器**来调度执行各协程。注意：⼀个线程同⼀时刻只能运⾏⼀个协程。
 
@@ -305,7 +310,7 @@ m_cb(cb), m_runInScheduler(run_in_scheduler)
 * 多级队列调度（`Multilevel Queue`），将就绪队列分为多个子队列（如前台交互队列、后台批处理队列），每个队列可配置不同调度算法
 * 实时调度算法，如最早截止时间优先（EDF, Earliest Deadline First）
 
-下面是一个最简单的调度算法实现：先来先服务`FCFS`，添加协程和执行调度。
+下面是一个最简单的调度算法实现：先来先服务`FCFS`，调度类中的方法包括添加协程和执行调度。
 
 ```cpp
 // coroutine-lib/fiber_lib/2fiber/test.cpp
@@ -324,7 +329,7 @@ public:
         std::cout << " number " << m_tasks.size() << std::endl;
 
         std::shared_ptr<Fiber> task;
-        // 调度策略：FIFO
+        // 调度策略：FCFS
         auto it = m_tasks.begin();
         while(it!=m_tasks.end())
         {
@@ -371,13 +376,24 @@ int main()
 }
 ```
 
-## 4. 小结
+## 4. 多线程+协程调度
 
-梳理学习协程基础原理，并走读[coroutine-lib](https://github.com/youngyangyang04/coroutine-lib)仓库中关于[sylar](https://github.com/sylar-yin/sylar)的协程实现代码。
+> 详情可见：[协程调度模块](https://www.midlane.top/wiki/pages/viewpage.action?pageId=10060963)
+
+从上述基本协程实现可知，一个线程中可以创建多个协程，协程间会进行挂起和恢复切换，但 **⼀个线程同⼀时刻只能运⾏⼀个协程**。所以一般需要**多线程**来提高协程的效率，这样同时可以有多个协程在运行。
+
+继续学习梳理下sylar里面的协程调度。
+* demo代码则可见：`coroutine-lib`中的[3scheduler](https://github.com/xiaodongQ/coroutine-lib/tree/main/fiber_lib/3scheduler)，其中的`fiber.h/fiber.cpp`协程类代码和`2fiber`里是一样的，独立目录只是便于单独测试。
+
+
+
+## 5. 小结
+
+梳理学习协程基础原理，并走读[coroutine-lib](https://github.com/youngyangyang04/coroutine-lib)仓库中关于[sylar](https://github.com/sylar-yin/sylar)的协程示例代码。
 
 本篇先覆盖简易协程的实现，上述有不少参考链接内容的梳理在后续篇幅中再进行展开。
 
-## 5. 参考
+## 6. 参考
 
 * [coroutine-lib](https://github.com/youngyangyang04/coroutine-lib)
 * [sylar开源项目 -- 协程模块](https://www.midlane.top/wiki/pages/viewpage.action?pageId=10060957)
