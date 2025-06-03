@@ -399,6 +399,75 @@ Running command: /usr/bin/ceph --cluster ceph --name client.bootstrap-osd --keyr
 
 好吧，折腾几次都不行，单台PC机器不带盘想骚操作部署OSD有点费劲。~~暂时不折腾了（TODO）~~ 下面小节在ECS里申请网盘进行实验，另外一个思路是插U盘/移动硬盘是否能在本地做为块设备部署OSD。
 
+**20250603更新**：尝试插U盘起OSD，可以拉起来，不过还是会reject。下面做下记录。
+
+```sh
+# 查看设备提示拒绝，下面进行清理
+# 3个原因：已经包含BlueStore设备标签、已有文件系统、设备总线类型不符合要求，比如是USB设备
+[root@xdlinux ➜ ceph ]$ ceph orch device ls
+HOST     PATH      TYPE  DEVICE ID                             SIZE  AVAILABLE  REFRESHED  REJECT REASONS
+xdlinux  /dev/sda  hdd   SanDisk_3.2Gen1_01018cxxx1074aac1ca1  57.3G  No         12m ago   Has BlueStore device label, Has a FileSystem, id_bus
+
+# 清理遗留数据
+# 擦除 BlueStore 标签和分区
+ceph-volume lvm zap /dev/sda --destroy
+# 确保所有残留被清除
+wipefs -a /dev/sda
+# 清除文件系统签名
+dd if=/dev/zero of=/dev/sda bs=1M count=100
+# 强制重新扫描设备。刷新设备状态
+ceph orch device zap xdlinux /dev/sda --force
+# 自动检测还是会拦截总线类型。貌似ceph里没有设置支持usb的选项，后面手动添加。
+[root@xdlinux ➜ ~ ]$ ceph orch device ls
+HOST     PATH      TYPE  DEVICE ID                            SIZE  AVAILABLE  REFRESHED  REJECT REASONS  
+xdlinux  /dev/sda  hdd   SanDisk_3.2Gen1_010185581074aac1ca1  57.3G  No         3m ago     id_bus
+
+# 手动添加osd。
+    # 如果提示bootstrap-osd密钥环认证失败，则创建keyring并设置权限后再执行手动添加
+    # ceph auth get-or-create client.bootstrap-osd mon 'allow profile bootstrap-osd' -o /var/lib/ceph/bootstrap-osd/ceph.keyring
+ceph-volume raw prepare --bluestore --data /dev/sda
+# ceph orch daemon add osd xdlinux:/dev/sda
+
+# 创建成功，查看：
+[root@xdlinux ➜ ceph ]$ ceph osd tree
+ID  CLASS  WEIGHT  TYPE NAME     STATUS  REWEIGHT  PRI-AFF
+-1              0  root default                           
+ 0              0  osd.0           down   1.00000  1.00000
+# ceph osd rm osd.0 可删除osd
+```
+
+```sh
+# 调整池副本数
+ceph osd pool ls detail
+ceph osd pool set $pool size 1
+ceph osd pool set $pool min_size 1
+# 确保 osd.0 正常运行
+systemctl restart ceph-osd@0
+# 验证 OSD 状态
+ceph osd tree
+
+[root@xdlinux ➜ ceph ]$ ceph -s
+  cluster:
+    id:     75ab91f2-2c23-11f0-8e6f-1c697af53932
+    health: HEALTH_WARN
+            cephadm background work is paused
+            1 stray daemon(s) not managed by cephadm
+            Reduced data availability: 33 pgs inactive
+            1 pool(s) have no replicas configured
+ 
+  services:
+    mon: 1 daemons, quorum xdlinux (age 26m)
+    mgr: xdlinux.qnvoyl(active, since 26m)
+    osd: 1 osds: 1 up (since 60m), 1 in (since 32m)
+ 
+  data:
+    pools:   2 pools, 33 pgs
+    objects: 0 objects, 0 B
+    usage:   0 B used, 0 B / 0 B avail
+    pgs:     100.000% pgs unknown
+             33 unknown
+```
+
 ### 3.2. 对象存储
 
 具体见：[cephadm-deploy-rgw](https://docs.ceph.com/en/quincy/cephadm/services/rgw/#cephadm-deploy-rgw)
@@ -680,11 +749,48 @@ dnf install -y --setopt=install_weak_deps=False --setopt=skip_missing_names_on_i
 ...
 ```
 
-## 5. ECS部署Ceph OSD
+## 5. 删除集群（危险操作）
+
+注意：仅限测试环境。
+
+```sh
+# 暂停 cephadm 以避免部署新的守护进程
+ceph orch pause
+# 获取集群 FSID
+ceph fsid
+# 到每个主机上，清除集群中所有主机的 ceph 守护进程
+# --zap-osds 擦除所有 OSD 设备上的数据
+cephadm rm-cluster --force --zap-osds --fsid <fsid>
+
+# 验证
+# 尝试运行 ceph 命令（应该失败）
+ceph -s
+# 检查 Ceph 进程
+ps aux | grep ceph
+
+# 部分残留，自行选择是否清理
+ll /var/log/ceph/*
+# 容器镜像，或者podman images
+docker images
+
+# 清理 Systemd 服务
+systemctl disable ceph.target
+# 禁用并删除 Ceph 服务
+# sudo systemctl disable ceph.target
+# 删除fsid相关的unit
+# sudo rm -f /etc/systemd/system/ceph-xxx.target.wants/*
+# sudo rm -f /etc/systemd/system/ceph-xxx.service
+# 注意不要删除 /usr/lib/systemd/system/下的 ceph 相关unit，会影响osd、volumn等后续创建使用。
+# 重新加载 systemd
+sudo systemctl daemon-reload
+sudo systemctl reset-failed
+```
+
+## 6. ECS部署Ceph OSD
 
 上面在自己的PC单机上简单部署Ceph环境，但是没有硬盘，没法起OSD，此处用阿里云ECS搭建下环境。
 
-### 5.1. ECS Ceph源配置
+### 6.1. ECS Ceph源配置
 
 ECS中默认的Ceph yum源无法访问，切换源到阿里镜像站的Ceph源：[Ceph镜像](https://developer.aliyun.com/mirror/ceph?spm=a2c6h.13651102.0.0.73ee1b11o4Rxad)。**注意：需要<mark>将公网地址转换为ECS VPC网络访问地址</mark>**
 
@@ -730,7 +836,7 @@ dnf makecache
 dnf install cephadm
 ```
 
-### 5.2. ECS部署Ceph及OSD
+### 6.2. ECS部署Ceph及OSD
 
 上面安装了`cephadm`，而后跟本地机器步骤一样进行部署。
 
@@ -811,11 +917,11 @@ vdb           253:16   0   40G  0 disk
               252:0    0   20G  0 lvm 
 ```
 
-## 6. 小结
+## 7. 小结
 
 基于`cephadm`安装部署ceph集群。使用`CentOS 8.5`有些资源无法获取了，所以自己PC的Linux切换为了`Rocky Linux 9.5`，效率提升不少。
 
-## 7. 参考
+## 8. 参考
 
 * [Ceph Document -- Quincy](https://docs.ceph.com/en/quincy/)
 * [Ceph Document -- Squid](https://docs.ceph.com/en/squid/)
