@@ -376,24 +376,13 @@ int main()
 }
 ```
 
-## 4. 多线程+协程调度
-
-> 详情可见：[协程调度模块](https://www.midlane.top/wiki/pages/viewpage.action?pageId=10060963)
-
-从上述基本协程实现可知，一个线程中可以创建多个协程，协程间会进行挂起和恢复切换，但 **⼀个线程同⼀时刻只能运⾏⼀个协程**。所以一般需要**多线程**来提高协程的效率，这样同时可以有多个协程在运行。
-
-继续学习梳理下sylar里面的协程调度。
-* demo代码则可见：`coroutine-lib`中的[3scheduler](https://github.com/xiaodongQ/coroutine-lib/tree/main/fiber_lib/3scheduler)，其中的`fiber.h/fiber.cpp`协程类代码和`2fiber`里是一样的，独立目录只是便于单独测试。
-
-
-
-## 5. 小结
+## 4. 小结
 
 梳理学习协程基础原理，并走读[coroutine-lib](https://github.com/youngyangyang04/coroutine-lib)仓库中关于[sylar](https://github.com/sylar-yin/sylar)的协程示例代码。
 
-本篇先覆盖简易协程的实现，上述有不少参考链接内容的梳理在后续篇幅中再进行展开。
+本篇先覆盖简易协程的实现，多线程下的协程调度机制，以及上述有不少参考链接内容的梳理在后续篇幅中再进行展开。
 
-## 6. 参考
+## 5. 参考
 
 * [coroutine-lib](https://github.com/youngyangyang04/coroutine-lib)
 * [sylar开源项目 -- 协程模块](https://www.midlane.top/wiki/pages/viewpage.action?pageId=10060957)
