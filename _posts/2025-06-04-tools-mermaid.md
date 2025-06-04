@@ -11,7 +11,7 @@ mermaid: true
 
 本博客主题（`Chirpy`）中默认支持`Mermaid`语法，另外看最近看`LLM`问答的结果里有的也带了`Mermaid`图，画了一些图试了下看表现力还不错，后续可以用起来。
 
-本篇对常用语法做下简要的操作熟悉，具体内容还是见下述的参考链接。
+本篇仅对部分常用语法做下简要的操作熟悉，具体详情还是见下述的参考链接。
 
 * 参考网站：[Mermaid语法](https://mermaid.nodejs.cn/syntax/flowchart.html)。
 
