@@ -3,6 +3,7 @@ title: Mermaid工具使用简述
 description: Mermaid工具使用简述
 categories: [工具和命令, HandyTools]
 tags: [Mermaid]
+mermaid: true
 ---
 
 
@@ -14,6 +15,8 @@ tags: [Mermaid]
 
 * 参考网站：[Mermaid语法](https://mermaid.nodejs.cn/syntax/flowchart.html)。
 
+**<mark>注意：</mark>**chirpy博客主题里，需要在文章头的元数据中启用`mermaid: true`，才会渲染为`Mermaid`图形。
+
 ---
 
 作为效果对比，之前在[TCP半连接全连接（三） -- eBPF跟踪全连接队列溢出（上）](https://xiaodongq.github.io/2024/06/23/bcctools-trace-tcp_connect)中用`PlantUML`生成的TCP连接关闭流程图如下，不大能接受：
@@ -23,9 +26,6 @@ tags: [Mermaid]
 用`Mermaid`语法生成的图效果如下：
 
 ```mermaid
----
-mermaid: true
----
 sequenceDiagram
     Note left of Client: 主动端发起关闭
     Client->>Server: FIN
@@ -68,18 +68,7 @@ id2 --> test2
 
 **效果：**
 
-**<mark>注意：</mark>**chirpy博客主题里，需要在`Mermaid`内容开头加上下面语句块，才会渲染为`Mermaid`图形：
-
-```yaml
----
-mermaid: true
----
-```
-
 ```mermaid
----
-mermaid: true
----
 ---
 title: node
 ---
@@ -107,9 +96,6 @@ id6[(sfjsldjf)]
 **效果：**
 
 ```mermaid
----
-mermaid: true
----
 %%flowchart TD
 flowchart BT
 id3(id3sfsdfsdfsdfdsf) --> tess(tess111)
@@ -157,9 +143,6 @@ end
 **效果：**
 
 ```mermaid
----
-mermaid: true
----
 %% 时序图
 sequenceDiagram
     autonumber
@@ -225,9 +208,6 @@ Fruit .. Test8 : Link(Dashed)
 **效果：**
 
 ```mermaid
----
-mermaid: true
----
 classDiagram
 %% +表示public，-表示private，#:protect，~:封装/内部
 class Fruit~T~ {
@@ -291,9 +271,6 @@ packet-beta
 
 ```mermaid
 ---
-mermaid: true
----
----
 title: "TCP Packet"
 ---
 packet-beta
@@ -346,9 +323,6 @@ mindmap
 **效果：**
 
 ```mermaid
----
-mermaid: true
----
 %% 脑图
 mindmap
   root((mindmap))
@@ -383,9 +357,6 @@ Unicode works too: 🤓`"]
 **效果：**
 
 ```mermaid
----
-mermaid: true
----
 mindmap
     id1["`**Root** with
 a second line
@@ -411,9 +382,6 @@ pie showData
 **效果：**
 
 ```mermaid
----
-mermaid: true
----
 %% 饼图关键字pie，显示具体数值则可加 showData
 pie showData
     title 日志等级示例 
@@ -444,9 +412,6 @@ timeline
 **效果：**
 
 ```mermaid
----
-mermaid: true
----
 %%{init: { 'logLevel': 'debug', 'theme': 'dark' } }%%
 %% 时间线图
 timeline
@@ -476,9 +441,6 @@ timeline
 **效果：**
 
 ```mermaid
----
-mermaid: true
----
 %%{init: { 'logLevel': 'debug', 'theme': 'base' } }%%
 timeline
     title Timeline of Industrial Revolution
