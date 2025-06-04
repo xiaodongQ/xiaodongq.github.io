@@ -18,7 +18,7 @@ tags: [Mermaid]
 
 作为效果对比，之前在[TCP半连接全连接（三） -- eBPF跟踪全连接队列溢出（上）](https://xiaodongq.github.io/2024/06/23/bcctools-trace-tcp_connect)中用`PlantUML`生成的TCP连接关闭流程图如下，不大能接受：
 
-![plantuml生成图](/images/2024-06-26-tcp-fin-plantuml.png){: width="340" height="600" }
+![plantuml生成图](/images/2024-06-26-tcp-fin-plantuml.png)
 
 用`Mermaid`语法生成的图效果如下：
 
