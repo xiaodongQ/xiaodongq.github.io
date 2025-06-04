@@ -52,7 +52,7 @@ sequenceDiagram
 
 流程图关键字：`flowchart` 或 `graph`
 
-**示例1：**
+**示例1：**（注释了animate动画箭头设置，其他渲染器里可以展示，chirpy里会报语法错误）
 
 ```
 ---
@@ -60,8 +60,9 @@ title: node
 ---
 %% flowchart LR
 graph LR
-id1[this  is id xxx] e1@ --> tess
-e1@{animate: true}
+id1[this  is id xxx] --> tess
+%%id1[this  is id xxx] e1@ --> tess
+%%e1@{animate: true}
 id1 --> id3 -->|指向| id4 -.-> id1
 id2 --> test2
 ```
@@ -75,8 +76,9 @@ title: node
 %% 使用flowchar和graph关键字都行
 %% flowchart LR
 graph LR
-id1[this  is id xxx] e1@ --> tess
-e1@{animate: true}
+id1[this  is id xxx] --> tess
+%%id1[this  is id xxx] e1@ --> tess
+%%e1@{animate: true}
 id1 --> id3 -->|指向| id4 -.-> id1
 id2 --> test2
 ```
