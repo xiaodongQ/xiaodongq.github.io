@@ -15,7 +15,7 @@ mermaid: true
 
 * 参考网站：[Mermaid语法](https://mermaid.nodejs.cn/syntax/flowchart.html)。
 
-**<mark>注意：</mark>**chirpy博客主题里，需要在文章头的元数据中启用`mermaid: true`，才会渲染为`Mermaid`图形。
+**<mark>注意：</mark>**Chirpy博客主题里，需要在文章头的元数据中启用`mermaid: true`，才会渲染为`Mermaid`图形。
 
 ---
 
@@ -50,19 +50,19 @@ sequenceDiagram
 
 ## 2. 流程图
 
-流程图关键字：`flowchart` 或 `graph`
+流程图关键字：`flowchart`，虽然`Mermaid`语法里还可以用`graph`关键字，但在Chirpy博客里`graph`貌似识别不了会报<mark>语法错误</mark>，还是用`flowchart`。
 
-**示例1：**（注释了animate动画箭头设置，其他渲染器里可以展示，chirpy里会报语法错误）
+**示例1：**
+
+其中`e1@`用于标识连接线，`{animate: true}`用于设置其属性，此处为开启动画效果。
 
 ```
 ---
 title: node
 ---
-%% flowchart LR
-graph LR
-id1[this  is id xxx] --> tess
-%%id1[this  is id xxx] e1@ --> tess
-%%e1@{animate: true}
+flowchart LR
+id1[this  is id xxx] e1@ --> tess
+e1@{animate: true}
 id1 --> id3 -->|指向| id4 -.-> id1
 id2 --> test2
 ```
@@ -73,12 +73,9 @@ id2 --> test2
 ---
 title: node
 ---
-%% 使用flowchar和graph关键字都行
-%% flowchart LR
 flowchart LR
-id1[this  is id xxx] --> tess
-%%id1[this  is id xxx] e1@ --> tess
-%%e1@{animate: true}
+id1[this  is id xxx] e1@ --> tess
+e1@{animate: true}
 id1 --> id3 -->|指向| id4 -.-> id1
 id2 --> test2
 ```
