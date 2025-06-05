@@ -50,19 +50,20 @@ sequenceDiagram
 
 ## 2. 流程图
 
-流程图关键字：`flowchart`，虽然`Mermaid`语法里还可以用`graph`关键字，但在Chirpy博客里`graph`貌似识别不了会报<mark>语法错误</mark>，还是用`flowchart`。
+流程图关键字：`flowchart`，虽然`Mermaid`语法里还可以用`graph`关键字，但在Chirpy博客里`graph`识别不了会报<mark>语法错误</mark>，还是用`flowchart`。
 
 **示例1：**
 
-其中`e1@`用于标识连接线，`{animate: true}`用于设置其属性，此处为开启动画效果。
+其中`e1@`用于标识连接线，`{animate: true}`用于设置其属性，此处为开启动画效果，不过Chirpy里貌似也不支持，一并注释。
 
 ```
 ---
 title: node
 ---
 flowchart LR
-id1[this  is id xxx] e1@ --> tess
-e1@{animate: true}
+%%id1[this  is id xxx] e1@ --> tess
+%%e1@{animate: true}
+id1[this  is id xxx] --> tess
 id1 --> id3 -->|指向| id4 -.-> id1
 id2 --> test2
 ```
@@ -74,8 +75,9 @@ id2 --> test2
 title: node
 ---
 flowchart LR
-id1[this  is id xxx] e1@ --> tess
-e1@{animate: true}
+%%id1[this  is id xxx] e1@ --> tess
+%%e1@{animate: true}
+id1[this  is id xxx] --> tess
 id1 --> id3 -->|指向| id4 -.-> id1
 id2 --> test2
 ```
