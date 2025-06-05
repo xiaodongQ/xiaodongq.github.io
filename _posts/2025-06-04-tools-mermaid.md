@@ -75,7 +75,7 @@ title: node
 ---
 %% 使用flowchar和graph关键字都行
 %% flowchart LR
-graph LR
+flowchart LR
 id1[this  is id xxx] --> tess
 %%id1[this  is id xxx] e1@ --> tess
 %%e1@{animate: true}
