@@ -115,9 +115,11 @@ id6[(sfjsldjf)]
 ```
 %% 时序图
 sequenceDiagram
+    %% 为每个箭头自动添加数字标号
     autonumber
     participant a as client
     participant b as server
+    %% 在线上添加注释则可： note over a: xxx
     note left of a: 左侧说明ttt
     a ->> +b: call1
     b -->> -a: return1
@@ -178,7 +180,7 @@ end
 
 ```
 classDiagram
-%% +表示public，-表示private，#:protect，~:封装/内部
+%% +表示public，-表示private，#表示protect，~表示封装/内部。~T~表示泛型<T>
 class Fruit~T~ {
     - int weight
     - string name
