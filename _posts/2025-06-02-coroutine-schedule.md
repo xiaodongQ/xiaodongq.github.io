@@ -17,13 +17,15 @@ tags: [协程, 异步编程]
 从上篇基本协程实现可知，一个线程中可以创建多个协程，协程间会进行挂起和恢复切换，但 **⼀个线程同⼀时刻只能运⾏⼀个协程**。所以一般需要**多线程**来提高协程的效率，这样同时可以有多个协程在运行。
 
 继续学习梳理下sylar里面的协程调度。
-* demo代码则可见：`coroutine-lib`中的[3scheduler](https://github.com/xiaodongQ/coroutine-lib/tree/main/fiber_lib/3scheduler)，其中的`fiber.h/fiber.cpp`协程类代码和`2fiber`里是一样的，独立目录只是便于单独编译测试。
+
+* demo代码则可见：`coroutine-lib`中的 [3scheduler](https://github.com/xiaodongQ/coroutine-lib/tree/main/fiber_lib/3scheduler)。
+* 其中的`fiber.h/fiber.cpp`协程类代码和`2fiber`里是一样的，独立目录只是便于单独编译测试。
 
 ### 2.1. 调度器类定义
 
 截取主要结构如下，添加任务：`scheduleLock`，开始调度：`run`。
 
-* `scheduleLock`用于添加任务`ScheduleTask`，是一个模板函数，`FiberOrCb`是模板参数
+* `scheduleLock`函数用于添加任务`ScheduleTask`，是一个模板函数，`FiberOrCb`是模板参数
     * 支持通过协程类（`Fiber`）或者函数（`std::function`）来构造 `ScheduleTask` 调度任务
 * 调度类中包含一个线程池：`std::vector<std::shared_ptr<Thread>> m_threads;`
     * 下述cpp中则可见**线程局部变量**定义：`static thread_local Scheduler* t_scheduler = nullptr;`，线程池中每个线程都有一个调度类
@@ -116,7 +118,7 @@ private:
 };
 ```
 
-### 2.2. 调度器初始化线程池
+### 2.2. 调度器初始化线程池：start()
 
 对应的类成员实现在`scheduler.cpp`中。
 
@@ -153,7 +155,7 @@ void Scheduler::start()
 }
 ```
 
-### 2.3. 线程类实现说明
+### 2.3. 线程类Thread实现说明
 
 `sylar`里面未使用C++标准库的`std::thread`，而是基于`pthread`自行实现了一个线程类。
 
@@ -322,11 +324,10 @@ __gthread_create (__gthread_t *__threadid, void *(*__func) (void*),
 }
 ```
 
-### 2.4. 调度处理
+### 2.4. 调度处理：run()
 
 每个线程各自有一个调度器。每个线程各自调度
 
-### 2.5. 调度器初始化
 
 
 ## 3. 小结
