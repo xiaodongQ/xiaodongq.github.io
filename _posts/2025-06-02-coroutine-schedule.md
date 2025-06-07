@@ -329,7 +329,6 @@ __gthread_create (__gthread_t *__threadid, void *(*__func) (void*),
 每个线程各自有一个调度器。每个线程各自调度
 
 
-
 ## 3. 小结
 
 
