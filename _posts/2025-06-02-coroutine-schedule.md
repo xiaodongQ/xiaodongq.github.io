@@ -12,10 +12,10 @@ tags: [协程, 异步编程]
 
 从上篇基本协程实现可知，一个线程中可以创建多个协程，协程间会进行挂起和恢复切换，但 **⼀个线程同⼀时刻只能运⾏⼀个协程**。所以一般需要**多线程**来提高协程的效率，这样同时可以有多个协程在运行。
 
-继续学习梳理下sylar里面的协程调度。
+继续学习梳理下sylar里面的协程调度，并基于[coroutine-lib](https://github.com/youngyangyang04/coroutine-lib)走读。
 
 * 详情可见：[协程调度模块](https://www.midlane.top/wiki/pages/viewpage.action?pageId=10060963)
-* demo代码则可见：`coroutine-lib`中的 [3scheduler](https://github.com/xiaodongQ/coroutine-lib/tree/main/fiber_lib/3scheduler)。其中的`fiber.h/fiber.cpp`协程类代码和`2fiber`里是一样的，独立目录只是便于单独编译测试。
+* demo代码则可见：`coroutine-lib`（fork）中的 [3scheduler](https://github.com/xiaodongQ/coroutine-lib/tree/main/fiber_lib/3scheduler)。其中的`fiber.h/fiber.cpp`协程类代码和`2fiber`里是一样的，独立目录只是便于单独编译测试。
 
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
@@ -32,7 +32,9 @@ tags: [协程, 异步编程]
     * `resume`会和**调度协程**进行 **<mark>协程上下文切换</mark>**，并执行协程函数，协程函数的实现中最后都会包含`yield()`，以便切换回调度协程的上下文。
 * 没有任务时，走的是idle分支，执行空闲协程进行`sleep 1秒`后切回调度协程
 
-## 3. 调度器类定义
+## 3. 调度逻辑梳理
+
+### 3.1. 调度器类定义
 
 截取主要结构如下，添加任务：`scheduleLock`，开始调度：`run`。
 
@@ -131,7 +133,7 @@ private:
 
 对应的类成员实现在`scheduler.cpp`中。
 
-构造时，根据`use_caller`来指定是否让调度类主线程也参与协程调度。
+构造时，根据`use_caller`来指定是否让调度类主线程也参与协程调度（即 是否让`caller线程`也作为一个协程调度线程）。
 * 若参与则少创建一个线程，只创建`threads - 1`个；
 * 并且记录主线程id，用以区分其他线程。主线程不参与协程任务的上下文切换，而是**创建一个单独的协程**，用于和任务间进行协程上下文切换。
     * 并把新建的这个调度协程设置给协程所在的线程，而不是用默认情况下线程中的主协程（默认情况下，线程创建主协程时，也指定其为该线程的调度协程）
@@ -140,10 +142,19 @@ private:
 Scheduler::Scheduler(size_t threads, bool use_caller, const std::string &name):
 m_useCaller(use_caller), m_name(name)
 {
-    ...
+    assert(threads>0 && Scheduler::GetThis()==nullptr);
+
+    // coroutine-lib里的这部分有问题，此处导致stop()里的 assert(GetThis() != this) 通不过。此处注释掉，移到if语句块中
+    // SetThis();
+
+    Thread::SetName(m_name);
+
     // 使用主线程当作工作线程（也用于协程调度）
     if(use_caller)
     {
+        // 将上面的SetThis();调整到if语句块中
+        SetThis();
+
         // 需要创建的工作线程数-1，当前线程也占了一个工作线程
         threads --;
 
@@ -167,7 +178,7 @@ m_useCaller(use_caller), m_name(name)
 }
 ```
 
-## 4. 调度器初始化线程池：start()
+### 3.2. 调度器初始化线程池：start()
 
 调度类初始化函数：`start()`。
 
@@ -205,7 +216,7 @@ void Scheduler::start()
 }
 ```
 
-## 5. 线程类Thread实现说明
+### 3.3. 线程类Thread实现说明
 
 `sylar`里面未使用C++标准库的`std::thread`，而是基于`pthread`自行实现了一个线程类。
 
@@ -304,7 +315,7 @@ void* Thread::run(void* arg)
 }
 ```
 
-### 5.1. 线程id
+#### 3.3.1. 线程id
 
 关于线程相关的几个id说明如下。注意：`pthread_self()`获取的线程id仅用于进程内部标识，和`ps`查看到的`pid`、`tid`无关。
 
@@ -315,7 +326,7 @@ void* Thread::run(void* arg)
 | **`PID`**       | `getpid()`            | 全局（系统内） | 系统唯一   | ✅ 一致（但所有线程相同）     | 进程ID，`ps -efL`中的`PID`列               |
 | **`ppid`**      | `getppid()`           | 全局（系统内） | 系统唯一   | ✅ 一致                       | 父进程ID，`ps -efL`中的`PPID`列            |
 
-### 5.2. std::thread 实现走读
+#### 3.3.2. std::thread 实现走读
 
 来看下从gcc中对应的C++标准实现，`std::thread`里的`thread`构造函数。
 
@@ -397,7 +408,7 @@ __gthread_create (__gthread_t *__threadid, void *(*__func) (void*),
 }
 ```
 
-## 6. 调度处理：run()
+### 3.4. 调度处理：run()
 
 每个线程各自有一个调度函数，由上述的`Scheduler::start()`中创建。
 
@@ -439,7 +450,8 @@ void Scheduler::run()
                 // 2 取出任务
                 assert(it->fiber||it->cb);
                 task = *it;
-                m_tasks.erase(it); 
+                m_tasks.erase(it);
+                // 获取到任务，执行前活跃线程数+1（有协程要执行的线程数）
                 m_activeThreadCount++;
                 // 只获取一个任务就退出循环，所以不会出现一个线程一直占用任务队列的情况
                 break;
@@ -461,6 +473,7 @@ void Scheduler::run()
                     task.fiber->resume();
                 }
             }
+            // 协程执行后计数-1
             m_activeThreadCount--;
             task.reset();
         }
@@ -478,16 +491,30 @@ void Scheduler::run()
         // 4 无任务 -> 执行空闲协程
         else
         {
-            ...
+            // 系统关闭 -> idle协程将从死循环跳出并结束 -> 此时的idle协程状态为TERM -> 再次进入将跳出循环并退出run()
+                // idle协程的协程函数中，只要不是stoping状态，就会while处理；
+                // 若是执行了stop，则协程函数结束，协程状态为 TERM 状态
+                // 然后会通过下面的break退出当前线程函数里的while(true)，结束当前线程
+            if (idle_fiber->getState() == Fiber::TERM) 
+            {
+                if(debug) std::cout << "Schedule::run() ends in thread: " << thread_id << std::endl;
+                break;
+            }
+            m_idleThreadCount++;
             // 上述idle协程创建时，绑定的协程函数为：Scheduler::idle，其中做sleep(1)后就挂起切换
             idle_fiber->resume();
-            ...
+            m_idleThreadCount--;
         }
     }
 }
 ```
 
-## 7. 停止协程调度：stop
+### 3.5. 停止协程调度：stop
+
+此处仅说明下关于`this`和线程局部变量的两个断言。
+
+* 当`m_useCaller`为true，即创建`Scheduler`调度类实例时指定了让`caller线程`（Scheduler主线程）也作为调度线程时，则必须由该主线程来调用`stop()`停止调度器。
+* 如上面对`Scheduler`的构造函数的说明中所述，coroutine_lib仓库里的`SetThis()`在`use_caller`为`true`时有问题，需要调整位置。
 
 ```cpp
 void Scheduler::stop()
@@ -502,31 +529,198 @@ void Scheduler::stop()
     } 
     else 
     {
-        // 此处特别注意：
         // 如果主线程（caller线程）不作为其中一个调度线程，则创建threads个线程，那么就会有 threads+1 个线程局部变量。
         // 这里表示stop必须由这threads之外的线程来触发
         assert(GetThis() != this);
     }
+    ...
 }
 ```
 
 ```cpp
-Scheduler* Scheduler::GetThis()
-{
-    return t_scheduler;
-}
-
 void Scheduler::SetThis()
 {
     t_scheduler = this;
 }
 ```
 
-## 8. 小结
+## 4. demo运行
+
+完整demo代码可见[3scheduler/main.cpp](https://github.com/xiaodongQ/coroutine-lib/blob/main/fiber_lib/3scheduler/main.cpp)。并在`scheduler.cpp`里开启debug日志打印。
+
+```cpp
+int main(int argc, char const *argv[])
+{
+    {
+        // 构造函数：Scheduler(size_t threads = 1, bool use_caller = true, const std::string& name="Scheduler");
+        // 此处有3个线程用于协程调度，由于use_caller指定了true，所以只会额外创建2个线程
+        std::shared_ptr<Scheduler> scheduler = std::make_shared<Scheduler>(3, true, "scheduler_1");
+        
+        scheduler->start();
+
+        sleep(2);
+
+        std::cout << "now: " << NowTime() << ", begin post\n\n"; 
+        for(int i=0;i<5;i++)
+        {
+            std::shared_ptr<Fiber> fiber = std::make_shared<Fiber>(task);
+            scheduler->scheduleLock(fiber);
+        }
+
+        sleep(6);
+
+        std::cout << "now: " << NowTime() << ", post again\n\n"; 
+        for(int i=0;i<15;i++)
+        {
+            std::shared_ptr<Fiber> fiber = std::make_shared<Fiber>(task);
+            scheduler->scheduleLock(fiber);
+        }
+
+        sleep(3);
+        scheduler->stop();
+    }
+    return 0;
+}
+```
+
+编译运行：
+* 此处`use_caller`为`true`，可看到几个线程对应的`thread_local`变量：`t_scheduler`保存的地址是一样的（`Scheduler::SetThis()`设置）
+
+```sh
+[root@xdlinux ➜ 3scheduler git:(main) ✗ ]$ ./test
+Scheduler::Scheduler() success
+    # 主线程的调度指针为Schedule实例的地址
+    ==== scheduler this: 0x16e0ec0
+# 只创建2个线程
+Schedule::run() starts in thread: 290619
+    ==== run() scheduler this: 0x16e0ec0
+Schedule::run() starts in thread: 290620
+    ==== run() scheduler this: 0x16e0ec0
+Scheduler::start() success
+Scheduler::idle(), sleeping in thread: 290620
+Scheduler::idle(), sleeping in thread: 290619
+Scheduler::idle(), sleeping in thread: 290619
+Scheduler::idle(), sleeping in thread: 290620
+now: Scheduler::idle(), sleeping in thread: 290619
+Scheduler::idle(), sleeping in thread: 290620
+2025-06-08 12:43:52, begin post
+
+task 0 is under processing in thread: 290619
+task 1 is under processing in thread: 290620
+task 2 is under processing in thread: 290620
+task 3 is under processing in thread: 290619
+task 4 is under processing in thread: 290620
+Scheduler::idle(), sleeping in thread: 290619
+Scheduler::idle(), sleeping in thread: 290619
+Scheduler::idle(), sleeping in thread: 290620
+Scheduler::idle(), sleeping in thread: 290619
+Scheduler::idle(), sleeping in thread: 290620
+now: 2025-06-08 12:43:58, post again
+
+task 5 is under processing in thread: 290619
+task 6 is under processing in thread: 290620
+task 7 is under processing in thread: 290620
+task 8 is under processing in thread: 290619
+task 9 is under processing in thread: 290620
+task 10 is under processing in thread: 290619
+# 由主线程stop（主线程也作为一个调度线程）
+Schedule::stop() starts in thread: 290618
+Schedule::run() starts in thread: 290618
+    ==== run() scheduler this: 0x16e0ec0
+task 11 is under processing in thread: 290618
+task 12 is under processing in thread: 290619
+task 13 is under processing in thread: 290620
+task 14 is under processing in thread: 290618
+task 15 is under processing in thread: 290619
+task 16 is under processing in thread: 290620
+task 17 is under processing in thread: 290618
+task 18 is under processing in thread: 290619
+task 19 is under processing in thread: 290620
+Scheduler::idle(), sleeping in thread: 290618
+Schedule::run() ends in thread: 290620
+Schedule::run() ends in thread: 290619
+Schedule::run() ends in thread: 290618
+m_schedulerFiber ends in thread:290618
+Schedule::stop() ends in thread:290618
+Scheduler::~Scheduler() success
+    ==== scheduler this: 0
+```
+
+调整`use_caller`为`false`，执行如下。
+* 可看到主线程中`t_scheduler`是nullptr
+* `std::shared_ptr<Scheduler> scheduler = std::make_shared<Scheduler>(3, false, "scheduler_1");`
+
+```sh
+[root@xdlinux ➜ 3scheduler git:(main) ✗ ]$ ./test
+Scheduler::Scheduler() success
+    # 主线程的调度指针为nullptr
+    ==== scheduler this: 0
+# 创建3个线程
+Schedule::run() starts in thread: 290745
+    ==== run() scheduler this: 0x1e14ec0
+Schedule::run() starts in thread: 290746
+    ==== run() scheduler this: 0x1e14ec0
+Schedule::run() starts in thread: 290747
+    ==== run() scheduler this: 0x1e14ec0Scheduler::start() success
+
+Scheduler::idle(), sleeping in thread: 290747
+Scheduler::idle(), sleeping in thread: 290746
+Scheduler::idle(), sleeping in thread: 290745
+Scheduler::idle(), sleeping in thread: 290745
+Scheduler::idle(), sleeping in thread: 290746
+Scheduler::idle(), sleeping in thread: 290747
+now: Scheduler::idle(), sleeping in thread: 290745
+Scheduler::idle(), sleeping in thread: 290746
+Scheduler::idle(), sleeping in thread: 290747
+2025-06-08 12:49:09, begin post
+
+task 0 is under processing in thread: 290747
+task 1 is under processing in thread: 290745
+task 2 is under processing in thread: 290746
+task 3 is under processing in thread: 290746
+task 4 is under processing in thread: 290745
+Scheduler::idle(), sleeping in thread: 290747
+Scheduler::idle(), sleeping in thread: 290747
+Scheduler::idle(), sleeping in thread: 290745
+Scheduler::idle(), sleeping in thread: 290746
+Scheduler::idle(), sleeping in thread: 290745
+Scheduler::idle(), sleeping in thread: 290746
+Scheduler::idle(), sleeping in thread: 290747
+Scheduler::idle(), sleeping in thread: 290745
+Scheduler::idle(), sleeping in thread: 290746
+Scheduler::idle(), sleeping in thread: 290747
+now: 2025-06-08 12:49:15, post again
+
+task 5 is under processing in thread: 290747
+task 6 is under processing in thread: 290745
+task 7 is under processing in thread: 290746
+task 8 is under processing in thread: 290745
+task 9 is under processing in thread: 290747
+task 10 is under processing in thread: 290746
+task 11 is under processing in thread: 290745
+task 12 is under processing in thread: 290746
+task 13 is under processing in thread: 290747
+# 由主线程stop
+Schedule::stop() starts in thread: 290744
+task 14 is under processing in thread: 290746
+task 15 is under processing in thread: 290745
+task 16 is under processing in thread: 290747
+task 17 is under processing in thread: 290746
+task 18 is under processing in thread: 290745
+task 19 is under processing in thread: 290747
+Schedule::run() ends in thread: 290747
+Schedule::run() ends in thread: 290746
+Schedule::run() ends in thread: 290745
+Schedule::stop() ends in thread:290744
+Scheduler::~Scheduler() success
+    ==== scheduler this: 0
+```
+
+## 5. 小结
 
 梳理sylar协程在多线程下的调度逻辑。
 
-## 9. 参考
+## 6. 参考
 
 * [coroutine-lib](https://github.com/youngyangyang04/coroutine-lib)
 * [sylar -- 协程调度模块](https://www.midlane.top/wiki/pages/viewpage.action?pageId=10060963)
