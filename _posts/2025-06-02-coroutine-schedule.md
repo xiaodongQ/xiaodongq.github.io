@@ -223,7 +223,8 @@ void Scheduler::start()
 **原因是：** 
 
 * `std::thread`在Linux下本身也是基于`pthread`实现的，并未有什么效率增益。（其实现走读可见下面的`std::thread`说明小节）
-* 且未提供读写锁（`C++11`未提供，`C++14`中引入了`std::shared_lock`可支持读写锁），而pthread原生的`pthread_rwlock_t`则可直接使用读写锁。
+* 且未提供读写锁（`C++11`未提供，`C++17`中引入了`std::shared_mutex`可支持读写锁），而pthread原生的`pthread_rwlock_t`则可直接使用读写锁。
+    * 可了解：[shared_mutex](https://en.cppreference.com/w/cpp/thread/shared_mutex.html)
 
 ```cpp
 // coroutine-lib/fiber_lib/3scheduler/thread.h
