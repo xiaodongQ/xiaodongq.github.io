@@ -280,21 +280,169 @@ void IOManager::tickle()
 ```
 
 2、如上面调度流程图所示，没有任务时，通过`idle`协程进行`resume()`操作，执行的是`idle`协程绑定的`idle()`函数，此处即重载后的`IOManager::idle()`
+* `idle()`里面结合了定时器做`epoll_wait`，定时器说明见下小节。
 
 ```cpp
 void IOManager::idle()
-{    
+{
     static const uint64_t MAX_EVNETS = 256;
+    // 创建临时的epoll_event数组（没用vector<epoll_event>方式），用于接收epoll_wait返回的就绪事件，每次最大256个
     std::unique_ptr<epoll_event[]> events(new epoll_event[MAX_EVNETS]);
 
-    while (true) 
+    while(true)
     {
-        if(debug) std::cout << "IOManager::idle(),run in thread: " << Thread::GetThreadId() << std::endl; 
-    }
-    ...
+        // blocked at epoll_wait
+        int rt = 0;
+        // 此处while循环为了结合定时器做超时检查，等待epoll事件超时触发，有触发则break此处的while(true)
+        while(true)
+        {
+            static const uint64_t MAX_TIMEOUT = 5000;
+            // 返回堆中最近的超时时间，还有多少ms到期（set里第一个成员时间最小，最先到期）
+            uint64_t next_timeout = getNextTimer();
+            next_timeout = std::min(next_timeout, MAX_TIMEOUT);
+
+            // 获取events原始指针，接收epoll触发的事件。此处阻塞等待事件发生，避免idle协程空转
+            rt = epoll_wait(m_epfd, events.get(), MAX_EVNETS, (int)next_timeout);
+            // EINTR -> retry
+            if(rt < 0 && errno == EINTR)
+            {
+                continue;
+            }
+            else
+            {
+                // 只要有任何事件通知就break出小循环
+                break;
+            }
+        }
+
+        // 既然有超时触发的事件，此处捞取超时定时器的回调函数
+        std::vector<std::function<void()>> cbs;
+        listExpiredCb(cbs);
+        if(!cbs.empty()) 
+        {
+            // 把这些回调函数都加入到协程调度器的任务队列里
+            for(const auto& cb : cbs) 
+            {
+                // 如果是第一次添加任务，则会tickle()一次：其中会向管道的fd[1]进行一次write（fd[0]就可以收到epoll读事件）
+                scheduleLock(cb);
+            }
+            cbs.clear();
+        }
+
+        // 处理epoll_wait获取到的事件
+        for (int i = 0; i < rt; ++i) 
+        {
+            epoll_event& event = events[i];
+            // pipe管道，则做read，由于是边缘触发，此处while处理。虽然fd[1] write时也只是写了1个字符。
+            if (event.data.fd == m_tickleFds[0]) 
+            {
+                uint8_t dummy[256];
+                // edge triggered -> exhaust
+                while (read(m_tickleFds[0], dummy, sizeof(dummy)) > 0);
+                continue;
+            }
+            // other events
+            FdContext *fd_ctx = (FdContext *)event.data.ptr;
+            std::lock_guard<std::mutex> lock(fd_ctx->mutex);
+            ...
+            // 事件只保留读和写类型
+            int real_events = NONE;
+            if (event.events & EPOLLIN) 
+            {
+                real_events |= READ;
+            }
+            if (event.events & EPOLLOUT) 
+            {
+                real_events |= WRITE;
+            }
+            ...
+            // 根据类型触发相应的事件回调处理
+            if (real_events & READ) 
+            {
+                fd_ctx->triggerEvent(READ);
+                --m_pendingEventCount;
+            }
+            if (real_events & WRITE) 
+            {
+                fd_ctx->triggerEvent(WRITE);
+                --m_pendingEventCount;
+            }
+        } // end for
+
+        Fiber::GetThis()->yield();
+    } // end while(true)
 }
 ```
 
+### 3.5. 定时器说明
+
+定时器通过`std::set`来模拟最小堆，`set`管理的类重载了`operator()`，从小到大，即第一个元素最小，`begin()`当做堆顶元素（最小）。
+* `getNextTimer()` 返回堆中最近的超时时间，还有多少`ms`到期（set里第一个成员时间最小，最先到期）。
+* `listExpiredCb` 取出所有超时定时器的回调函数，超时的定时器会从`m_timers`（`std::set`模拟的堆）中移除。
+
+```cpp
+// coroutine-lib/fiber_lib/5iomanager/timer.h
+class TimerManager 
+{
+    // 声明 Timer 是 TimerManager 的友元（Timer 可以访问 TimerManager 的私有成员）
+    friend class Timer;
+public:
+    TimerManager();
+    virtual ~TimerManager();
+    ...
+    // 添加timer
+    std::shared_ptr<Timer> addTimer(uint64_t ms, std::function<void()> cb, bool recurring = false);
+    // 拿到堆中最近的超时时间
+    uint64_t getNextTimer();
+    // 取出所有超时定时器的回调函数
+    void listExpiredCb(std::vector<std::function<void()>>& cbs);
+    ...
+protected:
+    ...
+    // 添加timer
+    void addTimer(std::shared_ptr<Timer> timer);
+private:
+    ...
+    // 时间堆。根据超时时间由小到大排序
+    // 此处用set模拟堆，begin作为堆顶（最小堆，堆顶是最小元素）。而没有用std::priority_queue优先级队列
+    std::set<std::shared_ptr<Timer>, Timer::Comparator> m_timers;
+    ...
+};
+
+class Timer : public std::enable_shared_from_this<Timer> 
+{
+    // 声明 TimerManager 是 Timer 的友元（TimerManager 可以访问 Timer 的私有成员）
+    friend class TimerManager;
+    ...
+private:
+    // 此处构造定义为了私有，可通过友元类（friend）TimerManager来访问
+    Timer(uint64_t ms, std::function<void()> cb, bool recurring, TimerManager* manager);
+private:
+    ...
+    // 超时时触发的回调函数
+    std::function<void()> m_cb;
+    ...
+private:
+    // 实现最小堆的比较函数
+    struct Comparator 
+    {
+        // 实现中是由小到大：lhs->m_next < rhs->m_next。默认情况就是`std::less`，也是从小到大升序排序。
+        bool operator()(const std::shared_ptr<Timer>& lhs, const std::shared_ptr<Timer>& rhs) const;
+    };
+};
+```
+
+`TimerManager`声明为了`Timer`的`friend`类，才能使用到`Timer`类的私有构造类：
+
+```cpp
+// coroutine-lib/fiber_lib/5iomanager/timer.cpp
+std::shared_ptr<Timer> TimerManager::addTimer(uint64_t ms, std::function<void()> cb, bool recurring) 
+{
+    std::shared_ptr<Timer> timer(new Timer(ms, cb, recurring, this));
+    addTimer(timer);
+    return timer;
+}
+```
 
 ## 4. 小结
 
