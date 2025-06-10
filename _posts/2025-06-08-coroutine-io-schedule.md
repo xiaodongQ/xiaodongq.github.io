@@ -27,6 +27,15 @@ sylar中的IO协程调度基于`epoll`实现。相对于上篇多线程下的协
 * 封装的添加、删除接口 和 `epoll_ctl`的`EPOLL_CTL_ADD`、`EPOLL_CTL_DEL`操作相对应。
 * 关注的事件则归类简化为了 **读（`EPOLLIN`）**、**写（`EPOLLOUT`）**事件。
 
+总体流程如下：
+
+![sylar_io_coroutine_scheduler](/images/sylar_io_coroutine_scheduler.svg)
+
+* IO协程调度类继承上篇中的调度类和一个定时器。支持epoll和定时器两个途径来产生任务，任务可以是协程或者函数对象，协程调度时都是包装为协程来进行`resume()`执行的。
+* 使用`idle()`和`tickle()`来避免没有任务情况下的空转，通过`epoll_wait`来进行等待，有两种情况会触发epoll事件：
+    * 1）当有用户注册的fd，如网络socket）有数据读写，epoll会触发事件，`run`调度处理中会进行事件处理，其中根据读、写不同，调用不同上下文进行任务添加；
+    * 2）通过`pipe`管道来进行通知，当任务队列里还有任务没一次性处理完，通过`tickle()`向管道发送数据来触发`epoll_wait`
+
 `epoll`的使用流程和项目中的应用，之前在好几篇历史博文里都梳理过了，可作回顾：
 * Redis的事件循环：[梳理Redis中的epoll机制](https://xiaodongq.github.io/2025/02/28/epoll-redis-nginx/)
 * muduo库，以及trae生成的demo项目：[ioserver服务实验（二） -- epoll使用梳理](https://xiaodongq.github.io/2025/02/25/ioserver2-epoll-dive/)
@@ -378,7 +387,9 @@ void IOManager::idle()
 
 定时器通过`std::set`来模拟最小堆，`set`管理的类重载了`operator()`，从小到大，即第一个元素最小，`begin()`当做堆顶元素（最小）。
 * `getNextTimer()` 返回堆中最近的超时时间，还有多少`ms`到期（set里第一个成员时间最小，最先到期）。
-* `listExpiredCb` 取出所有超时定时器的回调函数，超时的定时器会从`m_timers`（`std::set`模拟的堆）中移除。
+* `listExpiredCb` 取出所有超时定时器的回调函数
+    * 如果定时器支持循环利用，则重置超时时间后重新加入到管理器中；
+    * 否则超时的定时器会从`m_timers`（`std::set`模拟的堆）中移除。
 
 ```cpp
 // coroutine-lib/fiber_lib/5iomanager/timer.h
