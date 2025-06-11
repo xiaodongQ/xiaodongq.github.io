@@ -1,5 +1,5 @@
 ---
-title: 协程梳理实践（四） -- sylar协程中的标准库和系统API hook封装
+title: 协程梳理实践（四） -- sylar协程API hook封装
 description: 梳理sylar协程对标准库和系统API的hook封装
 categories: [并发与异步编程]
 tags: [协程, 异步编程]

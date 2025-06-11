@@ -1,6 +1,6 @@
 ---
 title: 协程梳理实践（三） -- sylar协程IO事件调度
-description: 梳理sylar协程中的IO事件调度，以及对系统IO的hook封装
+description: 梳理sylar协程中的IO事件调度
 categories: [并发与异步编程]
 tags: [协程, 异步编程]
 ---
