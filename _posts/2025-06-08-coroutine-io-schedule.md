@@ -41,7 +41,9 @@ sylar中的IO协程调度基于`epoll`实现。相对于上篇多线程下的协
 * 3FS里的事件循环也基于epoll：[DeepSeek 3FS学习实践（一） -- 事件循环](https://xiaodongq.github.io/2025/03/28/3fs-overview-eventloop/)
     * 另外其中也基于`Folly`库的**协程**，对IO进行了异步化。
 
-## 3. IO调度类定义
+## 3. 调度逻辑梳理
+
+### 3.1. IO调度类定义
 
 在前面的`class Scheduler`中，像`start()`/`stop()`、`tickle()`、`run()`、`idle()`等很多成员都定义为了`virtual`虚函数，是为了显式地提示这部分成员函数可被子类**重载**。
 
@@ -122,7 +124,7 @@ PIPE(3P)                          POSIX Programmer's Manual                     
        reading.
 ```
 
-## 4. IOManager类构造
+### 3.2. IOManager类构造
 
 其中工作：
 * 1）初始化epoll句柄；
@@ -168,7 +170,7 @@ Scheduler(threads, use_caller, name), TimerManager()
 }
 ```
 
-## 5. epoll事件注册：addEvent
+### 3.3. epoll事件注册：addEvent
 
 事件注册，传入需要注册的`fd`和事件，向epoll里进行注册（添加或修改）。几点说明：
 
@@ -259,7 +261,7 @@ int IOManager::addEvent(int fd, Event event, std::function<void()> cb)
 }
 ```
 
-## 6. 调度流程
+### 3.4. 调度流程
 
 `IOManager`里没有重载父类`Scheduler`中的`run()`，因此**调度类线程池**中各调度线程的线程函数还是`Scheduler::run()`。
 
@@ -380,7 +382,7 @@ void IOManager::idle()
 }
 ```
 
-## 7. 定时器说明
+### 3.5. 定时器说明
 
 定时器通过`std::set`来模拟最小堆，`set`管理的类重载了`operator()`，从小到大，即第一个元素最小，`begin()`当做堆顶元素（最小）。
 * `getNextTimer()` 返回堆中最近的超时时间，还有多少`ms`到期（set里第一个成员时间最小，最先到期）。
@@ -452,11 +454,115 @@ std::shared_ptr<Timer> TimerManager::addTimer(uint64_t ms, std::function<void()>
 }
 ```
 
-## 8. 小结
+## 4. 基本运行
+
+编译运行`coroutine-lib`中的基本示例。为了避免日志打印错误，暂时新增一个mutex用于日志互斥打印。
+
+```cpp
+// coroutine-lib/fiber_lib/5iomanager/main.cpp
+// 临时新增仅用于打印
+std::mutex mutex_cout;
+
+void func()
+{
+    recv(sock, recv_data, 4096, 0);
+    std::cout << recv_data << std::endl << std::endl;
+}
+
+const char data[] = "GET / HTTP/1.0\r\n\r\n"; 
+void func2()
+{
+    send(sock, data, sizeof(data), 0);
+}
+
+int main(int argc, char const *argv[])
+{
+    IOManager manager(2);
+
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+
+    sockaddr_in server;
+    server.sin_family = AF_INET;
+    server.sin_port = htons(80);  // HTTP 标准端口
+    // 百度网站的ip
+    server.sin_addr.s_addr = inet_addr("103.235.46.96");
+
+    fcntl(sock, F_SETFL, O_NONBLOCK);
+
+    connect(sock, (struct sockaddr *)&server, sizeof(server));
+    
+    // 发送 GET请求
+    manager.addEvent(sock, IOManager::WRITE, &func2);
+    manager.addEvent(sock, IOManager::READ, &func);
+    
+    {
+        std::lock_guard<std::mutex> lk(mutex_cout);
+        std::cout << "event has been posted\n\n";
+    }
+
+    // 等待一会，防止主线程退出提前触发调度线程等的析构，影响流程
+    sleep(1);
+    
+    return 0;
+}
+```
+
+运行：
+
+```sh
+[root@xdlinux ➜ 5iomanager git:(main) ✗ ]$ g++ *.cpp -o test -pthread -std=c++17
+[root@xdlinux ➜ 5iomanager git:(main) ✗ ]$ ./test
+Scheduler::Scheduler() success
+# 创建调度线程1
+Schedule::run() starts in thread: 499525
+Scheduler::start() success
+IOManager::idle(),run in thread: 499525
+# 线程1很快就已经调度处理了请求
+event has been posted
+
+IOManager::idle(),run in thread: 499525
+IOManager::idle(),run in thread: 499525
+# 应答信息
+HTTP/1.0 200 OK
+Accept-Ranges: bytes
+Cache-Control: no-cache
+Content-Length: 29506
+Content-Type: text/html
+    ...
+    <link
+        rel="search"
+        type="application/opensearchdescription+xml"
+        href="//www.baidu.com/content-search.xml"
+        title="百度搜索"
+    />
+    <title>百度一下，你就知道</title>
+    <style type="text/css">
+    ...
+
+IOManager::idle(),run in thread: 499525
+IOManager::idle(),run in thread: 499525
+# 触发析构，先stop线程2？（不是还没创建？）
+  # 这是由于main中，IOManager定义时设置了第一个参数为2，2个线程，
+  # 而主线程自身也作为调度线程（use_caller默认true），因此只创建一个新线程。执行结束即触发析构
+Schedule::stop() starts in thread: 499524
+# 调度线程2（其实是主线程，也作为协程调度线程）
+Schedule::run() starts in thread: 499524
+IOManager::idle(),run in thread: 499525
+name = IOManager idle exits in thread: 499525
+Schedule::run() ends in thread: 499525
+IOManager::idle(),run in thread: 499524
+name = IOManager idle exits in thread: 499524
+Schedule::run() ends in thread: 499524
+m_schedulerFiber ends in thread:499524
+Schedule::stop() ends in thread:499524
+Scheduler::~Scheduler() success
+```
+
+## 5. 小结
 
 梳理sylar中结合epoll和定时器之后的协程调度逻辑。限于篇幅，标准库和系统API hook的梳理还是作为下篇单独梳理。
 
-## 9. 参考
+## 6. 参考
 
 * [coroutine-lib](https://github.com/youngyangyang04/coroutine-lib)
 * [sylar -- IO协程调度模块](https://www.midlane.top/wiki/pages/viewpage.action?pageId=10061031)
