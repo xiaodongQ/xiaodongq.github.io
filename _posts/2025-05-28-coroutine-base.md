@@ -1,7 +1,7 @@
 ---
 title: 协程梳理实践（一） -- 实现一个简易协程
 description: 梳理协程相关机制，并跟踪sylar开源项目的协程实现。
-categories: [并发与异步编程]
+categories: [并发与异步编程, 协程]
 tags: [协程, 异步编程]
 ---
 
