@@ -16,15 +16,37 @@ tags: [编译原理, CSAPP]
 
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
-## 程序编译过程
+## 2. 程序编译过程
 
-此处仅说明C/C++的编译。gcc对C程序的编译过程：
+> 此处仅说明gcc对C/C++的编译。
 
+gcc对C程序的编译过程：
 
+* 预处理（`preprocessing`）
+    * 包含头文件处理、宏定义展开、条件编译处理
+    * 得到预处理后的代码（`.i`文件）
+    * `gcc -E hello.c -o hello.i`
+* 编译（`compilation`）
+    * 将预处理后的代码转换为汇编代码（`.s`文件）
+    * 这是整个编译器最核心的部分，包含：
+        * 词法分析（Lexical Analysis） → 
+        * 语法分析（Syntactic Analysis） → 
+        * 语义分析（Semantic Analysis） → 
+        * 中间代码生成（Intermediate Code Generation） → 
+        * 优化（Optimization） → 
+        * **目标代码生成（汇编）**（Code Generation）
+    * `gcc -S hello.i -o hello.s`
+* 汇编（`assembly`）
+    * 将汇编代码翻译成机器可识别的**目标代码**（二进制），生成目标文件（`.o`文件）
+        * 对应**目标代码生成（机器码）**，是**机器可识别**的机器码，而上一步编译中生成的目标代码是汇编语言的目标代码
+    * `gcc -c hello.s -o hello.o`，或直接 `gcc -c hello.c -o hello.o`
+* 链接（`linking`）
+    * 将多个`.o`目标文件和库文件链接在一起，生成可执行文件
+    * `gcc hello.o -o hello`，或直接 `gcc hello.c -o hello`
 
-## 2. ELF布局
+## 3. ELF布局
 
-### 2.1. `readelf`查看程序启动位置
+### 3.1. `readelf`查看程序启动位置
 
 通过`readelf`来查看ELF文件对应的头信息，可从 `Entry point address` 中查看程序启动位置。
 
@@ -54,7 +76,7 @@ ELF Header:
   Section header string table index: 34
 ```
 
-### 2.2. `objdump`反汇编
+### 3.2. `objdump`反汇编
 
 `objdump`对ELF文件进行**反汇编**：`objdump -d test > disassemble_d.txt`。
 
@@ -82,7 +104,7 @@ Disassembly of section .text:
   40225d:   00 00 00 
 ```
 
-## 3. 全局符号
+## 4. 全局符号
 
 [协程梳理实践（四） -- sylar协程API hook封装](https://xiaodongq.github.io/2025/06/10/coroutine-api-hook/) 中，`动态库hook方式`小节描述了动态库的**全局符号**覆盖机制。
 
