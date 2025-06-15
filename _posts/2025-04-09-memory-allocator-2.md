@@ -1,7 +1,7 @@
 ---
 title: CPU及内存调度（五） -- ptmalloc、tcmalloc、jemalloc、mimalloc内存分配器（下）
 description: 继续梳理 tcmalloc、jemalloc 和 mimalloc 内存分配器。
-categories: [CPU及内存调度]
+categories: [CPU及内存调度, 内存]
 tags: [内存]
 ---
 

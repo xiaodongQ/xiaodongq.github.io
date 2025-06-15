@@ -1,5 +1,5 @@
 ---
-title: 协程梳理实践（五） -- libco、boost.coroutine等开源协程库简析
+title: 协程梳理实践（五） -- libco、boost.coroutine等协程库简析
 description: 简要梳理libco、boost.coroutine2等开源协程库实现逻辑
 categories: [并发与异步编程, 协程]
 tags: [协程, 异步编程]
