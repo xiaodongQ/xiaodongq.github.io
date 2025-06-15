@@ -1,7 +1,7 @@
 ---
 title: 协程梳理实践（二） -- 多线程下的sylar协程调度
 description: 梳理多线程下的sylar协程调度
-categories: [并发与异步编程]
+categories: [并发与异步编程, 协程]
 tags: [协程, 异步编程]
 ---
 
