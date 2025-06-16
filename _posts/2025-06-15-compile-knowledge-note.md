@@ -76,6 +76,11 @@ ELF Header:
   Section header string table index: 34
 ```
 
+Linux的内存管理和空间分布，可见之前的梳理：[CPU及内存调度（二） -- Linux内存管理](https://xiaodongq.github.io/2025/03/20/memory-management/)。此处贴一下32位系统下进程的虚拟内存空间分布示意：
+
+![virtual-memory-struct-32bit](/images/virtual-memory-struct-32bit.png)  
+[出处](https://mp.weixin.qq.com/s/uWadcBxEgctnrgyu32T8sQ)
+
 ### 3.2. `objdump`反汇编
 
 `objdump`对ELF文件进行**反汇编**：`objdump -d test > disassemble_d.txt`。
