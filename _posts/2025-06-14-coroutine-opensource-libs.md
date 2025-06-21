@@ -21,6 +21,9 @@ tags: [协程, 异步编程]
     * [从 C++20 协程，到 Asio 的协程适配](https://www.bluepuni.com/archives/cpp20-coroutine-and-asio-coroutine)
     * [实现一个简单的协程](https://www.bluepuni.com/archives/implements-coroutine/)
 * boost.coroutine / boost.coroutine2
+* [PhotonLibOS](https://github.com/alibaba/PhotonLibOS)
+    * 阿里开源的LibOS库，里面的运行时基于协程实现，支持`io_uring`作为IO引擎
+    * [文档](https://photonlibos.github.io/cn/docs/category/introduction)
 
 *说明：本博客作为个人学习实践笔记，可供参考但非系统教程，可能存在错误或遗漏，欢迎指正。若需系统学习，建议参考原链接。*
 
