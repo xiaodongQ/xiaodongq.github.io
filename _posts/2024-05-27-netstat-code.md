@@ -1,6 +1,6 @@
 ---
 title: 分析netstat中的Send-Q和Recv-Q
-categories: [网络, TCP]
+categories: [网络, TCP半连接全连接]
 tags: [Linux, 网络]
 ---
 
