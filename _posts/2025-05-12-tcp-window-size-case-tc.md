@@ -1,7 +1,7 @@
 ---
 title: TCP发送接收过程（三） -- 实验观察TCP性能和窗口、Buffer的关系（下）
 description: 通过tc模拟异常实验观察TCP性能和窗口、Buffer的关系。
-categories: [网络, TCP]
+categories: [网络, TCP发送接收过程]
 tags: [TCP, Wireshark, 接收缓冲区]
 ---
 
@@ -69,7 +69,7 @@ tags: [TCP, Wireshark, 接收缓冲区]
 **扩展阅读**：[Linux-Traffic-Control-Classifier-Action-Subsystem-Architecture.pdf](https://people.netfilter.org/pablo/netdev0.1/papers/Linux-Traffic-Control-Classifier-Action-Subsystem-Architecture.pdf)，介绍了`TC Classifier-Action`子系统的架构。
 
 * 可了解到其和`netfilter`的位置关系：数据流入 -> `ingress TC` -> `netfilter` -> `egress TC` -> 数据流出。见下图示意。
-* 关于`netfilter`可见 [TCP发送接收过程（三） -- 学习netfilter和iptables](https://xiaodongq.github.io/2024/07/05/netfilter-iptables-learn/) 中的学习梳理。另外看了下当前自己`Rocky Linux`环境的`firewalld`防火墙后端，也默认`nftables`了（弃用了`iptables`）：`FirewallBackend=nftables`。
+* 关于`netfilter`可见 [TCP发送接收过程 -- 学习netfilter和iptables](https://xiaodongq.github.io/2024/07/05/netfilter-iptables-learn/) 中的学习梳理。另外看了下当前自己`Rocky Linux`环境的`firewalld`防火墙后端，也默认`nftables`了（弃用了`iptables`）：`FirewallBackend=nftables`。
 
 ![linux-tc-netfilter-datapath](/images/linux-tc-netfilter-datapath.png)  
 [出处](https://people.netfilter.org/pablo/netdev0.1/papers/Linux-Traffic-Control-Classifier-Action-Subsystem-Architecture.pdf)

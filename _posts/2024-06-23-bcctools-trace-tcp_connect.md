@@ -1,6 +1,6 @@
 ---
 title: TCP半连接全连接（三） -- eBPF跟踪全连接队列溢出（上）
-categories: [网络, TCP]
+categories: [网络, TCP半连接全连接]
 tags: 网络
 ---
 

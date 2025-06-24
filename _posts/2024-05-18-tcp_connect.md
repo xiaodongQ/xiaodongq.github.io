@@ -1,6 +1,6 @@
 ---
 title: TCP半连接全连接（一） -- 全连接队列相关过程
-categories: [网络, TCP]
+categories: [网络, TCP半连接全连接]
 tags: 网络
 ---
 
@@ -553,7 +553,7 @@ TCP协议的Seq显示修改成原始值(Protocol->TCP->取消相对Seq)，能更
 1. **内核drop掉的包，是否会被tcpdump抓到？(待定，TODO)**
 2. **全连接队列溢出导致内核drop掉的包，是否会被tcpdump抓到？**
 
-（后续更新：得分是接收过程还是发送过程。接收过程先过tcpdump挂接的协议，是可以抓到的；而发送过程的丢包由于先过netfilter再经过tcpdump挂接的协议，抓取不到。具体可见此篇博客笔记：[TCP发送接收过程（三） -- 学习netfilter和iptables](https://xiaodongq.github.io/2024/07/05/netfilter-iptables-learn/)）
+（后续更新：得分是接收过程还是发送过程。接收过程先过tcpdump挂接的协议，是可以抓到的；而发送过程的丢包由于先过netfilter再经过tcpdump挂接的协议，抓取不到。具体可见此篇博客笔记：[TCP发送接收过程 -- 学习netfilter和iptables](https://xiaodongq.github.io/2024/07/05/netfilter-iptables-learn/)）
 
 查资料上述两种情况若是drop了包，应该就抓不到包，所以包没有被drop掉。问题是服务端既然收到了客户端对于其`SYN+ACK`的`ACK`确认包，就应该是握手成功两端都`ESTABLISHED`了，为什么还要重传`SYN+ACK`呢？
 
