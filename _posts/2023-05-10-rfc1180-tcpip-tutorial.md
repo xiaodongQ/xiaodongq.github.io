@@ -1,6 +1,6 @@
 ---
 title: RFC1180学习笔记
-categories: [网络, TCP]
+categories: [网络, RFC]
 tags: 网络
 ---
 

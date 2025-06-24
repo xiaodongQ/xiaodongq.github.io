@@ -1,6 +1,6 @@
 ---
 title: TCP半连接全连接（二） -- 半连接队列代码逻辑
-categories: [网络, TCP]
+categories: [网络, TCP半连接全连接]
 tags: [网络, TCP]
 ---
 

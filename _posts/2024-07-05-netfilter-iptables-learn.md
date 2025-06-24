@@ -1,6 +1,6 @@
 ---
-title: TCP发送接收过程（三） -- 学习netfilter和iptables
-categories: [网络, TCP]
+title: TCP发送接收过程 -- 学习netfilter和iptables
+categories: [网络, TCP发送接收过程]
 tags: [TCP, netfilter, iptables]
 ---
 

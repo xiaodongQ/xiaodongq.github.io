@@ -1,7 +1,7 @@
 ---
 title: TCP发送接收过程（二） -- 实验观察TCP性能和窗口、Buffer的关系（上）
 description: 通过实验观察TCP性能和窗口、Buffer的关系，并用Wireshark跟踪TCP Stream Graphs。
-categories: [网络, TCP]
+categories: [网络, TCP发送接收过程]
 tags: [TCP, Wireshark, 接收缓冲区]
 ---
 
