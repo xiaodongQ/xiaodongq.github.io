@@ -21,6 +21,7 @@ tags: [协程, 异步编程]
     * [从 C++20 协程，到 Asio 的协程适配](https://www.bluepuni.com/archives/cpp20-coroutine-and-asio-coroutine)
     * [实现一个简单的协程](https://www.bluepuni.com/archives/implements-coroutine/)
 * boost.coroutine / boost.coroutine2
+    * [协程Part1-boost.Coroutine.md](https://www.cnblogs.com/pokpok/p/16932735.html)
 * [PhotonLibOS](https://github.com/alibaba/PhotonLibOS)
     * 阿里开源的LibOS库，里面的运行时基于协程实现，支持`io_uring`作为IO引擎
     * [文档](https://photonlibos.github.io/cn/docs/category/introduction)
@@ -29,9 +30,11 @@ tags: [协程, 异步编程]
 
 ## 2. libco协程库简析
 
+libco中实现了有栈协程。相关核心机制，和之前 [协程梳理实践](https://xiaodongq.github.io/categories/%E5%8D%8F%E7%A8%8B/) 中梳理`sylar`协程时基本类似，不过libco更为完善，**支持共享栈**、**协程间可嵌套调用**。核心机制，如：协程`yield`/`resume`操作、协程调度、系统调用hook等。
+
 ### 2.1. 项目文件结构
 
-项目中的文件并不多，如下。
+项目中的文件并不多：
 
 ```sh
 [MacOS-xd@qxd ➜ libco git:(master) ]$ ll
@@ -64,8 +67,11 @@ total 344
 
 其中：
 * `co_routine.h/cpp` 中为协程API实现
-    * `co_routine_inner.h`中定义 `stCoRoutine_t` 协程结构体
-    * `libco/coctx.h`中定义 `coctx_t` 协程上下文结构
+* `co_routine_inner.h`中定义 `stCoRoutine_t` 协程结构体
+* `libco/coctx.h`中定义 `coctx_t` 协程上下文结构
+    * `coctx_swap.S`里基于汇编实现了协程的上下文切换函数
+* `co_epoll.h/cpp` 封装了`epoll`和`kqueue`
+* `co_hook_sys_call.cpp` 对系统api的hook封装，使用`dlsym`函数获取原始系统调用的地址
 
 `stCoRoutine_t`协程结构定义如下：
 
@@ -101,6 +107,60 @@ struct stCoRoutine_t
 };
 ```
 
+### 2.2. 使用方式
+
+先说明下部分核心API：
+
+```cpp
+// libco/co_routine.h
+/**
+* 创建一个协程对象
+* 
+* @param ppco - (output) 创建的协程对象。传入指针（stCoRoutine_t *）的地址，该指针会指向本函数中创建的协程对象
+* @param attr - (input) 协程属性，目前主要是共享栈 
+* @param pfn - (input) 协程所运行的函数
+* @param arg - (input) 协程运行函数的参数
+*/
+int     co_create( stCoRoutine_t **co,const stCoRoutineAttr_t *attr,void *(*routine)(void*),void *arg );
+// 恢复协程co，即切换到co协程
+void    co_resume( stCoRoutine_t *co );
+// 挂起
+void    co_yield( stCoRoutine_t *co );
+...
+
+// 获取当前协程
+stCoRoutine_t *co_self();
+
+/**
+* 大部分的sys_hook都需要用到这个函数来把事件注册到epoll中。具体实现在`co_poll_inner`函数中。
+* 
+* @param ctx epoll上下文
+* @param fds[] fds 要监听的文件描述符 原始poll函数的参数，
+* @param nfds  nfds fds的数组长度 原始poll函数的参数
+* @param timeout_ms timeout 等待的毫秒数 原始poll函数的参数
+*/
+int     co_poll( stCoEpoll_t *ctx,struct pollfd fds[], nfds_t nfds, int timeout_ms );
+/*
+* libco的核心调度
+* 在此处调度三种事件：
+* 1. 被hook的io事件，该io事件是通过co_poll_inner注册进来的
+* 2. 超时事件
+* 3. 用户主动使用poll的事件
+* 所以，如果用户用到了三种事件，必须得配合使用co_eventloop
+*
+* @param ctx epoll管理器
+* @param pfn 每轮事件循环的最后会调用该函数
+* @param arg pfn的参数
+*/
+void    co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg );
+```
+
+使用方式，步骤如下：
+* 1、`co_create`创建协程。其声明如上所述，创建时指定协程处理函数。
+    * 比如：`co_create( &co,NULL,readwrite_routine, &endpoint);`
+* 2、协程切换，调用`co_resume`
+* 3、调用`co_eventloop`，开始协程调度
+    * 其中系统调用被hook为通过epoll事件驱动，流程类似：[协程梳理实践（四） -- sylar协程API hook封装](https://xiaodongq.github.io/2025/06/10/coroutine-api-hook/)。
 
 ## 3. 小结
 
