@@ -160,7 +160,102 @@ void    co_eventloop( stCoEpoll_t *ctx,pfn_co_eventloop_t pfn,void *arg );
     * 比如：`co_create( &co,NULL,readwrite_routine, &endpoint);`
 * 2、协程切换，调用`co_resume`
 * 3、调用`co_eventloop`，开始协程调度
-    * 其中系统调用被hook为通过epoll事件驱动，流程类似：[协程梳理实践（四） -- sylar协程API hook封装](https://xiaodongq.github.io/2025/06/10/coroutine-api-hook/)。
+    * 其中系统调用被hook为通过epoll事件驱动，流程类似：[协程梳理实践（四） -- sylar协程API hook封装](https://xiaodongq.github.io/2025/06/10ocoroutine-api-hook/)。
+
+示例：以libco里的`example_echocli.cpp`做说明。
+* 使用方式 `./example_echosvr 127.0.0.1 10000 100 50`，各参数为：服务端ip、端口、协程数（每个子进程都创建该数量的协程）、子进程数
+* 创建50个子进程，每个子进程里创建100个协程，而后每个子进程开始协程调度（各自包含一个协程调度器）
+
+```cpp
+// libco/example_echocli.cpp
+int main(int argc, char *argv[])
+{
+    stEndPoint endpoint;
+    endpoint.ip = argv[1];
+    endpoint.port = atoi(argv[2]);
+    int cnt = atoi( argv[3] );
+    int proccnt = atoi( argv[4] );
+    ...
+    for(int k=0; k<proccnt; k++) {
+        pid_t pid = fork();
+        if(pid > 0) {
+            // 父进程
+            continue;
+        }
+        else if(pid < 0) {
+            break;
+        }
+        // 下面是每个子进程都会进行的操作
+        for(int i=0; i<cnt; i++) {
+            stCoRoutine_t *co = 0;
+            // 创建协程
+            co_create( &co, NULL, readwrite_routine, &endpoint);
+            co_resume( co );
+        }
+        // 开始协程调度，每个子进程都有一个协程调度器
+        co_eventloop( co_get_epoll_ct(),0,0 );
+
+        exit(0);
+    }
+    return 0;
+}
+```
+
+协程处理函数如下：
+* 其中`socket`、`connect`、`close`、`write`、`read`等网络api接口都进行了hook封装，相关同步接口hook成了基于`epoll`的异步事件处理
+    * 并使用`dlsym`函数获取原始函数地址。具体可见`co_hook_sys_call.cpp`的实现。
+* `connect`连接服务端，连接成功后`write`发送8字节数据，而后进行`read`接收，这3个接口都在epoll事件循环中进行处理
+
+```cpp
+// libco/co_hook_sys_call.cpp
+static void *readwrite_routine( void *arg ) {
+    co_enable_hook_sys();
+    stEndPoint *endpoint = (stEndPoint *)arg;
+    ...
+    int fd = -1;
+    for(;;) {
+        // 若连接返回`EALREADY`或`EINPROGRESS`，则继续重连
+        if ( fd < 0 ) {
+            // 里面对原生socket做了hook，使用dlsym获取原有函数地址
+            fd = socket(PF_INET, SOCK_STREAM, 0);
+            struct sockaddr_in addr;
+            SetAddr(endpoint->ip, endpoint->port, addr);
+            // 句柄注册到epoll中（其中调用`co_poll_inner`），注册POLLOUT事件
+            ret = connect(fd,(struct sockaddr*)&addr,sizeof(addr));
+            if ( errno == EALREADY || errno == EINPROGRESS ) {
+                struct pollfd pf = { 0 };
+                pf.fd = fd;
+                pf.events = (POLLOUT|POLLERR|POLLHUP);
+                // 其中调用`co_poll_inner`，注册POLLOUT事件
+                co_poll( co_get_epoll_ct(),&pf,1,200);
+                //check connect
+                int error = 0;
+                uint32_t socklen = sizeof(error);
+                errno = 0;
+                ret = getsockopt(fd, SOL_SOCKET, SO_ERROR,(void *)&error,  &socklen);
+                if ( ret == -1 || error) {
+                    ...
+                    continue;
+                }
+            } 
+        }
+        
+        // hook写，其中会注册POLLOUT事件
+        ret = write( fd,str, 8);
+        if ( ret > 0 ) {
+            // hook读，其中注册POLLIN事件
+            ret = read( fd, buf, sizeof(buf) );
+            ...
+        }
+        ...
+    }
+    return 0;
+}
+```
+
+## boost.coroutine
+
+
 
 ## 3. 小结
 
