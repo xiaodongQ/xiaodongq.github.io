@@ -17,10 +17,15 @@ tags: [协程, 异步编程]
     * [漫谈微信libco协程设计及实现（万字长文）](https://runzhiwang.github.io/2019/06/21/libco/)
     * [微信 libco 协程库源码分析](https://www.cyhone.com/articles/analysis-of-libco/)
     * [C++20 Coroutine 性能测试 (附带和libcopp/libco/libgo/goroutine/linux ucontext对比)](https://cloud.tencent.com/developer/article/1563255)
+* boost asio中的coroutine
+    * 有栈协程：使用`boost::asio::spawn()`接口
+    * 可查看 [boost_asio overview](https://www.boost.org/doc/libs/latest/doc/html/boost_asio/overview.html)
 * C++20协程库
     * [从 C++20 协程，到 Asio 的协程适配](https://www.bluepuni.com/archives/cpp20-coroutine-and-asio-coroutine)
-    * [实现一个简单的协程](https://www.bluepuni.com/archives/implements-coroutine/)
+    * 了解：[实现一个简单的协程](https://www.bluepuni.com/archives/implements-coroutine/)
 * boost.coroutine / boost.coroutine2
+    * [boost.coroutine](https://www.boost.org/doc/libs/latest/libs/coroutine/doc/html/coroutine/overview.html)已经被标记为`已过时（deprecated）`
+    * 新的协程实现为 [boost.coroutine2](https://www.boost.org/doc/libs/latest/libs/coroutine2/doc/html/index.html)
     * [协程Part1-boost.Coroutine.md](https://www.cnblogs.com/pokpok/p/16932735.html)
 * [PhotonLibOS](https://github.com/alibaba/PhotonLibOS)
     * 阿里开源的LibOS库，里面的运行时基于协程实现，支持`io_uring`作为IO引擎
@@ -253,12 +258,12 @@ static void *readwrite_routine( void *arg ) {
 }
 ```
 
-## boost.coroutine
+## 3. boost.coroutine
 
 
 
-## 3. 小结
+## 4. 小结
 
 
-## 4. 参考
+## 5. 参考
 
