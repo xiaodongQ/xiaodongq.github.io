@@ -34,8 +34,74 @@ tags: [Go]
 * 支持页面设置多套数据库参数，并可选择连接哪个数据库，参数包含：服务端ip、端口、数据库用户、密码、数据库默认为test
 * 支持输入`bid`或者`bname`，检索展示其下包含的总文件数、大小，以及`fid`、`fname`详情，并可进一步输入`fid`/`fname`过滤检索
 
-## 代码走读
+## 3. 代码走读
 
 生成的项目代码在：[simple_web_tool](https://github.com/xiaodongQ/simple_web_tool)。
 
 基于：gin + gorm + html/template。
+
+
+
+## 4. 测试环境搭建
+
+本地是`Rocky Linux release 9.5 (Blue Onyx)`系统，容器基于`podman`。
+
+1、`podman`更换国内源：修改`/etc/containers/registries.conf`，而后`systemctl restart podman`
+
+```sh
+#unqualified-search-registries = ["registry.access.redhat.com", "registry.redhat.io", "docker.io"]
+unqualified-search-registries = ["docker.m.daocloud.io"]  
+```
+
+2、拉取MySQL镜像：`docker pull mysql:8.0`
+
+3、运行
+
+```sh
+podman run -d \
+  --name mysql-server \
+  -e MYSQL_ROOT_PASSWORD=Demo_123! \
+  -e MYSQL_DATABASE=testdb \
+  -e MYSQL_USER=test \
+  -e MYSQL_PASSWORD=test\
+  -p 3306:3306 \
+  -v mysql_data:/var/lib/mysql \
+  docker.m.daocloud.io/library/mysql:8.0 \
+  --character-set-server=utf8mb4 \
+  --collation-server=utf8mb4_unicode_ci
+```
+
+进容器登录查看：
+
+```sh
+# 或 podman ps、podman logs mysql-server
+[root@xdlinux ➜ ~ ]$ docker ps   
+CONTAINER ID  IMAGE        COMMAND     CREATED       STATUS        PORTS              NAMES
+bec5843eb92d  docker.m.daocloud.io/library/mysql:8.0  --character-set-s...  4 minutes ago  Up 4 minutes  0.0.0.0:3306->3306/tcp, 3306/tcp, 33060/tcp  mysql-server
+
+[root@xdlinux ➜ ~ ]$ docker logs mysql-server
+Emulate Docker CLI using podman. Create /etc/containers/nodocker to quiet msg.
+2025-07-08 14:56:56+00:00 [Note] [Entrypoint]: Entrypoint script for MySQL Server 8.0.42-1.el9 started.
+2025-07-08 14:56:56+00:00 [Note] [Entrypoint]: Switching to dedicated user 'mysql'
+2025-07-08 14:56:56+00:00 [Note] [Entrypoint]: Entrypoint script for MySQL Server 8.0.42-1.el9 started.
+'/var/lib/mysql/mysql.sock' -> '/var/run/mysqld/mysqld.sock'
+...
+
+# 进容器
+[root@xdlinux ➜ volumes ]$ docker exec -it mysql-server bash
+# root用户登录
+bash-5.1# mysql -uroot -pDemo_123!
+# test用户登录
+bash-5.1# mysql -utest -ptest  
+```
+
+宿主机登录MySQL，需要调整下`-h`
+
+```sh
+[root@xdlinux ➜ ~ ]$ mysql -h 127.0.0.1 -uroot -pDemo_123!
+mysql: [Warning] Using a password on the command line interface can be insecure.
+...
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql> 
+```
