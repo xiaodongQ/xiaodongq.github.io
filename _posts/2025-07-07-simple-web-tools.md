@@ -44,11 +44,85 @@ tags: [Go]
 
 生成的项目代码在：[simple_web_tool](https://github.com/xiaodongQ/simple_web_tool)。
 
-基于：gin + gorm + html/template。
+基于：gin + gorm + html/template，配置文件使用yaml格式。
 
+### 3.1. 代码结构
 
+代码结构如下：
 
-## 4. 测试环境搭建
+```sh
+[MacOS-xd@qxd ➜ simple_web_tool git:(main) ✗ ]$ tree 
+.
+├── build.sh
+├── config
+│   ├── database.go
+│   └── database.yaml
+├── controllers
+│   └── database.go
+├── go.mod
+├── go.sum
+├── init_db.sql
+├── main.go
+├── models
+│   └── models.go
+├── services
+│   └── database.go
+├── static
+│   ├── css
+│   │   └── bootstrap.min.css
+│   └── js
+│       └── main.js
+└── templates
+    └── index.html
+```
+
+其中：
+* 入口：`main.go`
+* html和css样式、js控制，在templates和static目录
+    * 部署时，需要拷贝这两个相对目录
+* models、controllers目录，MVC架构的数据和控制逻辑
+* config，配置文件相关加载逻辑
+* 测试数据库表和数据初始化：`init_db.sql`
+
+`build.sh`里的编译命令：`CGO_ENABLED=0 go build -ldflags="-s -w" -o simple_web_tool`，其中`CGO_ENABLED=0`可以去掉glibc的动态库依赖（不使用CGO），更便于分发。
+
+### 3.2. 入口函数
+
+```go
+package main
+
+import (
+	"log"
+	"simple_web_tool/controllers"
+	"simple_web_tool/services"
+
+	"github.com/gin-gonic/gin"
+)
+
+func main() {
+	// 初始化数据库连接
+	if err := services.InitDatabase(); err != nil {
+		log.Fatalf("数据库初始化失败: %v", err)
+	}
+
+	r := gin.Default()
+	r.Static("/static", "./static")
+	r.LoadHTMLGlob("templates/*")
+
+	r.GET("/", controllers.IndexHandler)
+	r.GET("/api/users", controllers.GetUserStats)
+	r.GET("/api/partitions", controllers.GetPartitionDetails)
+	r.GET("/api/configs", controllers.ListDBConfigs)
+	r.POST("/api/configure-db", controllers.ConfigureDB)
+	r.POST("/api/update-config", controllers.UpdateDBConfig)
+
+	r.Run(":8080")
+}
+```
+
+## 4. 测试环境部署
+
+### 4.1. MySQL容器环境
 
 本地是`Rocky Linux release 9.5 (Blue Onyx)`系统，容器基于`podman`。
 
@@ -111,3 +185,15 @@ Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 
 mysql> 
 ```
+
+### 4.2. 测试表和测试数据初始化
+
+初始脚本：`init_db.sql`，在宿主机上执行：`mysql -h 127.0.0.1 -utest -ptest testdb < init_db.sql`
+
+## 5. 程序效果
+
+
+
+## 6. 小结
+
+利用AI生成了一个基本的工具项目，并在调试过程中动态调整，结对过程中边学边实践。
