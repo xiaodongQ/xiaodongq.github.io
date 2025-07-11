@@ -42,7 +42,7 @@ tags: [Go]
   * 配置保存在配置文件里，不存在配置文件时，默认生成
 * 以用户维度展示统计信息
   * 展示用户中包含哪些有数据的分区，及各分区里的文件数和大小；并统计用户总文件数和大小。
-  * 分区下的文件数据，我可以点击进去查看具体文件详情列表，若数据太多则默认limit 10展示。并可输入bid来精确匹配，也可输入fname来like前后模糊匹配
+  * 分区下的文件数据，我可以点击进去查看具体文件详情列表，若数据太多则默认limit 10展示。并可输入fid来精确匹配，也可输入fname来like前后模糊匹配
 
 ## 3. 生成项目说明
 
@@ -51,9 +51,9 @@ tags: [Go]
 生成的项目代码在：[simple_web_tool](https://github.com/xiaodongQ/simple_web_tool)。
 
 生成了2个版本的代码。
-* v1版本：DeepSeek-V3-0324
+* v1版本：基于DeepSeek-V3-0324
     * 实现栈：gin + gorm + html/template，配置文件使用yaml格式。
-* v2版本：DeepSeek-Reasoner(R1)
+* v2版本：基于DeepSeek-Reasoner(R1)
     * 实现栈：基于基础的`net/http` + `database/sql`，配置文件基于json
 
 ### 4.1. v1版本代码结构说明
@@ -286,7 +286,15 @@ INSERT INTO bucket_files_7b (fid, fname, bid, fsize, status) VALUES
  
 ## 6. 程序效果
 
+只使用第2个版本。
 
+1、用户信息统计：`http://localhost:8080/user-stats`
+
+![用户信息统计](/images/2025-07-12-stats.png)
+
+2、分区过滤展示：`http://localhost:8080/files?user=2&part=f0`
+
+![用户信息统计](/images/2025-07-12-filter.png)
 
 ## 7. 小结
 
