@@ -48,7 +48,7 @@ tags: [Go]
 
 ## 4. 代码走读
 
-生成的项目代码在：[simple_web_tool](https://github.com/xiaodongQ/simple_web_tool)。
+生成（加上调试修改）的项目代码在：[simple_web_tool](https://github.com/xiaodongQ/simple_web_tool)。
 
 生成了2个版本的代码。
 * v1版本：基于DeepSeek-V3-0324
@@ -264,7 +264,11 @@ INSERT INTO users (username, status) VALUES
 INSERT INTO buckets (bid, bname, user, part) VALUES
 (1000000000000001, 'admin-backup', 1, 'a3'),
 (1000000000000002, 'tester-data', 2, 'f0'),
-(1000000000000003, 'dev-resources', 3, '7b');
+(1000000000000003, 'dev-resources', 3, '7b'),
+-- 增加部分空bucket
+(1000000000000004, 'xxxxxxxxxxxx', 1, 'b1'),
+(1000000000000005, 'yyyyyyyyyyyy', 3, 'c2'),
+(1000000000000006, 'zzzzzzzzzzzz', 3, 'd3');
 
 -- 插入测试文件数据
 -- 分区a3的文件
@@ -286,7 +290,18 @@ INSERT INTO bucket_files_7b (fid, fname, bid, fsize, status) VALUES
  
 ## 6. 程序效果
 
-只使用第2个版本。
+> 说明：仅使用第2个版本，[simple_web_tool/v2](https://github.com/xiaodongQ/simple_web_tool/tree/main/v2)。
+
+功能说明：
+* 支持全局统计，统计各个用户下文件分布信息
+* 支持配置多个MySQL数据库环境，可切换默认连接的数据库，数据库配置持久化为json配置文件
+* 支持用户分区下文件详情查询。并支持进一步根据文件id过滤、文件名称模糊过滤
+* 支持bucket名称和id精确查询，并支持跳转到文件详情查询
+* 分发和部署
+    * 分发便捷，页面基于Go的`embed.FS`特性，HTML直接嵌入在Go程序中，只需要单bin部署
+    * 支持指定监听端口，不指定则默认`8888`
+
+部分功能截图：
 
 1、用户信息统计：`http://localhost:8080/user-stats`
 
@@ -298,4 +313,4 @@ INSERT INTO bucket_files_7b (fid, fname, bid, fsize, status) VALUES
 
 ## 7. 小结
 
-利用AI生成了一个基本的工具项目，并在调试过程中动态调整，结对过程中边学边实践。
+利用AI生成了一个基本的工具项目，并在调试过程中动态调整，结对过程中边学边实践。帮助挺大。
