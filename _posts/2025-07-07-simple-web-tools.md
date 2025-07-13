@@ -8,7 +8,7 @@ tags: [Go]
 
 ## 1. 背景
 
-平时定位问题和查看测试环境数据时，经常要连Shell终端（PS：终端工具也从XShell/SecureCRT切换到[WindTerm](https://github.com/kingToolbox/WindTerm)了），连接数据库后再手敲SQL查询。数据库数据模型：总表`A`中有一个分区字段，范围`00~FF`共256张子表，需要先到A表找到分区，而后到对应的`A_xx`子表里查看进一步的信息。
+平时定位问题和查看测试环境数据时，经常要连Shell终端（XShell、SecureCRT、[WindTerm](https://github.com/kingToolbox/WindTerm)了），连接数据库后再手敲SQL查询。数据库数据模型：总表`A`中有一个分区字段，范围`00~FF`共256张子表，需要先到A表找到分区，而后到对应的`A_xx`子表里查看进一步的信息。
 
 有几个痛点：
 * 虽然连接数据库、联表等常用命令设置为了快捷按钮，但还是**需要多次点击**以及手动输入数据
@@ -46,9 +46,7 @@ tags: [Go]
 
 ## 3. 生成项目说明
 
-## 4. 代码走读
-
-生成（加上调试修改）的项目代码在：[simple_web_tool](https://github.com/xiaodongQ/simple_web_tool)。
+生成（加上多次调试修改）的项目代码在：[simple_web_tool](https://github.com/xiaodongQ/simple_web_tool)。
 
 生成了2个版本的代码。
 * v1版本：基于DeepSeek-V3-0324
@@ -56,9 +54,9 @@ tags: [Go]
 * v2版本：基于DeepSeek-Reasoner(R1)
     * 实现栈：基于基础的`net/http` + `database/sql`，配置文件基于json
 
-### 4.1. v1版本代码结构说明
+### 3.1. v1版本代码结构说明
 
-第一个版本用了`gin`框架和`gorm`，更复杂一些，本需求的场景逻辑并不复杂，所以逻辑拆分得有点散。
+第一个版本用了`gin`框架和`gorm`，更复杂一些，本需求的场景逻辑并不复杂，所以逻辑拆分得有点散，不是太有必要。
 
 代码结构如下：
 
@@ -98,7 +96,7 @@ tags: [Go]
 
 `build.sh`里的编译命令：`CGO_ENABLED=0 go build -ldflags="-s -w" -o simple_web_tool`，其中`CGO_ENABLED=0`可以去掉glibc的动态库依赖（不使用CGO），更便于分发。
 
-### 4.2. v2版本代码结构说明
+### 3.2. v2版本代码结构说明
 
 重新生成更简洁一点的代码逻辑。
 
@@ -127,9 +125,9 @@ tags: [Go]
 * 配置文件操作：config.go
 * 辅助脚本：build.sh编译，init_db.sql初始化数据库表结构和测试数据
 
-## 5. 测试环境部署
+## 4. 测试环境部署
 
-### 5.1. MySQL容器环境
+### 4.1. MySQL容器环境
 
 本地是`Rocky Linux release 9.5 (Blue Onyx)`系统，容器基于`podman`。
 
@@ -193,7 +191,7 @@ Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
 mysql> 
 ```
 
-### 5.2. 测试表和测试数据初始化
+### 4.2. 测试表和测试数据初始化
 
 初始化脚本：`init_db.sql`，在宿主机上执行：`mysql -h 127.0.0.1 -utest -ptest testdb < init_db.sql`
 
@@ -288,7 +286,7 @@ INSERT INTO bucket_files_7b (fid, fname, bid, fsize, status) VALUES
 (2000000000000007, 'database_dump.sql', 1000000000000003, 2097152, 1);
 ```
  
-## 6. 程序效果
+## 5. 程序实际功能效果
 
 > 说明：仅使用第2个版本，[simple_web_tool/v2](https://github.com/xiaodongQ/simple_web_tool/tree/main/v2)。
 
@@ -299,7 +297,11 @@ INSERT INTO bucket_files_7b (fid, fname, bid, fsize, status) VALUES
 * 支持bucket名称和id精确查询，并支持跳转到文件详情查询
 * 分发和部署
     * 分发便捷，页面基于Go的`embed.FS`特性，HTML直接嵌入在Go程序中，只需要单bin部署
-    * 支持指定监听端口，不指定则默认`8888`
+    * 支持`-port xxx`指定监听端口，不指定则默认`8888`
+* 其他小细节
+    * 日志打印客户端ip
+    * 页面显示操作耗时
+    * 按钮刷新、查询数据时，基于AJAX（Asynchronous JavaScript and XML）仅加载部分模板，优化性能
 
 部分功能截图：
 
@@ -311,6 +313,6 @@ INSERT INTO bucket_files_7b (fid, fname, bid, fsize, status) VALUES
 
 ![用户信息统计](/images/2025-07-12-filter.png)
 
-## 7. 小结
+## 6. 小结
 
-利用AI生成了一个基本的工具项目，并在调试过程中动态调整，结对过程中边学边实践。帮助挺大。
+利用AI生成了一个基本的工具项目，并在调试过程中动态调整，结对过程中边学边实践。生成的内容很多细节需要手动做调整，总体来说帮助还是挺大的。
