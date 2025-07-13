@@ -1,6 +1,6 @@
 ---
 title: ollama搭建本地个人知识库
-categories: [AI, 大模型]
+categories: [AI, LLM]
 tags: [工具, 大模型]
 ---
 
