@@ -1,8 +1,8 @@
 ---
-title: AI Agent学习实践笔记
-description: HuggingFace AI Agents Course学习笔记（AI智能体）
-categories: [AI, 大模型]
-tags: [大模型, AI]
+title: AI Agent学习实践笔记（一） -- Agents介绍
+description: HuggingFace AI Agents Course学习笔记，unit1 -- Agents介绍
+categories: [AI, LLM]
+tags: [LLM, AI]
 ---
 
 HuggingFace AI Agents Course学习笔记（AI智能体）
