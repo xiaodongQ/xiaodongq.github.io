@@ -313,6 +313,29 @@ INSERT INTO bucket_files_7b (fid, fname, bid, fsize, status) VALUES
 
 ![用户信息统计](/images/2025-07-12-filter.png)
 
+---
+
+优化一下HTML和CSS展示，效果如下。
+
+1、用户信息总体统计
+
+![summary](/images/2025-07-16-summary.png)
+
+2、分区详情显示
+
+![partition](/images/2025-07-16-partition.png)
+
+3、数据库配置
+
+![db-config](/images/2025-07-16-db-config.png)
+
+4、文件详情过滤
+
+![files](/images/2025-07-16-files.png)
+
+
 ## 6. 小结
 
-利用AI生成了一个基本的工具项目，并在调试过程中动态调整，结对过程中边学边实践。生成的内容很多细节需要手动做调整，总体来说帮助还是挺大的。
+利用AI生成了一个基本的工具项目，并在调试过程中动态调整，结对过程中边学边实践。折腾了一下HTML+CSS的展示和样式，也是一个新的体验。
+
+生成的内容很多细节需要手动做调整，总体来说帮助还是挺大的。
