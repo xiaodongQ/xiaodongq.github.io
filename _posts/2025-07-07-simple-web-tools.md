@@ -303,6 +303,12 @@ INSERT INTO bucket_files_7b (fid, fname, bid, fsize, status) VALUES
     * 页面显示操作耗时
     * 按钮刷新、查询数据时，基于AJAX（Asynchronous JavaScript and XML）仅加载部分模板，优化性能
 
+部分手动调整的操作：
+* html页面和css样式调整，多轮交互（气泡式展示，效果优化）
+* go协程优化数据库操作
+* 浏览器缓存数据库实例索引，支持多人下拉选择不同数据库实例查询信息（暂禁用了）
+* 增减查询条件和预期行为调整
+
 部分功能截图：
 
 1、用户信息统计：`http://localhost:8080/user-stats`
