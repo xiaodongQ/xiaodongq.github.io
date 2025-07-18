@@ -84,19 +84,126 @@ K8S集群由 **控制平面** 和 **一个或多个工作节点** 组成。
 
 ## 3. 搭建学习环境
 
-> 参考：[安装Kubernetes工具](https://kubernetes.io/zh-cn/docs/tasks/tools/)。
+参考：[安装Kubernetes工具](https://kubernetes.io/zh-cn/docs/tasks/tools/)。
 
-安装下述工具：
-* `kubectl`命令行工具，可用来部署应用、监测和管理集群资源以及查看日志。
-    * 按上面文档操作，`curl`会直接下载一个`kubectl`二进制文件，赋执行权限即可使用
-* 此外还有 `kind`、`minikube`、`kubeadm`，暂不安装，后续按需使用
+可以通过`kubeadm`、`kind` 或 `minikube`快速搭建集群。看极客时间几个专栏用`kubeadm`比较多，此处也用该工具。
+
+### 3.1. 安装工具
+
+按上面链接对应的操作说明，几个工具都可以`curl`直接下载相应工具的二进制文件。
+* `kubeadm`的步骤会添加K8S的yum源，而后统一安装`kubelet`、`kubeadm`、`kubectl`，此处选择按该方式快速安装。可见：[安装 kubeadm](https://kubernetes.io/zh-cn/docs/setup/production-environment/tools/kubeadm/install-kubeadm/)。
+
+```sh
+# 网络可能比较慢，可以挂梯子试下
+[root@xdlinux ➜ ~ ]$ sudo yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes
+Kubernetes                                                     2.4 kB/s |  12 kB     00:04    
+Dependencies resolved.
+===============================================================================================
+ Package                       Architecture  Version                   Repository         Size
+===============================================================================================
+Installing:
+ kubeadm                       x86_64        1.33.3-150500.1.1         kubernetes         12 M
+ kubectl                       x86_64        1.33.3-150500.1.1         kubernetes         11 M
+ kubelet                       x86_64        1.33.3-150500.1.1         kubernetes         15 M
+Installing dependencies:
+ conntrack-tools               x86_64        1.4.7-4.el9_5             appstream         222 k
+ cri-tools                     x86_64        1.33.0-150500.1.1         kubernetes        7.5 M
+ kubernetes-cni                x86_64        1.6.0-150500.1.1          kubernetes        8.0 M
+ libnetfilter_cthelper         x86_64        1.0.0-22.el9              appstream          23 k
+ libnetfilter_cttimeout        x86_64        1.0.0-19.el9              appstream          23 k
+ libnetfilter_queue            x86_64        1.0.5-1.el9               appstream          28 k
+
+Transaction Summary
+===============================================================================================
+Install  9 Packages
+
+Total download size: 55 M
+Installed size: 301 M
+...
+```
+
+安装完成后查看版信息：均为v1.33.3
 
 ```sh
 [root@xdlinux ➜ ~ ]$ kubectl version --client
 Client Version: v1.33.3
 Kustomize Version: v5.6.0
+
+[root@xdlinux ➜ ~ ]$ kubelet --version
+Kubernetes v1.33.3
+
+[root@xdlinux ➜ ~ ]$ kubeadm version
+kubeadm version: &version.Info{Major:"1", Minor:"33", EmulationMajor:"", EmulationMinor:"", MinCompatibilityMajor:"", MinCompatibilityMinor:"", GitVersion:"v1.33.3", GitCommit:"80779bd6ff08b451e1c165a338a7b69351e9b0b8", GitTreeState:"clean", BuildDate:"2025-07-15T18:05:14Z", GoVersion:"go1.24.4", Compiler:"gc", Platform:"linux/amd64"}
 ```
 
+### 3.2. kubeadm创建集群（报错）
+
+2、使用`kubeadm`创建集群，具体见：[使用 kubeadm 创建集群](https://kubernetes.io/zh-cn/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/)。
+
+初始化集群：`kubeadm init` 报错了
+
+```sh
+[root@xdlinux ➜ first git:(main) ]$ kubeadm init
+[init] Using Kubernetes version: v1.33.3
+[preflight] Running pre-flight checks
+W0719 00:31:45.855362  618460 checks.go:1065] [preflight] WARNING: Couldn't create the interface used for talking to the container runtime: failed to create new CRI runtime service: validate service connection: validate CRI v1 runtime API for endpoint "unix:///var/run/containerd/containerd.sock": rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing: dial unix /var/run/containerd/containerd.sock: connect: no such file or directory"
+	[WARNING Firewalld]: firewalld is active, please ensure ports [6443 10250] are open or your cluster may not function correctly
+	[WARNING Hostname]: hostname "xdlinux" could not be reached
+	[WARNING Hostname]: hostname "xdlinux": lookup xdlinux on [fe80::1%enp4s0]:53: no such host
+	[WARNING Service-Kubelet]: kubelet service is not enabled, please run 'systemctl enable kubelet.service'
+[preflight] Pulling images required for setting up a Kubernetes cluster
+[preflight] This might take a minute or two, depending on the speed of your internet connection
+[preflight] You can also perform this action beforehand using 'kubeadm config images pull'
+error execution phase preflight: [preflight] Some fatal errors occurred:
+failed to create new CRI runtime service: validate service connection: validate CRI v1 runtime API for endpoint "unix:///var/run/containerd/containerd.sock": rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing: dial unix /var/run/containerd/containerd.sock: connect: no such file or directory"[preflight] If you know what you are doing, you can make a check non-fatal with `--ignore-preflight-errors=...`
+To see the stack trace of this error execute with --v=5 or higher
+```
+
+### 3.3. 安装containerd运行时
+
+自己当前环境为`Rocky Linux release 9.5 (Blue Onyx)`，容器运行时为`podman`，而`kubeadm`的支持列表不包含该运行时，具体见：[容器运行时](https://kubernetes.io/zh-cn/docs/setup/production-environment/container-runtimes/)。
+
+* 运行时不支持Docker Engine了：v1.24 之前的 Kubernetes 版本直接集成了 Docker Engine 的一个组件，名为 dockershim，自 1.24 版起，Dockershim 已从 Kubernetes 项目中移除。
+
+安装`containerd`，具体见：[containerd/docs/getting-started.md](https://github.com/containerd/containerd/blob/main/docs/getting-started.md)。
+* 1）安装containerd
+    * 添加unit文件，设置自启动
+* 2）安装runc
+    * 安装到/usr/local/sbin
+* 3）安装CNI插件
+    * 安装到/opt/cni/bin
+
+```sh
+[root@xdlinux ➜ workspace ]$ tar Cxzvf /usr/local containerd-2.1.3-linux-amd64.tar.gz 
+bin/
+bin/containerd
+bin/containerd-shim-runc-v2
+bin/ctr
+bin/containerd-stress
+[root@xdlinux ➜ workspace ]$ ll /usr/local/bin 
+total 220M
+-rwxr-xr-x 1 root root  210 May 23 22:30 compiledb
+-rwxr-xr-x 1 root root  42M Jun 20 06:37 containerd
+-rwxr-xr-x 1 root root 7.6M Jun 20 06:37 containerd-shim-runc-v2
+-rwxr-xr-x 1 root root  21M Jun 20 06:37 containerd-stress
+-rwxr-xr-x 1 root root  23M Jun 20 06:37 ctr
+-rwxr-xr-x 1 root root 127M Jul 19 00:33 minikube
+```
+
+### 3.4. 重试：kubeadm创建集群
+
+```sh
+[root@xdlinux ➜ workspace ]$ kubeadm init
+[init] Using Kubernetes version: v1.33.3
+[preflight] Running pre-flight checks
+	[WARNING Firewalld]: firewalld is active, please ensure ports [6443 10250] are open or your cluster may not function correctly
+	[WARNING Hostname]: hostname "xdlinux" could not be reached
+	[WARNING Hostname]: hostname "xdlinux": lookup xdlinux on [fe80::1%enp4s0]:53: no such host
+	[WARNING Service-Kubelet]: kubelet service is not enabled, please run 'systemctl enable kubelet.service'
+[preflight] Pulling images required for setting up a Kubernetes cluster
+[preflight] This might take a minute or two, depending on the speed of your internet connection
+[preflight] You can also perform this action beforehand using 'kubeadm config images pull'
+```
 
 
 ## 4. 小结
