@@ -24,7 +24,7 @@ K8S中包含很多技术栈，如容器、存储、网络、计算等等，信�
 
 相关参考文档：
 * [Kubernetes Docs](https://kubernetes.io/docs/concepts/overview/)
-    * 相应的中文版本：(https://kubernetes.io/zh-cn/docs/home/)
+    * 相应的 [中文版本](https://kubernetes.io/zh-cn/docs/home/)
     * [概述](https://kubernetes.io/zh-cn/docs/concepts/overview/)
     * [Kubernetes 架构](https://kubernetes.io/zh-cn/docs/concepts/architecture/)
 * 几门极客时间课程：《Kubernetes 从上手到实践》、《Kubernetes 实践入门指南》、《深入剖析Kubernetes》
@@ -82,7 +82,7 @@ K8S集群由 **控制平面** 和 **一个或多个工作节点** 组成。
 
 下面的一些概念，可先搭建基本的学习环境后再对照理解，见下小节。
 
-## 3. 搭建学习环境
+## 3. 搭建学习环境记录
 
 参考：[安装Kubernetes工具](https://kubernetes.io/zh-cn/docs/tasks/tools/)。
 
@@ -92,6 +92,8 @@ K8S集群由 **控制平面** 和 **一个或多个工作节点** 组成。
 
 按上面链接对应的操作说明，几个工具都可以`curl`直接下载相应工具的二进制文件。
 * `kubeadm`的步骤会添加K8S的yum源，而后统一安装`kubelet`、`kubeadm`、`kubectl`，此处选择按该方式快速安装。可见：[安装 kubeadm](https://kubernetes.io/zh-cn/docs/setup/production-environment/tools/kubeadm/install-kubeadm/)。
+
+安装工具：kubelet kubeadm kubectl
 
 ```sh
 # 网络可能比较慢，可以挂梯子试下
@@ -136,6 +138,21 @@ Kubernetes v1.33.3
 kubeadm version: &version.Info{Major:"1", Minor:"33", EmulationMajor:"", EmulationMinor:"", MinCompatibilityMajor:"", MinCompatibilityMinor:"", GitVersion:"v1.33.3", GitCommit:"80779bd6ff08b451e1c165a338a7b69351e9b0b8", GitTreeState:"clean", BuildDate:"2025-07-15T18:05:14Z", GoVersion:"go1.24.4", Compiler:"gc", Platform:"linux/amd64"}
 ```
 
+如果安装还是慢，yum源也可改为国内的阿里云镜像源：
+
+```sh
+cat <<EOF > /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=https://mirrors.aliyun.com/kubernetes/yum/repos/kubernetes-el7-x86_64/
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg https://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg
+exclude=kube*
+EOF
+```
+
 ### 3.2. kubeadm创建集群（报错）
 
 2、使用`kubeadm`创建集群，具体见：[使用 kubeadm 创建集群](https://kubernetes.io/zh-cn/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/)。
@@ -159,13 +176,15 @@ failed to create new CRI runtime service: validate service connection: validate 
 To see the stack trace of this error execute with --v=5 or higher
 ```
 
+报错 `failed to create new CRI runtime service`，容器运行时需要另外安装，见下小节。
+
 ### 3.3. 安装containerd运行时
 
 自己当前环境为`Rocky Linux release 9.5 (Blue Onyx)`，容器运行时为`podman`，而`kubeadm`的支持列表不包含该运行时，具体见：[容器运行时](https://kubernetes.io/zh-cn/docs/setup/production-environment/container-runtimes/)。
 
 * 运行时不支持Docker Engine了：v1.24 之前的 Kubernetes 版本直接集成了 Docker Engine 的一个组件，名为 dockershim，自 1.24 版起，Dockershim 已从 Kubernetes 项目中移除。
 
-安装`containerd`，具体见：[containerd/docs/getting-started.md](https://github.com/containerd/containerd/blob/main/docs/getting-started.md)。
+手动安装`containerd`，具体见：[containerd/docs/getting-started.md](https://github.com/containerd/containerd/blob/main/docs/getting-started.md)。关于containerd的介绍见本篇中的后续小节。
 * 1）安装containerd
     * 添加unit文件，设置自启动
 * 2）安装runc
@@ -190,27 +209,185 @@ total 220M
 -rwxr-xr-x 1 root root 127M Jul 19 00:33 minikube
 ```
 
-### 3.4. 重试：kubeadm创建集群
+安装运行时后，再`kubeadm init`安装，`-v 5`跟踪更详细的日志，可看到一直在处理pull容器镜像，如`registry.k8s.io/kube-apiserver:v1.33.3`，最后都pull超时失败了。
 
 ```sh
-[root@xdlinux ➜ workspace ]$ kubeadm init
-[init] Using Kubernetes version: v1.33.3
-[preflight] Running pre-flight checks
-	[WARNING Firewalld]: firewalld is active, please ensure ports [6443 10250] are open or your cluster may not function correctly
-	[WARNING Hostname]: hostname "xdlinux" could not be reached
-	[WARNING Hostname]: hostname "xdlinux": lookup xdlinux on [fe80::1%enp4s0]:53: no such host
-	[WARNING Service-Kubelet]: kubelet service is not enabled, please run 'systemctl enable kubelet.service'
-[preflight] Pulling images required for setting up a Kubernetes cluster
-[preflight] This might take a minute or two, depending on the speed of your internet connection
+[root@xdlinux ➜ ~ ]$ kubeadm init -v 5
+I0719 19:26:59.866585  667392 initconfiguration.go:123] detected and using CRI socket: unix:///var/run/containerd/containerd.sock
+I0719 19:26:59.866705  667392 interface.go:432] Looking for default routes with IPv4 addresses
+I0719 19:26:59.866710  667392 interface.go:437] Default route transits interface "enp4s0"
+...
 [preflight] You can also perform this action beforehand using 'kubeadm config images pull'
+I0719 19:27:01.366724  667392 checks.go:832] using image pull policy: IfNotPresent
+I0719 19:27:01.367032  667392 checks.go:844] failed to detect the sandbox image for local container runtime, no 'sandboxImage' field in CRI info config
+...
+I0719 19:27:01.367247  667392 checks.go:868] pulling: registry.k8s.io/kube-apiserver:v1.33.3
+I0719 19:32:06.046226  667392 checks.go:868] pulling: registry.k8s.io/kube-scheduler:v1.33.3
+I0719 19:34:37.832502  667392 checks.go:868] pulling: registry.k8s.io/kube-proxy:v1.33.3
+I0719 19:37:10.742377  667392 checks.go:868] pulling: registry.k8s.io/coredns/coredns:v1.12.0
+I0719 19:39:42.004031  667392 checks.go:868] pulling: registry.k8s.io/pause:3.10
+I0719 19:42:13.522274  667392 checks.go:868] pulling: registry.k8s.io/etcd:3.5.21-0
+...
+[preflight] Some fatal errors occurred:
+	[ERROR ImagePull]: failed to pull image registry.k8s.io/kube-apiserver:v1.33.3: failed to pull image registry.k8s.io/kube-apiserver:v1.33.3: rpc error: code = DeadlineExceeded desc = failed to pull and unpack image "registry.k8s.io/kube-apiserver:v1.33.3": failed to resolve image: failed to do request: Head "https://asia-east1-docker.pkg.dev/v2/k8s-artifacts-prod/images/kube-apiserver/manifests/v1.33.3": dial tcp 64.233.189.82:443: i/o timeout
 ```
 
+### 3.4. 重试：kubeadm创建集群（使用阿里云镜像后成功）
 
-## 4. 小结
+`--image-repository`指定阿里云镜像（[Kubernetes k8s拉取镜像失败解决方法](https://blog.csdn.net/weixin_43168190/article/details/107227626)）
 
-## 5. 参考
+```sh
+[root@xdlinux ➜ ~ ]$ kubeadm init -v 5 --image-repository=registry.aliyuncs.com/google_containers 
+I0719 23:08:54.583750  677329 initconfiguration.go:123] detected and using CRI socket: unix:///var/run/containerd/containerd.sock
+I0719 23:08:54.583881  677329 interface.go:432] Looking for default routes with IPv4 addresses
+I0719 23:08:54.583887  677329 interface.go:437] Default route transits interface "enp4s0"
+...
+# pull K8S相关镜像
+I0719 23:08:56.147496  677329 checks.go:868] pulling: registry.aliyuncs.com/google_containers/kube-apiserver:v1.33.3
+I0719 23:08:59.965427  677329 checks.go:868] pulling: registry.aliyuncs.com/google_containers/kube-controller-manager:v1.33.3
+I0719 23:09:03.257804  677329 checks.go:868] pulling: registry.aliyuncs.com/google_containers/kube-scheduler:v1.33.3
+I0719 23:09:06.120594  677329 checks.go:868] pulling: registry.aliyuncs.com/google_containers/kube-proxy:v1.33.3
+I0719 23:09:09.923887  677329 checks.go:868] pulling: registry.aliyuncs.com/google_containers/coredns:v1.12.0
+I0719 23:09:12.736095  677329 checks.go:868] pulling: registry.aliyuncs.com/google_containers/pause:3.10
+I0719 23:09:13.678343  677329 checks.go:868] pulling: registry.aliyuncs.com/google_containers/etcd:3.5.21-0
+[certs] Using certificateDir folder "/etc/kubernetes/pki"
+I0719 23:09:20.299402  677329 certs.go:112] creating a new certificate authority for ca
+[certs] Generating "ca" certificate and key
+...
+[wait-control-plane] Waiting for the kubelet to boot up the control plane as static Pods from directory "/etc/kubernetes/manifests"
+[kubelet-check] Waiting for a healthy kubelet at http://127.0.0.1:10248/healthz. This can take up to 4m0s
+[kubelet-check] The kubelet is healthy after 501.465606ms
+[control-plane-check] Waiting for healthy control plane components. This can take up to 4m0s
+[control-plane-check] Checking kube-apiserver at https://192.168.1.150:6443/livez
+[control-plane-check] Checking kube-controller-manager at https://127.0.0.1:10257/healthz
+[control-plane-check] Checking kube-scheduler at https://127.0.0.1:10259/livez
+
+[control-plane-check] kube-controller-manager is not healthy after 4m0.000452992s
+[control-plane-check] kube-apiserver is not healthy after 4m0.000586746s
+[control-plane-check] kube-scheduler is not healthy after 4m0.000835841s
+...
+```
+
+虽然跑起来了，但最后停止了。重置`kubeadm`方式：`kubeadm reset -f`
+
+修复上述警告和报错：
+
+**1）错误**
+
+crictl命令报错：
+
+```sh
+[root@xdlinux ➜ hello git:(main) ✗ ]$ crictl --runtime-endpoint unix:///var/run/containerd/containerd.sock ps -a | grep kube | grep -v pause
+WARN[0000] Config "/etc/crictl.yaml" does not exist, trying next: "/usr/bin/crictl.yaml"
+```
+
+创建配置文件（指定 containerd 套接字路径）
+
+```sh
+cat <<EOF | sudo tee /etc/crictl.yaml
+runtime-endpoint: unix:///var/run/containerd/containerd.sock
+image-endpoint: unix:///var/run/containerd/containerd.sock
+timeout: 10
+debug: false
+EOF
+```
+
+而后可以执行了，如 查看镜像：
+
+```sh
+[root@xdlinux ➜ hello git:(main) ✗ ]$ crictl --runtime-endpoint unix:///var/run/containerd/containerd.sock images
+IMAGE                                                             TAG                 IMAGE ID            SIZE
+registry.aliyuncs.com/google_containers/coredns                   v1.12.0             1cf5f116067c6       20.9MB
+registry.aliyuncs.com/google_containers/etcd                      3.5.21-0            499038711c081       58.9MB
+registry.aliyuncs.com/google_containers/kube-apiserver            v1.33.3             a92b4b92a9916       30.1MB
+registry.aliyuncs.com/google_containers/kube-controller-manager   v1.33.3             bf97fadcef430       27.6MB
+registry.aliyuncs.com/google_containers/kube-proxy                v1.33.3             af855adae7960       31.9MB
+registry.aliyuncs.com/google_containers/kube-scheduler            v1.33.3             41376797d5122       21.8MB
+registry.aliyuncs.com/google_containers/pause                     3.10                873ed75102791       320kB
+```
+
+**2）警告**
+
+```sh
+# 开放端口
+sudo firewall-cmd --permanent --add-port=6443/tcp
+sudo firewall-cmd --permanent --add-port=10250/tcp
+sudo firewall-cmd --reload
+
+# 主机名解析警告
+sudo echo "127.0.0.1   xdlinux" >> /etc/hosts
+
+# kubelet自启动
+systemctl enable --now kubelet
+```
+
+重置重来：
+
+```sh
+[root@xdlinux ➜ hello git:(main) ✗ ]$ kubeadm reset -f
+...
+W0719 23:42:22.336336  680838 removeetcdmember.go:106] [reset] No kubeadm config, using etcd pod spec to get data directory
+[reset] Stopping the kubelet service
+[reset] Unmounting mounted directories in "/var/lib/kubelet"
+[reset] Deleting contents of directories: [/etc/kubernetes/manifests /var/lib/kubelet /etc/kubernetes/pki]
+[reset] Deleting files: [/etc/kubernetes/admin.conf /etc/kubernetes/super-admin.conf /etc/kubernetes/kubelet.conf /etc/kubernetes/bootstrap-kubelet.conf /etc/kubernetes/controller-manager.conf /etc/kubernetes/scheduler.conf]
+...
+```
+
+## 4. containerd运行时说明
+
+containerd 是一个开源的容器运行时（Container Runtime），主要用于管理容器的生命周期，包括容器的创建、启动、停止、删除等核心操作。它最初是 Docker 引擎的一部分，2017 年被分离出来并捐赠给云原生计算基金会（CNCF），成为独立的开源项目，目前已成为容器生态中广泛使用的基础组件。
+
+### 4.1. K8S为什么不再默认支持docker作为运行时
+
+可了解：[containerd简介](https://www.cnblogs.com/yangmeichong/p/16661444.html)
+
+> 在 2016 年 12 月 14 日，Docker 公司宣布将containerd 从 Docker 中分离，由开源社区独立发展和运营。Containerd 完全可以单独运行并管理容器，而 Containerd 的主要职责是镜像管理和容器执行。同时，Containerd 提供了 containerd-shim 接口封装层，
+向下继续对接 runC 项目，使得容器引擎 Docker Daemon 可以独立升级。
+
+Docker与containerd的关系：
+* Docker中包含`containerd`，`containerd`专注于**运行时的容器管理**，而Docker除了容器管理之外，还可以完成**镜像构建**之类的功能。
+
+K8S为什么要放弃使用Docker作为容器运行时，而使用containerd：
+* 使用Docker作为K8S容器运行时的话，`kubelet`需要先要通过`dockershim`去调用Docker，再通过Docker去调用`containerd`；如果使用`containerd`作为K8S容器运行时的话，`kubelet`可以直接调用`containerd`。
+    * Docker作为运行时：`kubelet --> docker shim （在 kubelet 进程中） --> dockerd --> containerd`
+    * containerd作为运行时：`kubelet --> cri plugin（在 containerd 进程中） --> containerd`
+* 使用`containerd`不仅性能提高了（调用链变短了），而且资源占用也会变小（Docker不是一个纯粹的容器运行时，具有大量其他功能）。
+
+### 4.2. containerd操作命令
+
+CLI工具：
+* 1、`ctr`：是containerd本身的CLI
+* 2、`crictl`：是Kubernetes社区定义的专门CLI工具
+
+相关命令示例：
+* 常用的跟docker功能对应的命令
+    * 显示运行的容器列表 `crictl ps`
+    * 查看状态 `crictl stats`
+    * 登陆容器 `crictl exec`
+    * 启停 `crictl start/stop`
+    * 日志 `crictl logs`
+* 查看本地镜像列表
+    * `ctr images list`
+    * `crictl images`
+* 查看、删除导入的镜像：
+    * `ctr images ls`
+    * `crictl rmi`
+* 下载镜像
+    * `ctr images pull xxx`
+* 打标签
+    * `ctr images tag docker.io/docker/alpine:latest host/test/alping:v1`
+* 导入、导出镜像
+    * `ctr images import app.tar`
+    * `ctr images exporter busybox-1.28.tar.gz docker.io/library/busybox:1.28`
+
+## 5. 小结
+
+## 6. 参考
 
 * [Kubernetes Docs](https://kubernetes.io/docs/concepts/overview/)
 * [Kubernetes中文文档](https://kubernetes.io/zh-cn/docs/concepts/overview/)
+* [containerd简介](https://www.cnblogs.com/yangmeichong/p/16661444.html)
+* [Kubernetes k8s拉取镜像失败解决方法](https://blog.csdn.net/weixin_43168190/article/details/107227626)
 * 极客时间
 
