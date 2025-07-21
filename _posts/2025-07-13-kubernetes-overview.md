@@ -489,6 +489,16 @@ kubectl get pods -n kube-system -l k8s-app=calico-node
 kubectl get pods -n kube-system -l k8s-app=calico-kube-controllers
 ```
 
+`kubeadm init --image-repository=registry.aliyuncs.com/google_containers --pod-network-cidr=192.168.0.0/16`
+
+#### 3.5.2. 网络插件：flannel
+
+`kubeadm init --image-repository=registry.aliyuncs.com/google_containers --pod-network-cidr=10.244.0.0/16`
+
+https://raw.githubusercontent.com/coreos/flannel/v0.26.7/Documentation/kube-flannel.yml
+
+<!-- kubectl apply -f https://github.com/flannel-io/flannel/releases/download/v0.26.7/kube-flannel.yml -->
+
 ## 4. containerd运行时说明
 
 containerd 是一个开源的容器运行时（Container Runtime），主要用于管理容器的生命周期，包括容器的创建、启动、停止、删除等核心操作。它最初是 Docker 引擎的一部分，2017 年被分离出来并捐赠给云原生计算基金会（CNCF），成为独立的开源项目，目前已成为容器生态中广泛使用的基础组件。
