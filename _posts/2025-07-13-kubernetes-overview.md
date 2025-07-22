@@ -1,6 +1,6 @@
 ---
 title: Kubernetes学习实践（一） -- 总体说明和基本使用
-description: Kubernetes学习实践，本篇进行总体说明和基本使用
+description: Kubernetes学习实践，本篇进行总体说明和基本环境搭建
 categories: [云原生, Kubernetes]
 tags: [云原生, Kubernetes]
 ---
@@ -158,7 +158,7 @@ EOF
 
 使用`kubeadm`创建集群，具体见：[使用 kubeadm 创建集群](https://kubernetes.io/zh-cn/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/)。
 
-初始化集群：`kubeadm init` 报错了
+初始化集群：`kubeadm init` 报错了（完整内容可见：[kubeadm_init.log](https://github.com/xiaodongQ/prog-playground/tree/main/kubernetes/hello/kubeadm_init.log)）
 
 ```sh
 [root@xdlinux ➜ first git:(main) ]$ kubeadm init
