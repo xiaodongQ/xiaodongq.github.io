@@ -97,7 +97,7 @@ K8S集群由 **控制平面** 和 **一个或多个工作节点** 组成。
 
 ```sh
 # 网络可能比较慢，可以挂梯子试下
-# crictl包含在cri-tools包中
+# crictl包含在cri-tools包中，此处一并安装了
 [root@xdlinux ➜ ~ ]$ sudo yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes
 Kubernetes                                                     2.4 kB/s |  12 kB     00:04    
 Dependencies resolved.
@@ -179,7 +179,45 @@ To see the stack trace of this error execute with --v=5 or higher
 
 报错 `failed to create new CRI runtime service`，容器运行时需要另外安装，见下小节。
 
-### 3.3. 安装containerd运行时
+### 3.3. containerd运行时说明
+
+containerd 是一个开源的容器运行时（Container Runtime），主要用于管理容器的生命周期，包括容器的创建、启动、停止、删除等核心操作。它最初是 Docker 引擎的一部分，2017 年被分离出来并捐赠给云原生计算基金会（CNCF），成为独立的开源项目，目前已成为容器生态中广泛使用的基础组件。
+
+#### 3.3.1. K8S为什么不再默认支持docker作为运行时
+
+可了解：[containerd简介](https://www.cnblogs.com/yangmeichong/p/16661444.html)
+
+> 在 2016 年 12 月 14 日，Docker 公司宣布将containerd 从 Docker 中分离，由开源社区独立发展和运营。Containerd 完全可以单独运行并管理容器，而 Containerd 的主要职责是镜像管理和容器执行。同时，Containerd 提供了 containerd-shim 接口封装层，
+向下继续对接 runC 项目，使得容器引擎 Docker Daemon 可以独立升级。
+
+Docker与containerd的关系：
+* Docker中包含`containerd`，`containerd`专注于**运行时的容器管理**，而Docker除了容器管理之外，还可以完成**镜像构建**之类的功能。
+
+K8S为什么要放弃使用Docker作为容器运行时，而使用containerd：
+* 使用Docker作为K8S容器运行时的话，`kubelet`需要先要通过`dockershim`去调用Docker，再通过Docker去调用`containerd`；如果使用`containerd`作为K8S容器运行时的话，`kubelet`可以直接调用`containerd`。
+    * Docker作为运行时：`kubelet --> docker shim （在 kubelet 进程中） --> dockerd --> containerd`
+    * containerd作为运行时：`kubelet --> cri plugin（在 containerd 进程中） --> containerd`
+* 使用`containerd`不仅性能提高了（调用链变短了），而且资源占用也会变小（Docker不是一个纯粹的容器运行时，具有大量其他功能）。
+
+#### 3.3.2. containerd操作命令
+
+CLI工具：
+* 1、`crictl`：是Kubernetes社区定义的专门CLI工具
+* 2、`ctr`：是containerd本身的CLI
+
+此处仅使用`crictl`，相关命令示例：
+* 常用的跟docker功能对应的命令
+    * 显示运行的容器列表 `crictl ps`
+    * 查看状态 `crictl stats`
+    * 登陆容器 `crictl exec`
+    * 启停 `crictl start/stop`
+    * 日志 `crictl logs`
+* 查看本地镜像列表
+    * `crictl images`
+* 查看、删除导入的镜像：
+    * `crictl rmi`
+
+### 3.4. 安装containerd运行时
 
 自己当前环境为`Rocky Linux release 9.5 (Blue Onyx)`，容器运行时为`podman`，而`kubeadm`的支持列表中包含该运行时，具体见：[容器运行时](https://kubernetes.io/zh-cn/docs/setup/production-environment/container-runtimes/)。
 
@@ -227,9 +265,9 @@ I0719 19:42:13.522274  667392 checks.go:868] pulling: registry.k8s.io/etcd:3.5.2
 	[ERROR ImagePull]: failed to pull image registry.k8s.io/kube-apiserver:v1.33.3: failed to pull image registry.k8s.io/kube-apiserver:v1.33.3: rpc error: code = DeadlineExceeded desc = failed to pull and unpack image "registry.k8s.io/kube-apiserver:v1.33.3": failed to resolve image: failed to do request: Head "https://asia-east1-docker.pkg.dev/v2/k8s-artifacts-prod/images/kube-apiserver/manifests/v1.33.3": dial tcp 64.233.189.82:443: i/o timeout
 ```
 
-### 3.4. 重试：kubeadm创建集群（使用阿里云镜像后成功）
+### 3.5. 重试：kubeadm创建集群（使用阿里云镜像后init成功）
 
-#### 3.4.1. 指定国内K8S镜像源
+#### 3.5.1. 指定国内K8S镜像源
 
 `--image-repository`指定阿里云镜像（参考自 [Kubernetes k8s拉取镜像失败解决方法](https://blog.csdn.net/weixin_43168190/article/details/107227626)）
 
@@ -276,7 +314,7 @@ Here is one example how you may list all running Kubernetes containers by using 
 
 虽然跑起来了，但最后 **<mark>状态检查还是没通过</mark>**，所以不算创建成功。
 
-#### 3.4.2. 问题定位和修改
+#### 3.5.2. 问题定位和修改
 
 1、**核心原因**：
 
@@ -416,7 +454,7 @@ systemctl enable --now kubelet
 * kubelet配置文件：
     * `/etc/kubernetes/kubelet.conf `
 
-### 3.5. 集群创建后的操作
+### 3.6. 集群创建后的操作
 
 上面`kubeadm init`已经成功创建集群了（提示：`Your Kubernetes control-plane has initialized successfully!`），还需要进行一些操作。
 
@@ -440,7 +478,7 @@ LLM给的插件简要对比：
 > - **生产环境** → **Calico**（功能全）或 **Cilium**（高性能）
 > - **测试环境** → **Flannel**（最简单）
 
-#### 3.5.1. 安装Pod网络插件：Calico
+#### 3.6.1. 安装Pod网络插件：Calico（失败）
 
 必须安装一个基于`CNI（Container Network Interface）`的Pod网络插件，用于Pod间的通信。
 * 此处选择 [Calico](https://www.tigera.io/project-calico/)
@@ -484,75 +522,128 @@ deployment.apps/calico-kube-controllers created
 ```
 
 ```sh
-# 检查所有 Calico Pod 是否 Running（约 2-3 分钟会全部就绪）
+# 查看所有pod
+[root@xdlinux ➜ ~ ]$  kubectl get pods --all-namespaces
+NAMESPACE     NAME                              READY   STATUS    RESTARTS   AGE
+kube-system   coredns-757cc6c8f8-nxw7g          0/1     Pending   0          35h
+kube-system   coredns-757cc6c8f8-v2mgf          0/1     Pending   0          35h
+kube-system   etcd-xdlinux                      1/1     Running   2          35h
+kube-system   kube-apiserver-xdlinux            1/1     Running   2          35h
+kube-system   kube-controller-manager-xdlinux   1/1     Running   0          35h
+kube-system   kube-proxy-v682x                  1/1     Running   0          35h
+kube-system   kube-scheduler-xdlinux            1/1     Running   2          35h
+
+# 过滤检查所有 Calico Pod 是否 Running
 kubectl get pods -n kube-system -l k8s-app=calico-node
 kubectl get pods -n kube-system -l k8s-app=calico-kube-controllers
 ```
 
-`kubeadm init --image-repository=registry.aliyuncs.com/google_containers --pod-network-cidr=192.168.0.0/16`
+开始默认镜像地址为`docker.io`，pull失败：
+```sh
+Jul 20 22:31:54 xdlinux containerd[12607]: time="2025-07-20T22:31:54.295953417+08:00" level=error msg="PullImage \"docker.io/calico/cni:v3.27.0\" failed" error="rpc error: code = DeadlineExceeded desc = failed to pull and unpack image \"docker.io/calico/cni:v3.27.0\": failed to resolve image: failed to do request: Head \"https://registry-1.docker.io/v2/calico/cni/manifests/v3.27.0\": dial tcp [2a03:2880:f10e:83:face:b00c:0:25de]:443: i/o timeout"
+```
 
-#### 3.5.2. 网络插件：flannel
+切换阿里云地址，还是pull失败（鉴权问题？）：`registry.aliyuncs.com/google_containers/calico/cni:v3.30.2`
+```sh
+Jul 20 23:07:17 xdlinux containerd[26160]: time="2025-07-20T23:07:17.337678802+08:00" level=info msg="fetch failed" error="pull access denied, repository does not exist or may require authorization: server message: insufficient_scope: authorization failed" host=registry.aliyuncs.com
+Jul 20 23:07:17 xdlinux containerd[26160]: time="2025-07-20T23:07:17.338977261+08:00" level=error msg="PullImage \"registry.aliyuncs.com/google_containers/calico/cni:v3.30.2\" failed" error="rpc error: code = Unknown desc = failed to pull and unpack image \"registry.aliyuncs.com/google_containers/calico/cni:v3.30.2\": failed to resolve image: pull access denied, repository does not exist or may require authorization: server message: insufficient_scope: authorization failed"
+```
 
-`kubeadm init --image-repository=registry.aliyuncs.com/google_containers --pod-network-cidr=10.244.0.0/16`
+折腾了好几个来回，也找了一些别的国内镜像，还是不行，先使用简单点的`flannel`插件吧。
 
-https://raw.githubusercontent.com/coreos/flannel/v0.26.7/Documentation/kube-flannel.yml
+另外，Calico对应的cidr需要使用`192.168.0.0/16`：`kubeadm init --image-repository=registry.aliyuncs.com/google_containers --pod-network-cidr=192.168.0.0/16`
 
-<!-- kubectl apply -f https://github.com/flannel-io/flannel/releases/download/v0.26.7/kube-flannel.yml -->
+#### 3.6.2. 网络插件切换成：flannel（成功）
 
-## 4. containerd运行时说明
+重新初始化：
 
-containerd 是一个开源的容器运行时（Container Runtime），主要用于管理容器的生命周期，包括容器的创建、启动、停止、删除等核心操作。它最初是 Docker 引擎的一部分，2017 年被分离出来并捐赠给云原生计算基金会（CNCF），成为独立的开源项目，目前已成为容器生态中广泛使用的基础组件。
+1、重置 `kubeadm reset -f`
 
-### 4.1. K8S为什么不再默认支持docker作为运行时
+2、重新初始化，指定CIDR：`kubeadm init --image-repository=registry.aliyuncs.com/google_containers --pod-network-cidr=10.244.0.0/16`
 
-可了解：[containerd简介](https://www.cnblogs.com/yangmeichong/p/16661444.html)
+3、安装flannel：`kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml`
 
-> 在 2016 年 12 月 14 日，Docker 公司宣布将containerd 从 Docker 中分离，由开源社区独立发展和运营。Containerd 完全可以单独运行并管理容器，而 Containerd 的主要职责是镜像管理和容器执行。同时，Containerd 提供了 containerd-shim 接口封装层，
-向下继续对接 runC 项目，使得容器引擎 Docker Daemon 可以独立升级。
+镜像pull直接成功了：`ghcr.io/flannel-io/flannel-cni-plugin:v1.7.1-flannel1`
 
-Docker与containerd的关系：
-* Docker中包含`containerd`，`containerd`专注于**运行时的容器管理**，而Docker除了容器管理之外，还可以完成**镜像构建**之类的功能。
+```sh
+Jul 22 19:48:52 xdlinux containerd[26160]: time="2025-07-22T19:48:52.976885795+08:00" level=info msg="Pulled image \"ghcr.io/flannel-io/flannel-cni-plugin:v1.7.1-flannel1\" with image id \"sha256:cca2af40a4a9ea852721be08a315aa3cbb9e119fbbbffbc388a5b178a89f6a59\", repo tag \"ghcr.io/flannel-io/flannel-cni-plugin:v1.7.1-flannel1\", repo digest \"ghcr.io/flannel-io/flannel-cni-plugin@sha256:cb3176a2c9eae5fa0acd7f45397e706eacb4577dac33cad89f93b775ff5611df\", size \"4878976\" in 5.094745543s"
+```
 
-K8S为什么要放弃使用Docker作为容器运行时，而使用containerd：
-* 使用Docker作为K8S容器运行时的话，`kubelet`需要先要通过`dockershim`去调用Docker，再通过Docker去调用`containerd`；如果使用`containerd`作为K8S容器运行时的话，`kubelet`可以直接调用`containerd`。
-    * Docker作为运行时：`kubelet --> docker shim （在 kubelet 进程中） --> dockerd --> containerd`
-    * containerd作为运行时：`kubelet --> cri plugin（在 containerd 进程中） --> containerd`
-* 使用`containerd`不仅性能提高了（调用链变短了），而且资源占用也会变小（Docker不是一个纯粹的容器运行时，具有大量其他功能）。
+但是看系统日志还是一直报错：提示找不到`/run/flannel/subnet.env`
 
-### 4.2. containerd操作命令
+```sh
+Jul 22 21:13:05 xdlinux containerd[170753]: time="2025-07-22T21:13:05.202071815+08:00" level=error msg="RunPodSandbox for &PodSandboxMetadata{Name:coredns-757cc6c8f8-v2mgf,Uid:3728bb94-a452-4245-864a-a369c4dfe138,Namespace:kube-system,Attempt:0,} failed, error" error="rpc error: code = Unknown desc = failed to setup network for sandbox \"c0f99a92d509c419f0b95d90d545e3cc24148bc59695b761ab5c9e4ca7f176df\": plugin type=\"flannel\" failed (add): loadFlannelSubnetEnv failed: open /run/flannel/subnet.env: no such file or directory"
+```
 
-CLI工具：
-* 1、`ctr`：是containerd本身的CLI
-* 2、`crictl`：是Kubernetes社区定义的专门CLI工具
+基于LLM的建议方式，先手动创建配置：手动获取集群网络CIDR，并如新建`/run/flannel/subnet.env`文件
 
-相关命令示例：
-* 常用的跟docker功能对应的命令
-    * 显示运行的容器列表 `crictl ps`
-    * 查看状态 `crictl stats`
-    * 登陆容器 `crictl exec`
-    * 启停 `crictl start/stop`
-    * 日志 `crictl logs`
-* 查看本地镜像列表
-    * `ctr images list`
-    * `crictl images`
-* 查看、删除导入的镜像：
-    * `ctr images ls`
-    * `crictl rmi`
-* 下载镜像
-    * `ctr images pull xxx`
-* 打标签
-    * `ctr images tag docker.io/docker/alpine:latest host/test/alping:v1`
-* 导入、导出镜像
-    * `ctr images import app.tar`
-    * `ctr images exporter busybox-1.28.tar.gz docker.io/library/busybox:1.28`
+```sh
+[root@xdlinux ➜ hello git:(main) ✗ ]$ kubectl cluster-info dump | grep -m1 cluster-cidr
+                            "--cluster-cidr=10.244.0.0/16",
+[root@xdlinux ➜ hello git:(main) ✗ ]$ POD_NETWORK_CIDR="10.244.0.0/16"
+[root@xdlinux ➜ hello git:(main) ✗ ]$ 
+[root@xdlinux ➜ hello git:(main) ✗ ]$ cat > /run/flannel/subnet.env <<EOF   
+FLANNEL_NETWORK=${POD_NETWORK_CIDR}
+FLANNEL_SUBNET=${POD_NETWORK_CIDR%.*}.100/24
+FLANNEL_MTU=1450
+FLANNEL_IPMASQ=true
+EOF
+```
 
-## 5. 小结
+可看到，`CoreDNS` Pod的状态正常了：一旦CoreDNS Pod启用并运行，就可以继续加入节点。
 
-## 6. 参考
+```sh
+[root@xdlinux ➜ hello git:(main) ✗ ]$ kubectl get pods --all-namespaces
+NAMESPACE     NAME                              READY   STATUS    RESTARTS   AGE
+kube-system   coredns-757cc6c8f8-nxw7g          1/1     Running   0          37h
+kube-system   coredns-757cc6c8f8-v2mgf          1/1     Running   0          37h
+kube-system   etcd-xdlinux                      1/1     Running   2          37h
+kube-system   kube-apiserver-xdlinux            1/1     Running   2          37h
+kube-system   kube-controller-manager-xdlinux   1/1     Running   0          37h
+kube-system   kube-proxy-v682x                  1/1     Running   0          37h
+kube-system   kube-scheduler-xdlinux            1/1     Running   2          37h
+```
+
+查看控制面节点，状态也从`NotReady` 变为 `Ready`了：
+
+```sh
+[root@xdlinux ➜ hello git:(main) ✗ ]$ kubectl get nodes
+NAME      STATUS   ROLES           AGE   VERSION
+xdlinux   Ready    control-plane   37h   v1.33.3
+```
+
+#### 3.6.3. 添加工作节点（单机不需要）
+
+工作节点是工作负载运行的地方，使用`kubeadm join`方式添加，可见 [添加 Linux 工作节点](https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/kubeadm/adding-linux-nodes/)。
+
+当前是单机环境，且上面`kubectl get nodes`结果中，本机为控制面节点（Master节点）且为`Ready`正常状态，**不需要**再`join`了。
+
+若还有**其他**的工作节点，可在新节点上执行`kubeadm join`，操作如下：
+
+`kubeadm init`时，最后会打印一条`kubeadm join`的命令示例，不过当时日志没保存下来。
+* `sudo kubeadm join --token <token> <control-plane-host>:<control-plane-port> --discovery-token-ca-cert-hash sha256:<hash>`
+* 比如：`kubeadm join 172.16.59.30:6443 --token yup5oo.s5ui8hfrrcm5jf2j --discovery-token-ca-cert-hash sha256:3fe816c50e13da9491b277711e6e77dc0d6d10c03b23f2d7487d5b3bea9b9525`
+
+通过 `kubeadm token create --print-join-command`，可以**重新创建新令牌并生成完整命令**：
+
+```sh
+[root@xdlinux ➜ lib ]$ kubeadm token create --print-join-command
+kubeadm join 192.168.1.150:6443 --token zzm9zc.ewdtn9oq3pztckaw --discovery-token-ca-cert-hash sha256:f929ef5b39a4b7901ffdeb3e9e095a1671521c6e773ff26a171072f57fd4407e
+```
+
+## 4. 小结
+
+介绍了K8S基本架构和关键概念，并基于`kubeadm`搭建本地环境，由于容器运行时和镜像地址问题，踩了不少坑。
+
+后续基于刚搭建的环境继续熟悉相关概念和操作。
+
+## 5. 参考
 
 * [Kubernetes Docs](https://kubernetes.io/docs/concepts/overview/)
-* [Kubernetes中文文档](https://kubernetes.io/zh-cn/docs/concepts/overview/)
+    * [Kubernetes中文文档](https://kubernetes.io/zh-cn/docs/concepts/overview/)
+* [使用 kubeadm 创建集群](https://kubernetes.io/zh-cn/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/)
+* [添加 Linux 工作节点](https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/kubeadm/adding-linux-nodes/)
 * [containerd简介](https://www.cnblogs.com/yangmeichong/p/16661444.html)
 * [Kubernetes k8s拉取镜像失败解决方法](https://blog.csdn.net/weixin_43168190/article/details/107227626)
 * 极客时间
-
+* LLM
