@@ -49,6 +49,7 @@ K8S集群由 **控制平面** 和 **一个或多个工作节点** 组成。
 * `kube-apiserver`，提供HTTP API服务，并负责处理接收到的请求，是K8S控制平面的**核心**。
 * `etcd`，高可用（HA）键值数据库，存储集群API服务的数据
 * `kube-scheduler`，负责调度监控`pods`的运行
+    * `Pod`是可以在Kubernetes中创建和管理的、最小的可部署的计算单元。`Pod`包含**一组容器（一个或多个）**，这些容器共享存储、网络、以及怎样运行这些容器的规约。
 * `kube-controller-manager`，负责运行控制器进程，通过API服务（kube-apiserver）将当前状态转变到期望的状态
     * 控制器有多种不同的类型，如Node控制器、Job控制器等等
 * `cloud-controller-manager`，与特定云驱动集成，允许集群连接到云提供商的API之上
@@ -227,7 +228,7 @@ CLI工具：
 * 1）安装containerd
     * 添加unit文件，设置自启动
         * uint: [containerd.service](https://raw.githubusercontent.com/containerd/containerd/main/containerd.service)
-        * /usr/local/lib/systemd/system/containerd.service
+        * 路径：`/usr/local/lib/systemd/system/containerd.service`
 * 2）安装runc
     * 安装到/usr/local/sbin
 * 3）安装CNI插件
@@ -330,6 +331,7 @@ Here is one example how you may list all running Kubernetes containers by using 
 
 ```sh
 sudo mkdir -p /etc/containerd
+# 生成默认的containerd配置文件
 containerd config default | sudo tee /etc/containerd/config.toml
 # 修改配置文件的内容：将 sandbox = 'registry.k8s.io/pause:3.10' 修改为国内镜像地址：
 sandbox = 'registry.aliyuncs.com/google_containers/pause:3.10'
@@ -423,7 +425,7 @@ registry.aliyuncs.com/google_containers/kube-scheduler            v1.33.3       
 registry.aliyuncs.com/google_containers/pause                     3.10                873ed75102791       320kB
 ```
 
-3、端口白名单，主机名，kubelet自启动修改
+3、端口白名单，主机名，kubelet自启动修改、关swap
 
 ```sh
 # 开放端口
@@ -436,6 +438,9 @@ sudo echo "127.0.0.1   xdlinux" >> /etc/hosts
 
 # kubelet自启动
 systemctl enable --now kubelet
+
+# 关swap，并注释掉/etc/fstab的swap挂载
+swapoff -a
 ```
 
 4、开启转发参数
@@ -452,7 +457,7 @@ systemctl enable --now kubelet
     * 在 `/etc/kubernetes/manifests/`目录下
     * 如 `/etc/kubernetes/manifests/kube-apiserver.yaml`
 * kubelet配置文件：
-    * `/etc/kubernetes/kubelet.conf `
+    * `/etc/kubernetes/kubelet.conf`
 
 ### 3.6. 集群创建后的操作
 
@@ -645,5 +650,5 @@ kubeadm join 192.168.1.150:6443 --token zzm9zc.ewdtn9oq3pztckaw --discovery-toke
 * [添加 Linux 工作节点](https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/kubeadm/adding-linux-nodes/)
 * [containerd简介](https://www.cnblogs.com/yangmeichong/p/16661444.html)
 * [Kubernetes k8s拉取镜像失败解决方法](https://blog.csdn.net/weixin_43168190/article/details/107227626)
-* 极客时间
+* 极客时间：Kubernetes从上手到实践
 * LLM
