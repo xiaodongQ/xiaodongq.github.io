@@ -219,11 +219,11 @@ CLI工具：
 
 ### 3.4. 安装containerd运行时
 
-自己当前环境为`Rocky Linux release 9.5 (Blue Onyx)`，容器运行时为`podman`，而`kubeadm`的支持列表中包含该运行时，具体见：[容器运行时](https://kubernetes.io/zh-cn/docs/setup/production-environment/container-runtimes/)。
+自己当前环境为`Rocky Linux release 9.5 (Blue Onyx)`，容器运行时为`podman`，而`kubeadm`的支持列表中不包含该运行时，支持列表具体见：[容器运行时](https://kubernetes.io/zh-cn/docs/setup/production-environment/container-runtimes/)。
 
 * 运行时不支持Docker Engine了：v1.24 之前的 Kubernetes 版本直接集成了 Docker Engine 的一个组件，名为 dockershim，自 1.24 版起，Dockershim 已从 Kubernetes 项目中移除。
 
-手动安装`containerd`，具体见：[containerd/docs/getting-started.md](https://github.com/containerd/containerd/blob/main/docs/getting-started.md)。关于containerd的介绍见本篇中的后续小节。
+手动安装`containerd`，可见：[containerd/docs/getting-started.md](https://github.com/containerd/containerd/blob/main/docs/getting-started.md)。
 * 1）安装containerd
     * 添加unit文件，设置自启动
         * uint: [containerd.service](https://raw.githubusercontent.com/containerd/containerd/main/containerd.service)
@@ -242,7 +242,7 @@ bin/ctr
 bin/containerd-stress
 ```
 
-安装运行时后，再`kubeadm init`安装，`-v 5`跟踪更详细的日志，可看到一直在处理pull容器镜像，如`registry.k8s.io/kube-apiserver:v1.33.3`，最后都pull超时失败了。
+安装运行时后，再`kubeadm init`安装，`-v 5`跟踪更详细的日志，可看到一直在处理pull容器镜像，比如`registry.k8s.io/kube-apiserver:v1.33.3`，最后都pull超时失败了。
 
 ```sh
 [root@xdlinux ➜ ~ ]$ kubeadm init -v 5
@@ -324,9 +324,9 @@ Here is one example how you may list all running Kubernetes containers by using 
  E0720 18:52:30.994969    9662 pod_workers.go:1301] "Error syncing pod, skipping" err="failed to \"CreatePodSandbox\" for \"kube-apiserver-xdlinux_kube-system(32a78a7f4b016e3715c0097719578050)\" with CreatePodSandboxError: \"Failed to create sandbox for pod \\\"kube-apiserver-xdlinux_kube-system(32a78a7f4b016e3715c0097719578050)\\\": rpc error: code = DeadlineExceeded desc = failed to start sandbox \\\"4b81dfeaa424dd7e8511a6d98ed2eadbaff65c9f13117b8b59bb07c139c53705\\\": failed to get sandbox image \\\"registry.k8s.io/pause:3.10\\\": failed to pull image \\\"registry.k8s.io/pause:3.10\\\": failed to pull and unpack image \\\"registry.k8s.io/pause:3.10\\\": failed to resolve image: failed to do request: Head \\\"https://asia-east1-docker.pkg.dev/v2/k8s-artifacts-prod/images/pause/manifests/3.10\\\": dial tcp 64.233.188.82:443: i/o timeout\"" pod="kube-system/kube-apiserver-xdlinux" podUID="32a78a7f4b016e3715c0097719578050" 
 ```
 
-原因：Kubernetes组件仍尝试从默认的 `registry.k8s.io` 拉取镜像。
+原因：Kubernetes组件仍尝试从默认的 `registry.k8s.io` 拉取`sandbox`对应的`pause`镜像。
 
-解决方式：需修改`containerd`的配置，调整`pause`的镜像地址。
+解决方式：修改`containerd`的配置，调整`pause`的镜像地址为国内镜像。
 
 ```sh
 sudo mkdir -p /etc/containerd
@@ -390,7 +390,7 @@ a1b3571e04878  499038711c081  2 hours ago  Running   etcd                      0
 
 2、修复上述警告和`crictl`命令执行不了的问题：
 
-`crictl`命令执行报错的问题，需要创建配置文件并指定套接字路径。`crictl`是Kubernetes社区定义的专门CLI工具，可见下面小节的单独说明。
+`crictl`命令执行报错的问题，需要创建配置文件并指定套接字路径。`crictl`则是Kubernetes社区定义的专门CLI工具。
 
 ```sh
 [root@xdlinux ➜ hello git:(main) ✗ ]$ crictl --runtime-endpoint unix:///var/run/containerd/containerd.sock ps -a | grep kube | grep -v pause
@@ -460,7 +460,7 @@ systemctl enable --now kubelet
 
 其最后的日志提示需要2个操作：
 
-* 1、若为root用户，`export KUBECONFIG=/etc/kubernetes/admin.conf`，直接终端操作即可，并加到启动项
+* 1、若为root用户，`export KUBECONFIG=/etc/kubernetes/admin.conf`，直接终端操作即可，并可加到`.bashrc`/`.zshrc`中启动时进行设置
 * 2、安装pod网络插件，可见：
     * [安装Pod网络插件](https://kubernetes.io/zh-cn/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/#pod-network)
     * 多种插件：[Addon--网络策略](https://kubernetes.io/zh-cn/docs/concepts/cluster-administration/addons/#networking-and-network-policy)
@@ -575,7 +575,7 @@ Jul 22 19:48:52 xdlinux containerd[26160]: time="2025-07-22T19:48:52.976885795+0
 Jul 22 21:13:05 xdlinux containerd[170753]: time="2025-07-22T21:13:05.202071815+08:00" level=error msg="RunPodSandbox for &PodSandboxMetadata{Name:coredns-757cc6c8f8-v2mgf,Uid:3728bb94-a452-4245-864a-a369c4dfe138,Namespace:kube-system,Attempt:0,} failed, error" error="rpc error: code = Unknown desc = failed to setup network for sandbox \"c0f99a92d509c419f0b95d90d545e3cc24148bc59695b761ab5c9e4ca7f176df\": plugin type=\"flannel\" failed (add): loadFlannelSubnetEnv failed: open /run/flannel/subnet.env: no such file or directory"
 ```
 
-基于LLM的建议方式，先手动创建配置：手动获取集群网络CIDR，并如新建`/run/flannel/subnet.env`文件
+基于LLM的建议方式，先手动创建配置：手动获取集群网络CIDR，并如下新建`/run/flannel/subnet.env`文件
 
 ```sh
 [root@xdlinux ➜ hello git:(main) ✗ ]$ kubectl cluster-info dump | grep -m1 cluster-cidr
