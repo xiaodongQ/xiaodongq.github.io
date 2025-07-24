@@ -325,9 +325,18 @@ Jul 23 22:57:43 xdlinux kubelet[197244]: E0723 22:57:43.256904  197244 pod_worke
 [root@xdlinux ➜ ~ ]$ systemctl status containerd.service
 ```
 
+但是toml解析这些新增的项都失败了，`unknown key`：
+```sh
+Jul 24 23:45:14 xdlinux containerd[358071]: time="2025-07-24T23:45:14.978826944+08:00" level=info msg="loading plugin" id=io.containerd.grpc.v1.cri type=io.containerd.grpc.v1
+Jul 24 23:45:14 xdlinux containerd[358071]: time="2025-07-24T23:45:14.978870876+08:00" level=warning msg="Ignoring unknown key in TOML for plugin" error="strict mode: fields in the document are missing in the target struct" key=registry plugin=io.containerd.grpc.v1.cri
+Jul 24 23:45:14 xdlinux containerd[358071]: time="2025-07-24T23:45:14.978881352+08:00" level=warning msg="Ignoring unknown key in TOML for plugin" error="strict mode: fields in the document are missing in the target struct" key="registry mirrors" plugin=io.containerd.grpc.v1.cri
+Jul 24 23:45:14 xdlinux containerd[358071]: time="2025-07-24T23:45:14.978889454+08:00" level=warning msg="Ignoring unknown key in TOML for plugin" error="strict mode: fields in the document are missing in the target struct" key="registry mirrors docker.io" plugin=io.containerd.grpc.v1.cri
+```
+
 直接指定`docker.m.daocloud.io/library/redis:alpine`（相对于`--image='redis:alpine'`）是可以正常pull的：  
 `kubectl run redis --image=docker.m.daocloud.io/library/redis:alpine`
 
+删除pod：
 ```sh
 # 删除pod
 [root@xdlinux ➜ containerd ]$ kubectl delete pod redis
