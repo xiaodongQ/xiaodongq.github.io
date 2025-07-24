@@ -311,7 +311,7 @@ redis   0/1     ImagePullBackOff   0          23m
 Jul 23 22:57:43 xdlinux kubelet[197244]: E0723 22:57:43.256904  197244 pod_workers.go:1301] "Error syncing pod, skipping" err="failed to \"StartContainer\" for \"redis\" with ImagePullBackOff: \"Back-off pulling image \\\"redis:alpine\\\": ErrImagePull: failed to pull and unpack image \\\"docker.io/library/redis:alpine\\\": failed to resolve image: failed to do request: Head \\\"https://registry-1.docker.io/v2/library/redis/manifests/alpine\\\": dial tcp 162.220.12.226:443: connect: connection refused\"" pod="default/redis" podUID="c21adea0-dbfc-4936-bce2-8db56b48d4fb"
 ```
 
-5、修改containerd镜像源，
+5、修改`containerd`镜像源，修改`/etc/containerd/config.toml`配置并重启`containerd`服务
 
 ```sh
 # 在/etc/containerd/config.toml中新增下述项（存在则修改）。不存在文件则创建，参考上篇
@@ -325,6 +325,7 @@ Jul 23 22:57:43 xdlinux kubelet[197244]: E0723 22:57:43.256904  197244 pod_worke
 [root@xdlinux ➜ ~ ]$ systemctl status containerd.service
 ```
 
+直接指定`docker.m.daocloud.io/library/redis:alpine`（相对于`--image='redis:alpine'`）是可以正常pull的：  
 `kubectl run redis --image=docker.m.daocloud.io/library/redis:alpine`
 
 ```sh
