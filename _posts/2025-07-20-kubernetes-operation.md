@@ -532,19 +532,15 @@ OK
 10.105.22.241:6379> get xdtest
 "1111"
 10.105.22.241:6379> 
+# 查看redis:alpine版本信息
+10.105.22.241:6379> info server
+redis_version:8.0.3
+...
 ```
 
 ## 4. 扩容Redis服务
 
 上述使用独立`Pod`方式部署了`Redis`，无法实现自动扩容。要实现自动扩容，这里使用`StatefulSet`替换`Deployment`。
-
-查看`Redis`服务端版本，为`8.0.3`，这里镜像还是用`redis:alpine`
-```sh
-10.105.22.241:6379> info server
-# Server
-redis_version:8.0.3
-...
-```
 
 1、创建 `Redis StatefulSet` 配置
 
@@ -616,9 +612,43 @@ NAME                     READY   AGE
 statefulset.apps/redis   1/1     113s
 ```
 
+验证，通过映射端口和Cluster-Ip都可以访问：
+
+```sh
+[root@xdlinux ➜ redis-stateful-set git:(main) ✗ ]$ redis-cli -h 192.168.1.150 -p 30000 ping
+PONG
+
+[root@xdlinux ➜ redis-stateful-set git:(main) ✗ ]$ redis-cli -h 10.107.73.216 ping
+PONG
+```
+
+4、水平扩容（增加Redis副本数）：`kubectl scale statefulset redis --replicas=3`
+
+```sh
+[root@xdlinux ➜ redis-stateful-set git:(main) ✗ ]$ kubectl scale statefulset redis --replicas=3
+statefulset.apps/redis scaled
+
+# 可看到有3个pod了（需要另外手动配置 Redis 主从关系实现读写分离，此处暂不进行后续操作）
+[root@xdlinux ➜ redis-stateful-set git:(main) ✗ ]$ kubectl get all
+NAME          READY   STATUS    RESTARTS   AGE
+pod/redis-0   1/1     Running   0          4m44s
+pod/redis-1   1/1     Running   0          6s
+pod/redis-2   1/1     Running   0          5s
+
+NAME                     TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+service/kubernetes       ClusterIP   10.96.0.1       <none>        443/TCP          6d16h
+service/redis-headless   ClusterIP   None            <none>        6379/TCP         4m44s
+service/redis-service    NodePort    10.107.73.216   <none>        6379:30000/TCP   2m57s
+
+NAME                     READY   AGE
+statefulset.apps/redis   3/3     4m44s
+```
+
+纵向扩容则可`kubectl edit statefulset redis`调整硬件资源。
+
 ## 5. 小结
 
-基于上篇环境进行基本命令操作和对比。并通过K8S创建了一个Redis的Pod、Service，过程中由于containerd新版本弃用调整了镜像配置的方式也折腾了挺久，创建Pod后，通过Service对外提供服务访问，增强了一些体感。
+基于上篇环境进行基本命令操作；并通过K8S创建了一个Redis的Pod、Service；以及集群扩容操作。过程中由于containerd新版本弃用调整了镜像配置的方式也折腾了挺久，创建Pod后，通过Service对外提供服务访问，增强了一些体感。
 
 ## 6. 参考
 
