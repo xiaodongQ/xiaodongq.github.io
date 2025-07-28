@@ -81,9 +81,9 @@ K8S集群由 **控制平面** 和 **一个或多个工作节点** 组成。
 * **节点（Node）**：可以是一个虚拟机或者物理机器，取决于所在的集群配置。
     * 节点上运行Pod，容器则运行在Pod中。节点由**控制面（Control Plane）**负责管理。
 
-下面的一些概念，可先搭建基本的学习环境后再对照理解，见下小节。
+下面先搭建基本的学习环境后再对照理解其他一些概念。
 
-## 3. 搭建学习环境记录
+## 3. kubeadm创建集群环境
 
 参考：[安装Kubernetes工具](https://kubernetes.io/zh-cn/docs/tasks/tools/)。
 
@@ -447,6 +447,8 @@ swapoff -a
 
 `/etc/sysctl.conf`里增加 `net.ipv4.ip_forward = 1`，而后`sysctl -p`
 
+### 3.6. 相关配置文件
+
 5、另外记录下相关排查命令和配置文件：
 
 * 查看日志：
@@ -459,7 +461,7 @@ swapoff -a
 * kubelet配置文件：
     * `/etc/kubernetes/kubelet.conf`
 
-### 3.6. 集群创建后的操作
+## 4. 集群创建后的操作
 
 上面`kubeadm init`已经成功创建集群了（提示：`Your Kubernetes control-plane has initialized successfully!`），还需要进行一些操作。
 
@@ -483,7 +485,7 @@ LLM给的插件简要对比：
 > - **生产环境** → **Calico**（功能全）或 **Cilium**（高性能）
 > - **测试环境** → **Flannel**（最简单）
 
-#### 3.6.1. 安装Pod网络插件：Calico（失败）
+### 4.1. 安装Pod网络插件：Calico（失败）
 
 必须安装一个基于`CNI（Container Network Interface）`的Pod网络插件，用于Pod间的通信。
 * 此处选择 [Calico](https://www.tigera.io/project-calico/)
@@ -558,7 +560,7 @@ Jul 20 23:07:17 xdlinux containerd[26160]: time="2025-07-20T23:07:17.338977261+0
 
 另外，Calico对应的cidr需要使用`192.168.0.0/16`：`kubeadm init --image-repository=registry.aliyuncs.com/google_containers --pod-network-cidr=192.168.0.0/16`
 
-#### 3.6.2. 网络插件切换成：flannel（成功）
+### 4.2. 网络插件切换成：flannel（成功）
 
 重新初始化：
 
@@ -617,7 +619,7 @@ NAME      STATUS   ROLES           AGE   VERSION
 xdlinux   Ready    control-plane   37h   v1.33.3
 ```
 
-#### 3.6.3. 添加工作节点（单机不需要）
+### 4.3. 添加工作节点（单机不需要）
 
 工作节点是工作负载运行的地方，使用`kubeadm join`方式添加，可见 [添加 Linux 工作节点](https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/kubeadm/adding-linux-nodes/)。
 
@@ -636,13 +638,13 @@ xdlinux   Ready    control-plane   37h   v1.33.3
 kubeadm join 192.168.1.150:6443 --token zzm9zc.ewdtn9oq3pztckaw --discovery-token-ca-cert-hash sha256:f929ef5b39a4b7901ffdeb3e9e095a1671521c6e773ff26a171072f57fd4407e
 ```
 
-## 4. 小结
+## 5. 小结
 
 介绍了K8S基本架构和关键概念，并基于`kubeadm`搭建本地环境，由于容器运行时和镜像地址问题，踩了不少坑。
 
 后续基于刚搭建的环境继续熟悉相关概念和操作。
 
-## 5. 参考
+## 6. 参考
 
 * [Kubernetes Docs](https://kubernetes.io/docs/concepts/overview/)
     * [Kubernetes中文文档](https://kubernetes.io/zh-cn/docs/concepts/overview/)
