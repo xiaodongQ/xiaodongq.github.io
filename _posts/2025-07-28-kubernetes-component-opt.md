@@ -46,7 +46,9 @@ c5b9e0185069d   41376797d5122   Running  kube-scheduler           kube-scheduler
 * `6` -- HTTP请求路径 + 响应状态码
 * `8` -- 完整请求和响应
 
-以`kubectl version`查看版本为例：
+### 3.1. kubectl version过程
+
+以`kubectl version`查看版本为例：可看到会先加载`/etc/kubernetes/admin.conf`配置文件进行认证
 
 ```sh
 [root@xdlinux ➜ ~ ]$ kubectl version -v 8 
@@ -92,7 +94,7 @@ Kustomize Version: v5.6.0
 Server Version: v1.33.3
 ```
 
-调用的是`https://192.168.1.150:6443/version`的`GET`接口（需要鉴权的命令则无法简单用下述方式）
+调用的是`https://192.168.1.150:6443/version`的`GET`接口（需要鉴权的命令则会报错无权限）
 * 1）可在浏览器里直接请求 `https://192.168.1.150:6443/version?timeout=32s`，可获取到结果信息
 * 2）也可用`curl`进行如下请求：
 
@@ -112,6 +114,134 @@ Server Version: v1.33.3
   "goVersion": "go1.24.4",
   "compiler": "gc",
   "platform": "linux/amd64"
+}
+```
+
+### 3.2. /etc/kubernetes/admin.conf 配置文件说明
+
+上述`kubectl`执行时，可看到会先加载`/etc/kubernetes/admin.conf`配置文件进行认证。
+* `admin.conf`是一个`YAML`格式的kubeconfig文件，该文件记录**集群管理员的认证信息和API服务器地址**
+* `kubeadm init`初始化集群时会自动生成该配置文件
+
+```sh
+[root@xdlinux ➜ ~ ]$ cat /etc/kubernetes/admin.conf
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: xxx (Base64编码的CA证书)
+    server: https://192.168.1.150:6443 (API服务器地址)
+  name: kubernetes
+contexts:
+- context:
+    cluster: kubernetes
+    user: kubernetes-admin
+  name: kubernetes-admin@kubernetes
+current-context: kubernetes-admin@kubernetes
+kind: Config
+preferences: {}
+users:
+- name: kubernetes-admin
+  user:
+    client-certificate-data: xxxxx (Base64编码的客户端证书)
+    client-key-data: xxxxxx (Base64编码的客户端私钥)
+```
+
+上述配置文件的加载逻辑实现在：`kubernetes/staging/src/k8s.io/client-go/tools/clientcmd/loader.go`
+```go
+// kubernetes/staging/src/k8s.io/client-go/tools/clientcmd/loader.go
+func LoadFromFile(filename string) (*clientcmdapi.Config, error) {
+	kubeconfigBytes, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+	config, err := Load(kubeconfigBytes)
+	if err != nil {
+		return nil, err
+	}
+}
+```
+
+对应的配置结构如下，可以和配置文件的`YAML`格式一一对应：
+```go
+// kubernetes/staging/src/k8s.io/client-go/tools/clientcmd/api/types.go
+type Config struct {
+	Kind string `json:"kind,omitempty"`
+	APIVersion string `json:"apiVersion,omitempty"`
+	// Preferences holds general information to be use for cli interactions
+	Preferences Preferences `json:"preferences"`
+	// Clusters is a map of referencable names to cluster configs
+	Clusters map[string]*Cluster `json:"clusters"`
+	// AuthInfos is a map of referencable names to user configs
+	AuthInfos map[string]*AuthInfo `json:"users"`
+	// Contexts is a map of referencable names to context configs
+	Contexts map[string]*Context `json:"contexts"`
+	// CurrentContext is the name of the context that you would like to use by default
+	CurrentContext string `json:"current-context"`
+	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
+	// +optional
+	Extensions map[string]runtime.Object `json:"extensions,omitempty"`
+}
+```
+
+除此之外，`/etc/kubernetes/`下面的其他几个配置文件（如`kubelet.conf`），也是通过上面的结构体所定义的。
+```sh
+[root@xdlinux ➜ ~ ]$ ll /etc/kubernetes/
+total 40K
+-rw------- 1 root root 5.6K Jul 21 07:47 admin.conf
+-rw------- 1 root root 5.6K Jul 21 07:47 controller-manager.conf
+-rw------- 1 root root 2.0K Jul 21 07:47 kubelet.conf
+drwxr-xr-x 2 root root  113 Jul 22 22:20 manifests
+drwxr-xr-x 3 root root 4.0K Jul 21 07:47 pki
+-rw------- 1 root root 5.5K Jul 21 07:47 scheduler.conf
+-rw------- 1 root root 5.6K Jul 21 07:47 super-admin.conf
+```
+
+### 3.3. kubectl proxy绕过认证（Authentication）
+
+`kubectl get pods -v 8` 可看到对应的请求为 `Request" verb="GET" url="https://192.168.1.150:6443/api/v1/namespaces/default/pods?limit=500"`。  
+下面通过`curl -k`调用`GET`请求，发现`-k`忽略掉认证过程的curl被判定为`system:anonymous`用户，而此用户没有`list pods`的权限，所以报错了。
+
+```sh
+[root@xdlinux ➜ ~ ]$ curl -k https://192.168.1.150:6443/api/v1/namespaces/default/pods\?limit\=500
+{
+  "kind": "Status",
+  "apiVersion": "v1",
+  "metadata": {},
+  "status": "Failure",
+  "message": "pods is forbidden: User \"system:anonymous\" cannot list resource \"pods\" in API group \"\" in the namespace \"default\"",
+  "reason": "Forbidden",
+  "details": {
+    "kind": "pods"
+  },
+  "code": 403
+}
+```
+
+可以通过`kubectl proxy`在本地和集群之间创建一个代理：
+```sh
+# 会阻塞等待请求，也可加&在后台运行
+[root@xdlinux ➜ ~ ]$ kubectl proxy -v8 
+I0729 23:23:16.454401  783638 loader.go:402] Config loaded from file:  /etc/kubernetes/admin.conf
+Starting to serve on 127.0.0.1:8001
+
+```
+
+而后向`127.0.0.1`的`8001`端口发送`HTTP`（而非`HTTPS`）请求：
+* 注意，`192.168.1.150`则不行
+* 上面的`kubectl proxy`会使用`/etc/kubernetes/admin.conf`配置文件
+
+```sh
+[root@xdlinux ➜ ~ ]$ curl http://127.0.0.1:8001/api/v1/namespaces/default/pods\?limit\=500
+{
+  "kind": "PodList",
+  "apiVersion": "v1",
+  "metadata": {
+    "resourceVersion": "987772"
+  },
+  "items": [
+    ...
+  ]
+  ...
 }
 ```
 
