@@ -1,5 +1,5 @@
 ---
-title: Kubernetes学习实践（三） -- 关键组件操作熟悉
+title: Kubernetes学习实践（三） -- 关键组件操作实践
 description: 进一步对K8S关键组件进行操作实践
 categories: [云原生, Kubernetes]
 tags: [云原生, Kubernetes]
@@ -8,7 +8,7 @@ tags: [云原生, Kubernetes]
 
 ## 1. 引言
 
-通过前面对K8S的环境搭建和Redis环境的部署，已经有一些实践经验了。下面继续对环境中的组件进行操作查看，并简要对比代码，进一步了解K8S各个组件的功能和相关实现。
+通过前面对K8S的环境搭建和Redis环境的部署，已经有一些实践经验了。下面继续对环境中的组件进行操作实践，并简要对比代码，进一步了解K8S各个组件的功能和相关实现。
 
 从 [kubernetes github](https://github.com/kubernetes/kubernetes) 中 [fork](https://github.com/xiaodongQ/kubernetes) 相应代码进行学习，并切换到与当前环境一致的分支：`release-1.33`。
 
@@ -60,34 +60,34 @@ I0729 21:45:30.645631  778204 envvar.go:172] "Feature gate default state" featur
 I0729 21:45:30.645636  778204 envvar.go:172] "Feature gate default state" feature="WatchListClient" enabled=false
 I0729 21:45:30.645665  778204 discovery_client.go:657] "Request Body" body=""
 I0729 21:45:30.645718  778204 round_trippers.go:527] "Request" verb="GET" url="https://192.168.1.150:6443/version?timeout=32s" headers=<
-	Accept: application/json, */*
-	User-Agent: kubectl/v1.33.3 (linux/amd64) kubernetes/80779bd
+    Accept: application/json, */*
+    User-Agent: kubectl/v1.33.3 (linux/amd64) kubernetes/80779bd
  >
 I0729 21:45:30.649450  778204 round_trippers.go:632] "Response" status="200 OK" headers=<
-	Audit-Id: ea53bfd7-8bd4-4cbc-9354-e3cbc656c712
-	Cache-Control: no-cache, private
-	Content-Length: 379
-	Content-Type: application/json
-	Date: Tue, 29 Jul 2025 13:45:30 GMT
-	X-Kubernetes-Pf-Flowschema-Uid: a85b9af0-4d2d-493d-8ebf-b43193f9dd31
-	X-Kubernetes-Pf-Prioritylevel-Uid: bb92ee23-b810-4c85-9fbc-b3c9f72105d2
+    Audit-Id: ea53bfd7-8bd4-4cbc-9354-e3cbc656c712
+    Cache-Control: no-cache, private
+    Content-Length: 379
+    Content-Type: application/json
+    Date: Tue, 29 Jul 2025 13:45:30 GMT
+    X-Kubernetes-Pf-Flowschema-Uid: a85b9af0-4d2d-493d-8ebf-b43193f9dd31
+    X-Kubernetes-Pf-Prioritylevel-Uid: bb92ee23-b810-4c85-9fbc-b3c9f72105d2
  > milliseconds=3
 I0729 21:45:30.649617  778204 discovery_client.go:657] "Response Body" body=<
-	{
-	  "major": "1",
-	  "minor": "33",
-	  "emulationMajor": "1",
-	  "emulationMinor": "33",
-	  "minCompatibilityMajor": "1",
-	  "minCompatibilityMinor": "32",
-	  "gitVersion": "v1.33.3",
-	  "gitCommit": "80779bd6ff08b451e1c165a338a7b69351e9b0b8",
-	  "gitTreeState": "clean",
-	  "buildDate": "2025-07-15T17:59:42Z",
-	  "goVersion": "go1.24.4",
-	  "compiler": "gc",
-	  "platform": "linux/amd64"
-	}
+    {
+      "major": "1",
+      "minor": "33",
+      "emulationMajor": "1",
+      "emulationMinor": "33",
+      "minCompatibilityMajor": "1",
+      "minCompatibilityMinor": "32",
+      "gitVersion": "v1.33.3",
+      "gitCommit": "80779bd6ff08b451e1c165a338a7b69351e9b0b8",
+      "gitTreeState": "clean",
+      "buildDate": "2025-07-15T17:59:42Z",
+      "goVersion": "go1.24.4",
+      "compiler": "gc",
+      "platform": "linux/amd64"
+    }
  >
 Client Version: v1.33.3
 Kustomize Version: v5.6.0
@@ -95,7 +95,7 @@ Server Version: v1.33.3
 ```
 
 调用的是`https://192.168.1.150:6443/version`的`GET`接口（需要鉴权的命令则会报错无权限）
-* 1）可在浏览器里直接请求 `https://192.168.1.150:6443/version?timeout=32s`，可获取到结果信息
+* 1）可在浏览器里直接请求 `https://192.168.1.150:6443/version?timeout=32s`，会返回结果信息
 * 2）也可用`curl`进行如下请求：
 
 ```sh
@@ -150,14 +150,14 @@ users:
 ```go
 // kubernetes/staging/src/k8s.io/client-go/tools/clientcmd/loader.go
 func LoadFromFile(filename string) (*clientcmdapi.Config, error) {
-	kubeconfigBytes, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
-	config, err := Load(kubeconfigBytes)
-	if err != nil {
-		return nil, err
-	}
+    kubeconfigBytes, err := os.ReadFile(filename)
+    if err != nil {
+        return nil, err
+    }
+    config, err := Load(kubeconfigBytes)
+    if err != nil {
+        return nil, err
+    }
 }
 ```
 
@@ -165,21 +165,21 @@ func LoadFromFile(filename string) (*clientcmdapi.Config, error) {
 ```go
 // kubernetes/staging/src/k8s.io/client-go/tools/clientcmd/api/types.go
 type Config struct {
-	Kind string `json:"kind,omitempty"`
-	APIVersion string `json:"apiVersion,omitempty"`
-	// Preferences holds general information to be use for cli interactions
-	Preferences Preferences `json:"preferences"`
-	// Clusters is a map of referencable names to cluster configs
-	Clusters map[string]*Cluster `json:"clusters"`
-	// AuthInfos is a map of referencable names to user configs
-	AuthInfos map[string]*AuthInfo `json:"users"`
-	// Contexts is a map of referencable names to context configs
-	Contexts map[string]*Context `json:"contexts"`
-	// CurrentContext is the name of the context that you would like to use by default
-	CurrentContext string `json:"current-context"`
-	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
-	// +optional
-	Extensions map[string]runtime.Object `json:"extensions,omitempty"`
+    Kind string `json:"kind,omitempty"`
+    APIVersion string `json:"apiVersion,omitempty"`
+    // Preferences holds general information to be use for cli interactions
+    Preferences Preferences `json:"preferences"`
+    // Clusters is a map of referencable names to cluster configs
+    Clusters map[string]*Cluster `json:"clusters"`
+    // AuthInfos is a map of referencable names to user configs
+    AuthInfos map[string]*AuthInfo `json:"users"`
+    // Contexts is a map of referencable names to context configs
+    Contexts map[string]*Context `json:"contexts"`
+    // CurrentContext is the name of the context that you would like to use by default
+    CurrentContext string `json:"current-context"`
+    // Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
+    // +optional
+    Extensions map[string]runtime.Object `json:"extensions,omitempty"`
 }
 ```
 
