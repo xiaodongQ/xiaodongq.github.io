@@ -30,12 +30,23 @@ f6f4852a86c52   bf97fadcef430   Running  kube-controller-manager  kube-controlle
 695cfc514a5ff   499038711c081   Running  etcd                     etcd-xdlinux                      kube-system
 c5b9e0185069d   41376797d5122   Running  kube-scheduler           kube-scheduler-xdlinux            kube-system
 9ffc7318407b7   a92b4b92a9916   Running  kube-apiserver           kube-apiserver-xdlinux            kube-system
+
+# 也可以看下 kube-system 对应namespace下的pod（不指定则只会显示default下的pod）
+[root@xdlinux ➜ ~ ]$ kubectl -n kube-system get pods
+NAME                              READY   STATUS    RESTARTS   AGE
+coredns-757cc6c8f8-nxw7g          1/1     Running   0          10d
+coredns-757cc6c8f8-v2mgf          1/1     Running   0          10d
+etcd-xdlinux                      1/1     Running   2          10d
+kube-apiserver-xdlinux            1/1     Running   2          10d
+kube-controller-manager-xdlinux   1/1     Running   0          10d
+kube-proxy-6ptwm                  1/1     Running   0          4d
+kube-scheduler-xdlinux            1/1     Running   2          10d
 ```
 
 再看下第一篇中的架构图进行对比映证：  
 ![kubernetes-cluster-architecture](/images/kubernetes-cluster-architecture.svg)
 
-下面对
+下面对各个组件进行操作说明。
 
 ## 3. 查看kube-apiserver处理过程
 
@@ -245,11 +256,78 @@ Starting to serve on 127.0.0.1:8001
 }
 ```
 
-## 4. 小结
+## 4. etcd基本操作
+
+根据上面`kubectl -n kube-system get pods`显示的pod，进入`etcd`对应的pod：`etcd-xdlinux`。
+* 注意需要`-n`指定`namespace`，否则默认命名空间（`default`）下会找不到pod
+* 当前基础镜像（取决于不同镜像的配置）对应的`etcd` pod里只安装了`sh`，没安装`bash`
+
+```sh
+[root@xdlinux ➜ ~ ]$ kubectl -n kube-system exec -it etcd-xdlinux -- sh
+sh-5.2#
+```
+
+而后可以在容器里通过`etcdctl`进行etcd相关操作：
+* etcd启用了**严格的安全认证机制**，且需要明确操作的目标集群，需要通过参数指定这些信息
+* `--endpoints`：指定操作的etcd节点地址，如果不指定，`etcdctl`会使用默认值（http://127.0.0.1:2379）
+* 证书参数
+    * `--cacert`：CA 根证书路径，用于验证etcd服务器的身份（确保连接的是真实的 etcd 节点，而非伪造的恶意节点）
+    * `--cert`和`--key`：客户端证书和私钥，用于向etcd服务器证明自己的身份（etcd 会验证客户端是否有权限操作数据）
+    * 这些证书在 Kubernetes 集群中通常存放在 `/etc/kubernetes/pki/etcd/` 目录下，路径是固定的（由 kubeadm 等工具自动生成）。
+
+```sh
+# 命令
+sh-5.2# etcdctl member list \
+>   --endpoints=https://127.0.0.1:2379 \
+>   --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+>   --cert=/etc/kubernetes/pki/etcd/server.crt \
+>   --key=/etc/kubernetes/pki/etcd/server.key
+# 结果
+bff3f519f190640f, started, xdlinux, https://192.168.1.150:2380, https://192.168.1.150:2379, false
+```
+
+小技巧：在etcd Pod内执行export来设置相关环境变量
+```sh
+export ETCDCTL_API=3
+export ETCDCTL_ENDPOINTS=https://127.0.0.1:2379
+export ETCDCTL_CACERT=/etc/kubernetes/pki/etcd/ca.crt
+export ETCDCTL_CERT=/etc/kubernetes/pki/etcd/server.crt
+export ETCDCTL_KEY=/etc/kubernetes/pki/etcd/server.key
+```
+
+而后就能省略这些参数来执行基本命令了：
+```sh
+# 1、增和改：put
+sh-5.2# etcdctl put xdkey1 111
+OK
+
+# 2、查：get
+sh-5.2# etcdctl get xdkey1
+xdkey1
+111
+
+# 3、删：del
+sh-5.2# etcdctl del xdkey1
+1
+sh-5.2# etcdctl get xdkey1
+sh-5.2# 
+
+# 4、观察监测更新：watch
+sh-5.2# etcdctl watch xdkey1
+# （上面阻塞会等待监测结果，在另一个窗口操作 etcdctl put xdkey1 ttt）
+PUT
+xdkey1
+tttt
+
+# 另外还支持分布式锁、租约等
+```
+
+
+## 5. 小结
 
 
 
-## 5. 参考
+## 6. 参考
 
 * 极客时间：Kubernetes从上手到实践
 * LLM

@@ -646,6 +646,23 @@ statefulset.apps/redis   3/3     4m44s
 
 纵向扩容则可`kubectl edit statefulset redis`调整硬件资源。
 
+`kubectl exec -it redis-0 -- bash` 可进入Pod，注意需要在命令前（包括`/bin/bash`）加`--`，不加`--`的方式已经不支持了。
+* `-i` 保持标准输入打开
+* `-t` 分配一个伪终端（TTY）
+* `--` 用于分隔 kubectl 命令和要在 Pod 中执行的命令
+
+```sh
+# 提示不支持直接接命令了，而需要在命令前加上`--`
+[root@xdlinux ➜ ~ ]$ kubectl exec -it redis-0 bash
+error: exec [POD] [COMMAND] is not supported anymore. Use exec [POD] -- [COMMAND] instead
+See 'kubectl exec -h' for help and examples
+
+# 加上 --
+[root@xdlinux ➜ ~ ]$ kubectl exec -it redis-0 -- bash
+root@redis-0:/data# ls
+appendonlydir
+```
+
 ## 5. 小结
 
 基于上篇环境进行基本命令操作；并通过K8S创建了一个Redis的Pod、Service；以及集群扩容操作。过程中由于containerd新版本弃用调整了镜像配置的方式也折腾了挺久，创建Pod后，通过Service对外提供服务访问，增强了一些体感。
