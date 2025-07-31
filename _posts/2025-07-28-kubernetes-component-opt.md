@@ -258,6 +258,10 @@ Starting to serve on 127.0.0.1:8001
 
 ## 4. etcd基本操作
 
+etcd是一个键值数据库，存储K8S中的相关集群信息。
+
+### 4.1. 进入etcd pod
+
 根据上面`kubectl -n kube-system get pods`显示的pod，进入`etcd`对应的pod：`etcd-xdlinux`。
 * 注意需要`-n`指定`namespace`，否则默认命名空间（`default`）下会找不到pod
 * 当前基础镜像（取决于不同镜像的配置）对应的`etcd` pod里只安装了`sh`，没安装`bash`
@@ -278,12 +282,21 @@ sh-5.2#
 ```sh
 # 命令
 sh-5.2# etcdctl member list \
->   --endpoints=https://127.0.0.1:2379 \
->   --cacert=/etc/kubernetes/pki/etcd/ca.crt \
->   --cert=/etc/kubernetes/pki/etcd/server.crt \
->   --key=/etc/kubernetes/pki/etcd/server.key
+    --endpoints=https://127.0.0.1:2379 \
+    --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+    --cert=/etc/kubernetes/pki/etcd/server.crt \
+    --key=/etc/kubernetes/pki/etcd/server.key
 # 结果
 bff3f519f190640f, started, xdlinux, https://192.168.1.150:2380, https://192.168.1.150:2379, false
+
+# etcd的版本
+sh-5.2# etcdctl version \
+    --endpoints=https://127.0.0.1:2379 \
+    --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+    --cert=/etc/kubernetes/pki/etcd/server.crt \
+    --key=/etc/kubernetes/pki/etcd/server.key
+etcdctl version: 3.5.21
+API version: 3.5
 ```
 
 小技巧：在etcd Pod内执行export来设置相关环境变量
@@ -295,7 +308,10 @@ export ETCDCTL_CERT=/etc/kubernetes/pki/etcd/server.crt
 export ETCDCTL_KEY=/etc/kubernetes/pki/etcd/server.key
 ```
 
-而后就能省略这些参数来执行基本命令了：
+### 4.2. 增删改查
+
+设置上述环境变量后，就能省略上述参数来执行基本增删改查命令了：
+
 ```sh
 # 1、增和改：put
 sh-5.2# etcdctl put xdkey1 111
@@ -318,9 +334,43 @@ sh-5.2# etcdctl watch xdkey1
 PUT
 xdkey1
 tttt
-
-# 另外还支持分布式锁、租约等
 ```
+
+另外还支持分布式锁、租约等。
+
+### 4.3. etcd中存储的K8S信息
+
+* 查看所有资源的键（简要概览）
+    * Kubernetes 资源在 etcd 中的根路径是 `/registry`，查看所有键的列表
+
+```sh
+# 只显示值，只看键名（避免输出过多）
+sh-5.2# etcdctl get /registry --prefix --keys-only
+/registry/apiregistration.k8s.io/apiservices/v1.
+/registry/apiregistration.k8s.io/apiservices/v1.admissionregistration.k8s.io
+/registry/apiregistration.k8s.io/apiservices/v1.apiextensions.k8s.io
+...
+```
+
+* 也可进一步过滤`pods`/`services`/`deployments`/`nodes`/`namespace`信息
+
+比如路径前缀：`/registry/namespaces`
+```sh
+sh-5.2# etcdctl get /registry/namespaces --prefix --keys-only
+/registry/namespaces/default
+/registry/namespaces/kube-node-lease
+/registry/namespaces/kube-public
+/registry/namespaces/kube-system
+```
+
+* 查看集群成员信息，常用于检查etcd集群的节点状态和成员健康情况：`etcdctl member list`
+
+```sh
+sh-5.2# etcdctl member list
+# 成员ID           状态     成员名称   Peer通信地址（etcd之间同步数据地址）      客户端通信地址     是否为learner（是则仅同步数据，无投票权）
+bff3f519f190640f, started, xdlinux, https://192.168.1.150:2380, https://192.168.1.150:2379, false
+```
+
 
 
 ## 5. 小结
