@@ -393,7 +393,7 @@ sh-5.2# etcdctl member list
 bff3f519f190640f, started, xdlinux, https://192.168.1.150:2380, https://192.168.1.150:2379, false
 ```
 
-### 4.3. 基于etcd的K8s核心功能说明
+### 4.4. 基于etcd的K8s核心功能说明
 
 K8s很多核心功能依赖etcd的原生特性实现。
 
@@ -411,15 +411,75 @@ etcd 提供 Watch API，支持监听某个键或前缀的变化（创建、更�
 
 etcd 支持基于条件的事务（`Transaction`）操作，K8s 利用这一特性实现并发安全的操作。
 
-## kube-controller-manager
+## 5. kube-controller-manager
+
+K8s的`Controller Manager`通过`kube-apiserver`提供的信息持续的监控集群状态，并尝试将集群调整至预期的状态。
+
+### 5.1. 相应的pod信息
+
+先describe查看下`kube-controller-manager`这个pod的信息，截取部分：
+
+```sh
+[root@xdlinux ➜ ~ ]$ kubectl -n kube-system describe pod kube-controller-manager
+Name:                 kube-controller-manager-xdlinux
+Namespace:            kube-system
+Priority:             2000001000
+Priority Class Name:  system-node-critical
+Node:                 xdlinux/192.168.1.150
+...
+Containers:
+  kube-controller-manager:
+    Container ID:  containerd://f6f4852a86c52bc368ad5c9ca4802782667b318d9835c1e03b6acbb2992cce6d
+    # 容器镜像
+    Image:         registry.aliyuncs.com/google_containers/kube-controller-manager:v1.33.3
+...
+    Requests:
+      cpu:        200m
+    # 健康检查接口
+    Liveness:     http-get https://127.0.0.1:10257/healthz delay=10s timeout=15s period=10s #success=1 #failure=8
+    Startup:      http-get https://127.0.0.1:10257/healthz delay=10s timeout=15s period=10s #success=1 #failure=24
+...
+```
+
+### 5.2. 简单观察Controller Manager
+
+1、之前的redis创建了3副本，信息如下
+
+```sh
+[root@xdlinux ➜ ~ ]$ kubectl get all 
+NAME          READY   STATUS    RESTARTS   AGE
+pod/redis-0   1/1     Running   0          5d
+pod/redis-1   1/1     Running   0          5d
+pod/redis-2   1/1     Running   0          5d
+
+NAME                     TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+service/kubernetes       ClusterIP   10.96.0.1       <none>        443/TCP          11d
+service/redis-headless   ClusterIP   None            <none>        6379/TCP         5d
+service/redis-service    NodePort    10.107.73.216   <none>        6379:30000/TCP   5d
+
+NAME                     READY   AGE
+statefulset.apps/redis   3/3     5d
+```
+
+2、删除其中一个redis pod，如`pod/redis-1`，查看信息，可看到立即就创建了一个新的pod（`AGE`处为2s）
+
+```sh
+[root@xdlinux ➜ ~ ]$ kubectl delete pod/redis-1
+pod "redis-1" deleted
+
+[root@xdlinux ➜ ~ ]$ kubectl get all           
+NAME          READY   STATUS    RESTARTS   AGE
+pod/redis-0   1/1     Running   0          5d
+pod/redis-1   1/1     Running   0          2s
+pod/redis-2   1/1     Running   0          5d
+...
+```
+
+## 6. 小结
 
 
 
-## 5. 小结
-
-
-
-## 6. 参考
+## 7. 参考
 
 * 极客时间：Kubernetes从上手到实践
 * LLM
