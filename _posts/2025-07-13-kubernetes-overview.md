@@ -8,9 +8,9 @@ tags: [云原生, Kubernetes]
 
 ## 1. 引言
 
-较早前的项目中有接触过Kubernetes（/ˌkuːbərˈnɛtiːz/，下文简称`K8S`，因为中间有8个字母`ubernete`，可读作`K-eights`），之前极客上也买过课程“看”过，简单搭建过toy环境，但缺乏系统和深入梳理。近期定位一个服务上的网络问题，涉及到K8S环境的`Calico`插件，这块不是太清楚需要补缺。
+较早前的项目中有接触过Kubernetes（/ˌkuːbərˈnɛtiːz/，下文简称`K8s`，因为中间有8个字母`ubernete`，可读作`K-eights`），之前极客上也买过课程“看”过，简单搭建过toy环境，但缺乏系统和深入梳理。近期定位一个服务上的网络问题，涉及到K8s环境的`Calico`插件，这块不是太清楚需要补缺。
 
-K8S中包含很多技术栈，如容器、存储、网络、计算等等，信息采集/分布式链路跟踪等等，在之前的博客中也记录了不少这些基础知识相关的学习实践。趁此机会，本篇开始梳理学习K8S的基本原理和应用，过程中可在更上一层看看如何使用这些技术，同时可以补充一些比较薄弱的技能点。
+K8s中包含很多技术栈，如容器、存储、网络、计算等等，信息采集/分布式链路跟踪等等，在之前的博客中也记录了不少这些基础知识相关的学习实践。趁此机会，本篇开始梳理学习K8s的基本原理和应用，过程中可在更上一层看看如何使用这些技术，同时可以补充一些比较薄弱的技能点。
 
 部分补缺，如：
 * 存储
@@ -18,9 +18,9 @@ K8S中包含很多技术栈，如容器、存储、网络、计算等等，信�
     * CSI相关存储系统对接，Ceph、JuiceFS
 * 网络
     * 容器网络底层原理
-    * K8S网络插件、CNI
+    * K8s网络插件、CNI
 * 调度
-    * K8S调度逻辑，etcd，分布式Raft
+    * K8s调度逻辑，etcd，分布式Raft
 
 相关参考文档：
 * [Kubernetes Docs](https://kubernetes.io/docs/concepts/overview/)
@@ -35,18 +35,18 @@ K8S中包含很多技术栈，如容器、存储、网络、计算等等，信�
 
 Kubernetes这个名字源于希腊语，意为“舵手”或“飞行员”，该项目于2014年由`Google`开源。
 
-Kubernetes是一个可移植、可扩展的开源平台，用于管理**容器化**工作负载和服务。它支持**声明式配置**与**自动化操作**，拥有庞大且快速发展的生态系统。K8S不仅仅是一个编排系统（执行已定义的工作流程），它能做什么，不是什么，可见：[概述](https://kubernetes.io/zh-cn/docs/concepts/overview/)。
+Kubernetes是一个可移植、可扩展的开源平台，用于管理**容器化**工作负载和服务。它支持**声明式配置**与**自动化操作**，拥有庞大且快速发展的生态系统。K8s不仅仅是一个编排系统（执行已定义的工作流程），它能做什么，不是什么，可见：[概述](https://kubernetes.io/zh-cn/docs/concepts/overview/)。
 
-组成K8S集群的架构和关键组件：  
+组成K8s集群的架构和关键组件：  
 ![components-of-kubernetes](/images/components-of-kubernetes.svg)  
 
 或这张图：  
 ![kubernetes-cluster-architecture](/images/kubernetes-cluster-architecture.svg)
 
-K8S集群由 **控制平面** 和 **一个或多个工作节点** 组成。
+K8s集群由 **控制平面** 和 **一个或多个工作节点** 组成。
 
 **1、控制面组件（Control Plane Component）**：管理集群整体状态
-* `kube-apiserver`，提供HTTP API服务，并负责处理接收到的请求，是K8S控制平面的**核心**。
+* `kube-apiserver`，提供HTTP API服务，并负责处理接收到的请求，是K8s控制平面的**核心**。
 * `etcd`，高可用（HA）键值数据库，存储集群API服务的数据
 * `kube-scheduler`，负责调度监控`pods`的运行
     * `Pod`是可以在Kubernetes中创建和管理的、最小的可部署的计算单元。`Pod`包含**一组容器（一个或多个）**，这些容器共享存储、网络、以及怎样运行这些容器的规约。
@@ -54,15 +54,15 @@ K8S集群由 **控制平面** 和 **一个或多个工作节点** 组成。
     * 控制器有多种不同的类型，如Node控制器、Job控制器等等
 * `cloud-controller-manager`，与特定云驱动集成，允许集群连接到云提供商的API之上
 
-**2、节点组件（Node Component）**：运行在每个节点上，维护Pod并提供K8S运行时环境
+**2、节点组件（Node Component）**：运行在每个节点上，维护Pod并提供K8s运行时环境
 * `kubelet`，确保Pod和容器运行正常
-    * kubelet保证容器（containers）都运行在 Pod 中，它 **不会管理** 不是由K8S创建的容器
+    * kubelet保证容器（containers）都运行在 Pod 中，它 **不会管理** 不是由K8s创建的容器
 * `kube-proxy`，维护节点上的网络规则，实现服务（`Service`）的功能
     * Kubernetes 中的 Service 是 将运行在一个或一组 Pod 上的网络应用程序公开为网络服务的方法，是一种抽象。
     * 如果使用 **<mark>网络插件</mark>**为Service实现数据包转发，提供和`kube-proxy`等效的行为，那就不需在节点运行该proxy
 * 容器运行时（`Container runtime`），负责运行容器的软件，比如`containerd`、`CRI-O`和 支持`CRI（Container Runtime Interface）`的其他实现。
 
-**3、插件（`Addons`）**：扩展了K8S的功能，比如：
+**3、插件（`Addons`）**：扩展了K8s的功能，比如：
 * DNS：集群范围内的DNS解析
 * Dashboard：通过Web页面管理集群
 * 容器资源监控：存储一些时序指标到数据库中，和`OpenMetrics`一起使用（`OpenMetrics`构建于`Prometheus`暴露格式之上，Exposition formats）
@@ -70,11 +70,11 @@ K8S集群由 **控制平面** 和 **一个或多个工作节点** 组成。
 
 ### 2.2. 一些重要概念
 
-* **Kubernetes对象（Objects）**：是Kubernetes系统中的**持久化实体**，K8S使用这些实体去表示**整个集群的状态**。
+* **Kubernetes对象（Objects）**：是Kubernetes系统中的**持久化实体**，K8s使用这些实体去表示**整个集群的状态**。
     * Kubernetes 对象是一种“`意向表达（Record of Intent）`”。通过创建对象，你本质上是在告知 Kubernetes 系统，你想要的集群工作负载状态看起来应是什么样子的，这就是 Kubernetes 集群所谓的`期望状态（Desired State）`。
     * 无论是创建、修改或者删除对象，都需要使用 **`Kubernetes API`**。
-        * 可以通过 `kubectl`指令式命令（开发项目） 或者 对象配置文件（生产项目） 的方式来管理K8S对象。实际都会用到相关API。
-        * K8S集群都会发布其所使用的API规范，有2种发布机制：`Discovery API` 和 `Kubernetes OpenAPI`。
+        * 可以通过 `kubectl`指令式命令（开发项目） 或者 对象配置文件（生产项目） 的方式来管理K8s对象。实际都会用到相关API。
+        * K8s集群都会发布其所使用的API规范，有2种发布机制：`Discovery API` 和 `Kubernetes OpenAPI`。
         * 可进一步了解：[Kubernetes API](https://kubernetes.io/zh-cn/docs/concepts/overview/kubernetes-api/)
     * 详情以及配置文件中的各项说明，可见 [Kubernetes 对象](https://kubernetes.io/zh-cn/docs/concepts/overview/working-with-objects/)。
 
@@ -92,7 +92,7 @@ K8S集群由 **控制平面** 和 **一个或多个工作节点** 组成。
 ### 3.1. 安装kubelet、kubeadm、kubectl工具
 
 按上面链接对应的操作说明，几个工具都可以`curl`直接下载相应工具的二进制文件。
-* `kubeadm`的步骤会添加K8S的yum源，而后统一安装`kubelet`、`kubeadm`、`kubectl`，此处选择按该方式快速安装。可见：[安装 kubeadm](https://kubernetes.io/zh-cn/docs/setup/production-environment/tools/kubeadm/install-kubeadm/)。
+* `kubeadm`的步骤会添加K8s的yum源，而后统一安装`kubelet`、`kubeadm`、`kubectl`，此处选择按该方式快速安装。可见：[安装 kubeadm](https://kubernetes.io/zh-cn/docs/setup/production-environment/tools/kubeadm/install-kubeadm/)。
 
 安装工具：kubelet kubeadm kubectl
 
@@ -184,7 +184,7 @@ To see the stack trace of this error execute with --v=5 or higher
 
 containerd 是一个开源的容器运行时（Container Runtime），主要用于管理容器的生命周期，包括容器的创建、启动、停止、删除等核心操作。它最初是 Docker 引擎的一部分，2017 年被分离出来并捐赠给云原生计算基金会（CNCF），成为独立的开源项目，目前已成为容器生态中广泛使用的基础组件。
 
-#### 3.3.1. K8S为什么不再默认支持docker作为运行时
+#### 3.3.1. K8s为什么不再默认支持docker作为运行时
 
 可了解：[containerd简介](https://www.cnblogs.com/yangmeichong/p/16661444.html)
 
@@ -194,8 +194,8 @@ containerd 是一个开源的容器运行时（Container Runtime），主要用�
 Docker与containerd的关系：
 * Docker中包含`containerd`，`containerd`专注于**运行时的容器管理**，而Docker除了容器管理之外，还可以完成**镜像构建**之类的功能。
 
-K8S为什么要放弃使用Docker作为容器运行时，而使用containerd：
-* 使用Docker作为K8S容器运行时的话，`kubelet`需要先要通过`dockershim`去调用Docker，再通过Docker去调用`containerd`；如果使用`containerd`作为K8S容器运行时的话，`kubelet`可以直接调用`containerd`。
+K8s为什么要放弃使用Docker作为容器运行时，而使用containerd：
+* 使用Docker作为K8s容器运行时的话，`kubelet`需要先要通过`dockershim`去调用Docker，再通过Docker去调用`containerd`；如果使用`containerd`作为K8s容器运行时的话，`kubelet`可以直接调用`containerd`。
     * Docker作为运行时：`kubelet --> docker shim （在 kubelet 进程中） --> dockerd --> containerd`
     * containerd作为运行时：`kubelet --> cri plugin（在 containerd 进程中） --> containerd`
 * 使用`containerd`不仅性能提高了（调用链变短了），而且资源占用也会变小（Docker不是一个纯粹的容器运行时，具有大量其他功能）。
@@ -268,7 +268,7 @@ I0719 19:42:13.522274  667392 checks.go:868] pulling: registry.k8s.io/etcd:3.5.2
 
 ### 3.5. 重试：kubeadm创建集群（使用阿里云镜像后init成功）
 
-#### 3.5.1. 指定国内K8S镜像源
+#### 3.5.1. 指定国内K8s镜像源
 
 `--image-repository`指定阿里云镜像（参考自 [Kubernetes k8s拉取镜像失败解决方法](https://blog.csdn.net/weixin_43168190/article/details/107227626)）
 
@@ -278,7 +278,7 @@ I0719 23:08:54.583750  677329 initconfiguration.go:123] detected and using CRI s
 I0719 23:08:54.583881  677329 interface.go:432] Looking for default routes with IPv4 addresses
 I0719 23:08:54.583887  677329 interface.go:437] Default route transits interface "enp4s0"
 ...
-# pull K8S相关镜像
+# pull K8s相关镜像
 I0719 23:08:56.147496  677329 checks.go:868] pulling: registry.aliyuncs.com/google_containers/kube-apiserver:v1.33.3
 I0719 23:08:59.965427  677329 checks.go:868] pulling: registry.aliyuncs.com/google_containers/kube-controller-manager:v1.33.3
 I0719 23:09:03.257804  677329 checks.go:868] pulling: registry.aliyuncs.com/google_containers/kube-scheduler:v1.33.3
@@ -640,7 +640,7 @@ kubeadm join 192.168.1.150:6443 --token zzm9zc.ewdtn9oq3pztckaw --discovery-toke
 
 ## 5. 小结
 
-介绍了K8S基本架构和关键概念，并基于`kubeadm`搭建本地环境，由于容器运行时和镜像地址问题，踩了不少坑。
+介绍了K8s基本架构和关键概念，并基于`kubeadm`搭建本地环境，由于容器运行时和镜像地址问题，踩了不少坑。
 
 后续基于刚搭建的环境继续熟悉相关概念和操作。
 

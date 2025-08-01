@@ -1,6 +1,6 @@
 ---
-title: Kubernetes学习实践（二） -- 熟悉K8S相关概念和实操印证
-description: 继续熟悉K8S的相关概念，并实操印证增强理解和体感
+title: Kubernetes学习实践（二） -- 熟悉K8s相关概念和实操印证
+description: 继续熟悉K8s的相关概念，并实操印证增强理解和体感
 categories: [云原生, Kubernetes]
 tags: [云原生, Kubernetes]
 ---
@@ -8,13 +8,13 @@ tags: [云原生, Kubernetes]
 
 ## 1. 引言
 
-上篇搭建了一个单机K8S环境，本篇基于环境进行操作印证，熟悉理解相关概念和操作命令。
+上篇搭建了一个单机K8s环境，本篇基于环境进行操作印证，熟悉理解相关概念和操作命令。
 
 ## 2. kubectl基本操作命令
 
-K8S提供了CLI工具：`kubectl`用于完成大多数集群管理相关的功能，上篇提到其会通过`Kubernetes API`进行`C/S`方式调用。
+K8s提供了CLI工具：`kubectl`用于完成大多数集群管理相关的功能，上篇提到其会通过`Kubernetes API`进行`C/S`方式调用。
 * 可使用`kubectl -h`/`--help`方式查看帮助信息
-* 另外可用`kubectl explain`方式解释一些K8S中的组件和包含的字段(Field)。支持查看的组件列表可通过`kubectl api-resources`获取，比如`nodes`/`services`
+* 另外可用`kubectl explain`方式解释一些K8s中的组件和包含的字段(Field)。支持查看的组件列表可通过`kubectl api-resources`获取，比如`nodes`/`services`
 
 下述相关命令结果详情，可见：[kubectl_cmd_operation.md](https://github.com/xiaodongQ/prog-playground/tree/main/kubernetes/hello/kubectl_cmd_operation.md)。
 
@@ -33,7 +33,7 @@ K8S提供了CLI工具：`kubectl`用于完成大多数集群管理相关的功�
 * 状况，`Conditions`，描述所有`Running`节点的状态
     * 如下述展示的几类状态：`MemoryPressure`内存压力、`DiskPressure`磁盘压力、`PIDPressure`进程压力、`Ready`：true表示节点健康，可接收Pod
     * 每种类型都有：当前的状态和状态发生变化的时间、出现该状态的原因信息
-    * 当节点出现问题时，K8S会自动创建和相应状态的 **<mark>污点（Taint）</mark>** ，其和节点的 **<mark>亲和性（affinity）</mark>**相反，使节点排斥一类特定的Pod。
+    * 当节点出现问题时，K8s会自动创建和相应状态的 **<mark>污点（Taint）</mark>** ，其和节点的 **<mark>亲和性（affinity）</mark>**相反，使节点排斥一类特定的Pod。
 * 容量（`Capacity`）和可分配（`Allocatable`）
     * 这两个值描述节点上的可用资源：CPU、内存和可以调度到节点上的 Pod 的个数上限
 * 信息（`Info`）
@@ -178,9 +178,9 @@ xdlinux   Ready    control-plane   2d14h   v1.33.3
 
 `kubectl run redis --image=docker.m.daocloud.io/library/redis:alpine` 可以启动一个Pod，此处指定了一个代理镜像，默认的镜像暂时连不上。
 
-## 3. 使用K8S部署一个Redis服务
+## 3. 使用K8s部署一个Redis服务
 
-Pod是K8S中最小的调度单元，所以无法直接在K8S中运行一个`container`，但是可以运行一个`Pod`，而这个`Pod`中只包含一个`container`。
+Pod是K8s中最小的调度单元，所以无法直接在K8s中运行一个`container`，但是可以运行一个`Pod`，而这个`Pod`中只包含一个`container`。
 
 下面以`kubectl run`来启动一个包含`Redis`的Pod，参考：[集群管理：以 Redis 为例-部署及访问](https://learn.lianglianglee.com/%e4%b8%93%e6%a0%8f/Kubernetes%20%e4%bb%8e%e4%b8%8a%e6%89%8b%e5%88%b0%e5%ae%9e%e8%b7%b5/07%20%e9%9b%86%e7%be%a4%e7%ae%a1%e7%90%86%ef%bc%9a%e4%bb%a5%20Redis%20%e4%b8%ba%e4%be%8b-%e9%83%a8%e7%bd%b2%e5%8f%8a%e8%ae%bf%e9%97%ae.md)。
 
@@ -665,7 +665,7 @@ appendonlydir
 
 ## 5. 小结
 
-基于上篇环境进行基本命令操作；并通过K8S创建了一个Redis的Pod、Service；以及集群扩容操作。过程中由于containerd新版本弃用调整了镜像配置的方式也折腾了挺久，创建Pod后，通过Service对外提供服务访问，增强了一些体感。
+基于上篇环境进行基本命令操作；并通过K8s创建了一个Redis的Pod、Service；以及集群扩容操作。过程中由于containerd新版本弃用调整了镜像配置的方式也折腾了挺久，创建Pod后，通过Service对外提供服务访问，增强了一些体感。
 
 ## 6. 参考
 

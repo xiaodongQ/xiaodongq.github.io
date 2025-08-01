@@ -1,6 +1,6 @@
 ---
 title: Kubernetes学习实践（三） -- 关键组件操作实践
-description: 进一步对K8S关键组件进行操作实践
+description: 进一步对K8s关键组件进行操作实践
 categories: [云原生, Kubernetes]
 tags: [云原生, Kubernetes]
 ---
@@ -8,13 +8,13 @@ tags: [云原生, Kubernetes]
 
 ## 1. 引言
 
-通过前面对K8S的环境搭建和Redis环境的部署，已经有一些实践经验了。下面继续对环境中的组件进行操作实践，并简要对比代码，进一步了解K8S各个组件的功能和相关实现。
+通过前面对K8s的环境搭建和Redis环境的部署，已经有一些实践经验了。下面继续对环境中的组件进行操作实践，并简要对比代码，进一步了解K8s各个组件的功能和相关实现。
 
 从 [kubernetes github](https://github.com/kubernetes/kubernetes) 中 [fork](https://github.com/xiaodongQ/kubernetes) 相应代码进行学习，并切换到与当前环境一致的分支：`release-1.33`。
 
-## 2. 集群运行的几个容器
+## 2. 集群中运行的几个容器
 
-`crictl ps`先查看当前运行的几个容器，可看到K8S集群的几个关键组件：`kube-proxy`、`kube-controller-manager`、`coredns`、`etcd`、`kube-scheduler`、`kube-apiserver`。
+`crictl ps`先查看当前运行的几个容器，可看到K8s集群的几个关键组件：`kube-proxy`、`kube-controller-manager`、`coredns`、`etcd`、`kube-scheduler`、`kube-apiserver`。
 
 ```sh
 # 省略了部分列
@@ -62,7 +62,7 @@ kube-system       Active   11d
 
 ## 3. 查看kube-apiserver处理过程
 
-第一篇总体介绍中提到，`kube-apiserver`提供HTTP API服务，并负责处理接收到的请求，是K8S控制平面的核心，并且`kubectl`的操作也是通过调用API来完成的。
+第一篇总体介绍中提到，`kube-apiserver`提供HTTP API服务，并负责处理接收到的请求，是K8s控制平面的核心，并且`kubectl`的操作也是通过调用API来完成的。
 
 可以在执行`kubectl`时，**通过`-v 8`来查看调用API的详细信息**。
 * `-v / --v`用于指定详细级别，部分级别说明如下：
@@ -268,12 +268,12 @@ Starting to serve on 127.0.0.1:8001
 }
 ```
 
-## 4. etcd基本操作
+## 4. etcd操作和K8s中的应用
 
-etcd是一个高可用的分布式键值存储系统（键值数据库），存储K8S中的关键配置、所有状态信息等。
+etcd是一个高可用的分布式键值存储系统（键值数据库），存储K8s中的关键配置、所有状态信息等，是K8s集群的核心存储组件。
 * `etcdctl`是官方命令行客户端工具，用于与etcd集群交互，执行键值存储操作、集群管理和监控等任务。
 
-在K8S中，只有`API Server（kube-apiserver）`会直接与etcd交互，其他组件（如`Controller Manager`、`Kubelet`、`Scheduler`等）均通过`API Server`提供的 REST API **间接**操作数据。
+在K8s中，只有`API Server（kube-apiserver）`会直接与etcd交互，其他组件（如`Controller Manager`、`Kubelet`、`Scheduler`等）均通过`API Server`提供的 REST API **间接**操作数据。
 
 ### 4.1. 进入etcd pod
 
@@ -322,7 +322,7 @@ export ETCDCTL_CERT=/etc/kubernetes/pki/etcd/server.crt
 export ETCDCTL_KEY=/etc/kubernetes/pki/etcd/server.key
 ```
 
-### 4.2. 增删改查
+### 4.2. 基本增删改查
 
 设置上述环境变量后，就能省略上述参数来执行基本增删改查命令了：
 
@@ -352,10 +352,10 @@ tttt
 
 另外还支持分布式锁、租约等。
 
-### 4.3. etcd中存储的K8S信息
+### 4.3. etcd中存储的K8s信息
 
-**K8S存储格式说明：**
-* K8S在etcd中以**键值对（Key-Value）**形式存储数据，键的结构与 K8s API 路径高度一致，便于按**资源类型**、**命名空间**等维度组织和查询。
+**K8s存储格式说明：**
+* K8s在etcd中以**键值对（Key-Value）**形式存储数据，键的结构与 K8s API 路径高度一致，便于按**资源类型**、**命名空间**等维度组织和查询。
 * **键（key）格式**：类似文件系统的分层路径结构，格式为`/registry/<资源类型>/<命名空间>/<资源名称>`
     * 比如：`etcdctl get /registry/pods/default/redis-1`
 * **值（Value）格式**：值是经过Protocol Buffers（`protobuf`）序列化的 K8s API 对象，相对于Json更紧凑、序列化效率更高
@@ -392,6 +392,26 @@ sh-5.2# etcdctl member list
 # 成员ID           状态     成员名称   Peer通信地址（etcd之间同步数据地址）      客户端通信地址     是否为learner（是则仅同步数据，无投票权）
 bff3f519f190640f, started, xdlinux, https://192.168.1.150:2380, https://192.168.1.150:2379, false
 ```
+
+### 4.3. 基于etcd的K8s核心功能说明
+
+K8s很多核心功能依赖etcd的原生特性实现。
+
+1、实时状态同步（Watch 机制）
+
+etcd 提供 Watch API，支持监听某个键或前缀的变化（创建、更新、删除）。K8s各组件通过该机制实现实时状态同步：
+* `Controller Manager`：通过 Watch 监听特定资源（如 Deployment）的变化，触发控制逻辑（如创建 / 删除 Pod）
+    * 示例：当`Deployment`资源被更新时，etcd通知`apiserver`，`apiserver`再通过`Watch`机制通知`Controller Manager`，后者根据新的 replicas 数量调整 Pod 副本数。
+* `Kubelet`：Watch 本节点上的 Pod 变化，执行启动、停止容器等操作
+* `Scheduler`：Watch 未调度的 Pod，触发调度逻辑
+
+2、分布式一致性，etcd基于`Raft`算法保证数据**强一致性**，确保所有节点看到的集群状态是一致的，当控制平面高可用部署多个实例时保证数据读写一致。
+
+3、事务与原子操作
+
+etcd 支持基于条件的事务（`Transaction`）操作，K8s 利用这一特性实现并发安全的操作。
+
+## kube-controller-manager
 
 
 
