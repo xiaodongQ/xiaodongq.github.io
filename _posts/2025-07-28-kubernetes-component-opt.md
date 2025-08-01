@@ -31,16 +31,28 @@ f6f4852a86c52   bf97fadcef430   Running  kube-controller-manager  kube-controlle
 c5b9e0185069d   41376797d5122   Running  kube-scheduler           kube-scheduler-xdlinux            kube-system
 9ffc7318407b7   a92b4b92a9916   Running  kube-apiserver           kube-apiserver-xdlinux            kube-system
 
-# 也可以看下 kube-system 对应namespace下的pod（不指定则只会显示default下的pod）
-[root@xdlinux ➜ ~ ]$ kubectl -n kube-system get pods
-NAME                              READY   STATUS    RESTARTS   AGE
-coredns-757cc6c8f8-nxw7g          1/1     Running   0          10d
-coredns-757cc6c8f8-v2mgf          1/1     Running   0          10d
-etcd-xdlinux                      1/1     Running   2          10d
-kube-apiserver-xdlinux            1/1     Running   2          10d
-kube-controller-manager-xdlinux   1/1     Running   0          10d
-kube-proxy-6ptwm                  1/1     Running   0          4d
-kube-scheduler-xdlinux            1/1     Running   2          10d
+# 可以看下所有namespace下的pod（`--all-namespaces`参数，也可以简写为`-A`，即：`kubectl get pod -A`）
+  # `-n kube-system` 指定对应namespace下的pod（不指定则默认只显示default下的pod）
+[root@xdlinux ➜ ~ ]$ kubectl get pod --all-namespaces
+NAMESPACE     NAME                              READY   STATUS    RESTARTS   AGE
+default       redis-0                           1/1     Running   0          4d21h
+default       redis-1                           1/1     Running   0          4d21h
+default       redis-2                           1/1     Running   0          4d21h
+kube-system   coredns-757cc6c8f8-nxw7g          1/1     Running   0          11d
+kube-system   coredns-757cc6c8f8-v2mgf          1/1     Running   0          11d
+kube-system   etcd-xdlinux                      1/1     Running   2          11d
+kube-system   kube-apiserver-xdlinux            1/1     Running   2          11d
+kube-system   kube-controller-manager-xdlinux   1/1     Running   0          11d
+kube-system   kube-proxy-6ptwm                  1/1     Running   0          4d23h
+kube-system   kube-scheduler-xdlinux            1/1     Running   2          11d
+
+# 查看所有namespace：
+[root@xdlinux ➜ ~ ]$ kubectl get namespaces
+NAME              STATUS   AGE
+default           Active   11d
+kube-node-lease   Active   11d
+kube-public       Active   11d
+kube-system       Active   11d
 ```
 
 再看下第一篇中的架构图进行对比映证：  
@@ -194,7 +206,7 @@ type Config struct {
 }
 ```
 
-除此之外，`/etc/kubernetes/`下面的其他几个配置文件（如`kubelet.conf`），也是通过上面的结构体所定义的。
+除此之外，`/etc/kubernetes/`下面的其他几个配置文件（如`kubelet.conf`），也是通过上面的结构体所定义的，查看里面可看到相同的YAML结构。
 ```sh
 [root@xdlinux ➜ ~ ]$ ll /etc/kubernetes/
 total 40K
@@ -258,20 +270,22 @@ Starting to serve on 127.0.0.1:8001
 
 ## 4. etcd基本操作
 
-etcd是一个键值数据库，存储K8S中的相关集群信息。
+etcd是一个高可用的分布式键值存储系统（键值数据库），存储K8S中的关键配置、所有状态信息等。
+* `etcdctl`是官方命令行客户端工具，用于与etcd集群交互，执行键值存储操作、集群管理和监控等任务。
+
+在K8S中，只有`API Server（kube-apiserver）`会直接与etcd交互，其他组件（如`Controller Manager`、`Kubelet`、`Scheduler`等）均通过`API Server`提供的 REST API **间接**操作数据。
 
 ### 4.1. 进入etcd pod
 
-根据上面`kubectl -n kube-system get pods`显示的pod，进入`etcd`对应的pod：`etcd-xdlinux`。
-* 注意需要`-n`指定`namespace`，否则默认命名空间（`default`）下会找不到pod
-* 当前基础镜像（取决于不同镜像的配置）对应的`etcd` pod里只安装了`sh`，没安装`bash`
+本地实验环境中只部署了一个etcd实例，根据上面`kubectl get pods -A`显示的pod，选择进入`etcd`对应的pod：`etcd-xdlinux`。
+* 当前基础镜像（取决于不同镜像的配置）对应的`etcd` pod里只安装了`sh`，没安装`bash`，所以下面`--`后面使用`sh`
 
 ```sh
 [root@xdlinux ➜ ~ ]$ kubectl -n kube-system exec -it etcd-xdlinux -- sh
 sh-5.2#
 ```
 
-而后可以在容器里通过`etcdctl`进行etcd相关操作：
+而后就可以在容器里通过`etcdctl`进行etcd相关操作了：
 * etcd启用了**严格的安全认证机制**，且需要明确操作的目标集群，需要通过参数指定这些信息
 * `--endpoints`：指定操作的etcd节点地址，如果不指定，`etcdctl`会使用默认值（http://127.0.0.1:2379）
 * 证书参数
@@ -339,6 +353,14 @@ tttt
 另外还支持分布式锁、租约等。
 
 ### 4.3. etcd中存储的K8S信息
+
+**K8S存储格式说明：**
+* K8S在etcd中以**键值对（Key-Value）**形式存储数据，键的结构与 K8s API 路径高度一致，便于按**资源类型**、**命名空间**等维度组织和查询。
+* **键（key）格式**：类似文件系统的分层路径结构，格式为`/registry/<资源类型>/<命名空间>/<资源名称>`
+    * 比如：`etcdctl get /registry/pods/default/redis-1`
+* **值（Value）格式**：值是经过Protocol Buffers（`protobuf`）序列化的 K8s API 对象，相对于Json更紧凑、序列化效率更高
+
+相关信息查看：
 
 * 查看所有资源的键（简要概览）
     * Kubernetes 资源在 etcd 中的根路径是 `/registry`，查看所有键的列表
