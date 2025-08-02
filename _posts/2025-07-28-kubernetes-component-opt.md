@@ -435,7 +435,7 @@ Containers:
 ...
     Requests:
       cpu:        200m
-    # 健康检查接口
+    # 健康检查接口，可手动curl -k调用检查
     Liveness:     http-get https://127.0.0.1:10257/healthz delay=10s timeout=15s period=10s #success=1 #failure=8
     Startup:      http-get https://127.0.0.1:10257/healthz delay=10s timeout=15s period=10s #success=1 #failure=24
 ...
@@ -467,7 +467,7 @@ statefulset.apps/redis   3/3     5d
 [root@xdlinux ➜ ~ ]$ kubectl delete pod/redis-1
 pod "redis-1" deleted
 
-[root@xdlinux ➜ ~ ]$ kubectl get all           
+[root@xdlinux ➜ ~ ]$ kubectl get all
 NAME          READY   STATUS    RESTARTS   AGE
 pod/redis-0   1/1     Running   0          5d
 pod/redis-1   1/1     Running   0          2s
@@ -475,11 +475,66 @@ pod/redis-2   1/1     Running   0          5d
 ...
 ```
 
-## 6. 小结
+## 6. kube-scheduler
+
+`kube-scheduler`主要负责Pod调度，即根据一系列规则将待调度的 Pod 分配到集群中最合适的 Node 节点上。
+
+```sh
+# 支持模糊匹配，所以下面的kube-scheduler可以找到kube-scheduler-xdlinux
+[root@xdlinux ➜ ~ ]$ kubectl describe -n kube-system pod kube-scheduler
+Name:                 kube-scheduler-xdlinux
+...
+Containers:
+  kube-scheduler:
+    ...
+    Liveness:     http-get https://127.0.0.1:10259/livez delay=10s timeout=15s period=10s #success=1 #failure=8
+    Readiness:    http-get https://127.0.0.1:10259/readyz delay=0s timeout=15s period=1s #success=1 #failure=3
+    Startup:      http-get https://127.0.0.1:10259/livez delay=10s timeout=15s period=10s #success=1 #failure=24
+    Mounts:
+      /etc/kubernetes/scheduler.conf from kubeconfig (ro)
+...
+```
+
+可手动检查上述接口，如：
+```sh
+[root@xdlinux ➜ ~ ]$ curl -k https://127.0.0.1:10259/livez
+ok#
+```
+
+具体调度逻辑，后续进行学习。
+
+## 7. kubelet
+
+> 按照一般架构设计上的习惯，kubelet所承担的角色一般会被叫做`agent`，这里叫做`kubelet`很大程度上受`Borg`的命名影响，`Borg`里面也有一个`Borglet`的组件存在。kubelet便是K8s中的agent，负责Node和Pod相关的管理任务。
+
+`kubelet`是K8s集群中每个`节点（Node）`上运行的核心代理组件，负责管理节点上的容器**生命周期**，是连接控制平面与节点的关键纽带。它确保容器按照**Pod规范（`PodSpec`）**的定义正确运行，是实现Kubernetes容器编排能力的基础组件之一。
+
+* 接收并执行控制平面（`kube-apiserver`）下发的Pod规范（`PodSpec`），确保节点上的容器按照规范运行（创建、启动、停止、重启等）。
+* 监控容器运行状态，并通过心跳向`kube-apiserver`汇报
+* 执行Pod中的 `存活探针（liveness probe）`、`就绪探针（readiness probe）`、`启动探针（startup probe）`，进行相关的容器健康状态检查
+* 此外还负责资源管理、配合控制平面进行节点管理、镜像管理（拉取Pod所需的容器镜像）
+
+配置文件路径：`/var/lib/kubelet/config.yaml`
+```sh
+# /var/lib/kubelet/config.yaml 部分内容
+apiVersion: kubelet.config.k8s.io/v1beta1
+cgroupDriver: systemd
+# 健康检查所监听的地址和端口
+healthzBindAddress: 127.0.0.1
+healthzPort: 10248
+```
+
+可验证健康检查接口：
+```sh
+[root@xdlinux ➜ ~ ]$ curl 127.0.0.1:10248/healthz   
+ok#
+```
+
+## 8. 小结
 
 
 
-## 7. 参考
+## 9. 参考
 
 * 极客时间：Kubernetes从上手到实践
 * LLM
