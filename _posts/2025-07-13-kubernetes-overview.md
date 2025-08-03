@@ -83,6 +83,23 @@ K8s集群由 **控制平面** 和 **一个或多个工作节点** 组成。
 
 下面先搭建基本的学习环境后再对照理解其他一些概念。
 
+### 2.3. 版本说明
+
+可了解：[发行版本历史](https://kubernetes.io/zh-cn/releases/)、[Kubernetes近十年里程碑及版本偏差策略(2024)](https://www.cnblogs.com/zhangmingcheng/p/18299855)
+
+Kubernetes版本表示为`x.y.z`， 其中`x`是主要版本，`y`是次要版本，`z`是补丁版本，比如 `Server Version: v1.33.3`。
+* Kubernetes 项目维护最近三个次要版本的发布分支，当前（202507）即`1.33`、`1.32`、`1.31`版本。
+
+历史版本：
+* 2015年7月21日发布了`1.0`版本，在发布1.0版本的同时，Google宣布将Kubernetes捐赠给Linux基金会下的一个新成立的分支， 即云原生计算基金会 (Cloud Native Computing Foundation，CNCF)。
+* 2017 年 4 月 — 引入基于角色的访问控制（`RBAC`）
+* 2017 年 12 月 — Kubernetes `1.9` 中， 工作负载 API 成为 **GA（正式可用）**。发布博客中指出：“`Deployment` 和 `ReplicaSet` 是 Kubernetes 中最常用的两个对象， 在经过一年多的实际使用和反馈后，现在已经稳定下来。”
+* 2018 年 12 月 — 在 `1.13` 版本中，容器存储接口（`CSI`）达到 GA，用于引导最小可用集群的 `kubeadm` 工具达到 GA，并且 `CoreDNS` 成为默认的 DNS 服务器。
+* 2020 年 12 月 — `Dockershim` 在 `1.20` 版本中被**弃用**。废弃`Docker`支持（**改用`containerd`作为默认运行时**）
+* 2022 年 12 月 - 在 `1.26` 版本中，进行了重大的批处理和作业 API 改进， 为更好地支持 AI/ML/批处理工作负载铺平了道路
+* ...
+* 2025 年 4 月 23 日，Kubernetes `1.33` 发布，这是目前最新的主要版本
+
 ## 3. kubeadm创建集群环境
 
 参考：[安装Kubernetes工具](https://kubernetes.io/zh-cn/docs/tasks/tools/)。
@@ -648,6 +665,7 @@ kubeadm join 192.168.1.150:6443 --token zzm9zc.ewdtn9oq3pztckaw --discovery-toke
 
 * [Kubernetes Docs](https://kubernetes.io/docs/concepts/overview/)
     * [Kubernetes中文文档](https://kubernetes.io/zh-cn/docs/concepts/overview/)
+    * [发行版本历史](https://kubernetes.io/zh-cn/releases/)
 * [使用 kubeadm 创建集群](https://kubernetes.io/zh-cn/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/)
 * [添加 Linux 工作节点](https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/kubeadm/adding-linux-nodes/)
 * [containerd简介](https://www.cnblogs.com/yangmeichong/p/16661444.html)
