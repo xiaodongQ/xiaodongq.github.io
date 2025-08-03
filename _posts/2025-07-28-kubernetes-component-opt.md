@@ -12,6 +12,9 @@ tags: [云原生, Kubernetes]
 
 从 [kubernetes github](https://github.com/kubernetes/kubernetes) 中 [fork](https://github.com/xiaodongQ/kubernetes) 相应代码进行学习，并切换到与当前环境一致的分支：`release-1.33`。
 
+先贴一下梳理后输出的架构图：  
+![kubernetes-process](/images/kubernetes-process.svg)
+
 ## 2. 集群中运行的几个容器
 
 `crictl ps`先查看当前运行的几个容器，可看到K8s集群的几个关键组件：`kube-proxy`、`kube-controller-manager`、`coredns`、`etcd`、`kube-scheduler`、`kube-apiserver`。
@@ -250,7 +253,7 @@ Starting to serve on 127.0.0.1:8001
 ```
 
 而后向`127.0.0.1`的`8001`端口发送`HTTP`（而非`HTTPS`）请求：
-* 注意，`192.168.1.150`则不行
+* 注意是监听了`127.0.0.1`，请求`192.168.1.150`则不通
 * 上面的`kubectl proxy`会使用`/etc/kubernetes/admin.conf`配置文件
 
 ```sh
@@ -530,11 +533,81 @@ healthzPort: 10248
 ok#
 ```
 
-## 8. 小结
+## 8. kube-proxy
+
+`kube-proxy`是运行在每个`节点（Node）`上的网络代理组件，维护节点上的网络规则，决定了如何将流量**转发**到`Service`关联的后端`Pod`上。
+
+### 8.1. 功能和工作模式
+
+功能包括：
+* 负载均衡：当Service关联多个Pod时，`kube-proxy`会通过一定的策略（如轮询、会话亲和性等）将流量分发到不同的Pod，实现负载均衡。
+* Service暴露：将Service的虚拟IP（`ClusterIP`）与后端Pod的实际IP关联起来，使得集群内的其他Pod可以通过`ClusterIP`访问 Service，无需关心具体Pod的IP变化
+* 会话保持：在需要的场景下，可确保同一个客户端请求转发到同一个Pod，维持会话连续性
+* 网络规则同步：监听`apiserver`中的`Service`和`Endpoints`资源变化，更新节点上的网络规则
+
+`kube-proxy`支持三种工作模式：
+* **用户空间模式（`Userspace`）**
+    * 原理：在用户空间维护一个进程，流量先经过内核 -> 转发到用户空间的`kube-proxy`进程 -> 由其决定转发给哪个后端Pod -> 经过内核协议栈发送到指定Pod
+    * 优缺点：实现简单，但由于涉及用户空间与内核空间的频繁切换，**性能较差**，目前已很少使用。
+* **内核空间模式（`IPVS`）**
+    * 原理：基于Linux内核的 **`IPVS（IP Virtual Server）`模块**实现，`kube-proxy`仅负责根据`Service`和`Endpoints`的变化配置`IPVS`规则，实际的流量转发由内核中的IPVS模块直接处理，**无需经过用户空间**。
+    * 优点：性能优异，支持更多的负载均衡算法（如轮询、加权轮询、最少连接数等），并且具有更好的扩展性；
+    * 缺点：但需要节点内核支持`IPVS`模块，若不支持则会降级为`iptables`模式
+* **内核空间模式（`iptables`）**
+    * 原理：基于Linux内核的`iptables`防火墙规则实现，`kube-proxy`根据`Service`和`Endpoints`的信息生成相应的`iptables`规则，流量转发由`iptables`规则在**内核空间**完成。
+    * 优点：内核原生支持，无需额外配置，实现相对简单；
+    * 缺点：当`Service`和`Pod`数量较多时，`iptables`规则会变得非常复杂，可能导致性能下降，且负载均衡算法较少（仅支持轮询和会话亲和性）
+
+### 8.2. 环境操作
+
+当Pod在创建和销毁的过程中，IP可能会发生变化。上面提到`kube-controller-manager`会调整集群到预期状态，下面加上`-o wide`继续看下：
+```sh
+[root@xdlinux ➜ ~ ]$ kubectl get pods -o wide
+NAME      READY   STATUS    RESTARTS   AGE     IP            NODE      NOMINATED NODE   READINESS GATES
+redis-0   1/1     Running   0          6d16h   10.244.0.14   xdlinux   <none>           <none>
+redis-1   1/1     Running   0          40h     10.244.0.17   xdlinux   <none>           <none>
+redis-2   1/1     Running   0          6d16h   10.244.0.16   xdlinux   <none>           <none>
+# 删除Pod
+[root@xdlinux ➜ ~ ]$ kubectl delete pod/redis-1                            
+pod "redis-1" deleted
+# 再次查看，kube-controller-manager 已经按预期重新创建了对应Pod
+[root@xdlinux ➜ ~ ]$ kubectl get pods -o wide  
+NAME      READY   STATUS    RESTARTS   AGE     IP            NODE      NOMINATED NODE   READINESS GATES
+redis-0   1/1     Running   0          6d16h   10.244.0.14   xdlinux   <none>           <none>
+# 这里的redis-1 Pod，对应的IP就修改了
+redis-1   1/1     Running   0          2s      10.244.0.18   xdlinux   <none>           <none>
+redis-2   1/1     Running   0          6d16h   10.244.0.16   xdlinux   <none>           <none>
+```
+
+## 9. Endpoint说明
+
+`Endpoint`也是K8s集群中的一个核心资源对象，扮演着连接`Service`和后端`Pod`的桥梁角色，直接关联了`Service`所指向的具体`Pod实例`，是实现`Service`**流量转发的关键基础**。
+* `Endpoint`可以理解为 “网络端点” 的集合，它存储了 Service 对应的后端 Pod 的**实际网络地址（IP 地址和端口）**
+* 当创建一个`Service`时，K8s会自动创建一个**与该Service同名**的 `Endpoint`对象（除非Service明确指定了`none`类型的`selector` 或 使用了外部服务），并根据`Service`的`selector`动态更新`Endpoint`中的Pod列表。
+    * 当Pod被创建、删除或IP变化时，`Endpoint`会**实时同步更新**。
+
+查看当前集群的endpoints：
+```sh
+[root@xdlinux ➜ redis-stateful-set git:(main) ]$ kubectl get endpoints
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME             ENDPOINTS                                            AGE
+kubernetes       192.168.1.150:6443                                   13d
+redis-headless   10.244.0.14:6379,10.244.0.16:6379,10.244.0.18:6379   6d16h
+redis-service    10.244.0.14:6379,10.244.0.16:6379,10.244.0.18:6379   6d16h
+
+# 可看到，自动创建的endpoint确实和对应的service同名
+[root@xdlinux ➜ redis-stateful-set git:(main) ]$ kubectl get services
+NAME             TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+kubernetes       ClusterIP   10.96.0.1       <none>        443/TCP          13d
+redis-headless   ClusterIP   None            <none>        6379/TCP         6d17h
+redis-service    NodePort    10.107.73.216   <none>        6379:30000/TCP   6d17h
+```
+
+## 10. 小结
 
 
 
-## 9. 参考
+## 11. 参考
 
 * 极客时间：Kubernetes从上手到实践
 * LLM

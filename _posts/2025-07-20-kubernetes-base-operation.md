@@ -352,7 +352,8 @@ service/kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP   6d14h
 
 ### 3.5. 对外暴露(expose)Redis服务
 
-上面`Redis`已部署但尚未创建对应的`Service`，要访问上述创建的`Redis`服务，还需要创建`Redis` Service。操作如下：
+上面`Redis` Pod已部署但尚未创建对应的`Service`，要访问上述创建的`Redis`服务，还需要创建`Redis Service`。
+* 实验的相关YAML文件内容归档在：[redis-pod目录](https://github.com/xiaodongQ/prog-playground/blob/main/kubernetes/redis-pod)
 
 #### 3.5.1. 创建Redis Service
 
@@ -541,45 +542,77 @@ redis_version:8.0.3
 ## 4. 扩容Redis服务
 
 上述使用独立`Pod`方式部署了`Redis`，无法实现自动扩容。要实现自动扩容，这里使用`StatefulSet`替换`Deployment`。
+* 实验的相关YAML文件内容归档在：[redis-stateful-set目录](https://github.com/xiaodongQ/prog-playground/tree/main/kubernetes/redis-stateful-set)
 
-1、创建 `Redis StatefulSet` 配置
+### 4.1. 创建`Redis StatefulSet`配置并apply
 
-创建`redis-statefulset.yaml`文件
+1、创建`redis-statefulset.yaml`文件，其中包含了`Service`和`StatefulSet`
 
-2、应用配置
+yaml文件内容如下（其中使用临时存储，而没有用PV）
 ```sh
-# 删除现有Pod和Service
-kubectl delete pod redis
-kubectl delete service redis-service
+# redis-statefulset.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-headless
+  labels:
+    app: redis
+spec:
+  clusterIP: None  # 无头服务，用于StatefulSet
+  ports:
+  - port: 6379
+    name: redis
+  selector:
+    app: redis
 
-# 创建新的Service和StatefulSet
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+spec:
+  serviceName: "redis-headless"
+  # 一个副本
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7.2.4
+        ports:
+        - containerPort: 6379
+          name: redis
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        args:
+        - "--appendonly"
+        - "yes"  # 启用AOF持久化（仅内存临时存储）
+      volumes:
+      - name: redis-data
+        emptyDir: {}  # 使用临时存储，不持久化到磁盘
+```
+
+2、apply应用配置
+
+apply创建新的Service和StatefulSet
+```sh
 kubectl apply -f redis-statefulset.yaml
 ```
 
-查看状态：
+若出现异常需要重新实验的话，则可删除原有Pod和Service
 ```sh
-[root@xdlinux ➜ redis-stateful-set git:(main) ✗ ]$ kubectl get all
-NAME          READY   STATUS    RESTARTS   AGE
-pod/redis-0   0/1     Pending   0          43s
-
-NAME                     TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)    AGE
-service/kubernetes       ClusterIP   10.96.0.1    <none>        443/TCP    6d15h
-service/redis-headless   ClusterIP   None         <none>        6379/TCP   43s
-
-NAME                     READY   AGE
-statefulset.apps/redis   0/1     43s
+kubectl delete pod redis
+kubectl delete service redis-service
 ```
 
-**定位：**可以`kubectl describe pod redis-0`查看原因。可看到是没有可用的`PV`。
-
-```sh
-Events:
-  Type     Reason            Age                    From               Message
-  ----     ------            ----                   ----               -------
-  Warning  FailedScheduling  2m15s (x2 over 7m19s)  default-scheduler  0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.
-```
-
-重新调整为临时存储，而不用PV。`kubectl delete`几个资源后重新apply，可看到正常创建了。
+可看到正常创建了Pod：
 ```sh
 [root@xdlinux ➜ redis-stateful-set git:(main) ✗ ]$ kubectl get all
 NAME          READY   STATUS    RESTARTS   AGE
@@ -591,13 +624,50 @@ service/redis-headless   ClusterIP   None         <none>        6379/TCP   32s
 
 NAME                     READY   AGE
 statefulset.apps/redis   1/1     32s
+```
+---
 
+这里也记录一下未使用临时存储之前的报错：
+
+当时查看`apply`后的集群状态，一直是`Pending`：
+```sh
+[root@xdlinux ➜ redis-stateful-set git:(main) ✗ ]$ kubectl get all
+NAME          READY   STATUS    RESTARTS   AGE
+pod/redis-0   0/1     Pending   0          43s
+...
 ```
 
-3、创建 `NodePort Service` 暴露 Redis
+**定位：**可以`kubectl describe pod redis-0`查看原因。可看到是没有可用的`PV`。
 
-创建：`redis-nodeport.yaml`
+```sh
+Events:
+  Type     Reason            Age                    From               Message
+  ----     ------            ----                   ----               -------
+  Warning  FailedScheduling  2m15s (x2 over 7m19s)  default-scheduler  0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.
+```
 
+重新调整临时存储，而不用PV。`kubectl delete`几个资源后重新apply最上面贴的yaml文件就正常了，即上面记录的正常过程。
+
+### 4.2. 创建`NodePort Service`来暴露Redis
+
+创建：`redis-nodeport.yaml`，内容如下：
+```sh
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+spec:
+  selector:
+    app: redis
+  ports:
+    - protocol: TCP
+      port: 6379
+      targetPort: 6379
+      nodePort: 30000
+  type: NodePort
+```
+
+`apply`应用配置，而后可看到`Redis`服务通过`NodePort`类型的`Service`暴露出来了：
 ```sh
 [root@xdlinux ➜ redis-stateful-set git:(main) ✗ ]$ kubectl get all
 NAME          READY   STATUS    RESTARTS   AGE
@@ -612,7 +682,7 @@ NAME                     READY   AGE
 statefulset.apps/redis   1/1     113s
 ```
 
-验证，通过映射端口和Cluster-Ip都可以访问：
+验证，通过映射端口和`CLUSTER-IP`都可以访问：
 
 ```sh
 [root@xdlinux ➜ redis-stateful-set git:(main) ✗ ]$ redis-cli -h 192.168.1.150 -p 30000 ping
@@ -622,7 +692,9 @@ PONG
 PONG
 ```
 
-4、水平扩容（增加Redis副本数）：`kubectl scale statefulset redis --replicas=3`
+### 扩容（`kubectl scale`增加Redis副本数）
+
+3副本：`kubectl scale statefulset redis --replicas=3`
 
 ```sh
 [root@xdlinux ➜ redis-stateful-set git:(main) ✗ ]$ kubectl scale statefulset redis --replicas=3
