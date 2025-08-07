@@ -1,6 +1,6 @@
 ---
 title: 网络实验 -- 搞懂大小端字节序
-description: 实验验证小端字节序
+description: 实验验证大小端字节序
 categories: [网络, 网络编程]
 tags: [网络, 网络编程]
 ---
@@ -8,11 +8,11 @@ tags: [网络, 网络编程]
 
 ## 1. 引言
 
-最近写小工具的过程中碰到客户端连接服务端时，传输的网络报文和预期不符，定位期间针对网络字节序又有些模糊了。
+最近写个客户端工具，过程中碰到客户端连接服务端时，传输的网络报文和预期不符，定位期间针对网络字节序又有些模糊了。
 
 业务模型：
 * Go开发小工具作为客户端，服务端是C++程序。
-* 服务端基于私有的RPC协议进行通信，所以Go需要进行对应数据结构的序列化和反序列化适配，并进行网络通信。
+* 服务端基于私有的RPC协议提供网络服务，所以Go需要进行对应数据结构的序列化和反序列化适配，并进行网络通信。
 
 大端、小端字节序和网络传输时的字节序经常容易混淆，常常是这次查了一下，下次碰到时又得去检索一遍进行确认，本篇进行实验增强印象和理解，尽量以后碰到时就不再模棱两可。
 
@@ -26,15 +26,29 @@ tags: [网络, 网络编程]
 1、**大端序（`Big-Endian`）**：高位字节存储在低地址
 * 示例：`0x12345678` 存储为 `12 34 56 78`，比如数组`int n[4]`，那`n[0]=12`、`n[3]=78`
 
-2、**小端序（Little-Endian）**：低位字节存储在低地址
+2、**小端序（`Little-Endian`）**：低位字节存储在低地址
 * 示例：`0x12345678` 存储为 `78 56 34 12`，比如数组`int n[4]`，那`n[0]=78`、`n[3]=12`
 
 3、**网络字节序**
 * TCP/IP协议强制使用 **<mark>大端序</mark>** 作为标准网络字节序（因为更符合人类阅读习惯），所有**网络传输的多字节数据必须使用大端序**
 
-### 2.2. 查看字节序
+下述实验中，数据均**转换为<mark>网络序</mark>进行传输**，即<mark>大端字节序</mark>。
+* 私有协议通信，也可按需定义，客户端和服务端协商一致即可，比如都按主机序（一般为小端）序列化和反序列化数据，可以减少数据的转换处理。
 
-`lscpu`可查看系统的字节序，可看到我当前系统（`Rocky Linux release 9.5 (Blue Onyx)`）为小端序
+这里提一下`gRPC`的字节序：
+* `gRPC`本身并没有规定特定的字节序（Endianness），但它底层依赖的协议（如 HTTP/2）和序列化机制（如 Protocol Buffers）对字节序有明确要求。
+* 直接使用`gRPC`时，只需关注业务逻辑，字节序问题已被封装在库中。
+* 以下是几个关键点说明。
+
+| 场景                 | 字节序         | 处理方               |
+| -------------------- | -------------- | -------------------- |
+| protobuf 序列化      | 小端（VarInt） | gRPC 库自动处理      |
+| HTTP/2 帧头部        | 大端           | 底层库（如 nghttp2） |
+| 用户自定义二进制数据 | 需显式约定     | 开发者自行保证       |
+
+### 2.2. 查看主机字节序
+
+`lscpu`可查看系统的字节序，可看到我当前系统（`Rocky Linux release 9.5 (Blue Onyx)`）为**小端序**，主机一般都是小端字节序。
 
 ```sh
 [root@xdlinux ➜ ~ ]$ lscpu | grep -i byte
@@ -56,6 +70,8 @@ Byte Order:                           Little Endian
 | Field1(4) | Field2(4) | ... | FieldN(N)   |
 ----------------------------------------------
 ```
+
+case1完整代码见：[case1_pragma_pack1](https://github.com/xiaodongQ/prog-playground/tree/main/network/byte_order/case1_pragma_pack1)
 
 ### 3.1. 客户端程序
 
@@ -146,15 +162,7 @@ func main() {
     fmt.Println("发送成功:")
     printPacket(header, body, fullPacket)
 }
-
-func calculateChecksum(data []byte) uint32 {
-    var sum uint32
-    for _, b := range data {
-        sum += uint32(b)
-    }
-    return sum
-}
-
+...
 func printPacket(header Header, body Body, raw []byte) {
     fmt.Printf("Header:\n")
     fmt.Printf("  Magic:    %s (0x%X)\n", string(header.Magic[:]), header.Magic)
@@ -180,6 +188,8 @@ func printPacket(header Header, body Body, raw []byte) {
 ```
 
 ### 3.2. 服务端程序
+
+实现时是按`sizeof(header)`长度接收客户端数据的，结构体的对齐补齐会影响长度，客户端和服务端的交互的结构体数据长度必须保持一致。
 
 ```cpp
 #include <iostream>
@@ -223,15 +233,7 @@ bool recvAll(int sock, void* buf, size_t len) {
     }
     return true;
 }
-
-uint32_t calculateChecksum(const char* data, uint32_t len) {
-    uint32_t sum = 0;
-    for (uint32_t i = 0; i < len; ++i) {
-        sum += (uint8_t)data[i];
-    }
-    return sum;
-}
-
+...
 void printPacket(const Header& header, const Body& body, const char* raw, size_t totalLen) {
     std::cout << "\nReceived Packet:\n";
     std::cout << "Header:\n";
@@ -390,7 +392,7 @@ go build -o client client.go
 
 `./server`运行服务端，并开启抓包`tcpdump -i lo port 8080 -w 8080.cap -v`，而后`./client`触发请求。
 
-详细结果如下，可看到客户端和服务端的header和body长度都是一致的：`14`和`16`字节。
+详细结果如下，可看到客户端和服务端的header和body长度都是一致的：分别为`14`和`16`字节。
 * C++结构中设置了`#pragma pack(1)`，按1字节对齐补齐
 * Go客户端传输时也通过`binary.Write`指定流式数据，也不涉及对齐
 
@@ -399,7 +401,7 @@ go build -o client client.go
 ```sh
 [root@xdlinux ➜ case1_pragma_pack git:(main) ✗ ]$ ./client
 2025/08/07 06:46:49 header len:16, bodyBuf len:16
-# 实际发送的头长度为14，上面unsafe.Sizeof(Header{})还是c方式打印的结构体长度
+# 实际发送的头长度为14（`binary.Write`拼接二进制数据），上面unsafe.Sizeof(Header{})只是C语言方式打印的结构体长度
 2025/08/07 06:46:49 req headerBuf len:14, bodyBuf len:16
 发送成功:
 Header:
@@ -460,77 +462,16 @@ Raw Bytes (1e bytes):
 00000010  33 44 55 66 77 88 99 aa  bb cc 54 45 53 54         3DUfw... ..TEST
 ```
 
-## 4. case2：不指定pragma pack
+## 4. case2：服务端不指定pragma pack
+
+case2完整代码见：[case2_no_pragma_pack](https://github.com/xiaodongQ/prog-playground/tree/main/network/byte_order/case2_no_pragma_pack)
 
 注释去掉C++服务端的`#pragma pack(1)`，再编译运行。
-```cpp
-// #pragma pack(push, 1)
-struct Header {
-    // 2字节字符数组
-    char magic[2];
-    uint16_t version;
-    uint16_t command;
-    uint32_t bodyLen;
-    uint32_t checksum;
-};
 
-struct Body {
-    uint32_t seqNum;
-    uint64_t timestamp;
-    char data[4];
-};
-// #pragma pack(pop)
-```
+### 4.1. 服务端默认规则下的内存布局
 
-### 4.1. 客户端：和原来一样
+去掉`#pragma pack(1)`后，默认的对齐补齐规则下，内存布局如下：
 
-```sh
-[root@xdlinux ➜ case2_no_pragma_pack git:(main) ✗ ]$ ./client 
-2025/08/07 06:56:56 header len:16, bodyBuf len:16
-2025/08/07 06:56:56 req headerBuf len:14, bodyBuf len:16
-发送成功:
-Header:
-  Magic:    AB (0x4142)
-  Version:  0x0101
-  Command:  0x0001
-  BodyLen:  16
-  Checksum: 0x0000066E
-
-Body:
-  SeqNum:   0x11223344
-  Timestamp:0x5566778899AABBCC
-  Data:     "TEST"
-
-Raw Bytes (30 bytes):
-  [0000] 41 42 01 01 00 01 00 00
-  [0008] 00 10 00 00 06 6E 11 22
-  [0010] 33 44 55 66 77 88 99 AA
-  [0018] BB CC 54 45 53 54
-```
-
-### 4.2. 服务端：报错
-
-由于结构体默认的对齐补齐规则，识别头长度变成了`16`字节，以该方式接收导致数据错位了：`bodyLen:1048576`
-
-```sh
-[root@xdlinux ➜ case2_no_pragma_pack git:(main) ✗ ]$ ./server 
-Server listening on port 8080...
-size Header:16
-len:16, rc:16
-bodyLen:1048576
-len:1048576, rc:14
-len:1048562, rc:0
-接收失败: 连接关闭
-recv body failed
-```
-
-## 5. case3：客户端调整
-
-针对服务端无法变动的场景，比如只是写工具获取服务端信息，就只能调整客户端逻辑：**<mark>精确匹配服务端的结构体对齐方式</mark>**。
-
-### 5.1. 服务端默认对齐布局
-
-再看下服务端结构，默认对齐：
 ```cpp
 // #pragma pack(push, 1)
 struct Header {
@@ -553,30 +494,60 @@ struct Body {
 // #pragma pack(pop)
 ```
 
-
-并在服务端增加：
-```cpp
-std::cout << "Magic offset: " << offsetof(Header, magic) << std::endl;
-std::cout << "Version offset: " << offsetof(Header, version) << std::endl;
-std::cout << "Command offset: " << offsetof(Header, command) << std::endl;
-std::cout << "BodyLen offset: " << offsetof(Header, bodyLen) << std::endl;
-```
+### 4.2. 客户端：发送和原来一样
 
 ```sh
-[root@xdlinux ➜ case3_client_padding git:(main) ✗ ]$ ./server
+[root@xdlinux ➜ case2_no_pragma_pack git:(main) ✗ ]$ ./client 
+2025/08/07 06:56:56 header len:16, bodyBuf len:16
+# 实际发送的头长度为14（`binary.Write`拼接二进制数据），上面unsafe.Sizeof(Header{})只是C语言方式打印的结构体长度
+2025/08/07 06:56:56 req headerBuf len:14, bodyBuf len:16
+发送成功:
+Header:
+  Magic:    AB (0x4142)
+  Version:  0x0101
+  Command:  0x0001
+  BodyLen:  16
+  Checksum: 0x0000066E
+
+Body:
+  SeqNum:   0x11223344
+  Timestamp:0x5566778899AABBCC
+  Data:     "TEST"
+
+Raw Bytes (30 bytes):
+  [0000] 41 42 01 01 00 01 00 00
+  [0008] 00 10 00 00 06 6E 11 22
+  [0010] 33 44 55 66 77 88 99 AA
+  [0018] BB CC 54 45 53 54
+```
+
+### 4.3. 服务端：解析长度异常
+
+由于结构体默认的对齐补齐规则，识别头长度变成了`16`字节，以该方式接收导致数据错位了：`bodyLen:1048576`
+
+```sh
+[root@xdlinux ➜ case2_no_pragma_pack git:(main) ✗ ]$ ./server 
 Server listening on port 8080...
 size Header:16
 len:16, rc:16
-Magic offset: 0
-Version offset: 2
-Command offset: 4
-BodyLen offset: 8
-bodyLen:16
-len:16, rc:16
-Body too small: 16 < 24
+bodyLen:1048576
+len:1048576, rc:14
+len:1048562, rc:0
+接收失败: 连接关闭
+recv body failed
 ```
 
-### 5.2. 方法1：手动添加填充字段
+## 5. 调整客户端结构
+
+针对服务端无法变动的场景，比如只是写工具获取服务端信息，就只能调整客户端逻辑了：需要 **<mark>精确匹配服务端的结构体对齐方式</mark>**。
+* 优先方案：让服务端提供结构体的**完整内存布局文档**
+* 长期建议：改用`Protobuf`/`FlatBuffers`等跨语言序列化方案
+
+### 5.1. 方法1：struct手动添加填充字段（case3）
+
+case3完整代码见：[case3_client_padding](https://github.com/xiaodongQ/prog-playground/tree/main/network/byte_order/case3_client_padding)
+
+1、客户端代码如下，对`Header` 和 `Body` 结构体定义，手动添加填充字段，保证和服务端一样的内存布局。
 
 ```go
 package main
@@ -608,7 +579,7 @@ type Header struct {
 // 而不是：
 // type Header struct {
 //     Magic    [2]byte  // 2字节
-//     _        [2]byte  // 填充2字节：使Version从4字节开始（假设4字节对齐）
+//     _        [2]byte  // 填充2字节：使Version从4字节开始
 //     Version  uint16   // 2字节
 //     Command  uint16   // 2字节
 //     BodyLen  uint32   // 4字节
@@ -690,39 +661,21 @@ func main() {
     fmt.Println("发送成功:")
     printPacket(header, body, fullPacket)
 }
-
-func calculateChecksum(data []byte) uint32 {
-    var sum uint32
-    for _, b := range data {
-        sum += uint32(b)
-    }
-    return sum
-}
-
-func printPacket(header Header, body Body, raw []byte) {
-    fmt.Printf("Header:\n")
-    fmt.Printf("  Magic:    %s (0x%X)\n", string(header.Magic[:]), header.Magic)
-    fmt.Printf("  Version:  0x%04X\n", header.Version)
-    fmt.Printf("  Command:  0x%04X\n", header.Command)
-    fmt.Printf("  BodyLen:  %d\n", header.BodyLen)
-    fmt.Printf("  Checksum: 0x%08X\n", header.Checksum)
-
-    fmt.Printf("\nBody:\n")
-    fmt.Printf("  SeqNum:   0x%08X\n", body.SeqNum)
-    fmt.Printf("  Timestamp:0x%016X\n", body.Timestamp)
-    fmt.Printf("  Data:     %s\n", strconv.Quote(string(body.Data[:])))
-
-    fmt.Printf("\nRaw Bytes (%d bytes):\n", len(raw))
-    for i := 0; i < len(raw); i += 8 {
-        end := i + 8
-        if end > len(raw) {
-            end = len(raw)
-        }
-        fmt.Printf("  [%04X] % X\n", i, raw[i:end])
-    }
-}
+...
 ```
 
+2、并在服务端增加偏移打印：
+
+```cpp
+std::cout << "Magic offset: " << offsetof(Header, magic) << std::endl;
+std::cout << "Version offset: " << offsetof(Header, version) << std::endl;
+std::cout << "Command offset: " << offsetof(Header, command) << std::endl;
+std::cout << "BodyLen offset: " << offsetof(Header, bodyLen) << std::endl;
+```
+
+3、运行
+
+客户端：
 ```sh
 [root@xdlinux ➜ case3_client_padding git:(main) ✗ ]$ ./client
 2025/08/07 07:56:59 Header len:16, Body len:24
@@ -748,11 +701,13 @@ Raw Bytes (40 bytes):
   [0020] 54 45 53 54 00 00 00 00
 ```
 
+服务端：
 ```sh
 [root@xdlinux ➜ case3_client_padding git:(main) ✗ ]$ ./server
 Server listening on port 8080...
 size Header:16
 len:16, rc:16
+# 字段在结构体中的偏移
 Magic offset: 0
 Version offset: 2
 Command offset: 4
@@ -781,9 +736,184 @@ Raw Bytes (28 bytes):
   [0020] 54 45 53 54 00 00 00 00
 ```
 
+偏移打印可和上述内存布局一一印证，这里再贴一下：
+```cpp
+struct Header {
+    // 2字节字符数组
+    char magic[2];     // 0-1
+    uint16_t version;  // 2-3
+    uint16_t command;  // 4-5
+                       // 6-7 对齐，填充2字节
+    uint32_t bodyLen;  // 8-11
+    uint32_t checksum; // 12-15
+}; // 总大小16字节
+```
+
+### 5.2. 方法2：原始字节操作（case4）
+
+case4完整代码见：[case4_client_rawdata](https://github.com/xiaodongQ/prog-playground/tree/main/network/byte_order/case4_client_rawdata)
+
+1、客户端中，结构体定义不变（不填充，同case2），在拼接发送报文时，按照和服务端相同的布局发送。
+
+作为对比，再贴下上面C++服务端协议体的内存布局的示意：
+```cpp
+struct Body {
+    uint32_t seqNum;    // 0-3
+                        // 4-7 对齐，填充4字节
+    uint64_t timestamp; // 8-15
+    char data[4];       // 16-19
+                        // 20-23 补齐，填充4字节
+}; // 总大小24字节
+```
+
+客户端修改代码如下：
+* 生成发送报文时，协议头`16`字节，协议体`24`字节，和服务端结构体对齐补齐后一致
+* 设置数据时，跳过自动对齐的字节填充，比如协议体中：`[0:4)` 和 `[8:16)`之间的`[4, 8)`这些字节就不做设置
+```go
+type Header struct {
+    Magic    [2]byte
+    Version  uint16
+    Command  uint16
+    BodyLen  uint32
+    Checksum uint32
+}
+
+type Body struct {
+    SeqNum    uint32
+    Timestamp uint64
+    Data      [4]byte
+}
+
+func main() {
+    conn, err := net.Dial("tcp", "localhost:8080")
+    if err != nil {
+            log.Fatal("连接失败:", err)
+    }
+    defer conn.Close()
+
+    // 准备协议体（24字节，包含8字节填充）
+    body := make([]byte, 24)
+    binary.BigEndian.PutUint32(body[0:4], 0x11223344)       // SeqNum 0-3
+    // 4-7为填充字节（自动初始化为0）
+    binary.BigEndian.PutUint64(body[8:16], 0x5566778899AABBCC) // Timestamp 8-15
+    copy(body[16:20], []byte("TEST"))                      // Data 16-19
+    // 20-23为填充字节（自动初始化为0）
+
+    // 准备协议头（16字节，包含2字节填充）
+    header := make([]byte, 16)
+    copy(header[0:2], []byte(MAGIC))                     // Magic 0-1
+    binary.BigEndian.PutUint16(header[2:4], VERSION)     // Version 2-3（紧接Magic）
+    binary.BigEndian.PutUint16(header[4:6], CMD_TEST)    // Command 4-5
+    // 6-7为填充字节（自动初始化为0）
+    binary.BigEndian.PutUint32(header[8:12], 24)         // BodyLen 8-11（24字节）
+    checksum := calculateChecksum(body)
+    binary.BigEndian.PutUint32(header[12:16], checksum)  // Checksum 12-15
+
+    // 发送数据
+    if _, err := conn.Write(append(header, body...)); err != nil {
+            log.Fatal("发送失败:", err)
+    }
+
+    fmt.Println("发送成功:")
+    printPacket(header, body)
+}
+
+func printPacket(header, body []byte) {
+    // 解析Header
+    fmt.Printf("Header:\n")
+    fmt.Printf("  Magic:    %q (0x%X)\n", string(header[0:2]), header[0:2])
+    fmt.Printf("  Version:  0x%04X\n", binary.BigEndian.Uint16(header[2:4]))
+    fmt.Printf("  Command:  0x%04X\n", binary.BigEndian.Uint16(header[4:6]))
+    fmt.Printf("  BodyLen:  %d\n", binary.BigEndian.Uint32(header[8:12]))
+    fmt.Printf("  Checksum: 0x%08X\n", binary.BigEndian.Uint32(header[12:16]))
+
+    // 解析Body
+    fmt.Printf("\nBody:\n")
+    fmt.Printf("  SeqNum:   0x%08X\n", binary.BigEndian.Uint32(body[0:4]))
+    fmt.Printf("  Timestamp:0x%016X\n", binary.BigEndian.Uint64(body[8:16]))
+    fmt.Printf("  Data:     %q\n", string(body[16:20]))
+
+    // 打印原始字节
+    fullPacket := append(header, body...)
+    fmt.Printf("\nRaw Bytes (%d bytes):\n", len(fullPacket))
+    for i := 0; i < len(fullPacket); i += 8 {
+        end := i + 8
+        if end > len(fullPacket) {
+            end = len(fullPacket)
+        }
+        fmt.Printf("  [%04X] % X\n", i, fullPacket[i:end])
+    }
+}
+```
+
+2、运行
+
+客户端：
+```sh
+[root@xdlinux ➜ case4_client_rawdata git:(main) ✗ ]$ ./client 
+发送成功:
+Header:
+  Magic:    "AB" (0x4142)
+  Version:  0x0101
+  Command:  0x0001
+  BodyLen:  24
+  Checksum: 0x0000066E
+
+Body:
+  SeqNum:   0x11223344
+  Timestamp:0x5566778899AABBCC
+  Data:     "TEST"
+
+Raw Bytes (40 bytes):
+  [0000] 41 42 01 01 00 01 00 00
+  [0008] 00 00 00 18 00 00 06 6E
+  [0010] 11 22 33 44 00 00 00 00
+  [0018] 55 66 77 88 99 AA BB CC
+  [0020] 54 45 53 54 00 00 00 00
+```
+
+服务端：
+```sh
+[root@xdlinux ➜ case4_client_rawdata git:(main) ✗ ]$ ./server 
+Server listening on port 8080...
+size Header:16
+len:16, rc:16
+bodyLen:24
+len:24, rc:24
+
+Received Packet:
+Header:
+Magic: A(0x41) B(0x42) 
+  Version:  0x101
+  Command:  0x1
+  BodyLen:  24
+  Checksum: 0x66e
+
+Body:
+  SeqNum:   0x11223344
+  Timestamp:0x5566778899aabbcc
+  Data:     'TEST'
+
+Raw Bytes (28 bytes):
+  [0000] 41 42 01 01 01 00 00 00 
+  [0008] 18 00 00 00 6E 06 00 00 
+  [0010] 11 22 33 44 00 00 00 00 
+  [0018] 55 66 77 88 99 AA BB CC 
+  [0020] 54 45 53 54 00 00 00 00
+```
+
 ## 6. 小结
 
-大小端字节序、网络字节序实验。
+通过实验查看大小端字节序、网络字节序的展示效果，并复现结构体对齐补齐会碰到的问题，以及针对问题出现时的解决方案。
+
+后续碰到同类问题就更容易区分了：
+* 网络字节序是大端序（主机序一般为小端序），更符合人类阅读习惯
+    * 大端序示例：`0x12345678` 存储为 `12 34 56 78`，比如数组`int n[4]`，那`n[0]=12`、`n[1]=34`、`n[0]=56`、`n[3]=78`
+    * 小端序则相反：上述存储为 `n[0]=78`、`n[1]=56`、`n[0]=34`、`n[3]=12`
+* 多字节数据（一个数据里有多个字节）才涉及到字节序的区分，如果数据只是一个字节，不涉及转换混淆
+* 比如：要传输一个结构体，包含`char A`和`uint16 B`两个字段
+    * 则`A`和`B`的顺序是固定的（`A`定义在前则先传`A`），
+    * 但是`B`中包含2个字节，假如其对应16进制为`0x1234`，那么大端序（网络序）时`0x12`就在`0x34`前面，小端序时`0x34`在前面先读取到并传输
 
 ## 7. 参考
 
