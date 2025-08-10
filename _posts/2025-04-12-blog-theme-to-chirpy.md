@@ -312,7 +312,7 @@ kramdown 是一个用 Ruby 实现的 Markdown 的解析器，Jekyll默认就是�
 }
 ```
 
-### 优化文本搜索
+### 5.6. 优化文本搜索
 
 当前搜索结果比较模糊，效果不大好。调整为支持精准搜索。从参考文章的博客拷贝使用，由于lib是个子模块，新增一个assets/lib2。
 
@@ -320,7 +320,7 @@ kramdown 是一个用 Ruby 实现的 Markdown 的解析器，Jekyll默认就是�
 
 参考：[优化文本搜索](https://ittousei.github.io/posts/customize-my-blog/#%E4%BC%98%E5%8C%96%E6%96%87%E6%9C%AC%E6%90%9C%E7%B4%A2)
 
-### 5.6. 增加4个新的prompt
+### 5.7. 增加4个新的prompt
 
 引用时可以显示颜色：
 
@@ -355,7 +355,7 @@ To be or not to be. That is a question.
 </div>
 ```
 
-### 5.7. 博客个性化参考链接
+### 5.8. 博客个性化参考链接
 
 1、**官网demo推荐的个性化方式**：从原博客拷贝一个 assets/css/jekyll-theme-chirpy.scss （[Customizing the Stylesheet](https://chirpy.cotes.page/posts/getting-started/#customizing-the-stylesheet)
 
@@ -372,7 +372,38 @@ To be or not to be. That is a question.
 * 目录不折叠就是在这里看的：[jekyll-theme-chirpy.scss](https://github.com/huanyushi/huanyushi.github.io/blob/main/assets/css/jekyll-theme-chirpy.scss)
 * 从 [chirpy博客改造指北（个人向）](https://makicelse.github.io/posts/%E7%BD%91%E7%AB%99%E6%94%B9%E9%80%A0/) 里面找到上面的博客链接
 
-## 6. 参考
+## 6. GitHub Profile
+
+通过`GitHub Profile`功能，可通过`README.md`来自定义Github首页。可以在GitHub主页展示commit、PR等统计信息和一些动画效果，挺有意思，可参考：[如何打造一个花里胡哨的Github个人主页？](https://www.cnblogs.com/meet/p/18084942)。
+
+GitHub提供的Profile操作文档：[管理个人资料自述文件](https://docs.github.com/zh/account-and-profile/how-tos/setting-up-and-managing-your-github-profile/customizing-your-profile/managing-your-profile-readme)
+
+步骤：
+* 1、创建一个和用户名同名的仓库，需要是`public`，需要包含`README.md`
+* 2、为内容添加自己需要的模块
+  * 可以参考一些模板，如：
+    * commit统计：[github-readme-stats](https://github.com/anuraghazra/github-readme-stats)
+      * 只要简单的一句放到README.md里面
+      * 支持的参数说明可见：[readme.md](https://github.com/anuraghazra/github-readme-stats/blob/master/readme.md)
+    * 贪吃蛇：[snk](https://github.com/Platane/snk)
+      * 使用`Actions`，可参考[给GitHub首页添加一个有趣的贪吃蛇小动画](https://cloud.tencent.com/developer/article/1935739)
+        * 生成的图片会提交到单独的branch，不影响GitHub正常的提交记录。
+      * 这个贪吃蛇叠加小游戏，更有意思一点：[把 GitHub 变成游戏厅！(吃豆人 + 贪吃蛇 + 炫酷奖杯！)](https://juejin.cn/post/7536115474624626697)
+
+```
+PR统计
+[![xiaodongQ's GitHub stats](https://github-readme-stats.vercel.app/api?username=xiaodongQ)](https://github.com/anuraghazra/github-readme-stats)
+
+使用语言统计
+[![Top Langs](https://github-readme-stats.vercel.app/api/top-langs/?username=xiaodongQ&layout=compact)](https://github.com/anuraghazra/github-readme-stats)
+
+
+排版到同一排
+| <img align="center" src="https://github-readme-stats.vercel.app/api?username=xiaodongQ&show_icons=true&include_all_commits=true&hide_border=true" alt="GitHub stats" /> | <img align="center" src="https://github-readme-stats.vercel.app/api/top-langs/?username=xiaodongQ&layout=compact&hide_border=true&langs_count=10&size_weight=0.5&count_weight=0.5&hide=assembly,BitBake,yacc,M4,SmPL,Roff,Objective-C,makefile,cmake,perl" /> |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+```
+
+## 7. 参考
 
 * 主题示例网站：[cotes page](https://chirpy.cotes.page/)
 * [Customizing the Stylesheet](https://chirpy.cotes.page/posts/getting-started/#customizing-the-stylesheet)
