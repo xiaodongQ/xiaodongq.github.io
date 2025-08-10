@@ -40,7 +40,7 @@ tags: 网络
 
 ## 3. bcc tools 跟踪
 
-从之前"[eBPF学习实践系列（二） -- bcc tools网络工具集](https://xiaodongq.github.io/2024/06/10/bcc-tools-network/)"学习记录的bcc tools工具集中，选取如下工具：
+从之前“[eBPF学习实践系列（二） -- bcc tools网络工具集](https://xiaodongq.github.io/2024/06/10/bcc-tools-network/)”学习记录的bcc tools工具集中，选取如下工具：
 
 * `tcpstates`，跟踪TCP状态变化，每次连接改变其状态时，tcpstates都会显示一个新行
 * `tcptracer`，追踪**已建立连接**的TCP socket，每个connect/accept/close事件都会记录打印
@@ -285,7 +285,7 @@ ffff90cdd53cb340 0     swapper/0  172.16.58.147   43782 172.16.58.146   8080  FI
 
 **情形1**：可看到客户端发起SYN连接 -> 建立连接 -> 主动发起FIN关闭 -> 收到对端ACK（因为变成了FIN_WAIT2） -> 最后成功CLOSE。
 
-且这种情形有 `6` 个stream（技巧：检索FIN_WAIT2并查看NEWSTATE列）。  
+且这种情形有 `6` 个stream（小技巧：检索FIN_WAIT2并查看NEWSTATE列）。  
 **和系列第一篇抓包中的case1对应**
 
 ```sh
