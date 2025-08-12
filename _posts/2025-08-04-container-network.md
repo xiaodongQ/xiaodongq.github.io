@@ -80,7 +80,90 @@ broadcast 192.168.1.255 dev enp4s0 proto kernel scope link src 192.168.1.150
 
 ### 2.2. Unix Domain Socket
 
+`Unix Domain Socket（UDS）`是一种用于同一主机上进程间通信（`IPC`）的机制，它**不依赖网络协议栈**，而是**直接通过内核**实现进程间的数据传递。相比基于 `TCP/UDP`的网络Socket，`UDS`更高效、更安全，是本地进程通信的优选方案之一。
 
+#### 2.2.1. 编程方式
+
+和传统`socket`类似，区别主要在 1）协议族需要指定`AF_UNIX`
+
+```cpp
+ // 创建socket  
+int server_fd = socket(AF_INET, SOCK_STREAM, 0)  
+struct sockaddr_in address;
+address.sin_family = AF_INET;  
+address.sin_addr.s_addr = INADDR_ANY;  
+address.sin_port = htons(PORT); 
+bind(server_fd, (struct sockaddr *)&address, sizeof(address))
+listen(server_fd, BACKLOG)
+```
+
+```cpp
+struct sockaddr_un server_addr;
+// 创建 unix domain socket
+int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+// 绑定监听
+char *socket_path = "./server.sock";
+strcpy(serun.sun_path, socket_path); 
+bind(fd, serun, ...);
+listen(fd, 128);
+```
+
+#### 2.2.2. unlink 和 rm 对比
+
+上面`UDS`的示例中，使用`unlink`进行文件删除，这里对其做下说明。
+* 在 Unix/Linux 系统中，`unlink`是一个用于删除文件（或特殊文件，如 Unix Domain Socket 创建的 .sock 文件）的系统调用（或同名命令）。它的核心作用是**移除文件系统中的目录项（directory entry），并减少文件的链接计数（link count）**。
+    * 当文件的链接计数变为 `0` 且没有进程打开该文件时，文件所占用的磁盘空间会被**内核回收**。
+* `rm`本质上调用`unlink`实现文件删除，但支持更多功能（如递归删除目录 -r、强制删除 -f 等）
+    * `unlink`一次只能删除一个文件，且不能删除目录；`rm`可批量删除文件或目录。
+
+文件的`inode`链接计数，之前在 [从1万空文件占用空间大小看Linux文件系统结构](https://xiaodongq.github.io/2023/06/30/linux-directory-struct/) 中也做过简单实验，这里再看下，刚touch的文件（未创建soft/hard链接）：`Links: 1`
+```sh
+[root@xdlinux ➜ unix_domain_socket git:(main) ✗ ]$ touch 111
+[root@xdlinux ➜ unix_domain_socket git:(main) ✗ ]$ stat 111 
+  File: 111
+  Size: 0               Blocks: 0          IO Block: 4096   regular empty file
+Device: fd06h/64774d    Inode: 25168712    Links: 1
+Access: (0644/-rw-r--r--)  Uid: (    0/    root)   Gid: (    0/    root)
+Access: 2025-08-11 07:20:05.473274762 +0800
+Modify: 2025-08-11 07:20:05.473274762 +0800
+Change: 2025-08-11 07:20:05.473274762 +0800
+ Birth: 2025-08-11 07:20:05.473274762 +0800
+```
+
+1）`unlink`命令，调用到`unlink`接口（`int unlink(const char *pathname);`）：
+
+```sh
+[root@xdlinux ➜ unix_domain_socket git:(main) ✗ ]$ touch 111           
+[root@xdlinux ➜ unix_domain_socket git:(main) ✗ ]$ strace -yy unlink 111
+execve("/usr/bin/unlink", ["unlink", "111"], 0x7ffc142d35d0 /* 52 vars */) = 0
+...
+# 调用到 unlink接口
+unlink("111")                           = 0
+close(1</dev/pts/0<char 136:0>>)        = 0
+close(2</dev/pts/0<char 136:0>>)        = 0
+exit_group(0)                           = ?
++++ exited with 0 +++
+```
+
+2）`rm`命令，调用到`unlinkat`接口（`int unlinkat(int dirfd, const char *pathname, int flags);`）：
+* 调用`unlinkat`接口的操作表现，和`unlink`或`rmdir`接口是一样的，但功能更强。
+* 是`unlink`的扩展，支持通过**相对路径+目录描述符**处理路径，更适合在多线程环境或需要动态切换目录的场景中使用。
+
+```sh
+[root@xdlinux ➜ unix_domain_socket git:(main) ✗ ]$ touch 111       
+[root@xdlinux ➜ unix_domain_socket git:(main) ✗ ]$ strace -yy rm -f 111
+execve("/usr/bin/rm", ["rm", "-f", "111"], 0x7ffef209eb68 /* 52 vars */) = 0
+...
+newfstatat(AT_FDCWD</home/workspace/prog-playground/network/unix_domain_socket>, "111", {st_mode=S_IFREG|0644, st_size=0, ...}, AT_SYMLINK_NOFOLLOW) = 0
+# 调用到 unlinkat接口
+unlinkat(AT_FDCWD</home/workspace/prog-playground/network/unix_domain_socket>, "111", 0) = 0
+lseek(0</dev/pts/0<char 136:0>>, 0, SEEK_CUR) = -1 ESPIPE (Illegal seek)
+close(0</dev/pts/0<char 136:0>>)        = 0
+close(1</dev/pts/0<char 136:0>>)        = 0
+close(2</dev/pts/0<char 136:0>>)        = 0
+exit_group(0)                           = ?
++++ exited with 0 +++
+```
 
 ## 3. 小结
 
