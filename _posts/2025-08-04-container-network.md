@@ -82,10 +82,26 @@ broadcast 192.168.1.255 dev enp4s0 proto kernel scope link src 192.168.1.150
 
 `Unix Domain Socket（UDS）`是一种用于同一主机上进程间通信（`IPC`）的机制，它**不依赖网络协议栈**，而是**直接通过内核**实现进程间的数据传递。相比基于 `TCP/UDP`的网络Socket，`UDS`更高效、更安全，是本地进程通信的优选方案之一。
 
+UDS的流程如下，具体详情见参考文章：[本机网络IO之Unix Domain Socket与普通socket的性能对比 实验使用源码](https://kfngxl.cn/index.php/archives/211/)。
+
+建立连接过程：  
+![uds-connection](/images/uds-connection.png)
+
+数据收发过程：  
+![uds-send-recv](/images/uds-send-recv.png)
+
+说明：
+* 不需要经过网络协议栈，无需像TCP那样的三次握手、全连接半连接等过程
+
 #### 2.2.1. 编程方式
 
-和传统`socket`类似，区别主要在 1）协议族需要指定`AF_UNIX`
+和传统`socket`类似，区别主要在 
+* 1）使用的socket地址结构为`sockaddr_un`，协议族需要指定`AF_UNIX`
+    * `sockaddr_un` 里的`un`表示`UNIX domain sockets`
+    * 传统socket地址是`sockaddr_in`结构，`Internet domain sockets`
+* 2）需要指定一个系统文件路径用于通信
 
+普通Socket使用方式：
 ```cpp
  // 创建socket  
 int server_fd = socket(AF_INET, SOCK_STREAM, 0)  
@@ -97,6 +113,7 @@ bind(server_fd, (struct sockaddr *)&address, sizeof(address))
 listen(server_fd, BACKLOG)
 ```
 
+Unix Domain Socket使用方式：
 ```cpp
 struct sockaddr_un server_addr;
 // 创建 unix domain socket
@@ -106,6 +123,40 @@ char *socket_path = "./server.sock";
 strcpy(serun.sun_path, socket_path); 
 bind(fd, serun, ...);
 listen(fd, 128);
+```
+
+完整demo示例，可见：[unix_domain_socket](https://github.com/xiaodongQ/prog-playground/tree/main/network/unix_domain_socket/)。
+
+服务端监听后，`netstat`和`ss`查看状态如下：
+* 查看下面的 `I-Node`，和 `uds_demo.sock` 文件的`inode`号(`stat`或者`ls -i`查看)并不相同，多次执行用的还是旧文件的引用？但是重启后发现还是不同，代码里尝试用绝对路径也不同（**TODO**）
+
+```sh
+# netstat
+[root@xdlinux ➜ unix_domain_socket git:(main) ✗ ]$ netstat -anp|grep -E "$(pidof ./server)|UNIX domain|I-Node"
+Active UNIX domain sockets (servers and established)
+Proto RefCnt Flags       Type       State         I-Node   PID/Program name     Path
+unix  2      [ ACC ]     STREAM     LISTENING     47497885 1835025/./server     ./uds_demo.sock
+# ss
+[root@xdlinux ➜ unix_domain_socket git:(main) ✗ ]$ ss -anp |grep -E "$(pidof ./server)|Send-Q"
+Netid State     Recv-Q Send-Q   Local Address:Port          Peer Address:Port    Process
+u_str LISTEN    0      5        ./uds_demo.sock 47497885    * 0                  users:(("server",pid=1835025,fd=3))
+```
+
+客户端执行（[uds_client.c代码](https://github.com/xiaodongQ/prog-playground/blob/main/network/unix_domain_socket/uds_client.c)）：
+```sh
+[root@xdlinux ➜ unix_domain_socket git:(main) ✗ ]$ ./client 
+Connected to server.
+Received from server: Hello from server!
+Client closed.
+```
+
+服务端执行（[uds_server.c代码](https://github.com/xiaodongQ/prog-playground/blob/main/network/unix_domain_socket/uds_server.c)）：
+```sh
+[root@xdlinux ➜ unix_domain_socket git:(main) ✗ ]$ ./server 
+Server listening on ./uds_demo.sock...
+Client connected.
+Received from client: Hello from client!
+Server closed.
 ```
 
 #### 2.2.2. unlink 和 rm 对比
@@ -169,3 +220,6 @@ exit_group(0)                           = ?
 
 
 ## 4. 参考
+
+* [127.0.0.1 之本机网络通信过程知多少](https://kfngxl.cn/index.php/archives/195/)
+* [本机网络IO之Unix Domain Socket与普通socket的性能对比 实验使用源码](https://kfngxl.cn/index.php/archives/211/)
