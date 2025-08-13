@@ -8,7 +8,7 @@ tags: [Go, AI]
 
 ## 1. 背景
 
-平时定位问题和查看测试环境数据时，经常要连Shell终端（XShell、SecureCRT、[WindTerm](https://github.com/kingToolbox/WindTerm)了），连接数据库后再手敲SQL查询。简化后的数据库模型：总表`A`中有一个分区字段，范围`00~FF`共256张子表，需要先到A表找到分区，而后到对应的`A_xx`子表里查看进一步的信息。
+平时定位问题和查看测试环境数据时，经常要连Shell终端（XShell、SecureCRT、[WindTerm](https://github.com/kingToolbox/WindTerm)），连接数据库后再手敲SQL查询。简化后的数据库模型：总表`A`中有一个分区字段，范围`00~FF`共256张子表，需要先到A表找到分区，而后到对应的`A_xx`子表里查看进一步的信息。
 
 有几个痛点：
 * 虽然连接数据库、联表等常用命令设置为了快捷按钮，但还是**需要多次点击**以及手动输入数据
