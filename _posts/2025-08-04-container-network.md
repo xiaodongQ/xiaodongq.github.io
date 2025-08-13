@@ -15,8 +15,8 @@ tags: [云原生, 容器网络]
     * [127.0.0.1 之本机网络通信过程知多少](https://kfngxl.cn/index.php/archives/195/)
     * [本机网络IO之Unix Domain Socket与普通socket的性能对比 实验使用源码](https://kfngxl.cn/index.php/archives/211/)
 * 容器网络
-    * [手工模拟实现 Docker 容器网络！ 配套实验源码](https://kfngxl.cn/index.php/archives/460/)
     * [轻松理解 Docker 网络虚拟化基础之 veth 设备](https://kfngxl.cn/index.php/archives/415/)
+    * [手工模拟实现 Docker 容器网络！ 配套实验源码](https://kfngxl.cn/index.php/archives/460/)
     * 命名空间
         * [彻底弄懂 Linux 网络命名空间 配套实验源码](https://kfngxl.cn/index.php/archives/443/)
     * 数据交换和路由
@@ -216,10 +216,129 @@ exit_group(0)                           = ?
 +++ exited with 0 +++
 ```
 
-## 3. 小结
+## 3. 容器网络虚拟化基础 -- veth
+
+> 详情可见参考链接：[轻松理解 Docker 网络虚拟化基础之 veth 设备](https://kfngxl.cn/index.php/archives/415/)
+
+网络虚拟化：用软件来模拟真实网线的连接，实现数据交互。
+* 本机网络IO里的 `lo`回环设备 也是一个用软件虚拟出来的设备
+
+### 3.1. 查看当前podman的veth
+
+自己环境里目前安装了K8s和podman，之前的容器都停掉了，启动一下之前的MySQL容器，而后可看到多出来了`4`和`5`对应的虚拟接口。
+
+```sh
+[root@xdlinux ➜ ~ ]$ docker ps
+Emulate Docker CLI using podman. Create /etc/containers/nodocker to quiet msg.
+CONTAINER ID  IMAGE                                   COMMAND               CREATED      STATUS        PORTS                                        NAMES
+3477156f2e93  docker.m.daocloud.io/library/mysql:8.0  --character-set-s...  5 weeks ago  Up 2 minutes  0.0.0.0:3306->3306/tcp, 3306/tcp, 33060/tcp  mysql-server
+
+[root@xdlinux ➜ ~ ]$ ip link show
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+2: enp4s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP mode DEFAULT group default qlen 1000
+    link/ether 1c:69:7a:f5:39:32 brd ff:ff:ff:ff:ff:ff
+3: wlp3s0: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/ether c8:94:02:4d:2d:01 brd ff:ff:ff:ff:ff:ff
+4: podman0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP mode DEFAULT group default qlen 1000
+    link/ether 92:8b:b7:39:c1:c3 brd ff:ff:ff:ff:ff:ff
+5: veth0@if2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master podman0 state UP mode DEFAULT group default qlen 1000
+    link/ether 1e:90:37:9e:56:88 brd ff:ff:ff:ff:ff:ff link-netns netns-1836f023-0e86-8ff4-1416-bfb03e668d95
+```
+
+### 3.2. 实验：手动添加veth
+
+创建veth：`ip link add veth4 type veth peer name veth5`，`ip a`可看到都是成对出现的：
+```sh
+[root@xdlinux ➜ ~ ]$ ip link add veth4 type veth peer name veth5
+[root@xdlinux ➜ ~ ]$ ip a
+...
+8: veth5@veth4: <BROADCAST,MULTICAST,M-DOWN> mtu 1500 qdisc noop state DOWN group default qlen 1000
+    link/ether 9a:2e:ed:06:0c:56 brd ff:ff:ff:ff:ff:ff
+9: veth4@veth5: <BROADCAST,MULTICAST,M-DOWN> mtu 1500 qdisc noop state DOWN group default qlen 1000
+    link/ether 22:af:86:d7:d3:73 brd ff:ff:ff:ff:ff:ff
+
+# 或ip link show 
+[root@xdlinux ➜ ~ ]$ ip link show 
+...
+8: veth5@veth4: <BROADCAST,MULTICAST,M-DOWN> mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/ether 9a:2e:ed:06:0c:56 brd ff:ff:ff:ff:ff:ff
+9: veth4@veth5: <BROADCAST,MULTICAST,M-DOWN> mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/ether 22:af:86:d7:d3:73 brd ff:ff:ff:ff:ff:ff
+```
+
+添加ip：
+```sh
+# 1、添加ip：
+ip addr add 192.168.5.1/24 dev veth4
+ip addr add 192.168.5.2/24 dev veth5
+
+# 2、可以看到ip了
+[root@xdlinux ➜ ~ ]$ ip a
+8: veth5@veth4: <BROADCAST,MULTICAST,M-DOWN> mtu 1500 qdisc noop state DOWN group default qlen 1000
+    link/ether 9a:2e:ed:06:0c:56 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.5.2/24 scope global veth5
+       valid_lft forever preferred_lft forever
+9: veth4@veth5: <BROADCAST,MULTICAST,M-DOWN> mtu 1500 qdisc noop state DOWN group default qlen 1000
+    link/ether 22:af:86:d7:d3:73 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.5.1/24 scope global veth4
+       valid_lft forever preferred_lft forever
+
+# 3、启动设备
+ip link set veth4 up
+ip link set veth5 up
+
+# 4、已启动
+8: veth5@veth4: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    link/ether 9a:2e:ed:06:0c:56 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.5.2/24 scope global veth5
+       valid_lft forever preferred_lft forever
+    inet6 fe80::982e:edff:fe06:c56/64 scope link 
+       valid_lft forever preferred_lft forever
+9: veth4@veth5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    link/ether 22:af:86:d7:d3:73 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.5.1/24 scope global veth4
+       valid_lft forever preferred_lft forever
+    inet6 fe80::20af:86ff:fed7:d373/64 scope link 
+       valid_lft forever preferred_lft forever
+```
+
+### 3.3. bpftrace追踪veth接口交互
+
+```sh
+[root@xdlinux ➜ ~ ]$ bpftrace -l|grep veth_xmit
+kfunc:veth:veth_xmit
+kprobe:veth_xmit
+```
+
+如下跟踪`kprobe`，通过`ping 192.168.5.2 -I veth4`进行发包，可追踪到调用栈：
+
+```sh
+[root@xdlinux ➜ ~ ]$ bpftrace -e 'BEGIN { @count = 0; } kprobe:veth_xmit { if (@count < 2) { printf("comm:%s, stack:%s\n", comm, kstack()); @count++; } else { exit(); } }'
+
+Attaching 2 probes...
+comm:ping, stack:
+        veth_xmit+1
+        dev_hard_start_xmit+136
+        __dev_queue_xmit+1214
+        arp_solicit+244
+        neigh_probe+81
+        __neigh_event_send+615
+        neigh_resolve_output+305
+        ip_finish_output2+401
+        ip_push_pending_frames+162
+        ping_v4_sendmsg+1086
+        __sys_sendto+457
+        __x64_sys_sendto+32
+        do_syscall_64+95
+        entry_SYSCALL_64_after_hwframe+120
+```
 
 
-## 4. 参考
+## 4. 小结
+
+
+## 5. 参考
 
 * [127.0.0.1 之本机网络通信过程知多少](https://kfngxl.cn/index.php/archives/195/)
 * [本机网络IO之Unix Domain Socket与普通socket的性能对比 实验使用源码](https://kfngxl.cn/index.php/archives/211/)
