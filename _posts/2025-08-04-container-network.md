@@ -1,5 +1,5 @@
 ---
-title: 容器网络（一） -- 本机网络通信和容器网络基础
+title: 容器网络（一） -- 本机网络通信 和 容器网络基础-veth
 description: 梳理学习容器网络
 categories: [云原生, 容器网络]
 tags: [云原生, 容器网络]
@@ -75,7 +75,7 @@ local 192.168.1.150 dev enp4s0 proto kernel scope host src 192.168.1.150
 broadcast 192.168.1.255 dev enp4s0 proto kernel scope link src 192.168.1.150 
 ```
 
-这里也贴下参考链接中提到的，在 边车（`sidecar`）代理程序 和 本地进程 间通信时，通过`eBPF`来绕开内核协议栈的开销：  
+这里也贴下参考链接中提到的，在 边车（`sidecar`）代理程序 和 本地进程 间通信时，通过`eBPF`来绕开内核协议栈的开销（后续再梳理展开）：  
 ![ebpf-sidecar](/images/network-process-ebpf-sidecar.png)
 
 ### 2.2. Unix Domain Socket
@@ -216,6 +216,12 @@ exit_group(0)                           = ?
 +++ exited with 0 +++
 ```
 
+### 2.3. 性能对比
+
+`Unix Domain Socket`相比`lo`本地回环少了网络协议栈的交互，小包（e.g. 100字节）传输性能基本是`lo`的**2倍**多（参考链接中的实验场景），当包足够大的时候，网络协议栈上的开销就显得没那么明显了。
+
+具体见：[本机网络IO之Unix Domain Socket与普通socket的性能对比 实验使用源码](https://kfngxl.cn/index.php/archives/211/)。
+
 ## 3. 容器网络虚拟化基础 -- veth
 
 > 详情可见参考链接：[轻松理解 Docker 网络虚拟化基础之 veth 设备](https://kfngxl.cn/index.php/archives/415/)
@@ -248,7 +254,7 @@ CONTAINER ID  IMAGE                                   COMMAND               CREA
 
 ### 3.2. 实验：手动添加veth
 
-创建veth：`ip link add veth4 type veth peer name veth5`，`ip a`可看到都是成对出现的：
+创建veth：`ip link add veth4 type veth peer name veth5`，`ip a`可看到`veth`是成对出现的：
 ```sh
 [root@xdlinux ➜ ~ ]$ ip link add veth4 type veth peer name veth5
 [root@xdlinux ➜ ~ ]$ ip a
@@ -267,7 +273,7 @@ CONTAINER ID  IMAGE                                   COMMAND               CREA
     link/ether 22:af:86:d7:d3:73 brd ff:ff:ff:ff:ff:ff
 ```
 
-添加ip：
+为设备添加ip并启动：
 ```sh
 # 1、添加ip：
 ip addr add 192.168.5.1/24 dev veth4
@@ -288,7 +294,7 @@ ip addr add 192.168.5.2/24 dev veth5
 ip link set veth4 up
 ip link set veth5 up
 
-# 4、已启动
+# 4、2个网口设备已启动
 8: veth5@veth4: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
     link/ether 9a:2e:ed:06:0c:56 brd ff:ff:ff:ff:ff:ff
     inet 192.168.5.2/24 scope global veth5
@@ -301,19 +307,32 @@ ip link set veth5 up
        valid_lft forever preferred_lft forever
     inet6 fe80::20af:86ff:fed7:d373/64 scope link 
        valid_lft forever preferred_lft forever
+
+[root@xdlinux ➜ ~ ]$ ping 192.168.5.1
+PING 192.168.5.1 (192.168.5.1) 56(84) bytes of data.
+64 bytes from 192.168.5.1: icmp_seq=1 ttl=64 time=0.115 ms
+64 bytes from 192.168.5.1: icmp_seq=2 ttl=64 time=0.217 ms
 ```
 
 ### 3.3. bpftrace追踪veth接口交互
 
+`veth`的创建、发送/接收等内核源码过程，具体可见[参考链接]((https://kfngxl.cn/index.php/archives/415/))进行学习，本篇暂只跟踪下数据发送接口：`veth_xmit`。
+
+追踪内核正反调用栈，还是用`bpftrace`（也可用`perf record -e`+`perf report`） + `funcgraph`。可了解之前的实践用法：[追踪内核网络堆栈的几种方式](https://xiaodongq.github.io/2024/07/03/strace-kernel-network-stack/) 和 [Linux存储IO栈梳理（三） -- eBPF和ftrace跟踪IO写流程](https://xiaodongq.github.io/2024/08/15/linux-write-io-stack/)，还是得结合场景多实践内化，要不时间一长又弱化了。
+* `perf-tools`需要从 [GitHub项目主页](https://github.com/brendangregg/perf-tools) 下载使用，可以自行本地归档一份，比如我的归档：[tools/perf-tools](https://github.com/xiaodongQ/prog-playground/tree/main/tools/perf-tools)。
+
+查看对应的符号和追踪点：
 ```sh
 [root@xdlinux ➜ ~ ]$ bpftrace -l|grep veth_xmit
 kfunc:veth:veth_xmit
 kprobe:veth_xmit
 ```
 
-如下跟踪`kprobe`，通过`ping 192.168.5.2 -I veth4`进行发包，可追踪到调用栈：
+如下跟踪`kprobe`，通过`ping 192.168.5.2 -I veth4`来用`veth4`向`veth5`进行发包，可追踪到调用栈：
 
+调用`veth_xmit`之前的调用栈（谁调用到`veth_xmit`）：
 ```sh
+# 通过计数控制抓取的个数
 [root@xdlinux ➜ ~ ]$ bpftrace -e 'BEGIN { @count = 0; } kprobe:veth_xmit { if (@count < 2) { printf("comm:%s, stack:%s\n", comm, kstack()); @count++; } else { exit(); } }'
 
 Attaching 2 probes...
@@ -334,11 +353,61 @@ comm:ping, stack:
         entry_SYSCALL_64_after_hwframe+120
 ```
 
+调用`veth_xmit`之后的调用栈，即`veth_xmit`中的实现流程：
+```sh
+[root@xdlinux ➜ bin git:(main) ✗ ]$ funcgraph -H veth_xmit
+Tracing "veth_xmit"... Ctrl-C to end.
+# tracer: function_graph
+#
+# CPU  DURATION                  FUNCTION CALLS
+# |     |   |                     |   |   |   |
+ 10)               |  veth_xmit [veth]() {
+ 10)               |    irq_enter_rcu() {
+ 10)   0.209 us    |      irqtime_account_irq();
+ 10)   0.676 us    |    }
+                        # 中断处理
+ 10)               |    __sysvec_irq_work() {
+ 10)               |      __wake_up() {
+ 10)   0.190 us    |        ...
+ 10)   7.999 us    |      }
+ 10)   8.437 us    |    }
+ 10)               |    irq_exit_rcu() {
+ 10)   0.180 us    |      irqtime_account_irq();
+ 10)   0.179 us    |      sched_core_idle_cpu();
+ 10)   0.866 us    |    }
+ 10)   0.179 us    |    __rcu_read_lock();
+ 10)   0.189 us    |    skb_clone_tx_timestamp();
+ 10)               |    __dev_forward_skb() {
+ 10)               |      __dev_forward_skb2() {
+ 10)   0.209 us    |        skb_scrub_packet();
+ 10)   0.219 us    |        eth_type_trans();
+ 10)   0.955 us    |      }
+ 10)   1.293 us    |    }
+ 10)               |    __netif_rx() {
+ 10)               |      netif_rx_internal() {
+ 10)               |        ktime_get_with_offset() {
+ 10)               |          read_hpet() {
+ 10)   1.155 us    |            read_hpet.part.0();
+ 10)   1.483 us    |          }
+ 10)   1.851 us    |        }
+ 10)               |        enqueue_to_backlog() {
+ 10)   0.179 us    |          _raw_spin_lock_irqsave();
+ 10)   0.190 us    |          __raise_softirq_irqoff();
+ 10)   0.179 us    |          _raw_spin_unlock_irqrestore();
+ 10)   1.264 us    |        }
+ 10)   3.612 us    |      }
+ 10)   3.971 us    |    }
+ 10)   0.179 us    |    __rcu_read_unlock();
+ 10) + 20.358 us   |  }
+...
+```
 
 ## 4. 小结
 
+梳理说明了本机网络通信方式：lo本地回环和`Unix Domain Socket`；介绍了容器网络基础中的`veth`并进行简单跟踪，容器网络基础的其他部分在后续篇幅继续梳理实践。
 
 ## 5. 参考
 
 * [127.0.0.1 之本机网络通信过程知多少](https://kfngxl.cn/index.php/archives/195/)
 * [本机网络IO之Unix Domain Socket与普通socket的性能对比 实验使用源码](https://kfngxl.cn/index.php/archives/211/)
+* [轻松理解 Docker 网络虚拟化基础之 veth 设备](https://kfngxl.cn/index.php/archives/415/)
