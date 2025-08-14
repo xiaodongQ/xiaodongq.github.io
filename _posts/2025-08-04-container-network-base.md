@@ -388,7 +388,7 @@ listening on veth4, link-type EN10MB (Ethernet), snapshot length 262144 bytes
 
 ### 3.4. bpftrace追踪veth接口交互
 
-`veth`的创建、发送/接收等内核源码过程，具体可见[参考链接]((https://kfngxl.cn/index.php/archives/415/))进行学习，本篇暂只跟踪下数据发送接口：`veth_xmit`。
+`veth`的创建、发送/接收等内核源码过程，具体可见[参考链接](https://kfngxl.cn/index.php/archives/415/)进行学习，本篇暂只跟踪下数据发送接口：`veth_xmit`。
 
 追踪内核正反调用栈，还是用`bpftrace`（也可用`perf record -e`+`perf report`） + `funcgraph`。可了解之前的实践用法：[追踪内核网络堆栈的几种方式](https://xiaodongq.github.io/2024/07/03/strace-kernel-network-stack/) 和 [Linux存储IO栈梳理（三） -- eBPF和ftrace跟踪IO写流程](https://xiaodongq.github.io/2024/08/15/linux-write-io-stack/)，还是得结合场景多实践内化，要不时间一长又弱化了。
 * `perf-tools`需要从 [GitHub项目主页](https://github.com/brendangregg/perf-tools) 下载使用，可以自行本地归档一份，比如我的归档：[tools/perf-tools](https://github.com/xiaodongQ/prog-playground/tree/main/tools/perf-tools)。
