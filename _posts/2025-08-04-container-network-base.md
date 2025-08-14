@@ -16,12 +16,12 @@ tags: [云原生, 容器网络]
     * [本机网络IO之Unix Domain Socket与普通socket的性能对比 实验使用源码](https://kfngxl.cn/index.php/archives/211/)
 * 容器网络
     * [轻松理解 Docker 网络虚拟化基础之 veth 设备](https://kfngxl.cn/index.php/archives/415/)
-    * [手工模拟实现 Docker 容器网络！ 配套实验源码](https://kfngxl.cn/index.php/archives/460/)
     * 命名空间
         * [彻底弄懂 Linux 网络命名空间 配套实验源码](https://kfngxl.cn/index.php/archives/443/)
     * 数据交换和路由
         * [聊聊 Linux 上软件实现的“交换机” - Bridge！ 配套实验源码](https://kfngxl.cn/index.php/archives/430/)
         * [天天讲路由，那 Linux 路由到底咋实现的！？](https://kfngxl.cn/index.php/archives/488/)
+    * [手工模拟实现 Docker 容器网络！ 配套实验源码](https://kfngxl.cn/index.php/archives/460/)
 
 ## 2. 本机网络通信方式说明
 
@@ -307,14 +307,86 @@ ip link set veth5 up
        valid_lft forever preferred_lft forever
     inet6 fe80::20af:86ff:fed7:d373/64 scope link 
        valid_lft forever preferred_lft forever
+```
 
+`ping 192.168.5.1`可看到网络是通的，不过其实数据走的是`192.168.5.1`自身对应的`lo`回环地址：
+```sh
 [root@xdlinux ➜ ~ ]$ ping 192.168.5.1
 PING 192.168.5.1 (192.168.5.1) 56(84) bytes of data.
 64 bytes from 192.168.5.1: icmp_seq=1 ttl=64 time=0.115 ms
 64 bytes from 192.168.5.1: icmp_seq=2 ttl=64 time=0.217 ms
+
+# 抓包可看到走的是lo
+[root@xdlinux ➜ ~ ]$ tcpdump -i any icmp
+listening on any, link-type LINUX_SLL2 (Linux cooked v2), snapshot length 262144 bytes
+22:46:50.444245 lo    In  IP 192.168.5.1 > 192.168.5.1: ICMP echo request, id 21, seq 1, length 64
+22:46:50.444259 lo    In  IP 192.168.5.1 > 192.168.5.1: ICMP echo reply, id 21, seq 1, length 64
 ```
 
-### 3.3. bpftrace追踪veth接口交互
+### 3.3. 实验：两个veth通信
+
+上述虽然启用了虚拟设备，但是veth之间（`veth4`和`veth5`）的网络是不通的，可`-I`指定通过`veth4`向`veth5`发送数据包查看：
+
+```sh
+# veth5：192.168.5.2； veth4：192.168.5.1，不通
+[root@xdlinux ➜ ~ ]$ ping 192.168.5.2 -I veth4
+PING 192.168.5.2 (192.168.5.2) from 192.168.5.1 veth4: 56(84) bytes of data.
+From 192.168.5.1 icmp_seq=1 Destination Host Unreachable
+
+# 抓包看veth4找不到哪个网口有192.168.5.2的MAC，ARP包并没有得到veth5的应答
+[root@xdlinux ➜ ~ ]$ tcpdump -i veth4
+listening on veth4, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+22:51:46.306207 ARP, Request who-has 192.168.5.2 tell 192.168.5.1, length 28
+22:51:47.328569 ARP, Request who-has 192.168.5.2 tell 192.168.5.1, length 28
+```
+
+涉及到网口对应的`rp_filter`**安全策略**，和 `accept_local` 内核参数：
+* `rp_filter`（`Reverse Path Filtering`，反向路径过滤）
+    * 是一个重要的内核模块，主要用于防止IP地址欺骗攻击，确保网络数据包的来源合法性。通过检查数据包的`源IP地址`是否与`接收接口的路由表`信息一致，来判断数据包是否来自“合理路径”。
+    * 三种模式：`0`（关闭模式）、`1`（严格模式，默认推荐）、`2`（松散模式）
+* `accept_local`内核参数
+    * 用于控制系统是否接受 源IP地址 为本地地址（本机已配置的IP地址）的数据包，`1`（允许）、`0`（不允许，默认值）
+    * 这一参数的设计初衷是防止本地地址被伪造，但在需要本地地址间通信的场景（如同一主机上的不同服务通过**本地IP而非`lo`回环地址**交互、容器间跨网络通信等）中，需要手动开启。
+
+当前默认参数：
+```sh
+[root@xdlinux ➜ ~ ]$ cat /proc/sys/net/ipv4/conf/all/rp_filter
+0
+[root@xdlinux ➜ ~ ]$ cat /proc/sys/net/ipv4/conf/veth4/rp_filter
+1
+[root@xdlinux ➜ ~ ]$ cat /proc/sys/net/ipv4/conf/veth5/rp_filter
+1
+[root@xdlinux ➜ ~ ]$ cat /proc/sys/net/ipv4/conf/veth4/accept_local
+0
+[root@xdlinux ➜ ~ ]$ cat /proc/sys/net/ipv4/conf/veth5/accept_local
+0
+```
+
+需要设置：
+```sh
+echo 0 > /proc/sys/net/ipv4/conf/all/rp_filter
+echo 0 > /proc/sys/net/ipv4/conf/veth4/rp_filter
+echo 0 > /proc/sys/net/ipv4/conf/veth5/rp_filter
+echo 1 > /proc/sys/net/ipv4/conf/veth4/accept_local
+echo 1 > /proc/sys/net/ipv4/conf/veth5/accept_local
+```
+
+再ping就能通了，而且走的是各自的IP，而不是回环地址：
+```sh
+# 两个veth间ping通了
+[root@xdlinux ➜ ~ ]$ ping 192.168.5.2 -I veth4
+PING 192.168.5.2 (192.168.5.2) from 192.168.5.1 veth4: 56(84) bytes of data.
+64 bytes from 192.168.5.2: icmp_seq=1 ttl=64 time=0.052 ms
+64 bytes from 192.168.5.2: icmp_seq=2 ttl=64 time=0.041 ms
+
+# 正常发送了ICMP请求和应答
+[root@xdlinux ➜ ~ ]$ tcpdump -i veth4
+listening on veth4, link-type EN10MB (Ethernet), snapshot length 262144 bytes
+23:24:32.047104 IP 192.168.5.1 > 192.168.5.2: ICMP echo request, id 27, seq 1, length 64
+23:24:33.088843 IP 192.168.5.1 > 192.168.5.2: ICMP echo request, id 27, seq 2, length 64
+```
+
+### 3.4. bpftrace追踪veth接口交互
 
 `veth`的创建、发送/接收等内核源码过程，具体可见[参考链接]((https://kfngxl.cn/index.php/archives/415/))进行学习，本篇暂只跟踪下数据发送接口：`veth_xmit`。
 
