@@ -343,7 +343,7 @@ qwen2:1.5b             	f6daf2b25194	934 MB	6 minutes ago
 
 3、下载模型
 
-**大模型下载地址**：[魔塔社区(ModelScope)](https://www.modelscope.cn/models) 或者 [Hugging Face](https://huggingface.co/)(这个要梯子)
+**大模型下载地址**：[魔搭社区(ModelScope)](https://www.modelscope.cn/models) 或者 [Hugging Face](https://huggingface.co/)(这个要梯子)
 
 **注意**：下载的时候要选`.gguf`类型而不是`model.safetensors`，才能用下述Modelfile方式加载，否则会报无法识别。搜仓库时就要区分：
 
