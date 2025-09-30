@@ -23,6 +23,7 @@ Agentic框架（Agentic Framework）不一定必须，如果只是简单的工�
 ## 3. smolagents 框架
 
 本节中使用`smolagents`库来构建AI agent，构建的agent将具备这些功能：搜索数据、执行代码、网页交互，并能学习到如何将多个agents结合起来创建一个更为强大的系统。
+* 仓库地址：[huggingface/smolagents](https://github.com/huggingface/smolagents.git)
 
 本节包含的内容简介：
 * `CodeAgents`（代码智能体），`smolagents`里主要的智能体类型，生成Python代码而不是JSON文本来执行操作（使用代码调用工作更高效）。
@@ -54,6 +55,157 @@ Agentic框架（Agentic Framework）不一定必须，如果只是简单的工�
         * 2.3 执行代码对象块，其中的任何工具调用通过函数调用工具后，继续执行后续代码
         * 2.4 将所有执行结果日志记录到 `ActionStep` 中
 
+### 3.2. demo实验
+
+目标：使用`smolagents`为派对选择播放列表。
+* 构建一个可以使用`DuckDuckGo`（一个互联网搜索引擎）来搜索网络的智能体
+
+#### 3.2.1. 安装`smolagents`框架
+
+安装：`pip install smolagents -U`
+* （MacOS上直接使用pip安装会提示“This environment is externally managed”，这里使用环境管理器创建用于项目隔离的虚拟环境以解决该问题，可了解：[通过brew安装的python无法使用pip安装第三方库](https://25pm-sumio.github.io/posts/2024/09/12/01/)）
+
+```sh
+# 创建虚拟环境
+[MacOS-xd@qxd ➜ ~ ]$ python3 -m venv ./env
+# 后续使用先加载虚拟环境： source /Users/xd/env/bin/activate
+[MacOS-xd@qxd ➜ ~ ]$ source ./env/bin/activate 
+(env) [MacOS-xd@qxd ➜ ~ ]$ 
+# pip安装 smolagents 包
+(env) [MacOS-xd@qxd ➜ ~ ]$ pip install smolagents -U
+Collecting smolagents
+  Downloading smolagents-1.22.0-py3-none-any.whl.metadata (16 kB)
+Collecting huggingface-hub>=0.31.2 (from smolagents)
+...
+Installing collected packages: urllib3, typing-extensions, tqdm, pyyaml, python-dotenv, pygments, pillow, packaging, mdurl, MarkupSafe, idna, hf-xet, fsspec, filelock, charset_normalizer, certifi, requests, markdown-it-py, jinja2, rich, huggingface-hub, smolagents
+Successfully installed MarkupSafe-3.0.3 certifi-2025.8.3 charset_normalizer-3.4.3 filelock-3.19.1 fsspec-2025.9.0 hf-xet-1.1.10 huggingface-hub-0.35.3 idna-3.10 jinja2-3.1.6 markdown-it-py-4.0.0 mdurl-0.1.2 packaging-25.0 pillow-11.3.0 pygments-2.19.2 python-dotenv-1.1.1 pyyaml-6.0.3 requests-2.32.5 rich-14.1.0 smolagents-1.22.0 tqdm-4.67.1 typing-extensions-4.15.0 urllib3-2.5.0
+```
+
+#### 3.2.2. 编写demo代码并解决依赖
+
+demo内容很简单：
+* 其中使用`InferenceClientModel`来访问模型，它提供对`Hugging Face`的无服务器推理模型API的访问（进一步了解可见：[Inference Providers](https://huggingface.co/docs/inference-providers/index)）
+
+```py
+# demo.py
+from smolagents import CodeAgent, DuckDuckGoSearchTool, InferenceClientModel
+
+agent = CodeAgent(tools=[DuckDuckGoSearchTool()], model=InferenceClientModel())
+# 为韦恩的派对寻找最佳音乐推荐
+agent.run("Search for the best music recommendations for a party at the Wayne's mansion.")
+```
+
+`python demo.py`运行，提示少`ddgs`包，pip安装即可：
+```sh
+(env) [MacOS-xd@qxd ➜ first_demo git:(main) ✗ ]$ pip install ddgs
+...
+Installing collected packages: brotli, socksio, sniffio, primp, lxml, hyperframe, hpack, h11, click, httpcore, h2, anyio, httpx, ddgs
+Successfully installed anyio-4.11.0 brotli-1.1.0 click-8.3.0 ddgs-9.6.0 h11-0.16.0 h2-4.3.0 hpack-4.1.0 httpcore-1.0.9 httpx-0.28.1 hyperframe-6.1.0 lxml-6.0.2 primp-0.15.0 sniffio-1.3.1 socksio-1.0.0
+```
+
+重新运行，报错提示需要提供一个`api_key`，或者授权登陆`Hugging Face Hub`：
+```sh
+(env) [MacOS-xd@qxd ➜ first_demo git:(main) ✗ ]$ python demo.py  
+╭───────────────────────────── New run ────────────────────────────────────────╮
+│                                                                              │
+│ Search for the best music recommendations for a party at the Wayne's ma      │
+│                                                                              │
+╰─ InferenceClientModel - Qwen/Qwen2.5-Coder-32B-Instruct ─────────────────────╯
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━Step 1━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Error in generating model output:
+You must provide an api_key to work with together API or log in with `hf auth login`.
+[Step 1: Duration 2.15 seconds]
+Traceback (most recent call last):
+...
+```
+
+新增一个`login.py`，补充登陆hub操作（只需要调一次）
+```py
+# login.py
+from huggingface_hub import login
+
+# 调用登陆接口
+login()
+```
+
+运行代码，会提示输入登陆token。如果忘记，可登陆[huggingface](https://huggingface.co/)，到“Access Tokens”中重新创建一个。
+```sh
+# 登陆
+(env) [MacOS-xd@qxd ➜ first_demo git:(main) ✗ ]$ python login.py 
+
+    _|    _|  _|    _|    _|_|_|    _|_|_|  _|_|_|  _|      _|    _|_|_|      _|_|_|_|    _|_|      _|_|_|  _|_|_|_|
+    _|    _|  _|    _|  _|        _|          _|    _|_|    _|  _|            _|        _|    _|  _|        _|
+    _|_|_|_|  _|    _|  _|  _|_|  _|  _|_|    _|    _|  _|  _|  _|  _|_|      _|_|_|    _|_|_|_|  _|        _|_|_|
+    _|    _|  _|    _|  _|    _|  _|    _|    _|    _|    _|_|  _|    _|      _|        _|    _|  _|        _|
+    _|    _|    _|_|      _|_|_|    _|_|_|  _|_|_|  _|      _|    _|_|_|      _|        _|    _|    _|_|_|  _|_|_|_|
+
+# 输入登陆token
+Enter your token (input will not be visible): 
+# 输入Y确认
+Add token as git credential? (Y/n) Y
+```
+
+#### 3.2.3. 查看运行效果
+
+运行时，输出会显示正在执行的工作流步骤的跟踪。
+
+```sh
+# 运行demo（省略部分内容）
+╭────────────────────────────────────── New run ──────────────────────────────────╮
+│                                                                                 │
+│ Search for the best music recommendations for a party at the Wayne's mansion.   │
+│                                                                                 │
+╰─ InferenceClientModel - Qwen/Qwen2.5-Coder-32B-Instruct ─────────────────────────
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Step 1 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ─ Executing parsed code: ──────────────────────────────────────────────────────────
+  search_results = web_search(query="best music for a party at Wayne's mansion")
+  print(search_results)
+ ──────────────────────────────────────────────────────────────────────────────────
+Execution logs:
+## Search Results
+
+[The 75 Best Party Songs That Will Get Everyone Dancing](https://www.gear4music.com/blog/best-party-songs/)
+May 9, 2024 · So, to keep things simple, we’ve compiled the best party songs of all time, from timeless classics to contemporary hits, giving you a diverse, 
+family-friendly playlist that guarantees to bring a great vibe to your gathering.
+...
+
+Out: None
+[Step 1: Duration 8.63 seconds| Input tokens: 2,090 | Output tokens: 81]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Step 2 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# 执行解析
+ ─ Executing parsed code: ─────────────────────────────────────────────────────────── 
+  # List of recommended songs for a party at Wayne's mansion
+  recommended_songs = [
+      "Daft Punk - One More Time",
+      "Montell Jordan - This Is How We Do It",
+      "Rob Base & DJ E-Z Rock - It Takes Two",
+      ...
+  ]
+  # Print the list of recommended songs
+  print(recommended_songs)
+ ──────────────────────────────────────────────────────────────────────────────────── 
+Execution logs:
+['Daft Punk - One More Time', 'Montell Jordan - This Is How We Do It', 'Rob Base & DJ E-Z Rock - It Takes Two', 'Billy Idol - Dancing with Myself', 'Beastie Boys - Fight 
+...
+
+Out: None
+[Step 2: Duration 18.14 seconds| Input tokens: 8,099 | Output tokens: 405]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Step 3 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ ─ Executing parsed code: ─────────────────────────────────────────────────────────── 
+  final_answer(recommended_songs)
+ ──────────────────────────────────────────────────────────────────────────────────── 
+Final answer: ['Daft Punk - One More Time', 'Montell Jordan - This Is How We Do It', 'Rob Base & DJ E-Z Rock - It Takes Two', 'Billy Idol - Dancing with Myself', 'Beastie
+Boys - Fight for Your Right', 'PSY - Gangnam Style', 'Blondie - Heart of Glass', 'Rednex - Cotton Eye Joe', 'Miley Cyrus - Party in the U. S. A.', 'Tech N9ne - Pump Up 
+the Jam', 'Uptown Funk - Mark Ronson (feat. Bruno Mars)', 'Bohemian Rhapsody - Queen', 'Dancing Queen - ABBA', 'September - Earth, Wind & Fire', 'Thriller - Michael 
+Jackson', 'Hotel California - Eagles', "Sweet Child O' Mine - Guns N' Roses", 'Stairway to Heaven - Led Zeppelin', 'Billie Jean - Michael Jackson', 'Imagine - John 
+Lennon']
+[Step 3: Duration 6.21 seconds| Input tokens: 14,977 | Output tokens: 477]
+```
+
+可看到最终agent输出了一个音乐推荐列表：`Final answer: ['Daft Punk - One More Time', ...`。
+
+
 ## 4. 小结
 
 从这篇笔记开篇到现在正好一个月，进度停了挺长时间，最近开始需要慢慢调整下节奏了。之前是基于英文来看相应教程内容，想着同时能增强下英语阅读，但也导致学习新内容得到的正反馈断断续续，打击了一些积极性。还是切换成中文来看了，官网上的中文版本表达也不错，顺畅了不少。
@@ -61,3 +213,4 @@ Agentic框架（Agentic Framework）不一定必须，如果只是简单的工�
 ## 5. 参考
 
 * [AI Agents Course -- unit2](https://huggingface.co/learn/agents-course/unit2/introduction)
+* [中文版：AI Agents Course -- unit2](https://huggingface.co/learn/agents-course/zh-CN/unit2/introduction)
