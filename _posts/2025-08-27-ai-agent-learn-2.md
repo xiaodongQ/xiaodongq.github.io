@@ -33,10 +33,59 @@ Agentic框架（Agentic Framework）不一定必须，如果只是简单的工�
     * 它们利用向量存储（`vector stores`）进行高效检索，并实现 **检索增强生成（`Retrieval-Augmented Generation，RAG`）** 模式。
     * 这些智能体特别适用于将网络搜索与自定义知识库集成，同时通过记忆系统维持对话上下文。
 * 工具
-    * 在 `smolagents` 中，工具是使用 `@tool`装饰器（`decorator`） 包装`Python函数`或`Tool类`定义的
+    * 在 `smolagents` 中，工具是使用 `@tool`装饰器（`decorator`）包装`Python函数` 或 `Tool类`定义的
 * 多智能体系统
 * 视觉和浏览器智能体
     * 视觉智能体（`Vision agents`）通过整合 **视觉-语言模型（`Vision-Language Models，VLM`）** 扩展了传统智能体的能力，使其能够处理和解释视觉信息。
+
+两种方式定义工具示例：
+* 方式1:`@tool`装饰器方式需要定义包含以下要素的函数：
+    * 明确描述性的函数名称：帮助LLM理解其用途
+    * 输入输出的类型提示：确保正确使用
+    * 详细描述：包含明确描述各参数的Args:部分，这些描述为 LLM 提供关键上下文信息
+```py
+@tool
+def catering_service_tool(query: str) -> str:
+    """
+    This tool returns the highest-rated catering service in Gotham City.
+    
+    Args:
+        query: A search term for finding catering services.
+    """
+    ...
+
+agent = CodeAgent(tools=[catering_service_tool], model=InferenceClientModel())
+```
+
+* 方式2：通过Python类定义工具（创建`Tool`的子类）。对于复杂工具，可以通过类封装函数及其元数据来帮助LLM理解使用方式，类中需要定义：
+    * name: 工具名称
+    * description: 用于构建智能体系统提示的描述
+    * inputs: 包含type和description的字典，帮助Python解释器处理输入
+    * output_type: 指定期望的输出类型
+    * forward: 包含执行逻辑的方法
+```py
+class SuperheroPartyThemeTool(Tool):
+    name = "superhero_party_theme_generator"
+    description = """ This tool suggests creative superhero-themed party ideas based on a category.xxx """
+    inputs = {
+        "category": {
+            "type": "string",
+            "description": "The type of superhero party (e.g., 'classic heroes',xxx",
+        }
+    }
+    output_type = "string"
+
+    def forward(self, category: str):
+        themes = {
+            "classic heroes": "Justice League Gala: Guests come dressed as their favorite DC heroes.",
+            "villain masquerade": "Gotham Rogues' Ball: A mysterious masquerade where xxx.",
+        }
+        return themes.get(category.lower(), "Themed party idea not found. Try 'classic heroes', 'villain' xxx")
+
+# 实例化工具
+party_theme_tool = SuperheroPartyThemeTool()
+agent = CodeAgent(tools=[party_theme_tool], model=InferenceClientModel())
+```
 
 ### 3.1. 构建使用代码的智能体
 
