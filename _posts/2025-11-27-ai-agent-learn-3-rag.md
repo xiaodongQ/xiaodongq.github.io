@@ -7,7 +7,7 @@ tags: [AI, LLM, RAG]
 
 ## 1. 引言
 
-本篇介绍 **检索增强生成（`Retrieval-Augmented Generation，RAG`）系统**。
+本篇学习介绍 **检索增强生成（`Retrieval-Augmented Generation，RAG`）系统**。
 
 `RAG`结合了数据检索和生成模型的能力，以提供上下文感知的响应：
 * 1、根据用户查询（利用搜索引擎、LLM）检索到结果
