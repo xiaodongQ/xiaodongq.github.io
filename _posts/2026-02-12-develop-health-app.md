@@ -37,10 +37,10 @@ tags: [AI, Vibe Coding]
 
 相关技术栈说明：
 * Go实现后端，Gin提供Web框架
-* SQLite，简化操作
+* 数据库使用SQLite，简化环境依赖和操作
 * 页面基于简单HTML+JS+CSS，暂不引入前端框架
 
-经过几轮提示和修改，代码层次如下：
+经过几轮提示和修改，代码层次如下（代码可见：[health_app](https://github.com/xiaodongQ/health_app)）：
 
 ```sh
 [MacOS-xd@qxd ➜ health_app git:(main) ✗ ]$ tree
@@ -50,7 +50,6 @@ tags: [AI, Vibe Coding]
 │   └── config.go
 ├── go.mod
 ├── go.sum
-├── health_app
 ├── health_app.db
 ├── internal
 │   ├── api
@@ -72,8 +71,6 @@ tags: [AI, Vibe Coding]
 ├── main.go
 └── web
     └── index.html
-
-7 directories, 20 files
 ```
 
 ### 2.3. 程序效果
@@ -88,6 +85,8 @@ tags: [AI, Vibe Coding]
 ![趋势图表](/images/2026-02-12_health_app_chart.png)
 
 ## 3. 集成微信小程序
+
+
 
 ## 4. 小结
 
