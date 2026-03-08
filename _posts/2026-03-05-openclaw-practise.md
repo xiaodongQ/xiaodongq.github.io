@@ -1,13 +1,13 @@
 ---
-title: AI能力集 -- Open Claude实战手记
-description: Open Claude实战手记，持续更新实践和技巧
+title: AI能力集 -- OpenClaw实战手记
+description: OpenClaw实战手记，持续更新实践和技巧
 categories: [AI, AI能力集]
-tags: [AI, Open Claude]
+tags: [AI, OpenClaw]
 ---
 
 ## 1. 引言
 
-Open Claude实战手记，持续更新实践和技巧。
+OpenClaw实战手记，持续更新实践和技巧。
 
 几个不错的参考链接：
 * 玩转OpenClaw：[一本书玩转 OpenClaw](https://awesome.tryopenclaw.asia/)
