@@ -97,16 +97,24 @@ Slash commands:
 
 2、有问题可以使用 doctor 命令修复配置并重启：`openclaw doctor --fix` （善用doctor）
 
-## 4. 必备配置
+## 4. 建议配置
 
 ### 4.1. 配置Skills
 
-优先配置 `网页搜索`：官方推荐`Brave Search`，配置方式：
-* 步骤 1: 获取 API Key
-  * 访问 Brave Search API 官网 `https://brave.com/search/api/` 注册账号,~~免费计划每月提供 2000 次搜索请求~~（貌似取消免费模式了）。
-* 步骤 2: 配置 OpenClaw
-  * 运行配置向导进行交互式设置:`openclaw configure --section web`
-  * 向导会提示你输入 Brave Search API Key,配置完成后会自动保存到 tools.web.search.apiKey
+找了几篇文章学习经验，一开始不用配置太多Skills，配置基本的几个Skills
+* 初步安装的Skills（优先配置`网页搜索`技能）
+  * `tavily-search`，实时检索+结构化输出，AI 原生优化的搜索工具
+    * 官方推荐`Brave Search`，不过貌似使用时要梯子，而且现在要绑VISA卡
+  * `exa-web-search-free`，全网检索：实时网络搜索、信息聚合、冷门知识挖掘
+  * `multi-search-engine`，元搜索：并行调用多引擎、结果交叉验证、准确率排序
+  * `mcporter-1-0-0`，内容生成：结构化文本生成、特定领域模板填充
+  * `local-rag-search`，私有知识库，本地文档检索、RAG (检索增强生成)
+  * `first-principles-decomposer`，思维建模：第一性原理拆解、复杂问题结构化分析
+* 参考的几篇文章
+  * [openclaw 新装好，真正值得先装的 10 个 skills，我帮你筛好了](https://mp.weixin.qq.com/s/wFDitFGJUkvklRB2VDbWEw)
+  * [OpenClaw 深度使用指南：普通人如何释放 AI Agent 的真正价值](https://mp.weixin.qq.com/s/nbaAYtHFoIxGHigYIkKdow)
+  * [这些Skills让OpenClaw把搜索做到极致](https://mp.weixin.qq.com/s/88N4aaOe9__gguQ9wvg4JQ)
+  * [安装了72个Skills后，我的OpenClaw无所不能](https://mp.weixin.qq.com/s/VjtLUWo32Huh7Zaa8EIgrA)
 
 ### 4.2. 人设配置
 
