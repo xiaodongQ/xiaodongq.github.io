@@ -22,6 +22,9 @@ tags: [AI, OpenClaw, Multi-Agent, 自动化]
 
 详细架构图和说明请参考：[一人团队 Multi-Agent 系统设计](https://github.com/xiaodongQ/ai-playground/blob/main/design/一人团队-Multi-Agent-系统设计.md)
 
+![一人团队 Multi-Agent 系统架构图](/images/2026-03-09-multi-agent-architecture.png)
+*图 1：一人团队 Multi-Agent 系统架构 - 用户通过小黑 - 管家与 4 个专业 Agent 交互*
+
 **核心设计**：
 ```
 用户 → 小黑 - 管家（路由）
