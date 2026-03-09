@@ -14,176 +14,39 @@ tags: [AI, OpenClaw, Multi-Agent, 自动化]
 
 ---
 
-## 3. 系统架构设计
+## 2. 系统架构
 
-### 3.1 整体架构
+### 2.1 整体架构
 
+详细架构图和说明请参考：[一人团队 Multi-Agent 系统设计](https://github.com/xiaodongQ/ai-playground/blob/main/design/一人团队-Multi-Agent-系统设计.md)
+
+**核心设计**：
 ```
-┌─────────────────────────────────────────────────────────┐
-│                     用户接口层                           │
-│              (Feishu Bot / Web UI / CLI)                │
-└─────────────────────┬───────────────────────────────────┘
-                      │
-┌─────────────────────▼───────────────────────────────────┐
-│              小黑 - 管家 (路由协调 Agent)                  │
-│         意图识别 → 路由决策 → 会话编排 → 记忆管理         │
-└─────┬─────────────┬─────────────┬─────────────┬─────────┘
-      │             │             │             │
-┌─────▼─────┐ ┌────▼─────┐ ┌────▼─────┐ ┌────▼─────┐
-│Dev·技术匠 │ │Edu·伴学堂│ │Wri·执笔人│ │Fin·财多多│
-│  🔧       │ │  📚      │ │  ✍️      │ │  💰      │
-│ 代码/架构  │ │ 学习/研究 │ │ 写作/博客 │ │ 理财/投资 │
-└───────────┘ └──────────┘ └──────────┘ └──────────┘
-      │             │             │             │
-┌─────▼─────────────▼─────────────▼─────────────▼─────┐
-│                  共享基础设施                          │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐          │
-│  │ MEMORY.md│  │ 工作流记录│  │ 规则中心  │          │
-│  │ 全局记忆  │  │ workflow │  │ RULES.md │          │
-│  └──────────┘  └──────────┘  └──────────┘          │
-└─────────────────────────────────────────────────────┘
+用户 → 小黑 - 管家（路由）
+        │
+        ├─→ Dev·技术匠（编程、架构）
+        ├─→ Edu·伴学堂（学习、研究）
+        ├─→ Wri·执笔人（写作、博客）
+        └─→ Fin·财多多（理财、投资）
 ```
 
-### 3.2 Agent 角色设计
+### 2.2 Agent 角色
 
-#### 小黑 - 管家 🖤（Main Agent）
+| Agent | 职责 | 触发关键词 |
+|------|------|-----------|
+| **小黑 - 管家** | 意图识别、路由编排、全局记忆 | 通用对话、闲聊、简单查询 |
+| **Dev·技术匠** | 编程、架构、代码审查 | 代码、Bug、架构、API、数据库 |
+| **Edu·伴学堂** | 学习辅导、概念讲解 | 学习、研究、教程、概念、入门 |
+| **Wri·执笔人** | 写作、润色、博客创作 | 写博客、文章、润色、写作 |
+| **Fin·财多多** | 理财建议、投资分析 | 理财、投资、股票、基金、预算 |
 
-**定位**：团队协调者，用户的日常对话伙伴
-
-**职责**：
-- 意图识别和路由（分析用户需求，分派给专业 Agent）
-- 多 Agent 协作编排（串行/并行调度）
-- 全局记忆管理（存储用户偏好、项目背景）
-- 权限控制和日志记录
-
-**触发场景**：
-- 通用知识问答
-- 日常闲聊
-- 需要多 Agent 协作的复杂任务
-
-**配置文件**：
-```json
-{
-  "id": "main",
-  "workspace": "/root/.openclaw/workspace",
-  "SOUL.md": "理性、周到、贴心、善于倾听"
-}
-```
+**详细配置**：参见 [一人团队配置文件归档](https://github.com/xiaodongQ/ai-playground/tree/main/design/一人团队配置文件归档)
 
 ---
 
-#### Dev·技术匠 🔧（Dev Agent）
+## 3. 路由机制
 
-**定位**：资深程序员，代码艺术家
-
-**职责**：
-- 架构设计和代码编写
-- 代码审查和重构建议
-- 调试和技术文档编写
-- 调用 Claude Code 执行代码
-
-**触发关键词**：
-```
-编程、代码、Bug、架构、算法、重构、调试、函数、API、数据库、Git、测试
-```
-
-**配置文件**：
-```json
-{
-  "id": "dev-agent",
-  "workspace": "/root/.openclaw/workspace-dev-agent",
-  "SOUL.md": "严谨、追求极致、优雅、乐于分享"
-}
-```
-
----
-
-#### Edu·伴学堂 📚（Research Agent）
-
-**定位**：耐心博学的私人学习导师
-
-**职责**：
-- 知识调研和概念讲解
-- 学习计划制定
-- 资料整理和答疑解惑
-
-**触发关键词**：
-```
-学习、研究、教程、概念、入门、原理、学习路线、怎么学、什么是、解释
-```
-
-**配置文件**：
-```json
-{
-  "id": "research-agent",
-  "workspace": "/root/.openclaw/workspace-research-agent",
-  "SOUL.md": "耐心、博学、善于拆解、鼓励探索"
-}
-```
-
----
-
-#### Wri·执笔人 ✍️（Writer Agent）
-
-**定位**：文思敏捷的文字创作者
-
-**职责**：
-- 博客/文章撰写
-- 内容润色和优化
-- 提纲生成和多语言写作
-
-**触发关键词**：
-```
-写博客、文章、润色、写作、文案、发布、大纲、翻译、改写、优化
-```
-
-**特殊规则**：
-- ⚠️ 所有博客提交前必须经过用户评审
-- ❌ 不得直接执行 `git push`
-
-**配置文件**：
-```json
-{
-  "id": "writer-agent",
-  "workspace": "/root/.openclaw/workspace-writer-agent",
-  "SOUL.md": "文思敏捷、生动有趣、注重逻辑、善于倾听"
-}
-```
-
----
-
-#### Fin·财多多 💰（Finance Agent）
-
-**定位**：精明谨慎的私人理财顾问
-
-**职责**：
-- 理财建议和预算规划
-- 投资分析和风险评估
-- 财务知识普及
-
-**触发关键词**：
-```
-理财、投资、股票、基金、预算、省钱、财务、收益、风险、定投、资产配置
-```
-
-**隐私保护**：
-- 敏感财务数据仅存储于本地记忆
-- 不写入共享记忆
-
-**配置文件**：
-```json
-{
-  "id": "finance-agent",
-  "workspace": "/root/.openclaw/workspace-finance-agent",
-  "SOUL.md": "精明谨慎、以数据说话、注重隐私、理性分析"
-}
-```
-
----
-
-### 3.3 路由机制设计
-
-#### 路由决策树
+### 3.1 路由决策树
 
 ```
 用户输入
@@ -199,78 +62,48 @@ tags: [AI, OpenClaw, Multi-Agent, 自动化]
    └─ 混合需求？ → 小黑启动协作流程（串行/并行调度）
 ```
 
-#### 关键词匹配规则
+### 3.2 群聊消息归属规则
 
-以 Dev·技术匠为例：
+**优先级**：
+1. 有 @ → 回复指定的人
+2. 有引用 → 回复引用的消息
+3. 无@无引用 → 智能判断话题连续性
+4. 不确定 → 提示用户确认
 
-```python
-DEV_KEYWORDS = [
-    "代码", "编程", "Bug", "调试", "重构", "架构", "算法",
-    "函数", "接口", "API", "数据库", "SQL", "Git", "测试",
-    "部署", "CI/CD", "Docker", "前端", "后端", "DevOps"
-]
+**实现脚本**：`/root/.openclaw/scripts/message-router.mjs`
 
-def match_dev_agent(user_input):
-    count = sum(1 for keyword in DEV_KEYWORDS if keyword in user_input)
-    return count >= 2  # 至少 2 个关键词命中
-```
-
-#### LLM 意图识别
-
-当关键词匹配失败或冲突时，调用 LLM 进行意图分类：
-
-```python
-intent_prompt = """
-请分析用户意图，将其分类到以下类别之一：
-
-类别：
-- GENERAL: 通用对话、闲聊、简单查询
-- DEV: 编程、代码、技术实现
-- EDU: 学习、概念理解、知识调研
-- WRI: 写作、润色、内容创作
-- FIN: 理财、投资、财务规划
-
-用户输入：{user_input}
-
-只返回类别代码，不要解释。
-"""
-```
+**详细说明**：[ROUTING.md](https://github.com/xiaodongQ/ai-playground/blob/main/design/一人团队配置文件归档/小黑 - 管家/ROUTING.md)
 
 ---
 
-### 3.4 协作流程设计
+## 4. 全局规则
 
-#### 串行协作
+全局规则由 AI 自动编写和维护，位于 `~/.openclaw/workspace/RULES.md`：
 
-适用于有依赖关系的任务：
+```markdown
+# 全局规则配置中心
 
-```
-用户 → 小黑 → Edu → 小黑 → Dev → 小黑 → Wri → 小黑 → 用户
-```
+| 规则 ID | 名称 | 优先级 | 适用 Agent |
+|--------|------|--------|-----------|
+| RULE-001 | 博客发布评审流程 | P0（强制） | Wri·执笔人、小黑 - 管家 |
+| RULE-002 | 群聊消息归属混合模式 | P0（强制） | 所有 Agent |
+| RULE-003 | 多 Agent 协作工作流记录 | P1（重要） | 小黑 - 管家 |
+| RULE-004 | 搜索工具优先级策略 | P1（重要） | 所有 Agent |
+| RULE-005 | 挑战式交互原则 | P2（建议） | 所有 Agent |
 
-**案例**：技术博客写作
-1. Edu·伴学堂 → 生成概念笔记
-2. Dev·技术匠 → 基于笔记编写示例代码
-3. Wri·执笔人 → 整合成文
-
-#### 并行协作
-
-适用于独立任务：
-
-```
-用户 → 小黑 → ┬ → Edu → ┐
-              ├ → Dev → ├ → 小黑 → 用户
-              └ → Wri → ┘
+**违规处理**:
+- P0 违规：立即停止，向用户报告
+- P1 违规：记录日志，事后报告
+- P2 违规：参考执行
 ```
 
-**案例**：多维度调研
-- 同时调研技术、市场、财务信息
+**完整规则**：[RULES.md](https://github.com/xiaodongQ/ai-playground/blob/main/design/一人团队配置文件归档/小黑 - 管家/RULES.md)
 
 ---
 
-### 3.5 记忆系统设计
+## 5. 记忆系统
 
-#### 记忆分类
+### 5.1 记忆分类
 
 | 类型 | 存储位置 | 内容 | 访问权限 |
 |------|---------|------|---------|
@@ -278,39 +111,23 @@ intent_prompt = """
 | **专业记忆** | `workspace-{agent}/memory/` | 领域特定偏好、项目进度 | 仅对应 Agent 可读写 |
 | **会话记忆** | `sessions/` | 当前对话历史 | 仅对应 Agent 可访问 |
 
-#### 记忆共享流程
+### 5.2 记忆共享流程
 
 ```
 子 Agent → 发现重要信息 → 通知小黑 → 小黑确认 → 写入 MEMORY.md
 ```
 
-#### 隐私保护
-
-| 信息类型 | 存储位置 | 访问权限 |
-|---------|---------|---------|
-| 财务数据 | Fin 独立记忆 | 仅 Fin + 小黑 |
-| 代码/项目 | Dev 独立记忆 | Dev + 小黑 |
-| 学习笔记 | Edu 独立记忆 | Edu + 小黑 |
-| 文章内容 | Wri 独立记忆 | Wri + 小黑 |
-| 用户基本信息 | MEMORY.md | 全部 Agent |
+**详细说明**：[MEMORY-SHARING.md](https://github.com/xiaodongQ/ai-playground/blob/main/design/一人团队配置文件归档/小黑 - 管家/MEMORY-SHARING.md)
 
 ---
 
-## 4. 搭建步骤
+## 6. 搭建步骤
 
-### 4.1 设计 Agent 角色
+### 6.1 设计 Agent 角色
 
-首先设计 5 个 Agent 的角色和职责：
+首先设计 5 个 Agent 的角色和职责（见第 2 节表格）。
 
-| Agent | 职责 | 触发关键词 |
-|------|------|-----------|
-| **小黑 - 管家** | 意图识别、路由编排、全局记忆 | 通用对话、闲聊、简单查询 |
-| **Dev·技术匠** | 编程、架构、代码审查 | 代码、Bug、架构、API、数据库 |
-| **Edu·伴学堂** | 学习辅导、概念讲解 | 学习、研究、教程、概念、入门 |
-| **Wri·执笔人** | 写作、润色、博客创作 | 写博客、文章、润色、写作 |
-| **Fin·财多多** | 理财建议、投资分析 | 理财、投资、股票、基金、预算 |
-
-### 4.2 创建 Agent
+### 6.2 创建 Agent
 
 设计好方案后，手动创建 Agent 工作区，剩下就让 OpenClaw 自己修改人设文件了。
 
@@ -332,7 +149,7 @@ cp -r ~/.openclaw/workspace/* ~/.openclaw/workspace-dev-agent/
 # OpenClaw 会根据对话自动优化这些人设文件
 ```
 
-### 4.3 配置飞书通道
+### 6.3 配置飞书通道
 
 参考：[OpenClaw 实战手记 - 飞书通道配置](https://xiaodongq.github.io/2026/03/05/openclaw-practise/#23-飞书通道配置)
 
@@ -343,34 +160,17 @@ cp -r ~/.openclaw/workspace/* ~/.openclaw/workspace-dev-agent/
 4. 配置 `allowFrom` 和 `groupAllowFrom`
 5. 重启网关：`openclaw gateway restart`
 
-### 4.4 全局规则配置
+### 6.4 配置路由规则
 
-全局规则由 AI 自动编写和维护，位于 `~/.openclaw/workspace/RULES.md`：
+路由规则由 AI 自动编写，位于 `~/.openclaw/workspace/ROUTING.md`。
 
-```markdown
-# 全局规则配置中心
-
-| 规则 ID | 名称 | 优先级 | 适用 Agent |
-|--------|------|--------|-----------|
-| RULE-001 | 博客发布评审流程 | P0（强制） | Wri·执笔人、小黑 - 管家 |
-| RULE-002 | 群聊消息归属混合模式 | P0（强制） | 所有 Agent |
-| RULE-003 | 多 Agent 协作工作流记录 | P1（重要） | 小黑 - 管家 |
-| RULE-004 | 搜索工具优先级策略 | P1（重要） | 所有 Agent |
-| RULE-005 | 挑战式交互原则 | P2（建议） | 所有 Agent |
-
-**违规处理**:
-- P0 违规：立即停止，向用户报告
-- P1 违规：记录日志，事后报告
-- P2 违规：参考执行
-```
-
-**规则详情**：参见 [RULES.md](https://github.com/xiaodongQ/ai-playground/blob/main/design/一人团队-Multi-Agent-系统设计.md#七全局规则)
+**完整内容**：[ROUTING.md](https://github.com/xiaodongQ/ai-playground/blob/main/design/一人团队配置文件归档/小黑 - 管家/ROUTING.md)
 
 ---
 
-## 5. 验证和测试
+## 7. 验证和测试
 
-### 5.1 基础通信测试
+### 7.1 基础通信测试
 
 **测试命令**：
 ```bash
@@ -381,7 +181,7 @@ cp -r ~/.openclaw/workspace/* ~/.openclaw/workspace-dev-agent/
 "✅ 测试成功！小黑 - 管家在线待命"
 ```
 
-### 5.2 路由功能测试
+### 7.2 路由功能测试
 
 **测试 Dev·技术匠**：
 ```
@@ -401,7 +201,7 @@ cp -r ~/.openclaw/workspace/* ~/.openclaw/workspace-dev-agent/
 → 应路由到 Wri·执笔人
 ```
 
-### 5.3 多 Agent 协作测试
+### 7.3 多 Agent 协作测试
 
 **测试命令**：
 ```
@@ -416,63 +216,7 @@ cp -r ~/.openclaw/workspace/* ~/.openclaw/workspace-dev-agent/
 
 ---
 
-## 6. 性能优化
-
-### 6.1 响应时间优化
-
-**问题**：多 Agent 串行执行耗时较长
-
-**解决方案**：
-1. 并行执行独立任务
-2. 使用缓存（`cache=True`）
-3. 减少不必要的 Agent 调用
-
-**示例**：
-```python
-# 并行执行
-task1 = Task(..., async_execution=True)
-task2 = Task(..., async_execution=True)
-
-# 启用缓存
-crew = Crew(..., cache=True)
-```
-
-### 6.2 成本控制
-
-**LLM API 费用优化**：
-1. 使用便宜的模型进行简单任务
-2. 减少 `max_iter` 参数
-3. 简化任务描述
-
-**示例**：
-```python
-# 简单任务用便宜模型
-agent = Agent(
-    ...,
-    llm="gpt-3.5-turbo",  # 便宜
-    max_iter=3  # 减少迭代
-)
-
-# 复杂任务用高级模型
-agent = Agent(
-    ...,
-    llm="claude-sonnet-4-6",  # 贵但质量好
-    max_iter=5
-)
-```
-
-### 6.3 记忆管理
-
-**问题**：记忆文件过大影响性能
-
-**解决方案**：
-1. 定期清理过期记忆
-2. 压缩历史对话
-3. 使用数据库存储（如 SQLite）
-
----
-
-## 7. 常见问题
+## 8. 常见问题
 
 ### Q1: Agent 无响应？
 
@@ -514,38 +258,14 @@ tail -f ~/.openclaw/logs/*.log
 
 ---
 
-## 8. 总结
+## 9. 参考链接
 
-本文介绍了基于 OpenClaw 搭建一人团队 Multi-Agent 系统的完整设计和实现过程：
+### 设计文档
+- [一人团队设计文档](https://github.com/xiaodongQ/ai-playground/blob/main/design/一人团队设计.md)
+- [一人团队 Multi-Agent 系统设计](https://github.com/xiaodongQ/ai-playground/blob/main/design/一人团队-Multi-Agent-系统设计.md)
+- [一人团队配置文件归档](https://github.com/xiaodongQ/ai-playground/tree/main/design/一人团队配置文件归档)
 
-**核心要点**：
-1. **专业化分工** - 5 个 Agent 各司其职
-2. **智能路由** - 关键词 + LLM 意图识别
-3. **协作编排** - 串行/并行流程
-4. **记忆系统** - 全局 + 专业 + 会话三层设计
-5. **规则中心** - 统一管理和约束
-
-**实际效果**：
-- 学习效率提升 50%（框架调研）
-- 开发效率提升 33%（Demo 开发）
-- 写作效率提升 50%（文档撰写）
-- 总体效率提升 44%
-
-**下一步**：
-- 阅读下一篇：《OpenClaw 一人团队实战：从日常对话到自动化内容创作》
-- 查看完整代码：[ai-playground 仓库](https://github.com/xiaodongQ/ai-playground)
-
----
-
-## 参考链接
-
-- [OpenClaw 实战手记](https://xiaodongq.github.io/2026/03/05/openclaw-practise/)
+### 实战文档
+- [OpenClaw 实战手记](https://xiaodongq.github.io/2026/03/05/openclaw-practise.html)
 - [OpenClaw 进阶搭建一人团队](https://xiaodongq.github.io/2026/03/05/openclaw-practise/#5-进阶搭建一人团队)
-- [一人团队设计文档](https://github.com/xiaodongQ/ai-playground/blob/main/design/一人团队-Multi-Agent-系统设计.md)
 - [CrewAI + LangChain 学习材料包](https://github.com/xiaodongQ/ai-playground/tree/main/learning/crewai-langchain)
-
----
-
-**本文状态**: ⏳ 待评审  
-**创建时间**: 2026-03-09  
-**作者**: 小黑 - 管家 🖤
