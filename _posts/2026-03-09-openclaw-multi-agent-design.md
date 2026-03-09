@@ -10,7 +10,9 @@ tags: [AI, OpenClaw, Multi-Agent, 自动化]
 
 本文介绍基于 OpenClaw 框架搭建的**一人团队 Multi-Agent 系统**，通过 5 个专业 Agent 协作，实现自动化处理。
 
-**说明**：本文是 AI 基于 2026-03-09 的聊天记录自动生成的博客文章。
+**说明**：
+1. 本文是 AI 基于 2026-03-09 的聊天记录自动生成的博客文章
+2. 由于是 AI 生成，部分内容可能存在不准确，具体实操请参考：[OpenClaw 实战手记 - 进阶搭建一人团队](https://xiaodongq.github.io/2026/03/05/openclaw-practise/#5-进阶搭建一人团队)
 
 ---
 
@@ -41,6 +43,8 @@ tags: [AI, OpenClaw, Multi-Agent, 自动化]
 | **Fin·财多多** | 理财建议、投资分析 | 理财、投资、股票、基金、预算 |
 
 **详细配置**：参见 [一人团队配置文件归档](https://github.com/xiaodongQ/ai-playground/tree/main/design/一人团队配置文件归档)
+
+**实操步骤**：详见 [OpenClaw 实战手记 - 进阶搭建一人团队](https://xiaodongq.github.io/2026/03/05/openclaw-practise/#5-进阶搭建一人团队)
 
 ---
 
@@ -131,7 +135,7 @@ tags: [AI, OpenClaw, Multi-Agent, 自动化]
 
 设计好方案后，手动创建 Agent 工作区，剩下就让 OpenClaw 自己修改人设文件了。
 
-参考：[OpenClaw 实战手记 - 进阶搭建一人团队](https://xiaodongq.github.io/2026/03/05/openclaw-practise/#5-进阶搭建一人团队)
+**实操步骤**：详见 [OpenClaw 实战手记 - 进阶搭建一人团队](https://xiaodongq.github.io/2026/03/05/openclaw-practise/#5-进阶搭建一人团队)
 
 **基本步骤**：
 ```bash
@@ -267,5 +271,9 @@ tail -f ~/.openclaw/logs/*.log
 
 ### 实战文档
 - [OpenClaw 实战手记](https://xiaodongq.github.io/2026/03/05/openclaw-practise.html)
-- [OpenClaw 进阶搭建一人团队](https://xiaodongq.github.io/2026/03/05/openclaw-practise/#5-进阶搭建一人团队)
+- [OpenClaw 进阶搭建一人团队](https://xiaodongq.github.io/2026/03/05/openclaw-practise/#5-进阶搭建一人团队) ⭐ **重点参考**
 - [CrewAI + LangChain 学习材料包](https://github.com/xiaodongQ/ai-playground/tree/main/learning/crewai-langchain)
+
+---
+
+**说明**：本文是 AI 基于聊天记录自动生成的博客文章，由于是 AI 生成，部分内容可能存在不准确，具体实操请重点参考 [OpenClaw 实战手记 - 进阶搭建一人团队](https://xiaodongq.github.io/2026/03/05/openclaw-practise/#5-进阶搭建一人团队)。
