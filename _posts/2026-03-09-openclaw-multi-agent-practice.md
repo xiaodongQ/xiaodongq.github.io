@@ -16,6 +16,10 @@ tags: [AI, OpenClaw, Multi-Agent, 实战案例]
 ![飞书群聊中的 5 个 Agent 机器人](/images/2026-03-09-feishu-agents-list.png)
 *图 1：飞书群聊配置 - 小黑 - 管家 + 4 个专业 Agent（Dev·技术匠、Edu·伴学堂、Wri·执笔人、Fin·财多多）*
 
+**实际使用场景**：
+![用户通过飞书向小黑 - 管家下发任务](/images/2026-03-09-feishu-user-request.png)
+*图 2：实际使用场景 - 用户通过飞书群聊@小黑 - 管家，请求处理博客仓库和图片优化任务*
+
 **今日应用场景**：
 1. 日常对话：图片压缩、GitHub 趋势爬取
 2. 学习任务：Python Agent 框架推荐
@@ -771,7 +775,7 @@ git diff /root/.openclaw/scripts/message-router.mjs
 
 **实际对话截图**：
 ![AI 自动生成博客的对话过程](/images/2026-03-09-feishu-dialog.png)
-*图 2：AI 自动生成博客的对话过程 - 用户下发命令，AI 自动修改并提交*
+*图 3：AI 自动生成博客的对话过程 - 用户下发命令，AI 自动修改并提交*
 
 ---
 
