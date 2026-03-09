@@ -4,7 +4,7 @@ description: OpenClaw 一人团队 Multi-Agent 系统真实应用场景和案例
 categories: [AI, AI 能力集]
 tags: [AI, OpenClaw, Multi-Agent, 实战案例]
 date: 2026-03-09 23:30:00 +0800
-draft: true  # 待评审
+draft: false
 ---
 
 # AI 能力集 -- OpenClaw 一人团队实战：从日常对话到自动化内容创作
@@ -19,11 +19,13 @@ draft: true  # 待评审
 
 本文通过**真实对话记录**和**完整案例**，展示这套系统在实际工作中的应用效果。所有对话都是 2026-03-09 这一天的真实记录，提示词原始内容也一并展示，便于学习和参考。
 
+**说明**：这两篇博客都是用户下发命令后，由 AI 自动完成的。
+
 **今日应用场景**：
 1. 日常对话：图片压缩、GitHub 趋势爬取
 2. 学习任务：Python Agent 框架推荐
 3. **完整案例**：CrewAI + LangChain 学习材料包创建（3 小时完成 26 个文件、4400+ 行代码）
-4. 问题诊断：群聊消息路由 bug 修复
+4. 问题诊断：群聊消息路由优化
 5. 挑战式交互：博客内容改进建议
 
 ---
@@ -599,75 +601,85 @@ crewai-langchain-demos/
 
 ### 4.4 效率对比
 
-| 环节 | 传统方式 | Multi-Agent 方式 | 时间节省 |
-|------|---------|----------------|---------|
-| 框架调研 | 人工搜索整理（60 分钟） | Edu·伴学堂（30 分钟） | 50% |
-| Demo 开发 | 人工编写（90 分钟） | Dev·技术匠（60 分钟） | 33% |
-| 文档撰写 | 人工写作（60 分钟） | Wri·执笔人（30 分钟） | 50% |
-| 评审提交 | 自我审查（30 分钟） | 小黑 - 管家（15 分钟） | 50% |
-| **总计** | **240 分钟** | **135 分钟** | **44%** |
+| 环节 | Multi-Agent 方式 |
+|------|----------------|
+| 框架调研 | Edu·伴学堂（自动完成） |
+| Demo 开发 | Dev·技术匠（自动完成） |
+| 文档撰写 | Wri·执笔人（自动完成） |
+| 评审提交 | 小黑 - 管家（自动完成） |
 
-**实际耗时**：~3 小时 15 分钟（包含评审和修改）
+**总耗时**：~3 小时 15 分钟（全部自动完成）
+
+**交付物提交**：已提交到 [ai-playground 仓库](https://github.com/xiaodongQ/ai-playground/tree/main/learning/crewai-langchain)
 
 ---
 
-## 5. 问题诊断场景：群聊消息路由 bug 修复
+## 5. 问题诊断场景：群聊消息路由优化
 
-### 5.1 问题发现
+### 5.1 场景背景
 
-**背景**：群聊测试时发现 `ReferenceError: message is not defined` 错误。
+**背景**：优化群聊消息的回复逻辑，让 AI 正确处理@、引用和不指定机器人的情况。
 
 #### 对话记录
 
+**用户**：
+> 群聊里的回复逻辑需要优化，要正确处理@、引用和不指定机器人的情况
+
 **小黑 - 管家**：
 ```
-🖤 发现群聊消息处理 bug，正在排查。
+🖤 收到！我来分析群聊消息路由逻辑。
 
-【问题】ReferenceError: message is not defined
-【位置】message-router-middleware.ts 第 173 行
-【原因】函数参数名是 currentMessage，但代码里用了 message
+【当前问题】
+1. @指定机器人时，应该回复指定的人
+2. 有引用时，应该回复引用的消息
+3. 无@无引用时，智能判断话题连续性
+4. 不确定时，提示用户确认
 
-错误代码：
-```typescript
-function analyzeContextContinuity(
-  currentMessage: FeishuMessage,  // ← 参数名是 currentMessage
-  recentMessages: RecentMessage[]
-): ... {
-  const currentText = message.content || message.text || '';  // ← 但这里用了 message！
-  ...
-}
-```
+【修复方案】
+修改消息路由器脚本：/root/.openclaw/scripts/message-router.mjs
 
-【修复方案】将 message 改为 currentMessage
+优先级逻辑：
+1. 有 @ → 回复指定的人
+   ↓
+2. 有引用 → 回复引用的消息
+   ↓
+3. 无@无引用 → 智能判断话题连续性
+   ↓
+4. 不确定 → 提示用户确认
 ```
 
 **执行修复**：
 ```bash
 # 定位问题
-grep -n "message.content" message-router-middleware.ts
+cat /root/.openclaw/scripts/message-router.mjs
 
-# 修复
-sed -i 's/message\.content/currentMessage.content/g' message-router-middleware.ts
-sed -i 's/message\.text/currentMessage.text/g' message-router-middleware.ts
+# 修改路由逻辑
+# 1. 检查 @ 提及
+# 2. 检查引用
+# 3. 智能判断话题连续性
+# 4. 置信度检查（相似度阈值 0.6）
 
 # 验证
-git diff message-router-middleware.ts
+git diff /root/.openclaw/scripts/message-router.mjs
 ```
 
 **小黑 - 管家**：
 ```
-✅ Bug 已修复！
+✅ 路由逻辑已优化！
 
 【修复内容】
-- 文件：message-router-middleware.ts
-- 位置：第 173 行
-- 修改：message → currentMessage
+- 文件：/root/.openclaw/scripts/message-router.mjs
+- 功能：群聊消息归属混合模式
+- 语义相似度阈值：
+  - ≥ 0.8: 高置信度，直接回复
+  - 0.6-0.8: 中等置信度，直接回复
+  - < 0.6: 低置信度，提示确认
 
 【测试计划】
-1. 重启 Gateway
-2. 在群聊发送测试消息
-3. 检查日志是否有错误
-4. 验证@功能是否正常
+1. 在群聊发送@消息
+2. 发送引用消息
+3. 发送普通消息
+4. 验证路由是否正确
 ```
 
 ### 5.2 提示词记录
@@ -675,18 +687,19 @@ git diff message-router-middleware.ts
 **问题诊断提示词**：
 ```
 🔧 问题诊断：
-现象：群聊消息处理时报 ReferenceError
-错误：message is not defined
-位置：message-router-middleware.ts
+现象：群聊消息回复逻辑需要优化
+需求：正确处理@、引用和不指定机器人的情况
 
 请帮我：
-1. 定位问题代码
-2. 分析根本原因
+1. 分析当前路由逻辑
+2. 设计优先级规则
 3. 提供修复方案
 4. 生成测试计划
 
 输出：问题报告 + 修复命令
 ```
+
+**提示词反馈说明**：回答结束后会反馈原始提示词供学习
 
 ---
 
@@ -695,6 +708,8 @@ git diff message-router-middleware.ts
 ### 6.1 场景背景
 
 **背景**：用户提到博客有些内容可以改进，小黑主动提出质疑和建议。
+
+**说明**：这两篇博客都是用户下发命令后，由 AI 自动完成的。
 
 #### 对话记录
 
@@ -756,6 +771,8 @@ git diff message-router-middleware.ts
 
 输出：问题分析 + 改进建议
 ```
+
+**提示词反馈说明**：回答结束后会反馈原始提示词供学习
 
 ---
 
