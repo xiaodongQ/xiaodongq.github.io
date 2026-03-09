@@ -3,7 +3,7 @@ title: AI 能力集 -- OpenClaw 一人团队 Multi-Agent 系统设计与搭建
 description: 基于 OpenClaw 搭建一人团队 Multi-Agent 系统的完整设计思路和实现过程
 categories: [AI, AI 能力集]
 tags: [AI, OpenClaw, Multi-Agent, 自动化]
-date: 2026-03-09 23:00:00 +0800
+date: 2026-03-09 20:00:00 +0800
 draft: false
 ---
 
@@ -68,11 +68,12 @@ draft: false
 
 **场景**：创建 CrewAI + LangChain 学习材料包
 
-**Agent 分工**：
-- **Edu·伴学堂**：框架调研、核心概念整理
-- **Dev·技术匠**：Demo 开发、完整场景实战
-- **Wri·执笔人**：学习文档整合
-- **小黑 - 管家**：任务编排、评审、Git 提交
+| 环节 | 传统方式 | Multi-Agent 方式 |
+|------|---------|----------------|
+| 框架调研 | 人工搜索整理 | Edu·伴学堂 |
+| Demo 开发 | 人工编写 | Dev·技术匠 |
+| 文档撰写 | 人工写作 | Wri·执笔人 |
+| 评审提交 | 自我审查 | 小黑 - 管家 |
 
 **交付物**：26 个文件、4400+ 行代码、完整文档（全部自动完成）
 

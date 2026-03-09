@@ -3,7 +3,7 @@ title: AI 能力集 -- OpenClaw 一人团队实战：从日常对话到自动化
 description: OpenClaw 一人团队 Multi-Agent 系统真实应用场景和案例分析
 categories: [AI, AI 能力集]
 tags: [AI, OpenClaw, Multi-Agent, 实战案例]
-date: 2026-03-09 23:30:00 +0800
+date: 2026-03-09 20:30:00 +0800
 draft: false
 ---
 
