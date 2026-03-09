@@ -1,16 +1,7 @@
 ---
-title: AI 能力集 -- OpenClaw 一人团队 Multi-Agent 系统设计与搭建
-description: 基于 OpenClaw 搭建一人团队 Multi-Agent 系统的完整设计思路和实现过程
-categories: [AI, AI 能力集]
+title: AI能力集 -- OpenClaw一人团队Multi-Agent系统设计与搭建
+categories: [AI, AI能力集]
 tags: [AI, OpenClaw, Multi-Agent, 自动化]
-date: 2026-03-09 20:00:00 +0800
-draft: false
----
-
-# AI 能力集 -- OpenClaw 一人团队 Multi-Agent 系统设计与搭建
-
-> 用 5 个专业 Agent 构建你的私人 AI 团队，效率提升 3 倍 +
-
 ---
 
 ## 1. 引言
