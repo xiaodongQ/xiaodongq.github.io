@@ -14,6 +14,10 @@ tags: [AI, OpenClaw, Multi-Agent, 自动化]
 1. 本文是 AI 基于 2026-03-09 的聊天记录自动生成的博客文章
 2. 由于是 AI 生成，部分内容可能存在不准确，具体实操请参考：[OpenClaw 实战手记 - 进阶搭建一人团队](https://xiaodongq.github.io/2026/03/05/openclaw-practise/#5-进阶搭建一人团队)
 
+**AI 自动生成博客流程**：
+![AI 自动生成博客的完整流程](/images/2026-03-09-blog-generation-flow.png)
+*图 1：AI 自动生成博客的完整流程 - 用户下发命令 → AI 生成内容 → 自动插入图片 → Git 提交发布*
+
 ---
 
 ## 2. 系统架构
@@ -23,7 +27,7 @@ tags: [AI, OpenClaw, Multi-Agent, 自动化]
 详细架构图和说明请参考：[一人团队 Multi-Agent 系统设计](https://github.com/xiaodongQ/ai-playground/blob/main/design/一人团队-Multi-Agent-系统设计.md)
 
 ![一人团队 Multi-Agent 系统架构图](/images/2026-03-09-multi-agent-architecture.png)
-*图 1：一人团队 Multi-Agent 系统架构 - 用户通过小黑 - 管家与 4 个专业 Agent 交互*
+*图 2：一人团队 Multi-Agent 系统架构 - 用户通过小黑 - 管家与 4 个专业 Agent 交互*
 
 **核心设计**：
 ```
