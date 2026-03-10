@@ -24,6 +24,12 @@ OpenClaw实战手记，持续更新实践和技巧。
 
 基本步骤：通过`npm`安装（可设置一下国内镜像源） -> 初始化OpenClaw并配置API -> 而后可以接入飞书（也有开源项目可以接入微信的），步骤可见：[Open Claw安装和配置](https://github.com/xiaodongQ/devNoteBackup/blob/master/%E5%90%84%E5%88%86%E7%B1%BB%E8%AE%B0%E5%BD%95/AI%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0.md#%E5%AE%89%E8%A3%85-1)。
 
+```
+1、先安装Node.js，node.js官网下载二进制包 -> 解压 -> 添加PATH环境变量。node -v检查，如v24.13.0
+2、设置npm国内镜像：npm config set registry https://registry.npmmirror.com/
+3、npm安装openclaw：npm install -g openclaw@latest。openclaw -v查看
+```
+
 执行`openclaw tui`即可启动终端页面，也可用`openclaw dashboard`启动web页面（其他机器上访问，可以在机器上起SSH隧道来转发请求：`ssh -N -L 18789:127.0.0.1:18789 root@192.168.1.150`，而后仍用`http://localhost:18789/`访问）
 
 ```sh
@@ -148,7 +154,9 @@ Slash commands:
 * 初步安装的Skills（优先配置`网页搜索`技能）
   * `tavily-search`，实时检索+结构化输出，AI 原生优化的搜索工具 **建议安装**
     * 官方推荐`Brave Search`，不过貌似使用时要梯子，而且现在要绑VISA卡
-  * `exa-web-search-free`，全网检索：实时网络搜索、信息聚合、冷门知识挖掘 **建议安装**
+    * 到[tavily](https://app.tavily.com/)上注册后，获取免费api后发给小龙虾自己去配置（每个月1000次）
+  * `skill-vetter`，skills安全审核 **建议安装**
+  * `exa-web-search-free`，全网检索：实时网络搜索、信息聚合、冷门知识挖掘
   * `self-improving-agent`，AI自我改进，让AI在犯错或被用户纠正时自动记录下来，下次遇到类似情况避免重蹈覆辙 **建议安装**
   * `multi-search-engine`，元搜索：并行调用多引擎、结果交叉验证、准确率排序
   * `mcporter-1-0-0`，内容生成：结构化文本生成、特定领域模板填充
@@ -187,6 +195,26 @@ Slash commands:
 
 多打磨：`SOUL.md`、`AGENTS.md`、`USER.md`
 * 社区经验：“在 OpenClaw 中，稳定的规则放 `SOUL.md`，临时的任务放对话，积累的认知放 `MEMORY.md`”。
+
+## OpenClaw使用案例
+
+GitHub上有很多实践案例，可以提供一些思路：
+* [awesome-openclaw-usecases](https://github.com/hesamsheikh/awesome-openclaw-usecases)
+* 中文案例：[awesome-openclaw-zh](https://github.com/cogine-ai/awesome-openclaw-zh)
+
+按需查看需要的案例，把提示发给OpenClaw即可，让它自己完成。
+
+比如：[每日 AI 行业日报推送](https://github.com/cogine-ai/awesome-openclaw-zh/blob/main/usecases/social/daily-ai-news-report-push.md)，我让我的小龙虾给我定期推送，对话稍微调整后它生成的提示词任务如下（让它返回当前定期推送的任务原始信息）：
+
+```sh
+请搜集今天（当前日期）的 AI 趋势新闻（5-8 条），使用飞书卡片格式推送给用户 ou_70d6eef77039cbf971450817c94eed8e。
+**卡片要求**：
+- 使用 feishu_doc 或 message 工具的卡片功能
+- 标题：📰 AI 趋势日报 - YYYY-MM-DD（替换为实际日期）
+- 分类：大模型🧠、开源🔓、应用📱、业界💼
+- 每条新闻包含：标题 + 一句话摘要 + 来源
+使用 Tavily Search 搜索最新新闻，来源包括虎嗅、36Kr、TechCrunch
+```
 
 ## 5. 进阶：搭建“一人团队”
 
