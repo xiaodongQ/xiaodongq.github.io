@@ -156,9 +156,11 @@ Slash commands:
     * 官方推荐`Brave Search`，不过貌似使用时要梯子，而且现在要绑VISA卡
     * 到[tavily](https://app.tavily.com/)上注册后，获取免费api后发给小龙虾自己去配置（每个月1000次）
   * `skill-vetter`，skills安全审核 **建议安装**
-  * `exa-web-search-free`，全网检索：实时网络搜索、信息聚合、冷门知识挖掘
+  * 其他网页搜索工具
+    * `multi-search-engine`，元搜索：并行调用多引擎、结果交叉验证、准确率排序
+    * `exa-web-search-free`，全网检索：实时网络搜索、信息聚合、冷门知识挖掘
+    * `Agent Reach`
   * `self-improving-agent`，AI自我改进，让AI在犯错或被用户纠正时自动记录下来，下次遇到类似情况避免重蹈覆辙 **建议安装**
-  * `multi-search-engine`，元搜索：并行调用多引擎、结果交叉验证、准确率排序
   * `mcporter-1-0-0`，内容生成：结构化文本生成、特定领域模板填充
   * `local-rag-search`，私有知识库，本地文档检索、RAG (检索增强生成)
   * `first-principles-decomposer`，思维建模：第一性原理拆解、复杂问题结构化分析
@@ -402,3 +404,49 @@ total 32K
 
 3、设置各自的人设：`SOUL.md`、`IDENTITY.md`
 
+## 实践经验：飞书群里消息路由规则优化
+
+初始需求：准备在自己的主机上另外装一个OpenClaw
+
+过程：让现有的全局小龙虾自动安装在独立目录和修改端口，两个还是各种冲突，还是调整成增加一个agent了，然后单独拉了个群，加了1个机器人。
+
+针对`main`和`finance-agent`这2个agent，开启不需要`@`，即 `requireMention`设置为`false`。两个不放在一个群里。
+
+```sh
+"channels": {
+    "feishu": {
+      "enabled": true,
+      "connectionMode": "websocket",
+      "domain": "feishu",
+      "accounts": {
+        "main": {
+          "appId": "cli_a9xxxxxxxxxxxx",
+          "appSecret": "1Rjxxxxxxxxxxxx",
+          "allowFrom": [
+            "ou_9197e1d0c38ef2aeec4eeb9866c7b7f7"
+          ],
+          "groupAllowFrom": [
+            "oc_7808579b7b1f6eeb5936f7828e2aaf23"
+          ],
+          "groups": {
+            "*": {
+              "requireMention": false
+            }
+          }
+        },
+        "dev-agent": {
+          "appId": "cli_axxxxxxxxxx",
+          "appSecret": "xxxxxxxxxxxxx",
+          "allowFrom": [
+            "ou_9197e1d0c38ef2aeec4eeb9866c7b7f7"
+          ],
+          "groupAllowFrom": [
+            "oc_7808579b7b1f6eeb5936f7828e2aaf23"
+          ],
+          "groups": {
+            "*": {
+              "requireMention": true
+            }
+          }
+        },
+```
