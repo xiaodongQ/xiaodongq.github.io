@@ -198,7 +198,7 @@ Slash commands:
 多打磨：`SOUL.md`、`AGENTS.md`、`USER.md`
 * 社区经验：“在 OpenClaw 中，稳定的规则放 `SOUL.md`，临时的任务放对话，积累的认知放 `MEMORY.md`”。
 
-## OpenClaw使用案例
+## 5. OpenClaw使用案例
 
 GitHub上有很多实践案例，可以提供一些思路：
 * [awesome-openclaw-usecases](https://github.com/hesamsheikh/awesome-openclaw-usecases)
@@ -218,11 +218,11 @@ GitHub上有很多实践案例，可以提供一些思路：
 使用 Tavily Search 搜索最新新闻，来源包括虎嗅、36Kr、TechCrunch
 ```
 
-## 5. 进阶：搭建“一人团队”
+## 6. 进阶：搭建“一人团队”
 
 `Open Claw` + `Claude Code`互补，针对需要代码理解、架构分析等编程任务，利用`Claude Code`来完成，用小龙虾管理多个智能体。
 
-### 5.1. 分析设计
+### 6.1. 分析设计
 
 1、先分析下自己适用的场景：一台机器上部署多个OpenClaw实例，还是一个OpenClaw+多个Agent 更为合理？
 
@@ -281,7 +281,7 @@ main：默认agent，飞书角色：`小黑-管家`
 
 我做了归档，可见：[一人团队设计](https://github.com/xiaodongQ/ai-playground/blob/main/design/%E4%B8%80%E4%BA%BA%E5%9B%A2%E9%98%9F%E8%AE%BE%E8%AE%A1.md)
 
-### 5.2. 实操搭建
+### 6.2. 实操搭建
 
 > 可参考：[如何用OpenClaw + 飞书，组建一支"AI团队"](https://mp.weixin.qq.com/s/8FeVltwZYDq7x2Kq5KvunA)
 
@@ -404,13 +404,52 @@ total 32K
 
 3、设置各自的人设：`SOUL.md`、`IDENTITY.md`
 
-## 实践经验：飞书群里消息路由规则优化
+## 7. 实践经验
 
-初始需求：准备在自己的主机上另外装一个OpenClaw
+### 7.1. 飞书群里消息路由规则优化
 
-过程：让现有的全局小龙虾自动安装在独立目录和修改端口，两个还是各种冲突，还是调整成增加一个agent了，然后单独拉了个群，加了1个机器人。
+初始需求：准备在自己的主机上另外装一个OpenClaw，给家人用。想着2个龙虾正好还能各自监测和修复问题。
 
-针对`main`和`finance-agent`这2个agent，开启不需要`@`，即 `requireMention`设置为`false`。两个不放在一个群里。
+操作过程和遇到的问题：
+
+1、问题1：让现有的全局小龙虾自动安装在独立目录和修改端口，但还是各种冲突，在飞书问着问着我全局的gateway就挂了
+* 措施：想了下也不是非2个不可，调整成增加一个agent（后面实际是将`Fin·财多多`这个基本用不上的理财规划师改成了新的agent），配置相关角色描述
+
+2、问题2：将新agent对接的机器人拉进飞书群，问问题时，答复的机器人不符合预期。不`@`指定人的话，每次都是管家回答，我预期的是最后一条机器人消息对应的人回答
+* 措施：在自己的应用场景下只是做规避，单独拉飞书群，只加这个新建的机器人。配置文件里指定`requireMention`为false，就可以不`@`指定了
+
+具体操作：
+
+1）**针对我自己的大群（我+4个机器人）**，消息是由管家（`小黑-管家（Main Agent）`）来负责路由。没具体指定人的话，由他判断消息给谁
+
+路由策略记录在`main`对应agent的`RULES.md`里（给小龙虾发消息来指定路由需求，他自己开发了一个脚本并自动记录到了规则文档里）：
+
+```sh
+### RULE-002: 群聊消息归属混合模式
+...
+**规则内容**:
+群聊中消息响应的归属规则（优先级从高到低）：
+
+1. 有 @ → 回复指定的人
+   ↓
+2. 有引用 → 回复引用的消息
+   ↓
+3. 无@无引用 → 智能判断话题连续性
+   ↓
+4. 不确定 → 提示用户确认
+...
+
+**实现文件**:
+- 路由器脚本：`/root/.openclaw/scripts/message-router.mjs`
+- 使用文档：`/root/.openclaw/scripts/README-ROUTER.md`
+
+**调用方式**:
+import { determineReplyTarget } from '/root/.openclaw/scripts/message-router.mjs';
+
+const target = determineReplyTarget(message, recentMessages);
+```
+
+2）**针对`main`和`finance-agent`这2个agent**，开启不需要`@`，即 `requireMention`设置为`false`。两个分别在不同群里。
 
 ```sh
 "channels": {
@@ -434,19 +473,68 @@ total 32K
             }
           }
         },
-        "dev-agent": {
-          "appId": "cli_axxxxxxxxxx",
-          "appSecret": "xxxxxxxxxxxxx",
-          "allowFrom": [
-            "ou_9197e1d0c38ef2aeec4eeb9866c7b7f7"
-          ],
-          "groupAllowFrom": [
-            "oc_7808579b7b1f6eeb5936f7828e2aaf23"
-          ],
-          "groups": {
-            "*": {
-              "requireMention": true
-            }
-          }
-        },
+        ...
 ```
+
+### 7.2. root环境下让agent调用Claude Code完成任务
+
+root环境下，Claude Code会拒绝`-dangerously-skip-permissions`模式运行，而agent（比如我这里的`Dev·技术匠`）派发任务一般是给一个提示词指定任务描述，一些权限确认会比较麻烦。
+
+**结合AI给的解决方案**：新建用户`clauded`给`Claude Code`运行时使用，OpenClaw保持`root`运行，仅`Claude Code`调用时临时切换到 `clauded` 用户。
+
+这个方案主要作了2个动作：
+
+1、封装了脚本：`/root/.openclaw/scripts/claude-code-wrapper.sh "你的任务"`
+
+里面的核心执行语句：`su clauded -s /bin/bash -c "cd '$WORKDIR' && claude --print --permission-mode bypassPermissions '$TASK'"`
+* `bypassPermissions` 跳过权限校验，强制让程序忽略权限检查，直接执行
+
+2、在`Dev·技术匠`对应的`coding-agent`智能体里，并记录了上述脚本的使用，以使用到`Claude Code`
+
+这里有个疑问，方案里说`“在 coding-agent skill 中已集成了上述工具“`，在`~`对应目录找各个SKILL的`SKILL.md`，并没有找到
+
+```sh
+[root@xdlinux ➜ .openclaw ]$ find . -name SKILL.md
+./workspace/skills/tavily-search/SKILL.md
+./workspace/skills/exa-web-search-free/SKILL.md
+./workspace/skills/xiucheng-self-improving-agent/SKILL.md
+./workspace/skills/skill-vetter/SKILL.md
+./workspace/skills/github/SKILL.md
+...
+```
+
+**结论**：确实记录了，记录在`OpenClaw`安装目录的默认SKILL里（`coding-agent`，前面其实已经明确说了）
+* 以后就知道区分agent安装的SKILL和`OpenClaw`默认安装的SKILL路径了
+
+即我环境中的：`/home/workspace/local/node-v24.13.0-linux-x64/lib/node_modules/openclaw/skills/coding-agent/SKILL.md`，`/home/workspace/local/node-v24.13.0-linux-x64/lib/node_modules/openclaw/`是npm全局安装`OpenClaw`的目录。
+
+信息如下：
+
+```sh
+## Claude Code
+
+**重要**: Claude Code 拒绝在 root 权限下运行。使用 `su clauded` 临时切换用户执行。
+
+# Foreground - 临时切换到 clauded 用户
+bash workdir:~/project command:"su clauded -s /bin/bash -c 'cd /root/.openclaw/workspace && claude --print --permission-mode bypassPermissions \"Your task\"'"
+
+# Background
+bash workdir:~/project background:true command:"su clauded -s /bin/bash -c 'cd /root/.openclaw/workspace && claude --print --permission-mode bypassPermissions \"Your task\"'"
+
+**前置条件**:
+- clauded 用户已创建：`/usr/sbin/useradd -m -s /bin/bash clauded`
+- clauded 用户对 workspace 有权限：`chown -R clauded:clauded /root/.openclaw/workspace`
+- /root 目录可执行：`chmod a+x /root`
+- /root/.openclaw 可读可执行：`chmod -R a+rx /root/.openclaw`
+
+**注意**: OpenClaw 保持 root 运行，仅 Claude Code 调用时临时切换。
+```
+
+### 7.3. 生成学习资料
+
+让小黑管家生成AI相关学习资料和运行demo，比如生成的这些（TODO项，待学及输出）：
+
+* Claude Code使用资料：[ai-claude-code-guide](https://github.com/xiaodongQ/ai-claude-code-guide)
+* 智能体开发资料：[crewai-langchain-demos](https://github.com/xiaodongQ/ai-playground/tree/main/learning/crewai-langchain/crewai-langchain-demos)
+  * 即此处描述的过程：[学习任务场景](https://xiaodongq.github.io/2026/03/09/openclaw-multi-agent-practice/#3-%E5%AD%A6%E4%B9%A0%E4%BB%BB%E5%8A%A1%E5%9C%BA%E6%99%AF)，提好要求后管家agent自动其他角色进行工作，等完成会自动提交GitHub
+* 让管家生成的`nanoClaw`学习资料，学习这个微型`OpenClaw`的项目以了解其原理：[nanoClaw-study](https://github.com/xiaodongQ/ai-playground/tree/main/nanoClaw-study)
