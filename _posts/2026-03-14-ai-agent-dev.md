@@ -7,7 +7,7 @@ tags: [AI, Agent]
 
 ## 1. 引言
 
-[之前](https://xiaodongq.github.io/2025/08/27/ai-agent-learn-2-framework/) 里跟着`Hugging Face`的[AI Agents Course](https://huggingface.co/learn/agents-course/unit0/introduction)简单实践过agent开发，现在通过IDE或者CLI直接一句话就可以生成了。其中的框架流程和具体逻辑还是有必要去掌握的。
+[之前](https://xiaodongq.github.io/2025/08/27/ai-agent-learn-2-framework/) 里跟着`Hugging Face`的[AI Agents Course](https://huggingface.co/learn/agents-course/unit0/introduction)简单实践过agent开发，实际使用的话还是应该选择一个比较主流的框架。现在通过IDE或者CLI直接一句话就可以生成了，其中的框架流程和具体逻辑还是有必要去掌握的。
 
 Agent开发实践，相关参考链接：
 * AI生成的`CrewAI`和`LangChain`资料：[crewai-langchain-demos](https://github.com/xiaodongQ/ai-playground/tree/main/learning/crewai-langchain/crewai-langchain-demos)
@@ -49,7 +49,9 @@ Agent开发实践，相关参考链接：
 
 ### 2.1. 核心组件 之 Agent（智能体）
 
-`Agent` 是 CrewAI 中的基本执行单元，类似于团队中的成员。核心属性包含下面示例列出来的几个参数。
+`Agent` 是 CrewAI 中的基本执行单元，类似于团队中的成员。
+
+核心属性包含下面示例列出来的几个参数（`role`、`goal`等）。
 * 此外还有`llm`(驱动 Agent 的语言模型)、`memory`(bool, 保持对话历史)、`max_iter`(最大迭代次数，默认 20)等核心参数
 
 ```py
@@ -70,14 +72,135 @@ researcher = Agent(
 
 `Task` 是分配给 Agent 的具体工作单元。
 
+核心属性见下面示例。
+* 此外还有：`tools`（任务可用的工具，`List[BaseTool]`类型）、`context`（依赖的其他任务输出，`List[Task]`类型）
+
 ```py
 from crewai import Task
 
 research_task = Task(
     description="对{topic}进行彻底调研，确保找到所有相关信息",       # 任务的清晰描述
-    expected_output="包含 10 个要点的列表，涵盖{topic}最重要的信息", # 
-    agent=researcher,
-    output_file="research_report.md",
-    markdown=True
+    expected_output="包含 10 个要点的列表，涵盖{topic}最重要的信息", # 任务完成的标准描述
+    agent=researcher,                  # 负责执行的 Agent，此处用的是上面定义的研究员智能体
+    output_file="research_report.md",                          # 输出文件路径
+    markdown=True                                              # 是否使用 Markdown 格式输出
 )
 ```
+
+### 2.3. 核心组件 之 Crew（团队）
+
+`Crew` 是 `Agent` 和 `Task` 的集合，定义了协作流程。
+
+参数：`process（执行流程类型）`，可选取值：
+* `Sequential`（顺序）：任务按定义顺序依次执行
+    * 按照下例中的`tasks`定义的任务列表顺序来执行
+* `Hierarchical`（层级）：根据 Agent 角色和专长分配任务
+    * 按照下例中的`agents`参数指定的多个智能体的专长来分配任务进行执行
+
+```py
+from crewai import Crew, Process
+
+crew = Crew(
+    agents=[researcher, analyst],
+    tasks=[research_task, analysis_task],
+    process=Process.sequential,           # 任务按定义顺序依次执行
+    verbose=True
+)
+
+result = crew.kickoff(inputs={"topic": "AI Agents"})
+```
+
+### 2.4. 核心组件 之 Process（流程）
+
+流程定义了 Crew 如何协调 Agent 和 Task 的执行。
+
+### 2.5. 推荐的项目结构
+
+CrewAI 推荐使用 `YAML` 配置 + `Python` 代码的混合方式：
+
+```sh
+my_crew/
+├── src/
+│   └── my_crew/
+│       ├── __init__.py
+│       ├── main.py           # 入口文件
+│       ├── crew.py           # Crew 定义
+│       └── config/
+│           ├── agents.yaml   # Agent 配置
+│           └── tasks.yaml    # Task 配置
+├── pyproject.toml
+└── .env
+```
+
+agents.yaml 示例：
+
+```yaml
+researcher:
+  role: >
+    {topic} 高级数据研究员
+  goal: >
+    发现{topic}领域的前沿发展
+  backstory: >
+    你是一位经验丰富的研究员，擅长发现最新发展趋势
+...
+```
+
+tasks.yaml 示例：
+
+```yaml
+research_task:
+  description: >
+    对{topic}进行彻底调研
+  expected_output: >
+    包含 10 个要点的列表
+  agent: researcher
+...
+```
+
+## 3. 快速入门实践
+
+1、安装
+
+暂时先用`pip install "crewai[tools]"`方式，和以前习惯一致。
+* 如果要隔离环境安装
+    * cd到项目路径后`python -m venv venv1`创建虚拟环境（此处虚拟环境叫`venv1`）
+    * 然后激活环境`source venv1/bin/activate`
+    * 再`pip install`安装
+    * 若要退出则`deactivate`
+* 注意老方式不可行了： ~~`pip install crewai crewai-tools`~~，`crewai-tools`已经改名/合并了
+
+```sh
+# 方式1
+pip install "crewai[tools]"
+
+# 方式2（推荐）
+# uv 是 Python 世界里新一代超快的包管理器 + 虚拟环境工具
+    # 超级快、超级简单的 Python 包管理工具，由做过 Rust 核心工具的大神开发，速度比 pip 快 10~100 倍
+    # 它能干两件事：1）创建虚拟环境、2）安装 / 卸载 / 更新 Python 包
+    # 现代 AI 项目（crewai、llama-index、langchain 都推荐用 uv）
+# 等价命令 pip install 包名
+uv add "crewai[tools]"
+```
+
+执行：
+
+```sh
+# 到项目目录创建隔离的虚拟环境，再安装crewai
+[root@xdlinux ➜ python_path ]$ cd crew_ai_agent_test 
+[root@xdlinux ➜ crew_ai_agent_test ]$ python -m venv venv1
+[root@xdlinux ➜ crew_ai_agent_test ]$ source venv1/bin/activate
+(venv1) [root@xdlinux ➜ crew_ai_agent_test ]$ pip install "crewai[tools]"
+Collecting crewai[tools]
+  Using cached crewai-0.5.0-py3-none-any.whl (27 kB)
+WARNING: crewai 0.5.0 does not provide the extra 'tools'
+Collecting pydantic<3.0.0,>=2.4.2
+  Downloading pydantic-2.12.5-py3-none-any.whl (463 kB)
+     |████████████████████████████████| 463 kB 55 kB/s             
+...
+Collecting SQLAlchemy<3,>=1.4
+  Downloading sqlalchemy-2.0.48-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (3.2 MB)
+...
+```
+
+2、创建项目
+
