@@ -540,3 +540,7 @@ bash workdir:~/project background:true command:"su clauded -s /bin/bash -c 'cd /
 * 智能体开发资料：[crewai-langchain-demos](https://github.com/xiaodongQ/ai-playground/tree/main/learning/crewai-langchain/crewai-langchain-demos)
   * 即此处描述的过程：[学习任务场景](https://xiaodongq.github.io/2026/03/09/openclaw-multi-agent-practice/#3-%E5%AD%A6%E4%B9%A0%E4%BB%BB%E5%8A%A1%E5%9C%BA%E6%99%AF)，提好要求后管家agent自动其他角色进行工作，等完成会自动提交GitHub
 * 让管家生成的`nanoClaw`学习资料，学习这个微型`OpenClaw`的项目以了解其原理：[nanoClaw-study](https://github.com/xiaodongQ/ai-playground/tree/main/nanoClaw-study)
+
+### 7.4. 定期检查SOUL.md、USER.md、MEMORY.md
+
+定期检查各agent的`SOUL.md`、`USER.md`、`MEMORY.md`，可以从中看到小龙虾针对个人日常使用的经验沉淀，也可以按需调整。
