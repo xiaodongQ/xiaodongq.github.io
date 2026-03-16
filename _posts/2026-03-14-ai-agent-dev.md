@@ -7,10 +7,12 @@ tags: [AI, Agent]
 
 ## 1. 引言
 
-[之前](https://xiaodongq.github.io/2025/08/27/ai-agent-learn-2-framework/) 里跟着`Hugging Face`的[AI Agents Course](https://huggingface.co/learn/agents-course/unit0/introduction)简单实践过agent开发，实际使用的话还是应该选择一个比较主流的框架。现在通过IDE或者CLI直接一句话就可以生成了，其中的框架流程和具体逻辑还是有必要去掌握的。
+[之前](https://xiaodongq.github.io/2025/08/27/ai-agent-learn-2-framework/) 跟着`Hugging Face`的[AI Agents Course](https://huggingface.co/learn/agents-course/unit0/introduction)简单实践过agent开发，实际使用的话还是应该选择一个比较主流的框架。现在通过IDE或者CLI直接一句话就可以生成了，其中的框架流程和具体逻辑还是有必要去掌握的。
 
 Agent开发实践，相关参考链接：
+* [crewai.cn文档](https://docs.crewai.org.cn/en/quickstart)
 * AI生成的`CrewAI`和`LangChain`资料：[crewai-langchain-demos](https://github.com/xiaodongQ/ai-playground/tree/main/learning/crewai-langchain/crewai-langchain-demos)
+    - 跟着实践的过程中，**发现AI生成的资料有些坑**，比如安装方式是老版本才支持的，**建议还是找官网文档或者他人实践过的文档为准**
 * AI生成的`NanoClaw`资料，学习这个微型龙虾项目以了解`OpenClaw`原理：[nanoClaw-study](https://github.com/xiaodongQ/ai-playground/tree/main/nanoClaw-study)
 * 他人实践：[从 0 到 1 复刻一个 Claude Code 这样的 Agent](https://plantegg.github.io/2026/03/05/%E4%BB%8E0%E5%88%B01%E5%A4%8D%E5%88%BB%E4%B8%80%E4%B8%AAClaude_Code%E8%BF%99%E6%A0%B7%E7%9A%84Agent/)
 
@@ -23,8 +25,7 @@ Agent开发实践，相关参考链接：
     * **行动**让模型与外部环境（知识库、API、交互环境）交互，获取真实信息以修正推理
     * 推理与行动统一为 LLM 的自然语言输出
 
-另外说些题外话：AI发展到现在，会使用和不会使用的人，效率可以差到10倍多。不是说只是用用AI问答和简单Vibe Coding就是会了，还有很多方面需要在日常边实践边学习。  
-[用好AI的第一步：停止使用ChatGPT](https://www.superlinear.academy/c/ai-resources/stop-using-chatgpt) 这篇文章里面说得很好：
+另外说些题外话：AI发展到现在，会使用和不会使用的人，效率可以差很多倍。[用好AI的第一步：停止使用ChatGPT](https://www.superlinear.academy/c/ai-resources/stop-using-chatgpt) 这篇文章里面说得很好：
 * 用好`Cursor`、`Claude Code`、`Codex`等这类`Agentic`工具，除了编程场景，它们**对于几乎所有知识工作都有用**
     * 国内如`Trae`、`Qoder`、`CodeBuddy`等，开源如`OpenCode`
 * 好处：
@@ -40,8 +41,6 @@ Agent开发实践，相关参考链接：
     * “工具会变，但三样东西是持久的：反馈闭环让AI能自我修正，上下文供给让AI能理解你的世界，资产积累让你和AI的协作越来越高效。这是底层的范式，跟具体工具无关。”
 
 ## 2. CrewAI简介和核心组件
-
-具体见前面所述的自动内成的资料内容：[CrewAI 核心概念](https://github.com/xiaodongQ/ai-playground/blob/main/learning/crewai-langchain/crewai-langchain-demos/docs/crewai-langchain-research.md#1-crewai-%E6%A0%B8%E5%BF%83%E6%A6%82%E5%BF%B5)
 
 `CrewAI` 是一个专注于**多Agent协作**的框架，让你能够像组建团队一样编排`AI Agent`。
 
@@ -107,6 +106,7 @@ crew = Crew(
     verbose=True
 )
 
+# kickoff 执行结果容器
 result = crew.kickoff(inputs={"topic": "AI Agents"})
 ```
 
@@ -175,21 +175,35 @@ pip install "crewai[tools]"
 
 # 方式2（推荐）
 # uv 是 Python 世界里新一代超快的包管理器 + 虚拟环境工具
-    # 超级快、超级简单的 Python 包管理工具，由做过 Rust 核心工具的大神开发，速度比 pip 快 10~100 倍
     # 它能干两件事：1）创建虚拟环境、2）安装 / 卸载 / 更新 Python 包
     # 现代 AI 项目（crewai、llama-index、langchain 都推荐用 uv）
 # 等价命令 pip install 包名
 uv add "crewai[tools]"
 ```
 
-执行：
+执行：`pip install 'crewai[tools]' -i https://mirrors.aliyun.com/pypi/simple/`（下载有点慢，指定国内镜像）
+* 参考：[CrewAI 制作智能体](https://www.runoob.com/ai-agent/crewai-agent.html)
+  * Python版本要求 必须：Python ≥ 3.10 且 < 3.14 ？这里说不满足版本范围的话，后续问题会非常多，不建议硬扛
+
+听劝，还是让claude帮我升级下python，安装`3.12.0`版本：
+
+```sh
+我的python版本是多少，如何升级                        
+我来帮你检查当前的 Python 版本。                      
+Bash(python --version 2>&1 || python3 --version 2>&1) 
+⎿  Python 3.9.21                                      
+你当前的 Python 版本是 Python 3.9.21。                
+方法 1：使用 pyenv（推荐，可管理多个版本）            
+pyenv install 3.12.0
+...
+```
 
 ```sh
 # 到项目目录创建隔离的虚拟环境，再安装crewai
 [root@xdlinux ➜ python_path ]$ cd crew_ai_agent_test 
 [root@xdlinux ➜ crew_ai_agent_test ]$ python -m venv venv1
 [root@xdlinux ➜ crew_ai_agent_test ]$ source venv1/bin/activate
-(venv1) [root@xdlinux ➜ crew_ai_agent_test ]$ pip install "crewai[tools]"
+(venv1) [root@xdlinux ➜ crew_ai_agent_test ]$ pip install 'crewai[tools]' -i https://mirrors.aliyun.com/pypi/simple/
 Collecting crewai[tools]
   Using cached crewai-0.5.0-py3-none-any.whl (27 kB)
 WARNING: crewai 0.5.0 does not provide the extra 'tools'
@@ -202,5 +216,142 @@ Collecting SQLAlchemy<3,>=1.4
 ...
 ```
 
+CrewAI 的 LLM 对第三方模型（包括 DeepSeek）底层必须通过 LiteLLM，使用前我们需要先安装：`pip install -U litellm`
+* 也是 [CrewAI 制作智能体](https://www.runoob.com/ai-agent/crewai-agent.html) 里说明的
+
+```sh
+(venv1) [root@xdlinux ➜ crew_ai_agent_test ]$ pip install litellm -i https://mirrors.aliyun.com/pypi/simple/
+Looking in indexes: https://mirrors.aliyun.com/pypi/simple/
+Collecting litellm
+...
+```
+
 2、创建项目
 
+方式1：简单逻辑，可以手动创建文件
+
+前面“修复 sqlite3 版本问题”那段是必要的，要不会报错 `RuntimeError: Your system has an unsupported version of sqlite3. Chroma requires sqlite3 >= 3.35.0.`
+
+```py
+[root@xdlinux ➜ crew_ai_agent_test ]$ cat test.py 
+# 修复 sqlite3 版本问题
+import pysqlite3 as sqlite3
+import sys
+sys.modules['sqlite3'] = sqlite3
+
+from dotenv import load_dotenv
+import os
+
+# 从 .env 文件加载环境变量
+load_dotenv()
+
+from crewai import Agent, Task, Crew, Process
+from crewai.llm import LLM
+
+# ==================== 配置 LLM ====================
+llm = LLM(
+    model=os.getenv("LLM_MODEL", "openai/qwen3.5-plus"),
+    api_key=os.getenv("LLM_API_KEY"),
+    api_base=os.getenv("LLM_API_BASE"),
+    temperature=0.7,
+)
+
+# ==================== 1. 定义 Agent ====================
+
+# 研究员 Agent
+researcher = Agent(
+    role="技术研究员",
+    goal="深入调研{topic}领域，找出关键信息和技术要点",
+    backstory=(
+        "你是一位经验丰富的技术研究员，拥有 10 年技术调研经验。"
+        "你擅长从海量信息中筛选出最关键的内容，并用清晰的结构呈现。"
+        "你特别关注技术的实用性、性能特点和适用场景。"
+    ),
+    llm=llm,  # 显式传递 LLM 配置
+    verbose=True,
+    allow_delegation=False
+)
+
+# ==================== 2. 定义 Task ====================
+# 调研任务
+research_task = Task(
+    description=(
+        "对{topic}进行彻底调研，重点关注：\n"
+        "1. 核心概念和原理\n"
+        "2. 主要特点和优势\n"
+        "3. 典型使用场景\n"
+        "4. 与其他技术的对比\n"
+        "5. 学习资源和最佳实践\n\n"
+        "确保信息准确、结构清晰，适合有 C++/Go 背景的开发者阅读。"
+    ),
+    expected_output=(
+        "一份包含以下内容的调研报告：\n"
+        "- 核心概念（5-7 个要点）\n"
+        "- 技术特点（3-5 个要点）\n"
+        "- 使用场景（3-5 个场景）\n"
+        "- 对比分析（与 1-2 个类似技术对比）\n"
+        "- 学习建议（3-5 条建议）"
+    ),
+    agent=researcher,
+    output_file="output/research_report.md"  # 输出到文件
+)
+
+# ==================== 3. 创建 Crew ====================
+crew = Crew(
+    agents=[researcher],
+    tasks=[research_task],
+    process=Process.sequential,
+    verbose=True,
+    memory=False  # 禁用记忆功能（需要额外的 embedder 配置）
+)
+
+# ==================== 4. 执行 ====================
+if __name__ == "__main__":
+    print("🚀 启动 CrewAI 基础 Demo - 技术调研团队")
+    print("=" * 50)
+
+    # 传入主题参数
+    inputs = {
+        "topic": "Claude Code使用技巧"  # 可以改成任何你想调研的主题
+    }
+
+    print(f"📋 调研主题：{inputs['topic']}")
+    print("=" * 50)
+    print()
+
+    # 启动执行
+    result = crew.kickoff(inputs=inputs)
+    print()
+    print("=" * 50)
+    print("✅ 任务完成！")
+    print(f"\n📄 调研报告：output/research_report.md")
+```
+
+执行：
+
+```sh
+((venv2) ) [root@xdlinux ➜ crew_ai_agent_test ]$ python test.py
+🚀 启动 CrewAI 基础 Demo - 技术调研团队
+==================================================
+📋 调研主题：Claude Code使用技巧
+==================================================
+...
+│  **结语：**    
+│  Claude 编程辅助技术并非要取代开发者，而是作为“力倍增器”（Force Multiplier）...
+│                     
+╰───────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+==================================================
+✅ 任务完成！
+
+📄 调研报告：output/research_report.md
+
+╭───────────────────────────────────────────── Tracing Status ───────────────────────────
+│                
+│  Info: Tracing is disabled.        
+│  To enable tracing, do any one of these:                                              
+│  • Set tracing=True in your Crew/Flow code                                                
+│  • Set CREWAI_TRACING_ENABLED=true in your project's .env file                           
+│  • Run: crewai traces enable           
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────
+```
