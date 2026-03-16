@@ -536,6 +536,8 @@ bash workdir:~/project background:true command:"su clauded -s /bin/bash -c 'cd /
 
 让小黑管家生成AI相关学习资料和运行demo，比如生成的这些（TODO项，待学及输出）：
 
+（**注意：生成的资料里面可能有坑**，还是建议以官网文档为准，**<mark>信息源的准确性很重要！</mark>**）
+
 * Claude Code使用资料：[ai-claude-code-guide](https://github.com/xiaodongQ/ai-claude-code-guide)
 * 智能体开发资料：[crewai-langchain-demos](https://github.com/xiaodongQ/ai-playground/tree/main/learning/crewai-langchain/crewai-langchain-demos)
   * 即此处描述的过程：[学习任务场景](https://xiaodongq.github.io/2026/03/09/openclaw-multi-agent-practice/#3-%E5%AD%A6%E4%B9%A0%E4%BB%BB%E5%8A%A1%E5%9C%BA%E6%99%AF)，提好要求后管家agent自动其他角色进行工作，等完成会自动提交GitHub
