@@ -159,7 +159,7 @@ research_task:
 
 ## 3. 快速入门实践
 
-1、安装
+### 3.1. 安装
 
 暂时先用`pip install "crewai[tools]"`方式，和以前习惯一致。
 * 如果要隔离环境安装
@@ -216,8 +216,9 @@ Collecting SQLAlchemy<3,>=1.4
 ...
 ```
 
-CrewAI 的 LLM 对第三方模型（包括 DeepSeek）底层必须通过 LiteLLM，使用前我们需要先安装：`pip install -U litellm`
-* 也是 [CrewAI 制作智能体](https://www.runoob.com/ai-agent/crewai-agent.html) 里说明的
+CrewAI 的 LLM 对第三方模型（包括 DeepSeek）底层必须通过 `LiteLLM`，使用前我们需要先安装：`pip install -U litellm`
+* **LiteLLM介绍**：开源LLM统一网关与调用框架，核心价值在于用OpenAI标准格式一键调用其他主流模型，同时提供成本追踪、故障容错、流量控制等企业级能力
+* 可参考 [CrewAI 制作智能体](https://www.runoob.com/ai-agent/crewai-agent.html) 里的说明
 
 ```sh
 (venv1) [root@xdlinux ➜ crew_ai_agent_test ]$ pip install litellm -i https://mirrors.aliyun.com/pypi/simple/
@@ -226,11 +227,11 @@ Collecting litellm
 ...
 ```
 
-2、创建项目
+### 3.2. 开发方式1：手动创建文件
 
 方式1：简单逻辑，可以手动创建文件
 
-前面“修复 sqlite3 版本问题”那段是必要的，要不会报错 `RuntimeError: Your system has an unsupported version of sqlite3. Chroma requires sqlite3 >= 3.35.0.`
+前面“修复 sqlite3 版本问题”那段是必要的，要不会报错 `RuntimeError: Your system has an unsupported version of sqlite3. Chroma requires sqlite3 >= 3.35.0.` （另一个方式是把系统的sqlite升级到>=3.35，目前yum安装时我的系统是3.34，需要源码编译安装）
 
 ```py
 [root@xdlinux ➜ crew_ai_agent_test ]$ cat test.py 
@@ -354,4 +355,127 @@ if __name__ == "__main__":
 │  • Set CREWAI_TRACING_ENABLED=true in your project's .env file                           
 │  • Run: crewai traces enable           
 ╰─────────────────────────────────────────────────────────────────────────────────────────────────────
+```
+
+### 3.3. 开发方式2：创建项目
+
+用`crewai create`命令来自动创建项目层级，基于yaml文件来定义`agent`和`task`：`crewai create crew test_project`（也报错需要`sqlite3 >= 3.35.0`，解决方式见下面的问题记录小节）。
+
+解决依赖问题后创建项目，按照提示进行操作：
+* 选择大模型的提供商，这里先选`openai`（`crewai create crew test_project --skip_provider`方式可以跳过这个步骤，可后续手动创建`.env`）
+* 模型和key也先随便选一下，走完项目目录结构的创建流程，后面再进行修改
+
+1、`crewai create crew test_project`
+
+```sh
+((venv2) ) [root@xdlinux ➜ crew_ai_agent_test ]$ crewai create crew test_create_project
+Creating folder test_create_project...
+Cache expired or not found. Fetching provider data from the web...
+Downloading  [####################################]  1313681/67203
+Select a provider to set up:
+1. openai
+2. anthropic
+3. gemini
+4. nvidia_nim
+5. groq
+6. huggingface
+7. ollama
+8. watson
+9. bedrock
+10. azure
+11. cerebras
+12. sambanova
+13. other
+q. Quit
+Enter the number of your choice or 'q' to quit: 
+Enter the number of your choice or 'q' to quit: 1
+Enter your OPENAI API key (press Enter to skip): 1
+API keys and model saved to .env file
+Selected model: gpt-4
+  - Created test_create_project/.gitignore
+  - Created test_create_project/pyproject.toml
+  - Created test_create_project/README.md
+  - Created test_create_project/knowledge/user_preference.txt
+  - Created test_create_project/src/test_create_project/__init__.py
+  - Created test_create_project/src/test_create_project/main.py
+  - Created test_create_project/src/test_create_project/crew.py
+  - Created test_create_project/src/test_create_project/tools/custom_tool.py
+  - Created test_create_project/src/test_create_project/tools/__init__.py
+  - Created test_create_project/src/test_create_project/config/agents.yaml
+  - Created test_create_project/src/test_create_project/config/tasks.yaml
+Crew test_create_project created successfully!
+```
+
+项目结构如下：
+
+```sh
+((venv2) ) [root@xdlinux ➜ crew_ai_agent_test ]$ tree test_create_project 
+test_create_project
+├── AGENTS.md                  # 一些架构说明和最佳实践示例（可创建crew或flow项目）
+├── knowledge
+│   └── user_preference.txt
+├── pyproject.toml
+├── README.md
+├── .env                       # 模型提供商和key
+├── src
+│   └── test_create_project
+│       ├── config
+│       │   ├── agents.yaml
+│       │   └── tasks.yaml
+│       ├── crew.py
+│       ├── __init__.py
+│       ├── main.py
+│       └── tools
+│           ├── custom_tool.py
+│           └── __init__.py
+└── tests
+```
+
+2、配置模型和API
+
+由于第三方api通过`LiteLLM`(大模型统一接口转换工具)方式接入，所以`.env`里如下方式使用（此处用的千问）
+```sh
+LLM_API_KEY=sk-sp-0b9521xxxxxxxxxxxxx
+LLM_API_BASE=https://coding.dashscope.aliyuncs.com/v1
+LLM_MODEL=openai/qwen3.5-plus
+```
+
+3、对模版代码进行修改
+
+* 修改agents.yaml
+* 修改tasks.yaml
+* 修改crew.py
+* [可选] 添加团队前后函数
+
+
+## 4. 问题记录
+
+### 4.1. Chroma依赖的sqlite版本报错：sqlite3 >= 3.35.0
+
+`RuntimeError: Your system has an unsupported version of sqlite3. Chroma requires sqlite3 >= 3.35.0.`
+
+虽然从[sqlite官网](https://www.sqlite.org/download.html)下载了新版本包进行编译安装（**没啥用**），如`sqlite-autoconf-3510300.tar.gz`，但是Python环境里面还是用的旧版。`crewai create`执行还是会报上述错误。
+
+```sh
+[root@xdlinux ➜ sqlite-autoconf-3510300 ]$ /usr/local/bin/sqlite3 --version
+3.51.3 2026-03-13 10:38:09 737ae4a34738ffa0c3ff7f9bb18df914dd1cad163f28fd6b6e114a344fe6d618 (64-bit)
+```
+
+**系统命令行的 sqlite3 ≠ Python 调用的 sqlite3**
+
+解决方式：安装兼容补丁后，自动注入Python环境：
+
+```sh
+# 激活虚拟环境（你已经在里面了可以跳过）
+source venv2/bin/activate
+
+# 安装兼容补丁（最关键）
+pip install pysqlite3-binary
+
+# 自动注入 Python 环境（强制使用新版本）
+cat > venv2/lib/python3.12/site-packages/sitecustomize.py << EOF
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+EOF
 ```
