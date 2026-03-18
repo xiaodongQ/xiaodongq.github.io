@@ -186,10 +186,6 @@ tags: [AI, OpenClaw, Multi-Agent, 开源框架]
 
 ---
 
-**最后更新**: 2026-03-19
-
----
-
 ## 参考链接
 
 - [Nanobot GitHub](https://github.com/HKUDS/nanobot)
