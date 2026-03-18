@@ -1,12 +1,12 @@
 ---
-title: AI 能力集 -- OpenClaw 开源替代项目对比
-categories: [AI, AI 能力集]
+title: AI能力集 -- OpenClaw 开源替代项目对比
+categories: [AI, AI能力集]
 tags: [AI, OpenClaw, Multi-Agent, 开源框架]
 ---
 
 ## 1. 引言
 
-在上一篇文章《AI 能力集 -- OpenClaw 实战手记》中，我们介绍了 OpenClaw 的基本使用和实践经验。但随着使用深入，不少开发者发现 OpenClaw 存在代码量大（43 万 + 行）、启动慢（分钟级）、资源占用高（4GB+ 内存）等问题。
+在上一篇文章《AI能力集 -- OpenClaw 实战手记》中，我们介绍了 OpenClaw 的基本使用和实践经验。但随着使用深入，不少开发者发现 OpenClaw 存在代码量大（43 万 + 行）、启动慢（分钟级）、资源占用高（4GB+ 内存）等问题。
 
 那么，有没有更轻量的替代方案？
 
