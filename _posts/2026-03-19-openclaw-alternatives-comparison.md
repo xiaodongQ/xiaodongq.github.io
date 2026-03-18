@@ -28,9 +28,7 @@ tags: [AI, OpenClaw, Multi-Agent, 开源框架]
 | CountBot | Python | 中文生态友好派 | 21,000 行 | 15K+ | MIT |
 | IronClaw | Rust | 安全沙箱增强派 | 18,000 行 | 20K+ | MIT |
 
-> **注意**: 
-> - 部分项目数据为调研估算，具体以官方为准
-> - 另有商业闭源方案 WorkBuddy（TypeScript，企业级兼容），不在本文讨论范围
+> **注意**: 部分项目数据为调研估算，具体以官方为准
 
 > 数据来源：GitHub 及各项目官方文档，截至 2026 年 3 月
 
@@ -49,7 +47,7 @@ tags: [AI, OpenClaw, Multi-Agent, 开源框架]
 | 二进制大小 | 15MB | 5MB | 8MB | 22MB | 180MB |
 | 最低硬件要求 | 树莓派 4 | 10 美元硬件 | 5 美元硬件 | 树莓派 4 | 中高端 PC |
 
-从表中可以看出，**Nanobot** 和 **PicoClaw** 在资源占用方面表现最优，适合资源受限环境。
+从表中可以看出，**PicoClaw** 在资源占用方面表现最优（<10MB），适合资源受限环境。
 
 ### 3.2 功能与生态兼容性
 
@@ -123,9 +121,6 @@ tags: [AI, OpenClaw, Multi-Agent, 开源框架]
 - 安全沙箱增强需求
 - 需要 WASM 隔离技能运行环境
 
-**商业闭源方案**（不在本文讨论）：
-- **WorkBuddy**：TypeScript 开发，企业级兼容，闭源商业许可
-
 ### 4.2 选型决策矩阵
 
 **表 6：选型建议**
@@ -182,7 +177,7 @@ tags: [AI, OpenClaw, Multi-Agent, 开源框架]
 
 ---
 
-> **实践笔记**：双活探测方案可采用 OpenClaw + PicoClaw 组合，资源占用从 8GB 降至 4GB+<10MB，备用节点秒级启动。详细配置后续更新。
+> **方案思路**：双活探测可采用 OpenClaw + PicoClaw 组合，主节点完整功能，备用节点轻量探测，内存占用大幅降低，秒级启动。
 
 ---
 
@@ -195,7 +190,3 @@ tags: [AI, OpenClaw, Multi-Agent, 开源框架]
 - [IronClaw GitHub](https://github.com/iron-claw)
 - [OpenClaw 官方文档](https://docs.openclaw.ai)
 - [MCP 协议规范](https://modelcontextprotocol.io)
-
----
-
-**最后更新**: 2026-03-19
