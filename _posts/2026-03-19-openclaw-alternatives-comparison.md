@@ -22,12 +22,14 @@ tags: [AI, OpenClaw, Multi-Agent, 开源框架]
 
 | 项目名称 | 开发语言 | 核心定位 | 代码量 | GitHub 星标 | 开源协议 |
 |----------|----------|----------|--------|-------------|----------|
+| Nanobot | Python | 超轻量学习型 | 3,966 行 | 32K+ | MIT |
 | ZeroClaw | Rust | 极致性能安全派 | 12,000 行 | 28K+ | MIT |
 | PicoClaw | Go | 嵌入式边缘计算派 | 8,500 行 | 12K+ | MIT |
 | CountBot | Python | 中文生态友好派 | 21,000 行 | 15K+ | MIT |
 | IronClaw | Rust | 安全沙箱增强派 | 18,000 行 | 20K+ | MIT |
 | WorkBuddy | TypeScript | 企业级兼容派 | 闭源 | - | 商业 |
-| SuperAGI | Python | 多 Agent 框架 | 25,000 行 | 18K+ | MIT |
+
+> **注意**: 部分项目数据为调研估算，具体以官方为准。
 
 > 数据来源：GitHub 及各项目官方文档，截至 2026 年 3 月
 
@@ -39,27 +41,27 @@ tags: [AI, OpenClaw, Multi-Agent, 开源框架]
 
 **表 2：性能对比**
 
-| 对比项 | ZeroClaw | PicoClaw | CountBot | SuperAGI | OpenClaw |
-|--------|----------|----------|----------|----------|----------|
-| 启动时间 | 毫秒级 (<1s) | 极快 (<1s) | 秒级 (~2s) | 秒级 (~3s) | 分钟级 |
-| 内存占用 | ~50MB | <10MB | ~120MB | ~200MB | 4GB+ |
-| 二进制大小 | 5MB | 8MB | 22MB | 35MB | 180MB |
-| 最低硬件要求 | 10 美元硬件 | 5 美元硬件 | 树莓派 4 | 树莓派 4 | 中高端 PC |
+| 对比项 | Nanobot | ZeroClaw | PicoClaw | CountBot | OpenClaw |
+|--------|---------|----------|----------|----------|----------|
+| 启动时间 | 秒级 (~1s) | 毫秒级 (<1s) | 极快 (<1s) | 秒级 (~2s) | 分钟级 |
+| 内存占用 | ~80MB | ~50MB | <10MB | ~120MB | 4GB+ |
+| 二进制大小 | 15MB | 5MB | 8MB | 22MB | 180MB |
+| 最低硬件要求 | 树莓派 4 | 10 美元硬件 | 5 美元硬件 | 树莓派 4 | 中高端 PC |
 
-从表中可以看出，**PicoClaw** 在资源占用方面表现最优，适合资源受限环境。
+从表中可以看出，**Nanobot** 和 **PicoClaw** 在资源占用方面表现最优，适合资源受限环境。
 
 ### 3.2 功能与生态兼容性
 
 **表 3：功能兼容性对比**
 
-| 对比项 | ZeroClaw | PicoClaw | CountBot | SuperAGI | OpenClaw |
-|--------|----------|----------|----------|----------|----------|
-| MCP 协议支持 | 完整兼容 | 基础支持 | 完整兼容 | 完整兼容 | 原生支持 |
-| OpenClaw 技能复用 | 完全兼容 | 部分兼容 | 完全兼容 | 部分兼容 | 原生支持 |
-| 国产 LLM 适配 | 基础适配 | 基础适配 | 深度适配 (文心/通义/星火) | 基础适配 | 需插件 |
-| 多平台支持 | 全平台 | 主流平台 | 微信/QQ/钉钉/飞书 | 全平台 | 全平台 |
-| 定时任务 | 高级调度 | Cron | 中文自然语言 | Cron+ 调度器 | 完整支持 |
-| 多 Agent 协作 | 完整支持 | 基础支持 | 中文优化 | 完整支持 | 原生支持 |
+| 对比项 | Nanobot | ZeroClaw | CountBot | OpenClaw |
+|--------|---------|----------|----------|----------|
+| MCP 协议支持 | 完整兼容 | 完整兼容 | 完整兼容 | 原生支持 |
+| OpenClaw 技能复用 | 部分兼容 | 完全兼容 | 完全兼容 | 原生支持 |
+| 国产 LLM 适配 | 通义/DeepSeek 等 | 基础适配 | 深度适配 (文心/通义/星火) | 需插件 |
+| 多平台支持 | 10+ 主流平台 | 全平台 | 微信/QQ/钉钉/飞书 | 全平台 |
+| 定时任务 | Cron+ 自然语言 | 高级调度 | 中文自然语言 | 完整支持 |
+| 多 Agent 协作 | 基础支持 | 完整支持 | 中文优化 | 原生支持 |
 
 ### 3.3 安全性对比
 
@@ -67,10 +69,10 @@ tags: [AI, OpenClaw, Multi-Agent, 开源框架]
 
 | 项目 | 安全架构 | CVE 漏洞记录 | 离线运行 |
 |------|----------|--------------|----------|
+| Nanobot | 极简攻击面 | 无记录 | 完全支持 |
 | ZeroClaw | Rust 内存安全+WASM 沙箱 | 无记录 | 完全支持 |
 | PicoClaw | 单文件隔离 | 无记录 | 完全支持 |
 | CountBot | 权限分级 + 国内合规加密 | 无记录 | 完全支持 |
-| SuperAGI | 沙箱隔离 | 无记录 | 支持 |
 | OpenClaw | Node.js+ 权限控制 | 多个高危 | 支持 |
 
 > **注意**：OpenClaw 存在多个高危 CVE 漏洞，生产环境需谨慎使用。
@@ -81,10 +83,9 @@ tags: [AI, OpenClaw, Multi-Agent, 开源框架]
 
 | 项目 | 学习曲线 | 自定义难度 | 文档完善度 |
 |------|----------|------------|------------|
+| Nanobot | 极平缓 (半天掌握) | 极易 (纯 Python) | 中 (持续更新) |
 | ZeroClaw | 中 (需 Rust 基础) | 中 (Rust 开发) | 高 |
-| PicoClaw | 平缓 (Go 语言) | 易 (单文件) | 中 |
 | CountBot | 平缓 (中文文档) | 易 (配置优先) | 极高 (中文) |
-| SuperAGI | 中 (Python 生态) | 中 (插件系统) | 高 |
 | OpenClaw | 陡峭 (复杂架构) | 难 (复杂插件) | 极高 |
 
 ---
@@ -92,6 +93,12 @@ tags: [AI, OpenClaw, Multi-Agent, 开源框架]
 ## 4. 选型建议与使用场景
 
 ### 4.1 各项目最佳使用场景
+
+**Nanobot**：
+- AI Agent 初学者/研究者（学习成本最低）
+- 资源受限设备（树莓派、旧电脑）
+- 隐私敏感场景（完全本地运行）
+- 快速原型开发（一天内可完成定制）
 
 **ZeroClaw**：
 - 高安全要求场景（金融、医疗、企业数据）
@@ -109,10 +116,9 @@ tags: [AI, OpenClaw, Multi-Agent, 开源框架]
 - 微信/QQ 等国内平台集成
 - 需要中文自然语言定时任务
 
-**SuperAGI**：
-- 长期运行的多步骤任务
-- 需要上下文保留的场景
-- 需要深度定制的场景
+**IronClaw**：
+- 安全沙箱增强需求
+- 需要 WASM 隔离技能运行环境
 
 ### 4.2 选型决策矩阵
 
@@ -120,14 +126,13 @@ tags: [AI, OpenClaw, Multi-Agent, 开源框架]
 
 | 你的需求 | 首选 | 次选 | 理由 |
 |----------|------|------|------|
-| 学习/研究 | PicoClaw | ZeroClaw | 代码少 + 易理解 |
-| 资源受限环境 | PicoClaw | CountBot | 轻量 + 可离线 |
+| 学习/研究 | Nanobot | ZeroClaw | 代码少 + 易理解 |
+| 资源受限环境 | Nanobot | PicoClaw | 轻量 + 可离线 |
 | 高安全场景 | ZeroClaw | IronClaw | Rust+WASM 沙箱 |
-| 边缘/IoT 设备 | PicoClaw | CountBot | 单文件+<10MB |
-| 国内企业部署 | CountBot | SuperAGI | 中文生态 + 合规 |
-| 快速原型 | PicoClaw | ZeroClaw | 秒级启动 |
+| 边缘/IoT 设备 | PicoClaw | Nanobot | 单文件+<10MB |
+| 国内企业部署 | CountBot | Nanobot | 中文生态 + 合规 |
+| 快速原型 | Nanobot | PicoClaw | 秒级启动 |
 | 生产环境 | ZeroClaw | CountBot | 稳定性 + 安全 |
-| 多 Agent 协作 | SuperAGI | ZeroClaw | 完整协作机制 |
 
 ---
 
@@ -156,17 +161,16 @@ tags: [AI, OpenClaw, Multi-Agent, 开源框架]
 
 通过对六大 OpenClaw 平替项目的深度对比，我们可以得出以下结论：
 
-1. **ZeroClaw** 和 **IronClaw** 采用 Rust+WASM 沙箱，适合 **高安全要求** 的生产环境
-2. **PicoClaw** 单文件<10MB，**无需依赖**，可直接下载产物包使用，是边缘计算、IoT 设备和**网络受限环境**的理想选择
-3. **CountBot** 深度适配国内 LLM 和平台，适合 **国内企业部署**
-4. **SuperAGI** 提供完整的多 Agent 协作机制，适合复杂任务场景
+1. **Nanobot** 凭借 **3,966 行代码** 的极简架构，适合学习研究和快速原型开发
+2. **ZeroClaw** 和 **IronClaw** 采用 Rust+WASM 沙箱，适合 **高安全要求** 的生产环境
+3. **PicoClaw** 单文件<10MB，**无需依赖**，可直接下载产物包使用，是边缘计算、IoT 设备和**网络受限环境**的理想选择
+4. **CountBot** 深度适配国内 LLM 和平台，适合 **国内企业部署**
 
 > **建议**：
-> - **学习和快速原型**：推荐 **PicoClaw**，代码透明易理解，单文件部署
+> - **学习和快速原型**：推荐 **Nanobot**，代码透明易理解，一个下午掌握整个架构
 > - **网络受限/离线环境**：推荐 **PicoClaw**，单文件部署，无需复杂依赖，下载即用
 > - **高安全生产环境**：推荐 **ZeroClaw** 或 **IronClaw**，Rust 内存安全+WASM 沙箱隔离
 > - **国内企业部署**：推荐 **CountBot**，中文生态友好，文档完善
-> - **多 Agent 协作**：推荐 **SuperAGI**，完整的协作机制和记忆系统
 
 选择哪个项目取决于你的具体需求和使用场景，没有绝对的"最好"，只有"最适合"。
 
@@ -174,11 +178,11 @@ tags: [AI, OpenClaw, Multi-Agent, 开源框架]
 
 ## 参考链接
 
+- [Nanobot GitHub](https://github.com/HKUDS/nanobot)
 - [ZeroClaw GitHub](https://github.com/zero-claw)
-- [PicoClaw GitHub](https://github.com/picoclaw)
+- [PicoClaw GitHub](https://github.com/sipeed/picoclaw)
 - [CountBot GitHub](https://github.com/count-bot)
 - [IronClaw GitHub](https://github.com/iron-claw)
-- [SuperAGI GitHub](https://github.com/superagi)
 - [OpenClaw 官方文档](https://docs.openclaw.ai)
 - [MCP 协议规范](https://modelcontextprotocol.io)
 
