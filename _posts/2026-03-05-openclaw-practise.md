@@ -164,7 +164,15 @@ Slash commands:
   * `mcporter-1-0-0`，内容生成：结构化文本生成、特定领域模板填充
   * `local-rag-search`，私有知识库，本地文档检索、RAG (检索增强生成)
   * `first-principles-decomposer`，思维建模：第一性原理拆解、复杂问题结构化分析
-* [clawhub](https://clawhub.ai/)：OpenClaw 的公共 Skills 注册中心
+**技能仓库参考**（按需浏览安装）：
+
+| 仓库 | 说明 |
+|------|------|
+| [ClawHub 官方技能市场](https://clawhub.ai) | 3000+ 官方验证技能，支持分类筛选 |
+| [OpenClaw 官方技能库](https://github.com/openclaw/skills) | 官方维护的基础技能集 |
+| [中文官方技能库](https://github.com/clawdbot-ai/awesome-openclaw-skills-zh) | 中文社区维护，适配国内场景 |
+| [VoltAgent 技能索引](https://github.com/VoltAgent/awesome-openclaw-skills) | ⭐5.3K，700+ 技能覆盖 30+ 领域 |
+
 * 参考的几篇文章
   * [openclaw 新装好，真正值得先装的 10 个 skills，我帮你筛好了](https://mp.weixin.qq.com/s/wFDitFGJUkvklRB2VDbWEw)
   * [这些Skills让OpenClaw把搜索做到极致](https://mp.weixin.qq.com/s/88N4aaOe9__gguQ9wvg4JQ)
