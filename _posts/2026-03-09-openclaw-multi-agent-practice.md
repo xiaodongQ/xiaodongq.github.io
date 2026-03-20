@@ -874,54 +874,6 @@ git diff /root/.openclaw/scripts/message-router.mjs
 
 ---
 
-## 8.5 OpenClaw 技能仓库推荐
-
-在搭建和使用 OpenClaw 一人团队系统时，你可以直接使用现成的技能来扩展 Agent 能力。以下是精选的技能仓库推荐：
-
-### 官方核心仓库
-
-| 仓库 | 说明 | 特点 |
-|------|------|------|
-| **[ClawHub 官方技能市场](https://clawhub.ai)** | 最权威源，收录**3000+**官方验证技能 | 支持按分类筛选，可直接下载 zip 包 |
-| **[OpenClaw 官方技能库](https://github.com/openclaw/skills)** | 官方维护的基础技能集 | 含核心工具与系统级技能，更新稳定 |
-| **[中文官方技能库](https://github.com/clawdbot-ai/awesome-openclaw-skills-zh)** | 中文社区维护 | 适配国内场景，含中文文档处理、办公自动化等技能 |
-
-### 社区精选仓库（离线首选）
-
-| 仓库 | Stars | 说明 |
-|------|-------|------|
-| **[VoltAgent/awesome-openclaw-skills](https://github.com/VoltAgent/awesome-openclaw-skills)** | ⭐5.3K | 生态最完整索引库，700+ 技能覆盖 30+ 领域（开发、办公、自动化等），支持一键安装与离线部署，社区活跃 |
-
-### 技能安装方式
-
-```bash
-# 方式 1：使用 ClawHub CLI（推荐）
-npx clawhub install <skill-name>
-
-# 方式 2：手动下载
-# 从 GitHub 下载技能文件夹，放到 ~/.openclaw/skills/ 目录
-
-# 方式 3：使用 skills 工具
-npx skills add <owner/repo@skill> -g -y
-```
-
-### 常用技能推荐
-
-针对一人团队场景，以下技能特别实用：
-
-| 技能 | 用途 | 推荐指数 |
-|------|------|---------|
-| `web-search` | 联网搜索、资讯调研 | ⭐⭐⭐⭐⭐ |
-| `github` | GitHub 操作、代码查询 | ⭐⭐⭐⭐⭐ |
-| `feishu-doc` | 飞书文档读写 | ⭐⭐⭐⭐ |
-| `notion` | Notion 集成、知识管理 | ⭐⭐⭐⭐ |
-| `coding-agent` | 代码生成、自动编程 | ⭐⭐⭐⭐⭐ |
-| `weather` | 天气查询 | ⭐⭐⭐ |
-
-**提示**：更多技能请访问 [ClawHub 技能市场](https://clawhub.ai) 浏览和安装。
-
----
-
 ## 9. 总结
 
 通过今天的 5 个应用场景，展示了 OpenClaw 一人团队 Multi-Agent 系统的实际能力：
@@ -951,18 +903,9 @@ npx skills add <owner/repo@skill> -g -y
 
 ## 参考链接
 
-### 文档与代码
-
 - [OpenClaw 官方文档](https://docs.openclaw.ai)
 - [CrewAI + LangChain 学习材料包](https://github.com/xiaodongQ/ai-playground/tree/main/learning/crewai-langchain)
 - [一人团队设计文档](https://github.com/xiaodongQ/ai-playground/blob/main/design/一人团队-Multi-Agent-系统设计.md)
-
-### 技能仓库
-
-- [ClawHub 官方技能市场](https://clawhub.ai) - 3000+ 官方验证技能
-- [OpenClaw 官方技能库](https://github.com/openclaw/skills) - 核心工具与系统级技能
-- [中文官方技能库](https://github.com/clawdbot-ai/awesome-openclaw-skills-zh) - 适配国内场景
-- [VoltAgent 技能索引](https://github.com/VoltAgent/awesome-openclaw-skills) - 700+ 技能，社区活跃
 
 ---
 
