@@ -11,6 +11,7 @@ tags: [AI, Agent]
 
 Agent开发实践，相关参考链接：
 * [crewai.cn文档](https://docs.crewai.org.cn/en/quickstart)
+    * crew：[kruː]，团队的意思，CrewAI就是让你像组建团队一样来编排AI Agent
 * AI生成的`CrewAI`和`LangChain`资料：[crewai-langchain-demos](https://github.com/xiaodongQ/ai-playground/tree/main/learning/crewai-langchain/crewai-langchain-demos)
     - 跟着实践的过程中，**发现AI生成的资料有些坑**，比如安装方式是老版本才支持的，**建议还是找官网文档或者他人实践过的文档为准**
 * AI生成的`NanoClaw`资料，学习这个微型龙虾项目以了解`OpenClaw`原理：[nanoClaw-study](https://github.com/xiaodongQ/ai-playground/tree/main/nanoClaw-study)
@@ -162,7 +163,7 @@ research_task:
 ### 3.1. 安装
 
 暂时先用`pip install "crewai[tools]"`方式，和以前习惯一致。
-* 如果要隔离环境安装
+* 如果要**隔离环境**安装（建议）
     * cd到项目路径后`python -m venv venv1`创建虚拟环境（此处虚拟环境叫`venv1`）
     * 然后激活环境`source venv1/bin/activate`
     * 再`pip install`安装
@@ -420,11 +421,11 @@ test_create_project
 ├── src
 │   └── test_create_project
 │       ├── config
-│       │   ├── agents.yaml
-│       │   └── tasks.yaml
-│       ├── crew.py
+│       │   ├── agents.yaml    # Agent配置
+│       │   └── tasks.yaml     # Task配置
+│       ├── crew.py            # 业务定义
 │       ├── __init__.py
-│       ├── main.py
+│       ├── main.py            # 入口文件
 │       └── tools
 │           ├── custom_tool.py
 │           └── __init__.py
@@ -440,13 +441,119 @@ LLM_API_BASE=https://coding.dashscope.aliyuncs.com/v1
 LLM_MODEL=openai/qwen3.5-plus
 ```
 
-3、对模版代码进行修改
+3、对模版代码进行修改，步骤如下
 
 * 修改agents.yaml
 * 修改tasks.yaml
 * 修改crew.py
-* [可选] 添加团队前后函数
+* [可选] 添加团队前后处理函数（使用`@before_kickoff`和`@after_kickoff`装饰器）
 
+4、实际验证
+
+test_create_project/crew.py默认内容：
+
+```sh
+researcher:
+  role: >
+    {topic} Senior Data Researcher
+  goal: >
+    Uncover cutting-edge developments in {topic}
+  backstory: >
+    You're a seasoned researcher with a knack for uncovering the latest
+    developments in {topic}. Known for your ability to find the most relevant
+    information and present it in a clear and concise manner.
+
+reporting_analyst:
+  role: >
+    {topic} Reporting Analyst
+  goal: >
+    Create detailed reports based on {topic} data analysis and research findings
+  backstory: >
+    You're a meticulous analyst with a keen eye for detail. You're known for
+    your ability to turn complex data into clear and concise reports, making
+    it easy for others to understand and act on the information you provide.
+```
+
+#### 3.3.1. 实际运行
+
+**需求丢给AI来修改**：我要修改成一个技术自媒体专家，非常擅长微信小红书抖音运营，并帮我输出可落地的报告
+
+修改后内容可见：[crew_ai_agent_test](https://github.com/xiaodongQ/crew_ai_agent_test.git)
+
+1、agents.yaml：
+
+```yaml
+wechat_specialist:
+  role: >
+    微信运营专家
+  goal: >
+    制定并执行高效的微信平台内容策略，提升用户互动和粉丝增长
+  backstory: >
+    您是微信生态运营领域的资深专家，精通公众号、视频号、朋友圈等微信生态内容创作与运营，
+    熟悉微信用户的使用习惯和算法推荐机制，能够制定出高传播性的内容策略。
+
+xiaohongshu_specialist:
+...
+reporting_analyst:
+...
+```
+
+2、tasks.yaml
+
+```yaml
+wechat_strategy_task:
+  description: >
+    针对人工智能技术主题，制定详细的微信平台运营策略。
+    分析微信生态特点，包括公众号、视频号、朋友圈等渠道，
+    设计适合微信用户的内容形式、发布频率、互动方式，
+    并提供具体的标题、封面图和内容框架建议。
+  expected_output: >
+    一份完整的微信平台运营策略报告，包含：
+    1. 微信生态分析（公众号、视频号、朋友圈）
+    2. 内容策略（选题方向、内容形式、发布计划）
+    3. 互动策略（用户增长、粉丝维护、社群运营）
+    4. 具体执行建议（标题模板、封面设计、内容框架）
+  agent: wechat_specialist
+
+xiaohongshu_strategy_task:
+...
+reporting_task:
+...
+```
+
+3、crew.py和main.py中也有相关修改
+
+4、`crewai run`运行，报告结果在`social_media_report.md`
+```sh
+((venv2) ) [root@xdlinux ➜ test_create_project git:(main) ✗ ]$ ls
+AGENTS.md  pyproject.toml  social_media_report.md  tests
+knowledge  README.md       src
+```
+
+social_media_report.md部分内容：
+
+```sh
+## 1. 各平台对比分析：优劣势、适用场景与用户特征
+### 1.1 平台核心属性对比表
+...
+### 1.2 深度分析与定位建议
+
+*   **微信：信任的基石与变现的终点**
+    *   **定位：** 作为“大本营”，承载最深度的内容和服务。
+    *   **策略：** 利用公众号建立专业权威，利用视频号突破圈层获取公域流量，最终通过企业微信和社群完成高客单价转化（如课程、咨询、企业服务）。
+    *   **关键点：** 必须做好“公域引流 -> 私域沉淀”的路径设计，避免流量浪费。
+
+*   **小红书：精准的搜索引擎与品牌门面**
+    *   **定位：** 作为“名片”与“获客渠道”，吸引追求自我提升和实用工具的年轻群体。
+    *   **策略：** 侧重“颜值”与“实用”，将高技术门槛降维。利用 SEO 优化获取长尾搜索流量（如"AI 怎么写公文”）。
+    *   **关键点：** 封面图决定点击率，干货内容决定收藏率。需注意引流合规性，避免直接导流微信。
+
+*   **抖音：流量的放大器与品牌声量**
+    *   **定位：** 作为“扩音器”，最大化品牌曝光，触达泛人群。
+    *   **策略：** 侧重“视觉冲击”与“节奏感”。利用 AI 生成的惊艳视觉效果吸引停留，通过通俗语言讲解技术。
+    *   **关键点：** 前 3 秒定生死。需高频更新以维持账号权重，适合通过直播进行大规模变现或引流。
+...
+```
 
 ## 4. 问题记录
 
