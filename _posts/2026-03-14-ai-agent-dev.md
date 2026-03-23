@@ -521,9 +521,9 @@ reporting_task:
 ...
 ```
 
-3、crew.py和main.py中也有相关修改
+3、crew.py和main.py中也有相关修改，具体见上面仓库链接
 
-4、`crewai run`运行，报告结果在`social_media_report.md`
+4、`python run_crew.py`运行，报告结果在`social_media_report.md`
 ```sh
 ((venv2) ) [root@xdlinux ➜ test_create_project git:(main) ✗ ]$ ls
 AGENTS.md  pyproject.toml  social_media_report.md  tests
