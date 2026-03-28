@@ -48,9 +48,9 @@ date: 2026-03-28
    - 避免盲目执行导致的返工
 
 2. **项目初始化策略**
-   - 各子目录单独 `git init`，模块化管理
-   - 大目录再 init 顶层仓库，找 Claude 生成 `.claude.md` 规范文件
-   - 分层管理，便于多 Agent 协作
+   - 各子目录分别执行 `claude init`，生成独立的 `SKILL.md` 或规范
+   - 总目录下再执行一次 `claude init`，作为索引说明，汇总各子目录功能
+   - 分层管理，便于多 Agent 协作和知识隔离
 
 ### 2.3. Agent 开发
 
@@ -61,17 +61,19 @@ date: 2026-03-28
 
 ### 2.4. Agent Skill 设计模式
 
-谷歌近期发布的 **5 个 Agent Skill 设计模式**（实践经验总结）：
+谷歌近期发布的 **5 个 Agent Skill 设计模式**（原文：[@GoogleCloudTech](https://x.com/GoogleCloudTech/status/2033953579824758855)，作者 @Saboo_Shubham_ 和 @lavinigam）：
 
-| 模式 | 适用场景 | 核心思想 |
-|------|---------|---------|
-| **1. Planner-Executor** | 复杂任务分解 | 规划器负责拆解，执行器负责落地 |
-| **2. Critic-Refiner** | 质量敏感任务 | 批评者找问题，优化者迭代改进 |
-| **3. Router-Specialist** | 多领域任务 | 路由器识别意图，分派给专业 Agent |
-| **4. Memory-Augmented** | 长上下文任务 | 外挂记忆库，突破上下文限制 |
-| **5. Human-in-the-Loop** | 高风险决策 | 关键节点引入人工确认 |
+| 模式 | 解决的问题 | 核心思路 |
+|------|-----------|---------|
+| **1. Tool Wrapper（工具包装器）** | Agent 需要特定库/框架的专业知识 | 按需加载知识，不硬编码到 system prompt |
+| **2. Generator（生成器）** | 每次生成的文档结构不一致 | 模板 + 风格指南约束输出格式 |
+| **3. Reviewer（审查器）** | 代码审查标准散落、不可维护 | 检查清单可插拔，分离"查什么"和"怎么查" |
+| **4. Inversion（反转）** | Agent 信息不足时就猜测执行 | 翻转控制流：Agent 当采访者，先问再做 |
+| **5. Pipeline（流水线）** | 复杂任务中 Agent 跳过步骤 | 钻石门控强制执行严格顺序，每步确认 |
 
-> 实践建议：根据任务复杂度选择模式，简单任务用单 Agent，复杂任务用多模式组合。
+> 参考阅读：[Agent Skill 的五种设计模式：从 SKILL.md 格式到内容设计](https://cobb789.ofox.ai/posts/agent-skill-design-patterns-adk/)
+>
+> 实践建议：模式可组合使用（如 Pipeline + Reviewer），根据任务复杂度选择。Inversion 模式被低估——强制"先问再做"能避免 80% 无用输出。
 
 ### 2.5. 其他工具
 
