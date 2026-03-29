@@ -122,9 +122,75 @@ Claude Code实战手记，持续更新实践和技巧。
 * Skills：编写详细的 Skill 描述文案。Claude 决定是否调用该工具，取决于对该工具用途的定义。例如：添加视觉理解能力Skill。
 * Skills vs MCP：Skills 教会 Claude “怎么做”（工作流知识），MCP 给 Claude“做的工具”（外部接口）。两者互补，Skills 也可集成外部接口。
 
+### 4.2. Skills
+
+Agent Skills（智能体技能）是将专业知识、工作流规范固化为可复用资产的核心工具。本质上是一个模块化的 Markdown 文件，能教会 AI 工具 （如 Claude、GitHub Copilot、Cursor 等） 执行特定任务，且支持自动触发、团队共享与工程化管理，彻底告别重复的提示词输入。
+
+Agent Skills 的关键是**渐进式披露**，分三层加载：
+* 层级 1：技能发现 -- AI 先读取所有技能的元数据（name 和 description），判断任务是否相关，这些元数据始终在系统提示中
+* 层级 2：加载核心指令 -- 如果相关，AI 自动读取 SKILL.md 的正文内容，获取详细指导
+* 层级 3：加载资源文件 -- 只在需要时读取额外文件（如脚本、示例），或通过工具执行脚本
+
+#### 4.2.1. 手动添加Skill示例
+
+这里添加一份Skill，添加视觉理解能力（部分模型可能已经默认具备视觉能力了，如`qwen3.5-plus`，这里假设切换的模型不支持）。
+
+1、在项目目录（按需看是否要全局目录）的`.claude`目录中，新建`skills/image-analyzer`目录，`image-analyzer`即Skill名  
+2、在该目录下创建`SKILL.md`文件，并写入下述内容
+
+```yaml
+---
+name: image-analyzer
+description: 帮助没有视觉能力的模型进行图像理解。当需要分析图像内容、提取图片中的信息、文字、界面元素，或理解截图、图表、架构图等任何视觉内容时，使用此技能，传入图片路径即可获得描述信息。
+model: qwen3.5-plus
+---
+qwen3.5-plus具有视觉理解能力，请直接使用qwen3.5-plus模型进行图片理解。
+```
+
+目录结构如下（或放全局里），`claude`重新进入，`/skills`即可看到：`image-analyzer · ~26 description tokens`
+
+```sh
+[root@xdlinux ➜ skills ]$ pwd
+/root/.claude/skills
+[root@xdlinux ➜ skills ]$ tree
+.
+└── image-analyzer
+    └── SKILL.md
+```
+
+删除Skills：直接删除相应文件，`rm -rf /root/.claude/skills/<skill-name>`
+
+参考自：[百炼 -- 添加视觉理解能力](https://help.aliyun.com/zh/model-studio/add-vision-skill?spm=a2c4g.11186623.help-menu-2400256.d_0_2_3_1.51165152hkJMsy&scm=20140722.H_3023166._.OR_help-T_cn~zh-V_1)
+
+#### 4.2.2. Skills编写最佳实践
+
+为避免上下文膨胀，**推荐目录结构**：
+
+* 核心规则 → SKILL.md
+  * 在 SKILL.md 中引用其他文件或者目录，比如md里说明：
+    * 查看示例 commit：./examples/good-commit.txt
+    * 运行脚本：使用工具执行 ./scripts/process.py
+* 详细资料 → 单独文件
+* 实用逻辑 → 脚本执行（不加载）
+
+```sh
+my-skill/
+├── SKILL.md
+├── reference.md   # 存放参考文档，也可以增加一个 references 目录
+├── examples.md    # 存放示例文件，也可以增加一个 examples 目录
+└── scripts/
+    └── helper.py
+```
+
+Skills 存放在 `~/.claude/skills/`（个人全局）或项目目录下的 `.claude/skills/`（项目专用）。
+
+创建Skill后，Claude执行任务就会扫描已安装的 Skills，发现你的请求有涉及就会调用。
+
+### 4.3. MCP
+
 查看当前已安装的MCP工具：`claude mcp list`
 
-### 4.2. 添加MCP示例
+**手动添加MCP示例：**
 
 在MCP广场找到MCP（暂时用阿里百炼里的MCP），开通并添加：
 `claude mcp add WebSearch https://dashscope.aliyuncs.com/api/v1/mcps/WebSearch/mcp -t http -H "Authorization: Bearer sk-sp-xxxxxxxxxxxx(相应的API Key)"`
@@ -158,40 +224,44 @@ File modified: /root/.claude.json [project: /home/workspace/tmpdir]
 
 参考自：[百炼 -- 添加联网搜索MCP](https://help.aliyun.com/zh/model-studio/web-search-for-coding-plan?spm=a2c4g.11186623.help-menu-2400256.d_0_2_3_0.52807719hn0Yus)
 
-### 4.3. 添加Skill示例
+### 4.4. 插件
 
-这里添加一份Skill，添加视觉理解能力（部分模型可能已经默认具备视觉能力了，如`qwen3.5-plus`，这里假设切换的模型不支持）。
+**插件（Plugin）**是 Claude Code 中最高级别的扩展机制，用于将`command`、`agent`、`Skills`、`钩子`、`MCP`、`LSP` 等能力打包、版本化、共享和分发。
 
-1、在项目目录（按需看是否要全局目录）的`.claude`目录中，新建`skills/image-analyzer`目录，`image-analyzer`即Skill名  
-2、在该目录下创建`SKILL.md`文件，并写入下述内容
+**插件 = 一组可复用的 Claude Code 扩展能力集合**
 
-```yaml
----
-name: image-analyzer
-description: 帮助没有视觉能力的模型进行图像理解。当需要分析图像内容、提取图片中的信息、文字、界面元素，或理解截图、图表、架构图等任何视觉内容时，使用此技能，传入图片路径即可获得描述信息。
-model: qwen3.5-plus
----
-qwen3.5-plus具有视觉理解能力，请直接使用qwen3.5-plus模型进行图片理解。
-```
+> 插件的核心目标只有一个：让 Claude Code 的能力像工具箱"一样被复用，而不是每个项目重复配置。**实现 "一次打包，多环境使用"**
 
-目录结构如下（我放在了全局里），`claude`重新进入，`/skills`即可看到：`image-analyzer · ~26 description tokens`
+* 什么时候用独立配置？
+  * 个人使用、单项目、快速实验、想要简短命令名（如 /review）
+* 什么时候用插件？
+  * 团队共享、跨项目、版本化控制
+* **最佳实践**：先在 `.claude/` 中迭代 → 稳定后打包为插件
+
+可见：[Claude Code插件](https://www.runoob.com/claude-code/claude-code-plugins.html)
+
+#### 4.4.1. 插件管理命令
 
 ```sh
-[root@xdlinux ➜ skills ]$ pwd
-/root/.claude/skills
-[root@xdlinux ➜ skills ]$ tree
-.
-└── image-analyzer
-    └── SKILL.md
+/plugin                # 打开插件管理器
+/plugin install         # 安装插件
+/plugin uninstall       # 卸载
+/plugin enable/disable  # 启用 / 禁用（回车后会进入选择页面）
+/plugin marketplace add # 添加市场
+/plugin marketplace rm  # 移除市场
 ```
 
-删除Skills：直接删除相应文件，`rm -rf /root/.claude/skills/<skill-name>`
+添加插件：
+* 在线方式：`/plugin marketplace add xxx`，而后`/plugin install xxx`
+* 离线方式：以`claude-hud`为例
+  * 1、克隆 claude-hud 仓库
+    * `git clone https://github.com/jarrodwatts/claude-hud.git`
+  * 2、添加仓库：`/plugin marketplace add 本地路径/claude-hud`
+  * 3、安装：`/plugin install claude-hud`
 
-参考自：[百炼 -- 添加视觉理解能力](https://help.aliyun.com/zh/model-studio/add-vision-skill?spm=a2c4g.11186623.help-menu-2400256.d_0_2_3_1.51165152hkJMsy&scm=20140722.H_3023166._.OR_help-T_cn~zh-V_1)
+下面是几个推荐插件。
 
-### 4.4. 推荐插件
-
-#### 4.4.1. Superpowers 插件
+#### 4.4.2. Superpowers 插件
 
 Superpowers 是一个 Claude Code 增强插件，安装后 AI 会自动获得一套完整的工作流技能——从需求分析、方案设计、代码编写到测试验证，全程自主完成。具体见：[Superpowers 插件](https://claude-zh.cn/guide/superpowers#superpowers-%E6%8F%92%E4%BB%B6)
 
@@ -215,6 +285,47 @@ Superpowers 会自动：
 
 整个过程中 AI 会在关键节点询问你的意见，你只需要回答即可。
 
+#### 4.4.3. claude-hud
+
+提供实时会话状态监控（Token 用量、上下文进度、工具调用状态等）
+
+> 除了在线安装，这里也补充下离线方式，见 [claude-hud-offline-install](https://github.com/xiaodongQ/ai-playground/blob/main/docs/claude-hud-offline-install.md)
+
+```sh
+# 1. 添加插件市场源（首次安装）
+# 作用：将 claude-hud 的 GitHub 仓库添加为插件市场源
+/plugin marketplace add jarrodwatts/claude-hud
+
+# 2. 安装插件
+/plugin install claude-hud
+
+# 3. 初始化 HUD 配置
+# 自动配置状态栏，启用 HUD 显示
+/claude-hud:setup
+# 会自动进行配置，执行后如下：
+    # 我来帮你配置 claude-hud。首先让我检测一下当前的安装状态。
+    # ● Bash(CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"   CACHE_EXISTS=$(ls -d "$CLAUDE_DIR/plugins/cache/claude-hud" 2>/dev/null && echo "YES" || echo "NO")…)
+    #   ⎿  (eval):4: no matches found: /root/.claude/plugins/cache/temp_local_*  
+    #      Cache: /root/.claude/plugins/cache/claude-hud
+    #      YES | Registry: YES | Temp: none     
+    # ...
+    
+```
+
+安装成功验证：应显示 HUD 界面（底部状态栏）
+
+观察会话底部出现：
+* Token 计数器：显示当前上下文占用 Token 数
+* 上下文进度条：直观显示上下文接近上限程度
+* 工具调用状态：显示正在执行的工具及进度
+* 任务进度：多步骤任务时显示完成百分比
+
+状态显示项先都启用，效果如下：
+* 能实时展示coding plan的进度情况，还是很方便的
+
+![claude-hud状态栏效果](/images/2026-03-29-claude-code-hud.png)
 
 
+## 参考
 
+* [菜鸟教程 -- Agent Skills（智能体技能）](https://www.runoob.com/claude-code/claude-agent-skills.html)
