@@ -33,6 +33,8 @@ date: 2026-03-28
         - 主题系统：内置 240+ 配色方案，支持动态切换，可自定义窗口框架、标签栏样式
         - 事件钩子：支持启动、退出、窗口创建 / 关闭等事件的自定义脚本，可集成第三方工具
         - 插件生态：通过 Lua 脚本扩展功能，支持自定义状态栏、快捷键、工作区管理
+    - 配置可以参考：[wezterm-config](https://github.com/QianSong1/wezterm-config)，使用了一下，快捷键和样式都挺好，也[fork](https://github.com/xiaodongQ/wezterm-config)了一份。
+      - 尤其是 `ctrl + alt + |或/`来分屏，并用 `ctrl + alt + j/k/h/l` 来切换，跟vim+tmux的体验一样
   
 - （备选方案） **Windows Terminal + PowerShell 7**
   - Windows Terminal：微软官方终端，支持多标签、分屏、GPU 加速
@@ -41,7 +43,8 @@ date: 2026-03-28
 
 ### 2.2. Claude Code 工具链
 
-#### 核心仓库
+#### 2.2.1. 核心仓库
+
 - **everything claude code** - Claude Code 资源聚合仓库，收录插件、脚本、使用技巧
 
 #### 2.2.2. 推荐插件和工具
@@ -112,6 +115,7 @@ date: 2026-03-28
 Harness Engineering（驾驭工程）是围绕 AI 智能体设计和构建约束机制、反馈回路、工作流控制和持续改进循环的系统工程实践。它不优化模型本身，而是优化模型运行的"环境"。核心哲学八个字：**人类掌舵，智能体执行**（Human Steer, Agent Execute）。
 
 #### 3.1.1. AI 工程范式的三次跃迁
+
 | 阶段                    | 核心          | 局限                           |
 | ----------------------- | ------------- | ------------------------------ |
 | **Prompt Engineering**  | 提示词优化    | 依赖单次输入，难以处理复杂任务 |
@@ -120,4 +124,3 @@ Harness Engineering（驾驭工程）是围绕 AI 智能体设计和构建约束
 
 ---
 
-*最后更新：2026-03-28*
