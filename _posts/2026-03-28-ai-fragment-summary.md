@@ -35,6 +35,8 @@ date: 2026-03-28
         - 插件生态：通过 Lua 脚本扩展功能，支持自定义状态栏、快捷键、工作区管理
     - 配置可以参考：[wezterm-config](https://github.com/QianSong1/wezterm-config)，使用了一下，快捷键和样式都挺好，也[fork](https://github.com/xiaodongQ/wezterm-config)了一份。
       - 尤其是 `ctrl + alt + |或/`来分屏，并用 `ctrl + alt + j/k/h/l` 来切换，跟vim+tmux的体验一样
+      - 进一步提升体验：安装`PowerShell 7`，并且`wezterm`脚本里配置，可体验新版本PowerShell带来的效率提升（如自动补全）
+        - 比如这里的配置：[wezterm配置分享](https://zhuanlan.zhihu.com/p/1973514411802108537)
   
 - （备选方案） **Windows Terminal + PowerShell 7**
   - Windows Terminal：微软官方终端，支持多标签、分屏、GPU 加速
