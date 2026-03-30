@@ -41,8 +41,8 @@ date: 2026-03-28
 
 ### 2.2. Claude Code 工具链
 
-#### 2.2.1. 核心仓库
-- **everything+claude+code** - Claude Code 资源聚合仓库，收录插件、脚本、使用技巧
+#### 核心仓库
+- **everything claude code** - Claude Code 资源聚合仓库，收录插件、脚本、使用技巧
 
 #### 2.2.2. 推荐插件和工具
 
@@ -60,7 +60,7 @@ date: 2026-03-28
    - 避免盲目执行导致的返工
 
 2. **项目初始化策略**
-   - 各子目录分别执行 `claude init`，生成独立的 `SKILL.md` 或规范
+   - 各子目录分别执行 `claude init`，生成独立的 md 文档（如 README.md、规范文档）
    - 总目录下再执行一次 `claude init`，作为索引说明，汇总各子目录功能
    - 分层管理，便于多 Agent 协作和知识隔离
 
