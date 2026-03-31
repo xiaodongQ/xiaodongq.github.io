@@ -1,7 +1,7 @@
 ---
 title: AI Agent学习实践笔记（三） -- RAG系统
 description: HuggingFace AI Agents Course学习笔记，RAG系统
-categories: [AI, LLM]
+categories: [AI, Agent开发]
 tags: [AI, LLM, RAG]
 ---
 

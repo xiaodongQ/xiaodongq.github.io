@@ -1,6 +1,6 @@
 ---
-title: AI 能力集 -- AI 碎片知识小结
-categories: [AI, AI 能力集]
+title: AI能力集 -- AI 碎片知识小结
+categories: [AI, AI能力集]
 tags: [AI, 工具链，Agent]
 date: 2026-03-28
 ---

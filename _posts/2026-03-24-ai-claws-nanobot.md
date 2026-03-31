@@ -1,6 +1,6 @@
 ---
-title: AI能力集 -- Nanobot框架源码解析
-categories: [AI, AI能力集]
+title: OpenClaw系列 -- Nanobot框架源码解析
+categories: [AI, OpenClaw系列]
 tags: [AI, Nanobot, 开源框架]
 ---
 

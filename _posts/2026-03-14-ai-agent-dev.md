@@ -1,7 +1,7 @@
 ---
 title: AI能力集 -- Agent开发实践
 description: Agent开发实践记录
-categories: [AI, AI能力集]
+categories: [AI, Agent开发]
 tags: [AI, Agent]
 ---
 

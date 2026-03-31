@@ -1,7 +1,7 @@
 ---
-title: AI能力集 -- Claude Code实战手记
+title: Claude Code系列 -- Claude Code实战手记
 description: Claude Code实战手记，持续更新实践和技巧
-categories: [AI, AI能力集]
+categories: [AI, Claude Code系列]
 tags: [AI, Claude Code]
 ---
 

@@ -1,7 +1,7 @@
 ---
 title: AI Agent学习实践笔记（二） -- Agent框架：smolagents
 description: HuggingFace AI Agents Course学习笔记，unit2 -- Agent框架
-categories: [AI, LLM]
+categories: [AI, Agent开发]
 tags: [AI, LLM]
 ---
 
