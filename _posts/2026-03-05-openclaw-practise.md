@@ -1,7 +1,7 @@
 ---
-title: AI能力集 -- OpenClaw实战手记
+title: OpenClaw系列 -- OpenClaw实战手记
 description: OpenClaw实战手记，持续更新实践和技巧
-categories: [AI, AI能力集]
+categories: [AI, OpenClaw系列]
 tags: [AI, OpenClaw]
 ---
 
