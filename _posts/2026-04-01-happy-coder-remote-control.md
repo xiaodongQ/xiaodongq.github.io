@@ -260,12 +260,41 @@ chmod -R 755 ~/happy_workspace
 
 ---
 
+## 实战案例：手机远程分析 claw-code 项目
+
+有了 happy-coder，我可以在手机上随时随地让 Claude Code 处理复杂任务。比如最近 Claude Code 源码泄露事件，我用手机让 Claude Code 分析了别人用 Rust 重写的版本。
+
+**任务**：分析 https://github.com/instructkr/claw-code 的架构，梳理代码结构。
+
+**手机操作流程**：
+
+1. 打开 happy-coder App，连接到 `xdlinux` 服务器
+2. 输入指令，让 Claude Code 分析仓库
+3. Claude Code 自动：
+   - Clone 仓库
+   - 分析代码结构
+   - 生成架构报告
+   - 输出待办清单
+
+![Claw Code 架构分析报告](/images/2026-04-01-claw-code-analysis.webp)
+
+**结果**：
+- ✅ 识别出项目定位：Claude Code 的 Python/Rust 重构版本
+- ✅ 梳理了仓库状态：Rust 分支 (dev/rust) 正在积极开发中
+- ✅ 生成了完整的架构与代码梳理报告
+- ✅ 待办清单清晰展示分析进度
+
+这就是移动远程开发的魅力——人不在电脑前，也能让 AI 助手处理复杂的技术任务。
+
+---
+
 ## 参考资源
 
 - **我用手机玩 Claude/Codex，直接控制终端！**  
   https://mp.weixin.qq.com/s/wk5P9PAwj0janrh50ccSxg  
   👈 强烈推荐！这是小龙虾的详细配置教程，手把手教学
 
+- **Claw Code 项目**: https://github.com/instructkr/claw-code
 - **happy 官方仓库**: https://github.com/slopus/happy
 - **hapi 官方仓库**: https://github.com/tiann/hapi
 - **Claude Code 官方**: https://docs.anthropic.com/claude-code/
