@@ -419,11 +419,6 @@ total 32K
 可参考：[龙虾AI一键发公众号](https://mp.weixin.qq.com/s/iptFNrUR-OJZhbaWHgRVyA)
 
 skills说明：
-* `wechat-article-writer`（文章写手），这个Skill能帮你：
-  * 自动搜索资料
-  * 生成1000-1500字高质量文章
-  * 生成5个爆款标题
-  * 提供排版优化建议
 * `baoyu-post-to-wechat`（发布助手），这个Skill能帮你：
   * 一键发布到公众号
   * 支持多种排版主题
@@ -433,8 +428,8 @@ skills说明：
 
 安装：
 ```sh
-# 安装文章写手
-npx skills add iamzhihuix/happy-claude-skills@wechat-article-writer -g -y
 # 安装发布助手
-npx skills add jimliu/baoyu-skills@baoyu-post-to-wechat -g -y
+# npx skills add jimliu/baoyu-skills@baoyu-post-to-wechat -g -y
+# 小龙虾市场安装
+clawhub install baoyu-post-to-wechat
 ```
