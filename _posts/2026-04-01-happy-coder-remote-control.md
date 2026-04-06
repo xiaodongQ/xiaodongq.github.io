@@ -20,7 +20,7 @@ tags: [Claude Code, happy-coder]
 
 happy-coder 是连接手机和服务器的桥梁。在服务器上npm安装：`npm install -g happy-coder`。
 
-`happy auth login`启动服务（让小龙虾自动执行了，若手动操作可参考上面链接）
+`happy claude`启动服务，会出来扫描和URL（让小龙虾自动执行了，若手动操作可参考上面链接）
 
 ### 2.2. 手机端安装
 
