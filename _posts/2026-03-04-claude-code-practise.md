@@ -489,8 +489,30 @@ Agent teams 和 subagents的对比可见：[协调 Claude Code 会话团队](htt
 }
 ```
 
-对话直接让Claude Code创建团队即可：  
+对话直接让Claude Code创建团队即可，比如：`帮我创建一个团队各自分析当前仓库下的不同目录内容`，比顺序分析速度快很多
+
 ![agent teams示例](/images/2026-04-09-agent-teams.png)
+
+### 6.3. 多agent各自显示窗格
+
+这个功能比较酷炫，见上面参考链接的“选择显示模式”章节。
+
+Agent teams 支持两种显示模式：
+* `in-process`：所有队友在你的主终端内运行。使用 `Shift+Down` 循环浏览队友并输入以直接向他们发送消息。（试了笔记本上，用`上下键`即可，不用`shift`，状态栏会提示按键作用）
+* `split panes`，每个队友获得自己的窗格。可以同时看到每个人的输出，并点击窗格直接交互。可以设置`tmux` 或 `iTerm2`。默认值是 "auto"，如果已经在 `tmux` 会话中运行，则使用分割窗格，否则使用 `in-process`。
+
+配置文件里，注意是`~/.claude.json`，这里设置`tmux`（系统先安装）：
+
+```json
+{
+  "teammateMode": "tmux"
+}
+```
+
+主窗口会提示： view teammates: `tmux -L claude-swarm-1001179 a`
+
+开一个新终端执行`tmux -L claude-swarm-1001179 a`，效果如下：  
+![agent-teams-tmux](/images/2026-04-09-agent-teams-tmux.png)
 
 ## 7. 参考
 
