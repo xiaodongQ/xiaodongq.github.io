@@ -11,7 +11,7 @@ Claude Code实战手记，持续更新实践和技巧。
 
 ## 2. 安装和基本使用
 
-基本安装和配置就不单独说了，基本步骤：通过`npm`安装（可设置一下国内镜像源） -> 配置API。具体步骤可见：[Claude Code安装和使用](https://github.com/xiaodongQ/devNoteBackup/blob/master/%E5%90%84%E5%88%86%E7%B1%BB%E8%AE%B0%E5%BD%95/AI%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0.md#%E5%AE%89%E8%A3%85)。
+基本安装和配置就不单独说了，基本步骤：通过`npm install -g @anthropic-ai/claude-code`安装（可设置一下国内镜像源） -> 配置API。具体步骤可见：[Claude Code安装和使用](https://github.com/xiaodongQ/devNoteBackup/blob/master/%E5%90%84%E5%88%86%E7%B1%BB%E8%AE%B0%E5%BD%95/AI%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%AD%A6%E4%B9%A0%E7%AC%94%E8%AE%B0.md#%E5%AE%89%E8%A3%85)。
 
 执行`claude`即可执行：
 
@@ -109,7 +109,7 @@ Claude Code实战手记，持续更新实践和技巧。
 
 `/memory`设置记忆，可以选择全局级别还是当前项目级别。选择后会自动打开相应的`CLAUDE.md`文件，比如设置中文环境，增加：`与用户交流始终使用中文。`；也可以之间vim编辑相应`CLAUDE.md`文件。
 
-[memory设置](/images/2026-03-06-claude-memory.png)
+![memory设置](/images/2026-03-06-claude-memory.png)
 
 ## 4. MCP、Skill和插件
 
@@ -327,17 +327,20 @@ Superpowers 会自动：
 
 说到这里，Claude Code的`/buddy`宠物展示，要取消的话，执行：`/buddy off`。
 
-## 5. Claude Code 15 个被低估的功能
+## 5. Claude Code 几个被低估的功能
 
-实践一下宝玉发的这篇文章中，涉及的其中几个功能：[Claude Code 15 个被低估的功能，创建者亲述](https://mp.weixin.qq.com/s/dxIFKYaKhoCDcPaCn3x6MA)。
+实践一下这篇文章中，涉及的其中几个功能：[Claude Code 15 个被低估的功能，创建者亲述](https://mp.weixin.qq.com/s/dxIFKYaKhoCDcPaCn3x6MA)。
 
 关于创始人`Boris Cherny`，可了解 [Claude Code 一周年：Boris Cherny 访谈中最值得开发者深思的 5 件事](https://www.ginonotes.com/posts/boris-cherny-insights-for-developers)。
 
 
-1、会话远程切换功能、Cowork Dispatch远程操控桌面端
-* 自己用`happy-coder`，貌似不需要了。可见：[用手机远程控制Claude Code](https://xiaodongq.github.io/2026/04/01/happy-coder-remote-control/)
+### 5.1. 会话远程切换功能、Cowork Dispatch远程操控桌面端
 
-**2、定时自动化：`/loop` 和 `/schedule`**（创始人说这是 Claude Code **<mark>最强大的两个功能</mark>**）
+自己用`happy-coder`，貌似不需要了。可见：[用手机远程控制Claude Code](https://xiaodongq.github.io/2026/04/01/happy-coder-remote-control/)
+
+### 5.2. 定时自动化：`/loop` 和 `/schedule`
+
+**（创始人说这是 Claude Code **<mark>最强大的两个功能</mark>**）
 
 **Boris 的建议：把工作流变成 skill + loop 的组合**
 * 这可能是整个帖子里最有想象力的部分，把 Claude 从“你问它答”变成了后台持续运行的自动化工人。
@@ -364,15 +367,21 @@ Superpowers 会自动：
   ...
 ```
 
-3、`Hooks`（钩子）：在代理生命周期中插入确定性逻辑
-* `SessionStart`：每次启动时动态加载上下文
-* `PreToolUse`：每次执行 bash 命令（工具）前记录日志
-* `PermissionRequest`：把权限请求发到IM，远程批准或拒绝
-* `Stop`：Claude 停下来时自动催它继续
+### 5.3. `Hooks`（钩子）：在代理生命周期中插入确定性逻辑
 
-4、会话分叉
-* 两种方式：在当前会话里运行 `/branch`，或从命令行运行 `claude --resume <session-id> --fork-session`
-* 场景：探索不同方案时有用。让 Claude 做到一半，想试另一个方向，分叉出去两边互不影响。
+`SessionStart`：每次启动时动态加载上下文
+
+`PreToolUse`：每次执行 bash 命令（工具）前记录日志
+
+`PermissionRequest`：把权限请求发到IM，远程批准或拒绝
+
+`Stop`：Claude 停下来时自动催它继续
+
+### 5.4. 会话分叉
+
+两种方式：在当前会话里运行 `/branch`，或从命令行运行 `claude --resume <session-id> --fork-session`
+
+场景：探索不同方案时有用。让 Claude 做到一半，想试另一个方向，分叉出去两边互不影响。
 
 ```sh
 ❯ /branch 
@@ -395,14 +404,19 @@ Superpowers 会自动：
 
 另外，在shell终端执行 `claude -r 4bc1ad63-b6e8-4835-b1a1-525247070857`，可恢复`/branch`之前会话的记录
 
-5、`/btw`（即by the way）：边工作边问问题 （这个平时用得多些）
-* Claude 执行任务的过程中，用 /btw 可以插入快速问题，不打断正在进行的工作。单轮问答，不会调用工具，但能看到当前会话的完整上下文。
+### 5.5. `/btw`（即by the way）：边工作边问问题 
 
-6、`Git Worktrees`：并行开发的基础设施
-* Git 工作树（worktrees）允许你在同一个仓库里同时检出多个分支到不同目录，互不干扰。Claude Code 对工作树有深度支持。
+（这个平时用得多些）
 
-7、`/batch`：大规模并行修改
-* `/batch` 先和你沟通需求，然后把任务扇出给多个工作树代理并行执行，数量可以是几十个、几百个甚至上千个。适用于大规模代码迁移和其他可并行化的工作。
+Claude 执行任务的过程中，用 /btw 可以插入快速问题，不打断正在进行的工作。单轮问答，不会调用工具，但能看到当前会话的完整上下文。
+
+### 5.6. `Git Worktrees`：并行开发的基础设施
+
+Git 工作树（worktrees）允许你在同一个仓库里同时检出多个分支到不同目录，互不干扰。Claude Code 对工作树有深度支持。
+
+### 5.7. `/batch`：大规模并行修改
+
+`/batch` 先和你沟通需求，然后把任务扇出给多个工作树代理并行执行，数量可以是几十个、几百个甚至上千个。适用于大规模代码迁移和其他可并行化的工作。
 * 前提是你的任务确实可以并行化，而且有足够的测试来验证批量修改没出问题。
 
 未指定指令时会交互提示：
@@ -424,16 +438,61 @@ Superpowers 会自动：
 ❯ /batch  <instruction>                                                       
 ```
 
-8、`--bare`：SDK 启动提速最多 10 倍
-* 写自动化脚本和 CI/CD 集成的人注意这条。加上 --bare 跳过不必要的配置加载，速度提升明显。
+### 5.8. `--bare`：SDK 启动提速最多 10 倍
 
-9、`--add-dir`：跨仓库工作
-* 在一个仓库启动 Claude，用 `--add-dir`（或 `/add-dir`）让它看到并操作另一个仓库。
+写自动化脚本和 CI/CD 集成的人注意这条。加上 --bare 跳过不必要的配置加载，速度提升明显。
 
-10、`--agent`：自定义代理
-* 在 .claude/agents 目录下定义代理，用 claude --agent=<名字> 启动。可以给代理设定专属的系统提示词和工具集。
-* 自定义代理的价值在于专业化。与其让一个通用 Claude 处理所有事，不如为代码审查、写测试、写文档各创建一个专用代理，每个加载不同的上下文和工具。这和前面 skill + loop 的思路是一脉相承的。
+### 5.9. `--add-dir`：跨仓库工作
 
-## 6. 参考
+在一个仓库启动 Claude，用 `--add-dir`（或 `/add-dir`）让它看到并操作另一个仓库。
+
+### 5.10. `--agent`：自定义代理
+
+在 `.claude/agents` 目录下定义代理，用 `claude --agent=<名字>` 启动。可以给代理设定专属的系统提示词和工具集。
+
+自定义代理的价值在于专业化。与其让一个通用 Claude 处理所有事，不如为代码审查、写测试、写文档各创建一个专用代理，每个加载不同的上下文和工具。这和前面 skill + loop 的思路是一脉相承的。
+
+## 6. agent teams（智能体团队）
+
+协调多个 Claude Code 实例作为一个团队一起工作，具有共享任务、代理间消息传递和集中管理。
+* Agent teams 需要 Claude Code `v2.1.32` 或更高版本。使用 `claude --version` 检查版本。
+* 本地版本：`2.1.97 (Claude Code)`
+
+> Agent teams 是实验性功能，默认禁用。通过将 CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS 添加到你的 settings.json 或环境变量来启用它们。
+
+### 6.1. 使用场景
+
+Agent teams最适合用于并行探索能增加真实价值的任务：
+* 研究和审查：多个队友同时调查问题的**不同方面**，然后**分享和质疑彼此的发现**
+* 新模块或功能：各自拥有一个**独立**的部分
+* **并行测试不同的理论**，更快地收敛到答案
+* 跨层协调：**跨越前端、后端和测试**的更改，每个由不同的队友负责
+
+注意：Agent teams 增加了协调开销，使用的token数量明显多于单个会话。
+
+* **建议场景**：当队友可以**独立运作**时，它们效果最好。
+* **不建议场景**：对于**顺序任务**、同一文件编辑或有许多**依赖关系**的工作，单个会话或 `subagents` 更有效。
+
+Agent teams 和 subagents的对比可见：[协调 Claude Code 会话团队](https://code.claude.com/docs/zh-CN/agent-teams)
+* Subagents 仅向主代理报告结果，彼此不交谈
+* 在 agent teams 中，队友共享任务列表、认领工作并直接相互通信
+
+### 6.2. 使用方式
+
+配置文件`~/.claude/settings.json`中，设置环境变量。
+
+```json
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  }
+}
+```
+
+对话直接让Claude Code创建团队即可：  
+![agent teams示例](/images/2026-04-09-agent-teams.png)
+
+## 7. 参考
 
 * [菜鸟教程 -- Agent Skills（智能体技能）](https://www.runoob.com/claude-code/claude-agent-skills.html)
+* [Claude Code Docs](https://code.claude.com/docs/zh-CN/agent-teams)
