@@ -325,6 +325,38 @@ Superpowers 会自动：
 
 ![claude-hud状态栏效果](/images/2026-03-29-claude-code-hud.png)
 
+此处贴一下相关配置（都开启了），也可以直接新增编辑该文件：  
+```sh
+[MacOS-xd@qxd ➜ ~ ]$ cat ~/.claude/plugins/claude-hud/config.json
+{
+  "lineLayout": "compacted",
+  "showSeparators": false,
+  "language": "en",
+  "gitStatus": {
+    "enabled": true,
+    "showDirty": true,
+    "showAheadBehind": false,
+    "showFileStats": false
+  },
+  "display": {
+    "showModel": true,
+    "showContextBar": true,
+    "showTools": true,
+    "showAgents": true,
+    "showTodos": true,
+    "showProject": true,
+    "showConfigCounts": true,
+    "showTokenBreakdown": true,
+    "showSpeed": true,
+    "showUsage": true,
+    "usageBarEnabled": true,
+    "showDuration": true,
+    "showSessionName": true,
+    "showSessionTokens": true
+  }
+}
+```
+
 说到这里，Claude Code的`/buddy`宠物展示，要取消的话，执行：`/buddy off`。
 
 ## 5. Claude Code 几个被低估的功能
