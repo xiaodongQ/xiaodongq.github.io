@@ -93,63 +93,9 @@ date: 2026-03-28
 >
 > 实践建议：模式可组合使用（如 Pipeline + Reviewer），根据任务复杂度选择。Inversion 模式被低估——强制"先问再做"能避免 80% 无用输出。
 
-## 3. 20260412更新
+### 2.5. 其他工具
 
-### 3.1. OpenRouter查看各家模型用量统计
-
-[OpenRouter](https://openrouter.ai/rankings) 是一个统一的大模型 API 聚合平台。
-* 通过 OpenRouter 的一个 API 端点，可以访问来自不同提供商的数百个 AI 模型
-* 统一计费 - 只需要在一个平台充值，就可以使用所有接入的模型，无需分别向各个厂商付费
-* 智能路由 - 可以设置自动选择最便宜/最快的模型，或者在某个模型不可用时自动切换到备选模型
-* 统一接口格式 - 采用类似 OpenAI 的 API 格式，调用不同模型时只需改变 model 参数
-
-`OpenRouter`的**调用量数据**已成为衡量全球AI模型受欢迎程度的**重要风向标**。
-* 除了调用量，还可以查看模型评测、各模型工具调用次数等等
-* 还有AI工具的使用token排行，可以了解到近期流行的AI工具，比如最近的爱马仕（Hermes Agent）
-
-比如这周的调用量情况：  
-![model-rankings](/images/2026-04-12-openrouter-ranking.png)
-
-模型用量的top app：  
-![token-used-top-app](/images/2026-04-12-top-app.png)
-
-### 3.2. CC-Switch工具说明
-
-`CC-Switch`是一款专为 AI 编程助手（特别是 Claude Code）设计的**跨平台配置管理工具**。  
-简单来说，它就像是一个“万能遥控器”或“中控面板”，帮你**统一管理**各种 AI 模型的 API 密钥、地址配置，让你无需手动修改复杂的配置文件，就能在不同的大模型之间一键切换。
-
-核心功能：
-* 统一管理配置：它支持管理 Claude Code、Codex、Gemini CLI 等多种编程工具的配置文件。你不需要去翻找 `.json` 或 `.toml` 文件手动修改，直接在它的图形界面里操作。
-* 一键切换模型：你可以预设多个模型（比如今天想用 GPT-4o，明天想用 DeepSeek），在 CC-Switch 界面点一下就能立刻生效。
-* 本地代理与故障转移：它能在本地搭建一个代理服务器。如果某个模型接口挂了，它可以自动切换到备用接口，保证你的编程工作流不中断。
-* 可视化监控：可以查看 API 的使用量统计、延迟测试等数据。
-
-#### 3.2.1. CC-Switch 与 OpenRouter 的关系
-
-它们是“工具”与“服务”的互补关系，经常被开发者组合在一起使用，以实现“花最少的钱，用最爽的模型”。
-* CC-Switch是工具，OpenRouter是服务
-* OpenRouter 提供了统一的接口，而 CC-Switch 提供了便捷的切换界面。
-
-**通常操作方案**：
-* 1、注册 OpenRouter 获取 API Key
-* 2、填入 CC-Switch
-* 3、在 CC-Switch 中配置并一键切换。
-
-#### 3.2.2. Linux下CLI版本使用
-
-桌面UI版本，直接用原始仓库的即可。Linux下的命令行版本，可以看这个fork后的CLI版本：[SaladDay/cc-switch-cli](https://github.com/SaladDay/cc-switch-cli)。
-
-下载下来就一个文件，执行就会进入tui页面：
-![cc-switch-cli](/images/2026-04-12-cc-switch-cli.png)
-
-命令：
-* `cc-switch env tools`查看本地安装了哪些AI Cli工具，如Claude code/Codex/Gemini/OpenCode
-* `cc-switch provider list`查看提供商
-* 其他命令文档，可见：[文档](https://github.com/SaladDay/cc-switch-cli/blob/main/README_ZH.md)
-
-### 3.3. 其他工具
-
-#### 3.3.1. 手机端浏览器选择
+#### 2.5.1. 手机端浏览器选择
 测试过以下几款：
 - **Via 浏览器** - 轻量、无广告、支持脚本、高度自定义 ✅ **最终选择**
 - **X 浏览器** - 跟Via差不多，但是感觉自定义搜索不好用（默认百度不大好用）
@@ -163,15 +109,15 @@ date: 2026-03-28
 
 ---
 
-## 4. 概念
+## 3. 概念
 
-### 4.1. Harness Engineering（驾驭工程）
+### 3.1. Harness Engineering（驾驭工程）
 
 参考：[Harness Engineering（驾驭工程）](https://www.runoob.com/ai-agent/harness-engineering.html)
 
 Harness Engineering（驾驭工程）是围绕 AI 智能体设计和构建约束机制、反馈回路、工作流控制和持续改进循环的系统工程实践。它不优化模型本身，而是优化模型运行的"环境"。核心哲学八个字：**人类掌舵，智能体执行**（Human Steer, Agent Execute）。
 
-#### 4.1.1. AI 工程范式的三次跃迁
+#### 3.1.1. AI 工程范式的三次跃迁
 
 | 阶段                    | 核心          | 局限                           |
 | ----------------------- | ------------- | ------------------------------ |
