@@ -16,7 +16,7 @@ tags: [Claude Code, Harness]
 也记录一些近期的碎片内容：
 * [Claude Code核心源码解析 -- 架构设计和工程细节透视Harness最佳实践](http://gk.link/a/12IoB)，极客时间上的直播，讲得很好。（里面的框图挺好，有个思路：把图保存到自己的素材库，让AI生成时就有好的参考了）
 
-## 2. 先说说Claude Code
+## 2. 先说说Claude Code架构
 
 Claude Code是AI行业的一个标杆了，模型和工程上都是T0级别。从Claude Code前段时间泄漏的代码里能参考学习到很多东西，基于上面的“Claude Code核心源码解析 -- 架构设计和工程细节透视Harness最佳实践”做些笔记记录。
 
