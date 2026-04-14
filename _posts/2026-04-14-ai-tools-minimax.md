@@ -1,6 +1,6 @@
 ---
-title: AI能力集 -- MiniMax能力补充
-description: MiniMax能力补充
+title: AI能力集 -- MiniMax能力补充：MCP和Skills
+description: MiniMax能力补充，安装MCP和Skills
 categories: [AI, AI能力集]
 tags: [AI, Skills]
 ---
