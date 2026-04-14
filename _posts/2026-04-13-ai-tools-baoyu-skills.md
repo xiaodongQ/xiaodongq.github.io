@@ -212,3 +212,5 @@ drwxr-xr-x  157 xd  staff  5024 Apr 13 18:49 _posts
   ✓ baoyu-skills:baoyu-imagine: Generat...
   ⏵⏵ accept edits on (shift+tab to cycle)
 ```
+
+MiniMax 01模型生图效果比较差。
