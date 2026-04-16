@@ -546,6 +546,25 @@ Agent teams 支持两种显示模式：
 开一个新终端执行`tmux -L claude-swarm-1001179 a`，效果如下：  
 ![agent-teams-tmux](/images/2026-04-09-agent-teams-tmux.png)
 
+## 常见工作流（20260416更新）
+
+参考官方文档：[常见工作流程](https://code.claude.com/docs/zh-CN/common-workflows)
+
+headless模式（无头模式）：`claude -p xxx`
+* 在 Plan Mode 中运行”无头”查询，`claude --permission-mode plan -p "Analyze the authentication system and suggest improvements"`
+* 可以添加到构建脚本里，如：`cat build-error.txt | claude -p 'concisely explain the root cause of this build error' > output.txt`
+
+
+可考虑将 Plan Mode 配置为默认值：
+
+```sh
+{
+  "permissions": {
+    "defaultMode": "plan"
+  }
+}
+```
+
 ## 7. 参考
 
 * [菜鸟教程 -- Agent Skills（智能体技能）](https://www.runoob.com/claude-code/claude-agent-skills.html)
