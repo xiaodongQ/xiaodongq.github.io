@@ -20,7 +20,24 @@ tags: [Claude Code, happy-coder]
 
 happy-coder 是连接手机和服务器的桥梁。在服务器上npm安装：`npm install -g happy-coder`。
 
-`happy claude`启动服务，会出来扫描和URL（让小龙虾自动执行了，若手动操作可参考上面链接）
+`happy claude`/`happy`启动服务，会出来扫描和URL（让小龙虾自动执行了，若手动操作可参考上面链接）
+
+`happy auth logout`退出后需重新认证。
+
+```sh
+[root@xdlinux ➜ ~clauded ]$ happy -h
+happy - Claude Code On the Go
+Usage:
+  happy [options]         Start Claude with mobile control
+  happy auth              Manage authentication
+  happy codex             Start Codex mode
+  happy gemini            Start Gemini mode (ACP)
+  happy connect           Connect AI vendor API keys
+  happy notify            Send push notification
+  happy daemon            Manage background service that allows
+                            to spawn new sessions away from your computer
+  happy doctor            System diagnostics & troubleshooting
+```
 
 ### 2.2. 手机端安装
 
@@ -38,8 +55,7 @@ happy-coder 是连接手机和服务器的桥梁。在服务器上npm安装：`n
 
 ### 3.2. 设备命名
 
-在设置界面，我给这台服务器命名为 `xdlinux`，方便后续识别。如果你有多台服务器，建议用有意义的名称（如 `home-server`、`work-station`）。
-
+在设置界面，可以给这台服务器重命名，方便后续识别。如果有多台服务器，建议用有意义的名称（如 `home-server`、`work-station`）。
 
 ### 3.3. 设置工作目录
 
