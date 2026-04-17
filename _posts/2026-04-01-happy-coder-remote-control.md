@@ -24,6 +24,8 @@ happy-coder 是连接手机和服务器的桥梁。在服务器上npm安装：`n
 
 `happy auth logout`退出后需重新认证。
 
+`happy daemon status`查看守护进程，若没自动启动，可以`happy daemon start`启动
+
 ```sh
 [root@xdlinux ➜ ~clauded ]$ happy -h
 happy - Claude Code On the Go
