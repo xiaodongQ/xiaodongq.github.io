@@ -6,7 +6,16 @@ tags: [AI, picoclaw, 开源框架]
 
 ## 1. 引言
 
-上篇介绍了几个`OpenClaw`平替的开源项目，开始跟踪代码学习核心流程。本篇学习[picoclaw](https://github.com/sipeed/picoclaw)。
+[上篇](https://xiaodongq.github.io/2026/03/19/openclaw-alternatives-comparison/)介绍了几个`OpenClaw`平替的开源项目，本文梳理学习几个Claw系列项目的核心工作流代码，原理上应该都是Agent的的ReAct循环+工具调用。
+
+想法：分析学习项目代码不需要大而全，尤其现在AI生成代码速度远远超过个人能阅读的速度。只要关注自己的核心需求，并收缩一些注意力。
+
+* [picoclaw](https://github.com/sipeed/picoclaw)
+
+思路：
+开发一个任务领取系统，工作上提效；
+知识库；
+
 
 ## 基本介绍
 

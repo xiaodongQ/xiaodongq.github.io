@@ -161,8 +161,6 @@ Slash commands:
     * `exa-web-search-free`，全网检索：实时网络搜索、信息聚合、冷门知识挖掘
     * `Agent Reach`
   * `self-improving-agent`，AI自我改进，让AI在犯错或被用户纠正时自动记录下来，下次遇到类似情况避免重蹈覆辙 **建议安装**
-  * `mcporter-1-0-0`，内容生成：结构化文本生成、特定领域模板填充
-  * `local-rag-search`，私有知识库，本地文档检索、RAG (检索增强生成)
   * `first-principles-decomposer`，思维建模：第一性原理拆解、复杂问题结构化分析
 **技能仓库参考**（按需浏览安装）：
 
@@ -414,7 +412,7 @@ total 32K
 
 ## 7. 实践
 
-### 7.1. 集成公众号
+### 7.1. 集成公众号发布
 
 可参考：[龙虾AI一键发公众号](https://mp.weixin.qq.com/s/iptFNrUR-OJZhbaWHgRVyA)
 
@@ -432,4 +430,32 @@ skills说明：
 # npx skills add jimliu/baoyu-skills@baoyu-post-to-wechat -g -y
 # 小龙虾市场安装
 clawhub install baoyu-post-to-wechat
+```
+
+### 7.2. 通过 MCPorter 接入 MCP 服务
+
+[MCPorter](https://github.com/steipete/mcporter) 是一个 MCP (Model Context Protocol) 服务器管理工具。可以轻松配置、调用各种AI服务的MCP服务器。可了解：[MCPorter - MCP服务器管理工具](https://clawd.org.cn/forum/post?id=258)。
+
+通过`MCPorter`，OpenClaw可以调用Claude Code等AI工具安装的MCP。
+
+安装mcporter很简单：
+
+```sh
+npm install -g mcporter
+# 查看
+[root@xdlinux ➜ ~ ]$ npm list -g
+/home/workspace/local/node-v24.13.0-linux-x64/lib
+├── mcporter@0.8.1
+├── mmx-cli@1.0.7
+├── openclaw@2026.4.8
+...
+```
+
+查看所有可用的MCP服务器/工具：
+
+```sh
+[root@xdlinux ➜ ~ ]$ mcporter list
+mcporter 0.7.3 — Listing 1 server(s) (per-server timeout: 30s)
+- MiniMax (2 tools, 0.6s) [source: .claude.json]
+✔ Listed 1 server (1 healthy).
 ```

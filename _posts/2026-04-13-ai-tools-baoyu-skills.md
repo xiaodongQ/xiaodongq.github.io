@@ -73,7 +73,7 @@ MINIMAX_BASE_URL=https://api.minimaxi.com
 # MINIMAX_BASE_URL=https://api.minimax.io
 ```
 
-## 3. 实践使用
+## 3. 图片生成功能实践
 
 创建一个临时项目目录`/Users/xd/Documents/workspace/repo/tmp_baoyu`，拷贝一些内容这个目录，这里把博客文章拷贝过来，因为需要基于一些内容来生成图片等。第一次使用`baoyu-xxx`相关命令，会让你记录一些偏好保存下来。
 
@@ -213,4 +213,11 @@ drwxr-xr-x  157 xd  staff  5024 Apr 13 18:49 _posts
   ⏵⏵ accept edits on (shift+tab to cycle)
 ```
 
-MiniMax 01模型生图效果比较差。
+受限于`MiniMax image-01`模型生图后，其中文字效果比较差，其他的生图功能暂时不试用了。
+
+比如：  
+![penrouter-cc-switch-architecture](/images/2026-04-12-openrouter-cc-switch-architecture-diagram.png)
+
+## 4. 语音生成功能实践
+
+
