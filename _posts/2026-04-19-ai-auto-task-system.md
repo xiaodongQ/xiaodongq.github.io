@@ -1,119 +1,296 @@
 ---
-title: AI能力集 -- 开发一个待办任务自动执行系统
+title: AI能力集 -- 开发一个任务自动执行系统
+description: 记录开发个人AI领取任务系统的全过程，从v1到v5的演进，包括踩坑和解决方案
 categories: [AI, AI能力集]
-tags: [AI]
+tags: [AI, Claude Code, 自动化]
 ---
 
 ## 1. 引言
 
-几个Claw系列项目的核心工作流，原理上应该都是Agent的的ReAct循环+工具调用。
+需求场景很简单：个人任务有时有多个，添加到任务池后由AI自动申领后执行，完成后由另一个AI进行评估。整个过程我希望能看到详细记录。
+
+### 1.1 最初想法
+
+两个思路：
+* Claude Code的`/loop`功能，定期向指定目录获取任务进行执行
+* OpenClaw及类似agent软件（Hermes、PicoClaw等等）
+
+几个Claw系列项目的核心工作流，原理上都是Agent的ReAct循环+工具调用：
 * [picoclaw](https://github.com/sipeed/picoclaw)
 
-想法：分析学习项目代码不需要大而全，尤其现在AI生成代码速度远远超过个人能阅读的速度。只要关注自己的核心需求，并收缩一些注意力。
+想法：分析学习项目代码不需要大而全，尤其现在AI生成代码速度远远超过个人能阅读的速度。只要关注自己的核心需求，收缩注意力即可。
 
-思路：
-开发一个任务领取系统，工作上提效；
-知识库；
+### 1.2 开发过程
 
-```sh
-● 需求概述
-/superpowers:brainstorming 我有个需求，设计实现一个个人的ai领取任务系统，最好是有可视化页面。我可以从页面上添加删除待办任务，ai自动从任务池获取任务并进行执行实现。结果需要形成报告，我能从页面看过程及系列：什么是否领取的，什么时候执行，完成时间，方案如何，评估如何，可以指定不同模型或者agent负责评估。我用的是腾讯的code buddy ide（类似cursor)以及相应的cli
-● 现有方案调研
-帮我确认下有什么热门的开源ai任务发布和执行系统，个人待办任务添加任务即可，ai自动认领，可以观察过程和结果。不用容器。
-我的环境里不用openclaw类软件这么丰富的功能，不接入im，是不是从某个项目截取一部分逻辑就行。执行任务也是利用claude code的cli去完成
-multica
-https://mp.weixin.qq.com/s/87Qy-hPIOIZfHaucSzkdxw，要docker
-openclaw
-  lobster ai网易的，openclaw作为执行引擎，增加安全机制
+第一版是在手机上用 happy-coder 远程控制 Claude Code 写的（当时电脑不在身边），后续迭代用了 OpenClaw。
 
-● 轻量级解决方案设计
-从 Nanobot/PicoClaw 截取的最小核心模块
-不用 OpenClaw 等重型框架，直接基于 Claude Code CLI 做轻量任务执行，本质就是：极简调度 + 命令行调用 + 结果解析，无容器、无 IM、无复杂依赖。
-● 核心模块设计
-一、核心思路（截取最小逻辑）
-你只需要保留 3 个核心模块（从现有项目/框架里抽即可）：
-1. 任务调度（极简）
-​
-● 任务队列/列表
-● 简单循环/定时触发
-● 状态管理（待执行/执行中/成功/失败）
-​
-2. Claude Code CLI 调用封装
-​
-● 构造命令行参数
-● 非交互执行（ -p ）
-● 权限预授权（ --allowedTools ）
-● 输出 JSON 解析
-​
-3. 结果处理与循环
-​
-● 解析 JSON 输出
-● 判断是否需要多轮（ --max-turns ）
-● 简单记忆/上下文传递
-不需要：IM 接入、多 Agent 协作、复杂记忆、插件系统、Web 服务、容器编排。
-● 模块裁剪建议
-1. 原项目里完全用不到的模块直接整段删除：
-多智能体路由
-权限/用户系统
-实时消息推送
-环境隔离容器层
-2. 可选择性保留：
-任务超时
-失败重试次数
-执行日志分级
-● 钉钉通知集成
-claude code里需要我确认和完成时，进行hook通知，调用我自己的一个钉钉通知mcp
-结合你的需求：
-1. 极简裁剪版架构（截取 PicoClaw/Nanobot 最小核心）
-​
-2. 依靠 Claude Code CLI 执行任务
-​
-3. 无容器、无 IM、无多余模块
-​
-4. Hook 关键点：Claude 需要人工确认 / 任务完成 时，调用你自研的「钉钉通知 MCP」
-我给你完整落地方案 + 可直接复用代码 + 原项目对应截取位置。
-● 详细实现方案
-一、核心实现思路
-1. 拦截 Claude Code 两种关键节点
-​
-● 节点A：触发人工确认（需要你手动点击同意/拒绝）
-​
-● 节点B：任务完整执行完成 / 异常终止
-​
-2. 调用方式：
-你的钉钉通知是 MCP 服务，直接走 HTTP / MCP 协议请求推送消息
-​
-3. 完全复用之前精简的调度器，只新增两处 Hook 埋点
-​
-4. 从 PicoClaw / Nanobot 源码对应位置：
-​
-● 执行器回调钩子
-​
-● 任务生命周期钩子
-● 源码截取位置
-二、原项目对应截取位置（方便你自行摘抄）
-1. PicoClaw
-● 执行器生命周期钩子： app/executor/base.py  里  on_need_confirm  /  on_task_finish
- 
-​
-● 任务状态变更回调： app/core/task_life.py​
-2. Nanobot
-● 进程阻塞/等待确认钩子： bot/executor/claude_exec.py​
-​
-● 任务结束回调： bot/agent/runner.py​
-👉 你只需要抄这两处回调逻辑，删掉原有通知（飞书/企微），替换成你的钉钉 MCP 调用即可。
-● 可选优化功能
-六、额外可选优化（贴合你本地无容器场景）
-1. 增加白名单：安全指令不触发确认通知，只高危操作推送
-​
-2. 增加防抖：短时间多次确认只发一条钉钉
-​
-3. MCP 增加鉴权头、内网token 校验
-​
-4. 记录到本地日志文件，和钉钉通知联动
-需要我给你加上高危指令白名单防抖版本
-● Claude Code 原生 Hook 方案
-claude code自身配置hooks
-好，直接给你 Claude Code 原生 Hooks 配置方案（完全不用你自己写调度器，直接用 Claude 内置机制触发钉钉 MCP）。
-一、你要的两个关键事件（官方原生支持）
+```
+第一版(happy-coder + Claude Code) → 后续迭代(OpenClaw)
+```
+
+整个过程记录在了截图中，后来逐步演进成 v1-v5 多个版本。
+
+---
+
+## 2. 方案设计
+
+### 2.1 需求拆解
+
+需要实现的功能：
+* 任务池：添加/删除待办任务
+* AI自动申领：从池子里拿任务执行
+* 执行过程追踪：什么时候领取、什么时候执行、耗时多久
+* 评估机制：另一个AI来评估执行结果
+* 可视化界面：看任务状态和过程记录
+
+### 2.2 技术选型
+
+| 组件     | 选型                    | 原因                                       |
+| -------- | ----------------------- | ------------------------------------------ |
+| 执行引擎 | Claude Code CLI / claw  | 本地CLI直接执行，支持 `--print` 非交互模式 |
+| 评估     | OpenAI API / Claude API | 可配置不同模型评估                         |
+| 后端     | FastAPI + SQLite        | 轻量，无需额外服务                         |
+| 前端     | HTML + Tailwind         | 单文件，够用就行                           |
+
+### 2.3 核心模块设计
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                     AI 任务系统                          │
+├─────────────────────────────────────────────────────────┤
+│  任务队列 (SQLite)                                      │
+│    - pending → running → completed → evaluating → evaluated
+│    - failed (自动重试)
+│                                                         │
+│  调度器 (Scheduler)                                     │
+│    - 轮询 pending 任务                                  │
+│    - 心跳保活 + stale 检测                              │
+│    - 自动重试 (指数退避)                                │
+│                                                         │
+│  执行器 (Executor)                                      │
+│    - CLI 模式: 调用 `claw --print`                      │
+│    - SDK 模式: CodeBuddy Python SDK                     │
+│                                                         │
+│  评估器 (Evaluator)                                     │
+│    - 自动评估执行结果                                   │
+│    - 可配置评估模型                                     │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 3. 版本演进
+
+### 3.1 V1 — 最初的原型
+
+基于 CodeBuddy CLI，实现：
+* Web UI 任务管理（添加/删除/查看）
+* 自动领取执行
+* 交叉评估（不同AI模型交叉评估）
+* 迭代闭环（评分低于阈值自动重试）
+
+```bash
+cd v1
+pip install -r requirements.txt
+export PYTHONPATH=$(pwd)
+uvicorn backend.main:app --reload --port 8000
+```
+
+### 3.2 V2 — Claude Code 集成版
+
+V1 改进版，接入 Claude Code CLI，支持多Agent并行：
+* Claude Code CLI 执行引擎
+* Web 界面 + API 双接口
+* 多 Agent 并行执行
+* 任务调度器（60s 轮询间隔）
+
+### 3.3 V3 — CodeBuddy 原生适配版
+
+* 100% 遵循 CodeBuddy CLI 规范
+* 单机无容器、零配置一键启动
+* WebSocket 实时同步
+* 双超时防护（绝对超时 + 无输出超时）
+* Git 版本自动提交
+
+### 3.4 V4 — 多 Agent 抽象层（活跃版本）
+
+统一的多 Agent CLI 编排层，支持 Claude Code、OpenAI Codex 和 CodeBuddy：
+
+| 特性       | 说明                                |
+| ---------- | ----------------------------------- |
+| 三种入口   | CLI / TUI（全屏）/ REPL（交互）     |
+| 任务路由   | 13 种任务类型 → 最优 Agent 自动选择 |
+| 基准测试   | Agent 能力评分，持续跟踪对比        |
+| 会话持久化 | 跨会话恢复，session export/import   |
+
+```bash
+# CLI 模式
+python -m ai_task_system.v4.cli create "任务" -a claude -y -w
+
+# TUI 全屏
+python -m ai_task_system.v4 --tui
+
+# REPL 交互
+python -m ai_task_system.v4
+```
+
+### 3.5 V5 — 增加特性
+
+V4 的生产级扩展，带持久化队列和进程池：
+
+* **进程池**：预热 Worker，故障自动恢复
+* **持久化队列**：SQLite WAL，支持优先级/延迟/死信
+* **REST API**：18 个端点，API Key 认证
+* **WebSocket**：实时任务状态/输出流推送
+* **Prometheus**：`/metrics` 端点，Grafana 就绪
+
+```bash
+export AI_TASK_API_KEY="my-secret-key"  # 可选
+python -m v5.api.app --port 18792
+```
+
+---
+
+## 4. 核心实现
+
+### 4.1 任务状态机
+
+```
+pending → waiting(依赖) → running → completed → evaluating → evaluated
+                    ↘ failed (auto-retry → pending)
+                    ↘ stale (heartbeat 超时 → pending)
+```
+
+### 4.2 调度器核心逻辑
+
+```python
+# scheduler.py 核心循环
+while running:
+    tasks = db.get_pending_tasks()
+    for task in tasks:
+        if task.is_runnable():
+            executor.execute(task)
+
+    # 心跳保活
+    update_heartbeat()
+
+    # Stale 检测
+    recover_stale_tasks()
+
+    sleep(poll_interval)
+```
+
+### 4.3 执行器封装
+
+```python
+# cli_executor.py
+def execute(self, task):
+    cmd = [
+        "claw", "--print", "--verbose",
+        "--model", task.model,
+        task.description
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    return result
+```
+
+---
+
+## 5. 效果展示
+
+### 5.1 任务执行界面
+
+![任务执行中](/images/ai-task-system-task-execution.png)
+
+图中显示了一个"分析任务"弹窗：
+* 状态：执行中
+* 执行引擎：minimax-2.7
+* 评估方式：CLI默认
+* 迭代进度：0/3
+
+### 5.2 任务详情+评估
+
+![任务详情+评估](/images/ai-task-system-task-detail-eval.png)
+
+可以看到：
+* 命令详情：`claude --print --verbose --model claude "任务描述 18"`
+* 模型、开始/完成时间
+* 输出内容：AI 返回了询问具体含义
+* 评估历史：评分 7/10
+
+### 5.3 手机端远程控制
+
+这是用 happy-coder 在手机上远程控制 Claude Code 开发的截图：
+
+![手机端开发](/images/ai-task-system-mobile-dev.png)
+
+当时在出差路上，用手机操作完成了第一版开发。可以看到：
+* 待办列表自动流转
+* Task 1-6 已完成（绿色勾选）
+* Task 7 正在执行（蓝色选中）
+* 底部显示 AI 状态（germinating...）
+
+---
+
+## 6. 配置说明
+
+### 6.1 config.yaml
+
+```yaml
+scheduler:
+  poll_interval: 5
+  heartbeat_interval: 30
+  stale_threshold: 120
+
+executor:
+  engine: cli                 # cli | sdk
+  cli_path: claw
+  timeout: 1800
+  max_auto_retries: 3
+  auto_retry_delay: 180
+
+evaluator:
+  model: "claude-opus-4-6"
+  default_model: gpt-4o
+
+server:
+  host: 0.0.0.0
+  port: 8000
+```
+
+### 6.2 数据目录
+
+| 内容        | 路径                                      |
+| ----------- | ----------------------------------------- |
+| 会话存储    | `~/.ai_task_system/sessions.json`         |
+| 基准分数    | `~/.ai_task_system/benchmark_scores.json` |
+| 任务队列 DB | `~/.ai_task_system/tasks.db`              |
+
+---
+
+## 7. 总结
+
+这个系统从最初的简单想法，演进成了 v1-v5 多个版本。核心收获：
+
+1. **轻量优先**：不追求大而全，关注自己的核心需求
+2. **快速迭代**：从原型到生产，版本逐步演进
+3. **工具组合**：Claude Code + happy-coder + OpenClaw，各取所长
+4. **自动化闭环**：任务领取→执行→评估→迭代，全自动流转
+
+代码已开源：[ai-task-system](https://github.com/xiaodongQ/ai-playground/tree/main/ai-task-system)
+
+---
+
+## 附录：版本演进路径
+
+```
+V1:  单 Agent  + 任务池  + 评估迭代
+     ↓
+V2:  多 Agent  + 任务池  + 评估迭代
+     ↓
+V3:  CodeBuddy 原生适配  + 双超时防护
+     ↓
+V4:  多 Agent 抽象层  + CLI/TUI/REPL  + 任务路由
+     ↓
+V5:  V4 × 生产化  + 进程池  + 持久化队列  + REST API
 ```
