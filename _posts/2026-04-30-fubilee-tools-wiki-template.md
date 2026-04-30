@@ -145,10 +145,10 @@ obsidian_xd/
 默认配色感觉不大好看，参考了[博主 sansui233 的配置](https://www.sansui233.com/posts/2024-11-12-%E6%8A%8Adrawio%E8%A3%85%E4%BF%AE%E4%B8%BA%E7%AE%80%E5%8D%95%E7%BE%8E%E8%A7%82%E7%9A%84%E7%99%BD%E6%9D%BF%E5%BA%94%E7%94%A8)，自己也改了一版，见：[draw_io快捷键和修改默认配置.md](https://github.com/xiaodongQ/devNoteBackup/blob/master/%E5%B7%A5%E5%85%B7%E4%BD%BF%E7%94%A8/draw_io%E5%BF%AB%E6%8D%B7%E9%94%AE.md)。
 
 效果1：  
-![handy-tools.drawio](/images/handy-tools.drawio.svg)
+![handy-tools.drawio](/images/handy-tools.drawio.svg.png)
 
 效果2:  
-![sylar_io_coroutine_scheduler](/images/sylar_io_coroutine_scheduler.svg)
+![sylar_io_coroutine_scheduler](/images/sylar_io_coroutine_scheduler.svg.png)
 
 **修改方式：** 在 “其他“ -> “配置“ -> 选择JSON，把上面链接里的json配置内容复制后，应用即可。
 
