@@ -7,7 +7,7 @@ tags: [Obsidian, WezTerm, Draw.io, 知识管理, 工具链]
 
 ## 1. 引言
 
-搭 Obsidian Wiki 这套系统的时候，顺手把配置打包成了一个[模板仓库](https://github.com/xiaodongq/obsidian_xd_template)，里面的插件和配置可以分享给其他人复用。
+搭 Obsidian Wiki 这套系统的时候，顺手把配置打包成了一个[模板仓库](https://github.com/xiaodongq/obsidian_template)，里面的插件和配置可以分享给其他人复用。
 
 另外日常积累的仓库里躺了很多工具配置和快捷键笔记，这次一并整理一下。本文涉及的工具：
 - **Obsidian** — 知识库，配合 LLM Wiki 模式管理笔记
