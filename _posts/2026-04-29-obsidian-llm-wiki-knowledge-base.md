@@ -1,5 +1,5 @@
 ---
-title: Obsidian + LLM Wiki 打造个人知识库
+title: 基于 Obsidian + LLM Wiki 开始构建个人知识工程
 description: 基于 Karpathy 的 LLM Wiki 模式，配合 Obsidian 和 Claude Code，构建增量维护的个人知识库。
 categories: [工具, 知识管理]
 tags: [Obsidian, 知识库, LLM, Claude]
@@ -12,6 +12,7 @@ tags: [Obsidian, 知识库, LLM, Claude]
 主要参考链接：
 * Karpathy分享的 [LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
 * [490万浏览量的方案：用 LLM 构建持续更新积累的个人知识库](https://cloud.tencent.com/developer/article/2651812)
+* 两个开源项目参考：[graphify](https://github.com/safishamsi/graphify)：把所有内容压缩成一张可查询的知识图谱，每次查询的token量能大大降低；[sage-wiki](https://github.com/xoai/sage-wiki)：也是参考Karpathy做的知识库
 
 之前短暂用过`Obsidian`，当时因为多端同步问题，最后换成了`Notion`。平常记录笔记用的是`Sublime Text`，比较轻量、Markdown效果也挺好。但是用来给别人展示的话效果还是差一些，`Typora`会友好一些，而`Obsidian`则效果更好。
 
@@ -152,7 +153,6 @@ Claudian + Claude Code 的组合就是让 LLM 维护 Wiki 的关键——Claude 
 
 ## 目录结构
 
-```
 obsidian_xd/
 ├── 01_sources/        # 源文档目录（只读，Immutable）
 │   ├── _clippings/    # 外部下载内容（网页、PDF、文档等）→ 需要摄入到 wiki
@@ -161,7 +161,6 @@ obsidian_xd/
 │   └── _assets/      # 静态资源 → 不摄入
 ├── 02_wiki/           # AI 生成的 wiki 内容
 └── CLAUDE.md          # 本文件 - AI维护指南
-```
 
 ## 核心原则
 
