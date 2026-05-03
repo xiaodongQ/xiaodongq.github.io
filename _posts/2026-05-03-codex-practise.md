@@ -20,6 +20,10 @@ pin: true
 
 暂时安装`codex@0.57.0`，minimax和codex新版本可能有兼容性问题，见[Minimax的说明](https://platform.minimaxi.com/docs/token-plan/codex-cli)。
 
+> 新一点的版本（比如0.125.0）用minimax会报错：⚠ Model metadata for `codex-MiniMax-M2.7` not found. Defaulting to fallback metadata; this can degrade performance and cause issues.
+>
+> 而codex@0.57.0使用minimax时，经常会重连。对于minimax模型来说，还是Claude Code合适点。
+
 ```sh
 [MacOS-xd@qxd ➜ test git:(main) ]$ npm install -g @openai/codex@0.57.0
 added 1 package in 12s
