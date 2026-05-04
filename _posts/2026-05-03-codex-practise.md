@@ -3,7 +3,6 @@ title: Codex系列 -- Codex实战手记
 description: Codex实战手记，持续更新实践和技巧
 categories: [AI, Codex系列]
 tags: [AI, Codex]
-pin: true
 ---
 
 ## 1. 引言
