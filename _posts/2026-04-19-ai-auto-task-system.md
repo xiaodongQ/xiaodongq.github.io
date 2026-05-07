@@ -9,7 +9,7 @@ tags: [AI, Claude Code, 自动化]
 
 需求场景很简单：个人任务有时有多个，添加到任务池后由AI自动申领后执行，完成后由另一个AI进行评估。整个过程我希望能看到详细记录。
 
-### 1.1 最初想法
+### 1.1. 1.1 最初想法
 
 两个思路：
 * Claude Code的`/loop`功能，定期向指定目录获取任务进行执行
@@ -20,7 +20,7 @@ tags: [AI, Claude Code, 自动化]
 
 想法：分析学习项目代码不需要大而全，尤其现在AI生成代码速度远远超过个人能阅读的速度。只要关注自己的核心需求，收缩注意力即可。
 
-### 1.2 开发过程
+### 1.2. 1.2 开发过程
 
 第一版是在手机上用 happy-coder 远程控制 Claude Code 写的（当时电脑不在身边），后续迭代用了 OpenClaw。
 
@@ -34,7 +34,7 @@ tags: [AI, Claude Code, 自动化]
 
 ## 2. 方案设计
 
-### 2.1 需求拆解
+### 2.1. 2.1 需求拆解
 
 需要实现的功能：
 * 任务池：添加/删除待办任务
@@ -43,7 +43,7 @@ tags: [AI, Claude Code, 自动化]
 * 评估机制：另一个AI来评估执行结果
 * 可视化界面：看任务状态和过程记录
 
-### 2.2 技术选型
+### 2.2. 2.2 技术选型
 
 | 组件     | 选型                    | 原因                                       |
 | -------- | ----------------------- | ------------------------------------------ |
@@ -52,7 +52,7 @@ tags: [AI, Claude Code, 自动化]
 | 后端     | FastAPI + SQLite        | 轻量，无需额外服务                         |
 | 前端     | HTML + Tailwind         | 单文件，够用就行                           |
 
-### 2.3 核心模块设计
+### 2.3. 2.3 核心模块设计
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -81,7 +81,7 @@ tags: [AI, Claude Code, 自动化]
 
 ## 3. 版本演进
 
-### 3.1 V1 — 最初的原型
+### 3.1. 3.1 V1 — 最初的原型
 
 基于 CodeBuddy CLI，实现：
 * Web UI 任务管理（添加/删除/查看）
@@ -96,7 +96,7 @@ export PYTHONPATH=$(pwd)
 uvicorn backend.main:app --reload --port 8000
 ```
 
-### 3.2 V2 — Claude Code 集成版
+### 3.2. 3.2 V2 — Claude Code 集成版
 
 V1 改进版，接入 Claude Code CLI，支持多Agent并行：
 * Claude Code CLI 执行引擎
@@ -104,7 +104,7 @@ V1 改进版，接入 Claude Code CLI，支持多Agent并行：
 * 多 Agent 并行执行
 * 任务调度器（60s 轮询间隔）
 
-### 3.3 V3 — CodeBuddy 原生适配版
+### 3.3. 3.3 V3 — CodeBuddy 原生适配版
 
 * 100% 遵循 CodeBuddy CLI 规范
 * 单机无容器、零配置一键启动
@@ -112,7 +112,7 @@ V1 改进版，接入 Claude Code CLI，支持多Agent并行：
 * 双超时防护（绝对超时 + 无输出超时）
 * Git 版本自动提交
 
-### 3.4 V4 — 多 Agent 抽象层（活跃版本）
+### 3.4. 3.4 V4 — 多 Agent 抽象层（活跃版本）
 
 统一的多 Agent CLI 编排层，支持 Claude Code、OpenAI Codex 和 CodeBuddy：
 
@@ -134,7 +134,7 @@ python -m ai_task_system.v4 --tui
 python -m ai_task_system.v4
 ```
 
-### 3.5 V5 — 增加特性
+### 3.5. 3.5 V5 — 增加特性
 
 V4 的生产级扩展，带持久化队列和进程池：
 
@@ -153,7 +153,7 @@ python -m v5.api.app --port 18792
 
 ## 4. 核心实现
 
-### 4.1 任务状态机
+### 4.1. 4.1 任务状态机
 
 ```
 pending → waiting(依赖) → running → completed → evaluating → evaluated
@@ -161,7 +161,7 @@ pending → waiting(依赖) → running → completed → evaluating → evaluat
                     ↘ stale (heartbeat 超时 → pending)
 ```
 
-### 4.2 调度器核心逻辑
+### 4.2. 4.2 调度器核心逻辑
 
 ```python
 # scheduler.py 核心循环
@@ -180,7 +180,7 @@ while running:
     sleep(poll_interval)
 ```
 
-### 4.3 执行器封装
+### 4.3. 4.3 执行器封装
 
 ```python
 # cli_executor.py
@@ -198,7 +198,7 @@ def execute(self, task):
 
 ## 5. 效果展示
 
-### 5.1 任务执行界面
+### 5.1. 5.1 任务执行界面
 
 ![任务执行中](/images/ai-task-system-task-execution.png)
 
@@ -208,7 +208,7 @@ def execute(self, task):
 * 评估方式：CLI默认
 * 迭代进度：0/3
 
-### 5.2 任务详情+评估
+### 5.2. 5.2 任务详情+评估
 
 ![任务详情+评估](/images/ai-task-system-task-detail-eval.png)
 
@@ -218,7 +218,7 @@ def execute(self, task):
 * 输出内容：AI 返回了询问具体含义
 * 评估历史：评分 7/10
 
-### 5.3 手机端远程控制
+### 5.3. 5.3 手机端远程控制
 
 这是用 happy-coder 在手机上远程控制 Claude Code 开发的截图：
 
@@ -234,7 +234,7 @@ def execute(self, task):
 
 ## 6. 配置说明
 
-### 6.1 config.yaml
+### 6.1. 6.1 config.yaml
 
 ```yaml
 scheduler:
@@ -258,7 +258,7 @@ server:
   port: 8000
 ```
 
-### 6.2 数据目录
+### 6.2. 6.2 数据目录
 
 | 内容        | 路径                                      |
 | ----------- | ----------------------------------------- |
@@ -281,7 +281,7 @@ server:
 
 ---
 
-## 附录：版本演进路径
+## 8. 附录：版本演进路径
 
 ```
 V1:  单 Agent  + 任务池  + 评估迭代
@@ -294,3 +294,35 @@ V4:  多 Agent 抽象层  + CLI/TUI/REPL  + 任务路由
      ↓
 V5:  V4 × 生产化  + 进程池  + 持久化队列  + REST API
 ```
+
+## 9. multica
+
+> [multica-ai/multica](https://github.com/multica-ai/multica/blob/main/README.zh-CN.md)
+
+Multica 管理完整的 Agent 生命周期：从任务分配到执行监控再到技能复用。
+
+1、安装：
+
+```sh
+[root@xdlinux ➜ ~ ]$ curl -fsSL https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.sh | bash
+
+  Multica — Installer
+
+==> Installing Multica CLI from GitHub Releases...
+==> Downloading https://github.com/multica-ai/multica/releases/download/v0.2.27/multica-cli-0.2.27-linux-amd64.tar.gz ...
+✓ Multica CLI installed to /usr/local/bin/multica
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✓ Multica CLI is ready!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Next: configure your environment
+
+     multica setup                # Connect to Multica Cloud (multica.ai)
+     multica setup self-host       # Connect to a self-hosted server
+
+  Self-hosting? Install the server first:
+     curl -fsSL https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.sh | bash -s -- --with-server
+```
+
+2、multica setup （默认云端）
