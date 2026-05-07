@@ -189,6 +189,71 @@ MCP可以是一个服务程序或者工具，在配置中告诉Claude Code可以
 * 第一步：本地写一个MCP服务器脚本（需要满足MCP协议要求的接口和交互方式），比如叫 my_tool.py
 * 第二步：添加到 Claude Code，`claude mcp add my_tool python3 ~/my_mcp_tools/my_tool.py`
 
+#### 4.3.1. 添加MCP：github CLI
+
+1、从官方仓库`claude-plugins-official`里安装github MCP
+
+2、安装CLI，见 [cli#installation](https://github.com/cli/cli#installation)
+
+可以手动下载assets里面的bin程序，而后加到PATH。
+
+```sh
+[MacOS-xd@qxd ➜ tools ]$ gh version
+gh version 2.92.0 (2026-04-28)
+https://github.com/cli/cli/releases/tag/v2.92.0
+
+# 一些操作（认证后可查看）
+# 查看仓库信息
+gh repo view                                     # 查看当前仓库 README
+gh pr list                                       # 列出 PR
+gh pr review 123 --approve                       # 批准 PR
+gh issue list                                    # 列出 Issue
+gh issue create                                  # 交互式创建
+```
+
+3、认证 `gh auth login`
+
+```sh
+[root@xdlinux ➜ repo ]$ gh auth login
+? Where do you use GitHub? GitHub.com
+? What is your preferred protocol for Git operations on this host? HTTPS
+? How would you like to authenticate GitHub CLI? Paste an authentication token
+Tip: you can generate a Personal Access Token here https://github.com/settings/tokens
+The minimum required scopes are 'repo', 'read:org', 'workflow'.
+? Paste your authentication token: *************************************************************************************- gh config set -h github.com git_protocol https
+✓ Configured git protocol
+! Authentication credentials saved in plain text
+✓ Logged in as xiaodongQ
+! You were already logged in to this account
+```
+
+**到GitHub创建token的方式**：
+
+```
+根据 GitHub 官方文档，以下是创建个人授权 Token 的步骤：
+
+创建细粒度个人访问令牌（推荐）
+GitHub 推荐使用细粒度个人访问令牌，更安全且权限控制更细：
+
+进入设置：在 GitHub 右上角点击头像，选择 Settings（设置）
+
+进入开发者设置：在左侧边栏点击 Developer settings（开发者设置）
+
+选择令牌类型：在左侧边栏的 Personal access tokens（个人访问令牌） 下，点击 Fine-grained tokens（细粒度令牌）
+
+生成新令牌：点击 Generate new token（生成新令牌）
+
+配置令牌：
+
+Token name：输入令牌名称
+Expiration：设置过期时间
+Description：（可选）添加说明
+Resource owner：选择资源所有者（个人或组织）
+Repository access：选择令牌可以访问的仓库
+Permissions：选择具体权限（建议按最小权限原则设置）
+生成：点击 Generate token（生成令牌） 后，立即复制并保存令牌（之后无法再查看）
+```
+
 ### 4.4. 插件
 
 **插件（Plugin）**是 Claude Code 中最高级别的扩展机制，用于将`command`、`agent`、`Skills`、`钩子`、`MCP`、`LSP` 等能力打包、版本化、共享和分发。
