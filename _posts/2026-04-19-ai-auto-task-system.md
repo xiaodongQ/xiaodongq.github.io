@@ -9,7 +9,7 @@ tags: [AI, Claude Code, 自动化]
 
 需求场景很简单：个人任务有时有多个，添加到任务池后由AI自动申领后执行，完成后由另一个AI进行评估。整个过程我希望能看到详细记录。
 
-### 1.1. 1.1 最初想法
+### 1.1. 最初想法
 
 两个思路：
 * Claude Code的`/loop`功能，定期向指定目录获取任务进行执行
@@ -20,7 +20,7 @@ tags: [AI, Claude Code, 自动化]
 
 想法：分析学习项目代码不需要大而全，尤其现在AI生成代码速度远远超过个人能阅读的速度。只要关注自己的核心需求，收缩注意力即可。
 
-### 1.2. 1.2 开发过程
+### 1.2. 开发过程
 
 第一版是在手机上用 happy-coder 远程控制 Claude Code 写的（当时电脑不在身边），后续迭代用了 OpenClaw。
 
@@ -34,7 +34,7 @@ tags: [AI, Claude Code, 自动化]
 
 ## 2. 方案设计
 
-### 2.1. 2.1 需求拆解
+### 2.1. 需求拆解
 
 需要实现的功能：
 * 任务池：添加/删除待办任务
@@ -43,7 +43,7 @@ tags: [AI, Claude Code, 自动化]
 * 评估机制：另一个AI来评估执行结果
 * 可视化界面：看任务状态和过程记录
 
-### 2.2. 2.2 技术选型
+### 2.2. 技术选型
 
 | 组件     | 选型                    | 原因                                       |
 | -------- | ----------------------- | ------------------------------------------ |
@@ -52,7 +52,7 @@ tags: [AI, Claude Code, 自动化]
 | 后端     | FastAPI + SQLite        | 轻量，无需额外服务                         |
 | 前端     | HTML + Tailwind         | 单文件，够用就行                           |
 
-### 2.3. 2.3 核心模块设计
+### 2.3. 核心模块设计
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -81,7 +81,7 @@ tags: [AI, Claude Code, 自动化]
 
 ## 3. 版本演进
 
-### 3.1. 3.1 V1 — 最初的原型
+### 3.1. V1 — 最初的原型
 
 基于 CodeBuddy CLI，实现：
 * Web UI 任务管理（添加/删除/查看）
@@ -96,7 +96,7 @@ export PYTHONPATH=$(pwd)
 uvicorn backend.main:app --reload --port 8000
 ```
 
-### 3.2. 3.2 V2 — Claude Code 集成版
+### 3.2. V2 — Claude Code 集成版
 
 V1 改进版，接入 Claude Code CLI，支持多Agent并行：
 * Claude Code CLI 执行引擎
@@ -104,7 +104,7 @@ V1 改进版，接入 Claude Code CLI，支持多Agent并行：
 * 多 Agent 并行执行
 * 任务调度器（60s 轮询间隔）
 
-### 3.3. 3.3 V3 — CodeBuddy 原生适配版
+### 3.3. V3 — CodeBuddy 原生适配版
 
 * 100% 遵循 CodeBuddy CLI 规范
 * 单机无容器、零配置一键启动
@@ -112,7 +112,7 @@ V1 改进版，接入 Claude Code CLI，支持多Agent并行：
 * 双超时防护（绝对超时 + 无输出超时）
 * Git 版本自动提交
 
-### 3.4. 3.4 V4 — 多 Agent 抽象层（活跃版本）
+### 3.4. V4 — 多 Agent 抽象层（活跃版本）
 
 统一的多 Agent CLI 编排层，支持 Claude Code、OpenAI Codex 和 CodeBuddy：
 
@@ -134,7 +134,7 @@ python -m ai_task_system.v4 --tui
 python -m ai_task_system.v4
 ```
 
-### 3.5. 3.5 V5 — 增加特性
+### 3.5. V5 — 增加特性
 
 V4 的生产级扩展，带持久化队列和进程池：
 
@@ -153,7 +153,7 @@ python -m v5.api.app --port 18792
 
 ## 4. 核心实现
 
-### 4.1. 4.1 任务状态机
+### 4.1. 任务状态机
 
 ```
 pending → waiting(依赖) → running → completed → evaluating → evaluated
@@ -161,7 +161,7 @@ pending → waiting(依赖) → running → completed → evaluating → evaluat
                     ↘ stale (heartbeat 超时 → pending)
 ```
 
-### 4.2. 4.2 调度器核心逻辑
+### 4.2. 调度器核心逻辑
 
 ```python
 # scheduler.py 核心循环
@@ -180,7 +180,7 @@ while running:
     sleep(poll_interval)
 ```
 
-### 4.3. 4.3 执行器封装
+### 4.3. 执行器封装
 
 ```python
 # cli_executor.py
@@ -198,7 +198,7 @@ def execute(self, task):
 
 ## 5. 效果展示
 
-### 5.1. 5.1 任务执行界面
+### 5.1. 任务执行界面
 
 ![任务执行中](/images/ai-task-system-task-execution.png)
 
@@ -208,7 +208,7 @@ def execute(self, task):
 * 评估方式：CLI默认
 * 迭代进度：0/3
 
-### 5.2. 5.2 任务详情+评估
+### 5.2. 任务详情+评估
 
 ![任务详情+评估](/images/ai-task-system-task-detail-eval.png)
 
@@ -218,7 +218,7 @@ def execute(self, task):
 * 输出内容：AI 返回了询问具体含义
 * 评估历史：评分 7/10
 
-### 5.3. 5.3 手机端远程控制
+### 5.3. 手机端远程控制
 
 这是用 happy-coder 在手机上远程控制 Claude Code 开发的截图：
 
@@ -234,7 +234,7 @@ def execute(self, task):
 
 ## 6. 配置说明
 
-### 6.1. 6.1 config.yaml
+### 6.1. config.yaml
 
 ```yaml
 scheduler:
@@ -258,7 +258,7 @@ server:
   port: 8000
 ```
 
-### 6.2. 6.2 数据目录
+### 6.2. 数据目录
 
 | 内容        | 路径                                      |
 | ----------- | ----------------------------------------- |
@@ -295,34 +295,149 @@ V4:  多 Agent 抽象层  + CLI/TUI/REPL  + 任务路由
 V5:  V4 × 生产化  + 进程池  + 持久化队列  + REST API
 ```
 
-## 9. multica
+## 9. 开源AI智能体编排系统：Multica
+
+### 9.1. 基本介绍
 
 > [multica-ai/multica](https://github.com/multica-ai/multica/blob/main/README.zh-CN.md)
 
-Multica 管理完整的 Agent 生命周期：从任务分配到执行监控再到技能复用。
+Multica 是一个托管式 Agent 平台，它聚焦于将 AI 编程智能体变成你团队中真正的“队友”。它的目标是解决 AI 编程中任务分配、执行追踪和经验沉淀的问题。Multica 管理完整的 Agent 生命周期：从任务分配到执行监控再到技能复用。
+- 定位：**AI 项目管理平台**（Task Management）
+- 粒度：项目 / 任务 / Agent / 技能
+- 重点：**编程 Agent 协作、任务生命周期、技能复用**
+- 场景：软件开发、工程任务、AI 辅助研发
 
-1、安装：
+对比 [Paperclipai/paperclip](https://github.com/paperclipai/paperclip)，paperclip的定位是一个 AI 员工编排平台，其核心理念是帮助你建立一个由 AI 组成的“零人力公司”（zero-human company）。在这个系统中，你扮演“董事会”的角色，负责设定公司的顶层目标和战略，而具体的执行则交给 AI 员工团队。
+- 定位：**AI 公司操作系统**（Orchestration）
+- 粒度：公司 / 部门 / 角色 / 预算 / 治理
+- 重点：**目标驱动、组织化、成本可控、全链路自治**
+- 场景：跑产品、创业公司、全流程业务
+
+默认情况下安装后，需要连接云端。也支持**自部署(`self-host`)**，即在本地安装服务端。下面只操作自部署模式，云端模式见原始链接。
+
+### 9.2. 在线安装
+
+1、使用`--with-server`参数，即可同时安装server服务（基于容器），不加则只安装`CLI`。
 
 ```sh
-[root@xdlinux ➜ ~ ]$ curl -fsSL https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.sh | bash
+[root@xdlinux ➜ ~ ]$ curl -fsSL https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.sh | bash -s -- --with-server
 
-  Multica — Installer
+  Multica — Self-Host Installer
+  Provisioning server infrastructure + installing CLI
 
-==> Installing Multica CLI from GitHub Releases...
-==> Downloading https://github.com/multica-ai/multica/releases/download/v0.2.27/multica-cli-0.2.27-linux-amd64.tar.gz ...
-✓ Multica CLI installed to /usr/local/bin/multica
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  ✓ Multica CLI is ready!
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  Next: configure your environment
-
-     multica setup                # Connect to Multica Cloud (multica.ai)
-     multica setup self-host       # Connect to a self-hosted server
-
-  Self-hosting? Install the server first:
-     curl -fsSL https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.sh | bash -s -- --with-server
+✓ Docker is available
+==> Setting up Multica server...
+==> Using self-host assets from v0.2.28...
+==> Cloning Multica repository...
+Cloning into '/root/.multica/server'...
+remote: Enumerating objects: 1747, done.
+remote: Counting objects: 100% (1747/1747), done.
+remote: Compressing objects: 100% (1600/1600), done.
+Receiving objects:  21% (370/1747), 7.04 MiB | 65.00 KiB/s
+...
 ```
 
-2、multica setup （默认云端）
+2、`multica setup self-host`
+
+### 9.3. 离线安装（手动编译）
+
+网络有点慢，直接GitHub上下载zip包，让AI修改`install.sh`脚本，支持本地编译和安装，正好了解下代码流程。
+
+#### 9.3.1. 编译本地产物
+
+```sh
+# 1. 先构建 CLI（如果没有）
+cd /home/workspace/repo/multica-main
+make build
+
+# 2. 确认产物存在
+ls server/bin/multica
+
+# 3. 运行安装脚本
+cd /home/workspace/repo/multica-main
+./scripts/install.sh --with-server --offline
+
+注意事项：
+
+  - 确保 Docker 运行中
+  - .env 文件需要自己创建（从 .env.example 复制）
+  - 如果没有现成的 .env，脚本会生成一个带随机 JWT_SECRET 的
+
+  # 如果还没有 .env
+  cp .env.example .env
+  openssl rand -hex 32  # 生成 JWT_SECRET 填入
+```
+
+`make build`提示需要`go >= 1.26.1`，我当前系统是`1.23.1`，可以先升级下系统默认的新版本`1.25.9`，再修改下`server/go.mod`里的go版本要求：`go >= 1.25.1`（若编译时某些库版本要求更高，再考虑下载新版本）
+
+另外，若github的依赖库下载慢，可以配置go代理，`go env -w GOPROXY=https://goproxy.cn,direct`。
+
+```sh
+[root@xdlinux ➜ multica-main ]$ dnf upgrade go
+Last metadata expiration check: 0:08:00 ago on Fri 08 May 2026 09:22:04 PM CST.
+Dependencies resolved.
+==============================================================================================
+ Package                      Architecture            Version                          Repository                  Size
+==============================================================================================
+Upgrading:
+ golang                       x86_64                  1.25.9-1.el9_7                   appstream                  1.2 M
+ golang-bin                   x86_64                  1.25.9-1.el9_7                   appstream                   37 M
+...
+
+# 新版本Go
+[root@xdlinux ➜ multica-main ]$ go version
+go version go1.25.9 (Red Hat 1.25.9-1.el9_7) linux/amd64
+```
+
+编译：
+
+```sh
+# go mod tidy
+[root@xdlinux ➜ multica-main ]$ cd server
+[root@xdlinux ➜ server ]$ go mod tidy
+go: downloading github.com/stretchr/testify v1.11.1
+go: downloading github.com/google/go-cmp v0.7.0
+...
+
+# 编译
+# make build 只是构建 Go 二进制文件到 server/bin/，不会构建也不启动任何服务。
+[root@xdlinux ➜ multica-main ]$ make build
+cd server && go build -ldflags "-X main.version=dev -X main.commit=unknown" -o bin/server ./cmd/server
+cd server && go build -ldflags "-X main.version=dev -X main.commit=unknown -X main.date=2026-05-08T13:35:37Z" -o bin/multica ./cmd/multica
+cd server && go build -o bin/migrate ./cmd/migrate
+```
+
+构建镜像：
+
+```sh
+# make selfhost-build 从当前代码构建（推荐开发/自托管）
+  # 这会：
+  # 1. 从当前 checkout 构建 server/ Go 代码
+  # 2. 构建 Next.js 前端
+  # 3. 通过 Docker Compose 启动完整栈（PostgreSQL + backend + web）
+# make selfhost 
+  # 则会从 GitHub Container Registry 拉取官方预编译的 backend + web 镜像并启动。
+make selfhost-build
+```
+
+### 9.4. 问题记录
+
+问题：Alpine Linux 官方软件源在国内访问超时，导致 apk add 安装包失败
+
+```sh
+[root@xdlinux ➜ multica-main ]$ make selfhost-build
+==> Building Multica from the current checkout...
+docker compose -f docker-compose.selfhost.yml -f docker-compose.selfhost.build.yml up -d --build
+[+] up 0/17
+ ⠹ Image pgvector/pgvector:pg17 [⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀] Pulling
+ ...
+=> [backend internal] load build context              0.1s
+ => => transferring context: 3.88MB                   0.1s
+ => ERROR [backend stage-1 2/9] RUN apk add --no-cache ca-certificates tzdata                   10.6s
+ => CANCELED [backend builder 2/9] RUN apk add --no-cache git   0.0s
+ => CANCELED [frontend deps  2/11] RUN corepack enable && corepack prepare pnpm@10.28.2 --activate    0.0s
+ => CANCELED [frontend runner 2/6] WORKDIR /app           0.0s
+------
+ > [backend stage-1 2/9] RUN apk add --no-cache ca-certificates tzdata:
+0.181 fetch https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/APKINDEX.tar.gz
+```

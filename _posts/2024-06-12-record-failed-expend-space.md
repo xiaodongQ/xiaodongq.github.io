@@ -626,7 +626,7 @@ qdisc netem 8002: dev enp4s0 root refcnt 2 limit 1000 loss 10%
 [root@desktop-mme7h3a ➜ /root ]$ tc qdisc show 
 ```
 
-## 202505更新
+## 5. 202505更新
 
 `CentOS 8`很多源缺失，系统重装为 `Rocky Linux`（Rocky Linux release 9.5）。
 
@@ -640,11 +640,95 @@ Rocky Linux release 9.5 (Blue Onyx)
 Linux xdlinux 5.14.0-503.14.1.el9_5.x86_64 #1 SMP PREEMPT_DYNAMIC Fri Nov 15 12:04:32 UTC 2024 x86_64 x86_64 x86_64 GNU/Linux
 ```
 
-## 5. 小结
+## 6. 202605更新
+
+### 6.1. 默认桌面模式启动
+
+有时OpenClaw需要浏览器操作，默认用桌面模式启动。
+
+```sh
+# 原来是命令行模式
+[root@xdlinux ➜ yum.repos.d ]$ systemctl get-default
+multi-user.target
+
+# 设置为graphical.target 表示桌面模式
+[root@xdlinux ➜ yum.repos.d ]$ systemctl set-default graphical.target
+Removed "/etc/systemd/system/default.target".
+Created symlink /etc/systemd/system/default.target → /usr/lib/systemd/system/graphical.target.
+[root@xdlinux ➜ yum.repos.d ]$
+```
+
+### 6.2. 安装docker
+
+Rocky Linux默认基于`podman`管理容器，不是太习惯。而且当前很多开源项目还是基于`docker`构建镜像。
+
+```sh
+dnf install -y dnf-plugins-core
+# 添加国内docker源
+dnf config-manager --add-repo https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+# 刷新缓存
+dnf makecache
+
+# 安装docker
+# 安装前先卸载podman-docker提供的docker命令兼容包（podman自身还是保留的）
+dnf remove -y podman-docker
+# 可以安装Docker了
+dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+# 设置自启动
+systemctl enable docker
+systemctl start docker
+```
+
+`docker ps`会报错，还有podman相关上下文残留：
+
+```sh
+[root@xdlinux ➜ multica-main ]$ docker ps
+failed to connect to the docker API at unix:///run/podman/podman.sock; check if the path is correct and if the daemon is running: dial unix /run/podman/podman.sock: connect: no such file or directory
+```
+
+修改：
+
+```sh
+docker context use default
+unset DOCKER_HOST
+
+# 然后就正常了
+[root@xdlinux ➜ ~ ]$ docker ps
+CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
+[root@xdlinux ➜ ~ ]$ docker context ls
+NAME        DESCRIPTION                               DOCKER ENDPOINT               ERROR
+default *   Current DOCKER_HOST based configuration   unix:///var/run/docker.sock
+
+# docker compose也可以用了
+[root@xdlinux ➜ ~ ]$ docker compose version
+Docker Compose version v5.1.3
+```
+
+#### 设置国内docker源
+
+```sh
+vi /etc/docker/daemon.json
+# 添加下述源：
+{
+  "registry-mirrors": [
+    "https://docker.m.daocloud.io",
+    "https://docker.1ms.run",
+    "https://docker.xuanyuan.me"
+  ]
+}
+
+# 重启
+systemctl daemon-reload
+systemctl restart docker
+# 验证，可看到Registry Mirrors里包含上述源
+docker info
+```
+
+## 7. 小结
 
 折腾了一下LVM操作，又重新装了一次机。
 
-## 6. 参考
+## 8. 参考
 
 1、[LVM----从CentOS7默认安装的/home中转移空间到根目录/](https://www.cnblogs.com/user-sunli/p/15484345.html)
 
