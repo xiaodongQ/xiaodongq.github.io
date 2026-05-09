@@ -1,7 +1,7 @@
 ---
 title: 复利工程 -- 基于 Obsidian + LLM Wiki 开始构建个人知识工程
 description: 基于 Karpathy 的 LLM Wiki 模式，配合 Obsidian 和 Claude Code，构建增量维护的个人知识库。
-categories: [复利工程, 知识库]
+categories: [AI, 复利工程]
 tags: [Obsidian, 知识库, LLM, Claude]
 ---
 

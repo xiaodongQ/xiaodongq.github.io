@@ -415,9 +415,38 @@ cd server && go build -o bin/migrate ./cmd/migrate
   # 1. 从当前 checkout 构建 server/ Go 代码
   # 2. 构建 Next.js 前端
   # 3. 通过 Docker Compose 启动完整栈（PostgreSQL + backend + web）
+# make selfhost-build 实际执行的是：
+  # docker compose -f docker-compose.selfhost.yml -f docker-compose.selfhost.build.yml up -d --build
+  # 前者 docker-compose.selfhost.yml 定义 postgres + backend + frontend 三个服务
+  # 后者 docker-compose.selfhost.build.yml 覆盖 backend 和 frontend 的 image 字段，改指向本地 multica-backend:dev 和 multica-web:dev，并用本地 Dockerfile / Dockerfile.web build
+make selfhost-build
+
 # make selfhost 
   # 则会从 GitHub Container Registry 拉取官方预编译的 backend + web 镜像并启动。
-make selfhost-build
+```
+
+#### 9.3.2. 运行安装脚本
+
+```sh
+ install.sh --offline --with-server 的实际行为
+
+  关键：它不会 build，只启动服务。
+
+  流程是：
+  1. setup_server() — 确保源码目录存在，.env 存在
+  2. 直接 docker compose up -d（在离线模式下读 $SOURCE_DIR 的 compose 文件）
+
+  所以 离线模式你需要先 build 好镜像，然后 install.sh 才能启动它们。
+
+
+ 设置环境变量后执行：
+  export MULTICA_OFFLINE_MODE=1
+  export MULTICA_SOURCE_DIR=/home/workspace/repo/multica-main    # 源码目录
+  export MULTICA_INSTALL_DIR=$HOME/.multica/server               # 运行时目录
+
+  # 执行离线自托管安装
+  curl -fsSL https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.sh | bash -s -- --offline
+  --with-server
 ```
 
 ### 9.4. 问题记录
