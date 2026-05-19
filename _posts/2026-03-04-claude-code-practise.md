@@ -157,6 +157,47 @@ Skills 存放在 `~/.claude/skills/`（个人全局）或项目目录下的 `.cl
 
 创建Skill后，Claude执行任务就会扫描已安装的 Skills，发现你的请求有涉及就会调用。
 
+#### 4.2.3. 推荐skill：skill-creator
+
+claude code官方仓库中包含，很实用的几个用法：
+* 1、按照规范来创建skill
+* 2、已创建的skill进行修修补补后，用它来进行评审和修改，进一步迭代
+
+skill规范（最佳实践）：
+
+```sh
+根据 skill-creator 的内容，skill 创建的核心流程如下：                                        
+                                                                                               
+  1. 捕获意图                                                                                  
+                                                                                               
+  在开始之前，明确四个问题：                                                                   
+  - 这个 skill 要让 Claude 完成什么？    
+  - 何时触发？（用户说什么时使用）       
+  - 期望的输出格式是什么？               
+  - 是否需要测试用例来验证？             
+                           
+  2. 编写 SKILL.md
+                                         
+  Skill 的标准结构：
+
+  skill-name/
+  ├── SKILL.md (必需)
+  │   ├── YAML frontmatter (name, description 必需)                                            
+  │   └── Markdown instructions
+  └── Bundled Resources (可选)                                                                 
+      ├── scripts/    - 可执行代码
+      ├── references/ - 按需加载的文档
+      └── assets/     - 模板、图标等
+```
+
+#### 4.2.4. 推荐skill：ralph-loop
+
+官方插件中也包含。
+
+一种 AI 开发方法论，核心是无限循环 + 每次全新上下文。让 AI 反复尝试同一个任务，每次迭代都从干净的状态开始，通过文件系统看到之前的工作成果。
+
+[Ralph Wiggum 深度解析](https://yudesk.dev/docs/notes/ralph-wiggum/concept)
+
 ### 4.3. MCP
 
 MCP可以是一个服务程序或者工具，在配置中告诉Claude Code可以使用它来扩展能力，比如联网、比如自定义一些私有的工具功能。
