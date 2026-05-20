@@ -159,8 +159,8 @@ Skills 存放在 `~/.claude/skills/`（个人全局）或项目目录下的 `.cl
 
 #### 4.2.3. 推荐skill：skill-creator
 
-claude code官方仓库中包含，很实用的几个用法：
-* 1、按照规范来创建skill
+claude code官方仓库中包含，实用的几个用法：
+* 1、按照规范来创建skill（覆盖了上小节说明的规范）
 * 2、已创建的skill进行修修补补后，用它来进行评审和修改，进一步迭代
 
 skill规范（最佳实践）：
@@ -786,4 +786,81 @@ Claude Code会话周期各个阶段支持的hooks事件，示意图：
   ↓ 5.  Notification (1)    When notifications are sent
 
   Enter to confirm · Esc to cancel
+```
+
+## 8. 创建个人插件市场（202605更新）
+
+### 8.1. 初步搭建的市场
+
+如之前在 [复利工程 -- Obsidian Wiki模板仓库与实用工具分享](https://xiaodongq.github.io/2026/04/30/fubilee-tools-wiki-template/) 所说的，创建的个人AI工具集市场：[xiaodongQ/xd-self-market](https://github.com/xiaodongQ/xd-self-market)。
+
+目录结构如下：
+
+```sh
+[MacOS-xd@qxd ➜ xd-self-market git:(main) ]$ tree
+.
+├── CLAUDE.md
+├── README.md
+├── docs
+│   └── superpowers
+│       └── specs
+│           └── 2026-05-03-xd-self-market-marketplace-design.md
+└── skills
+    ├── prompt-optimizer
+    │   └── SKILL.md
+    ├── xd-blog-style
+    │   └── SKILL.md
+    └── xd-git-push
+        └── SKILL.md
+```
+
+但这里存在一个问题，目前只有skills，而Claude Code官方的插件市场，支持将`command`、`agent`、`Skills`、`钩子`、`MCP`、`LSP` 等能力打包，需要根据官方规范来改造当前的市场。
+
+### 8.2. 按官方规范进行市场改造
+
+**官方插件市场文档**：
+* [创建和分发 plugin marketplace](https://code.claude.com/docs/zh-CN/plugin-marketplaces)
+* [Claude Code创建插件](https://code.claude.com/docs/zh-CN/plugins)
+* [Plugin 清单架构](https://code.claude.com/docs/zh-CN/plugins-reference#plugin-%E6%B8%85%E5%8D%95%E6%9E%B6%E6%9E%84)
+
+插件目录结构：
+
+```sh
+enterprise-plugin/
+├── .claude-plugin/           # 元数据目录（可选）
+│   └── plugin.json             # plugin 清单
+├── skills/                   # Skills
+│   ├── code-reviewer/
+│   │   └── SKILL.md
+│   └── pdf-processor/
+│       ├── SKILL.md
+│       └── scripts/
+├── commands/                 # Skills 作为平面 .md 文件
+│   ├── status.md
+│   └── logs.md
+├── agents/                   # Subagent 定义
+...
+```
+
+`xxx插件/.claude-plugin/plugin.json`：
+
+```sh
+{
+  "name": "plugin-name",
+  "displayName": "Plugin Name",
+  "version": "1.2.0",
+  "description": "Brief plugin description",
+  "author": {
+    "name": "Author Name",
+    "email": "author@example.com",
+    "url": "https://github.com/author"
+  },
+  "homepage": "https://docs.example.com/plugin",
+  "repository": "https://github.com/author/plugin",
+  "license": "MIT",
+  "keywords": ["keyword1", "keyword2"],
+  "skills": "./custom/skills/",
+  "commands": ["./custom/commands/special.md"],
+  "agents": ["./custom/agents/reviewer.md"],
+  "hooks": "./config/hooks.json",
 ```
