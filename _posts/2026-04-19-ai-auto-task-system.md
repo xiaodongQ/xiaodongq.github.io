@@ -358,10 +358,41 @@ cd multica
   # 用 docker-compose.selfhost.yml 启动全部服务
   # 等后端 /health 端点准备就绪
 make selfhost
-# 网络原因，拉取镜像会比较慢
+# 网络原因，拉取镜像可能会比较慢
 #  ✔ Image pgvector/pgvector:pg17                            Pulled                                        1002.6s
 #  ✔ Image ghcr.io/multica-ai/multica-backend:latest         Pulled                                         386.5s
 #  ⠹ Image ghcr.io/multica-ai/multica-web:latest [⣿⣿⣿⣿⣄⣿⣿⣿⣿] 63.96MB / 93.11MB Pulling                    1353.3s
+
+[root@xdlinux ➜ multica-main ]$ make selfhost
+==> Pulling official Multica images...
+[+] pull 3/11
+ ✔ Image ghcr.io/multica-ai/multica-backend:latest Pulled                 32.2s
+ ✔ Image ghcr.io/multica-ai/multica-web:latest     Pulled                 99.6s
+ ✔ Image pgvector/pgvector:pg17                    Pulled                  1.3s
+==> Starting Multica via Docker Compose...
+docker compose -f docker-compose.selfhost.yml up -d
+[+] up 6/6
+ ✔ Network multica_default        Created                                  0.1s
+ ✔ Volume multica_backend_uploads Created                                  0.0s
+ ✔ Volume multica_pgdata          Created                                  0.0s
+ ✔ Container multica-postgres-1   Healthy                                  6.1s
+ ✔ Container multica-backend-1    Started                                  5.9s
+ ✔ Container multica-frontend-1   Started                                  6.0s
+==> Waiting for backend to be ready...
+
+✓ Multica is running!
+  Frontend: http://localhost:3000
+  Backend:  http://localhost:8080
+
+Images: ghcr.io/multica-ai/multica-backend:latest
+        ghcr.io/multica-ai/multica-web:latest
+
+Log in: configure RESEND_API_KEY in .env for email codes,
+        or read the generated code from backend logs when Resend is unset.
+
+Next — install the CLI and connect your machine:
+  brew install multica-ai/tap/multica
+  multica setup self-host
 ```
 
 ```sh
