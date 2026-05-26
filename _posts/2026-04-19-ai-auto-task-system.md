@@ -341,76 +341,31 @@ Receiving objects:  21% (370/1747), 7.04 MiB | 65.00 KiB/s
 
 ### 9.3. 离线安装（手动编译）
 
-网络有点慢，直接GitHub上下载zip包，让AI修改`install.sh`脚本，支持本地编译和安装，正好了解下代码流程。
+网络有点慢，直接GitHub上下载zip包，进行本地构建。
+
+参考：[self-host-quickstart](https://multica.ai/docs/zh/self-host-quickstart)
 
 #### 9.3.1. 编译本地产物
 
 ```sh
-# 1. 先构建 CLI（如果没有）
-cd /home/workspace/repo/multica-main
-make build
+git clone https://github.com/multica-ai/multica.git
+cd multica
 
-# 2. 确认产物存在
-ls server/bin/multica
-
-# 3. 运行安装脚本
-cd /home/workspace/repo/multica-main
-./scripts/install.sh --with-server --offline
-
-注意事项：
-
-  - 确保 Docker 运行中
-  - .env 文件需要自己创建（从 .env.example 复制）
-  - 如果没有现成的 .env，脚本会生成一个带随机 JWT_SECRET 的
-
-  # 如果还没有 .env
-  cp .env.example .env
-  openssl rand -hex 32  # 生成 JWT_SECRET 填入
+# make selfhost会从 GitHub Container Registry 拉取官方预编译的 backend + web 镜像并启动。
+# 会进行：
+  # 如果没有 .env 文件，从 .env.example 自动生成一份并生成随机 JWT_SECRET
+  # 拉取官方 Docker 镜像（PostgreSQL、Multica backend、Multica frontend）
+  # 用 docker-compose.selfhost.yml 启动全部服务
+  # 等后端 /health 端点准备就绪
+make selfhost
+# 网络原因，拉取镜像会比较慢
+#  ✔ Image pgvector/pgvector:pg17                            Pulled                                        1002.6s
+#  ✔ Image ghcr.io/multica-ai/multica-backend:latest         Pulled                                         386.5s
+#  ⠹ Image ghcr.io/multica-ai/multica-web:latest [⣿⣿⣿⣿⣄⣿⣿⣿⣿] 63.96MB / 93.11MB Pulling                    1353.3s
 ```
 
-`make build`提示需要`go >= 1.26.1`，我当前系统是`1.23.1`，可以先升级下系统默认的新版本`1.25.9`，再修改下`server/go.mod`里的go版本要求：`go >= 1.25.1`（若编译时某些库版本要求更高，再考虑下载新版本）
-
-另外，若github的依赖库下载慢，可以配置go代理，`go env -w GOPROXY=https://goproxy.cn,direct`。
-
 ```sh
-[root@xdlinux ➜ multica-main ]$ dnf upgrade go
-Last metadata expiration check: 0:08:00 ago on Fri 08 May 2026 09:22:04 PM CST.
-Dependencies resolved.
-==============================================================================================
- Package                      Architecture            Version                          Repository                  Size
-==============================================================================================
-Upgrading:
- golang                       x86_64                  1.25.9-1.el9_7                   appstream                  1.2 M
- golang-bin                   x86_64                  1.25.9-1.el9_7                   appstream                   37 M
-...
-
-# 新版本Go
-[root@xdlinux ➜ multica-main ]$ go version
-go version go1.25.9 (Red Hat 1.25.9-1.el9_7) linux/amd64
-```
-
-编译：
-
-```sh
-# go mod tidy
-[root@xdlinux ➜ multica-main ]$ cd server
-[root@xdlinux ➜ server ]$ go mod tidy
-go: downloading github.com/stretchr/testify v1.11.1
-go: downloading github.com/google/go-cmp v0.7.0
-...
-
-# 编译
-# make build 只是构建 Go 二进制文件到 server/bin/，不会构建也不启动任何服务。
-[root@xdlinux ➜ multica-main ]$ make build
-cd server && go build -ldflags "-X main.version=dev -X main.commit=unknown" -o bin/server ./cmd/server
-cd server && go build -ldflags "-X main.version=dev -X main.commit=unknown -X main.date=2026-05-08T13:35:37Z" -o bin/multica ./cmd/multica
-cd server && go build -o bin/migrate ./cmd/migrate
-```
-
-构建镜像：
-
-```sh
-# make selfhost-build 从当前代码构建（推荐开发/自托管）
+# make selfhost-build 会从当前代码构建（推荐开发/自托管）
   # 这会：
   # 1. 从当前 checkout 构建 server/ Go 代码
   # 2. 构建 Next.js 前端
@@ -419,10 +374,6 @@ cd server && go build -o bin/migrate ./cmd/migrate
   # docker compose -f docker-compose.selfhost.yml -f docker-compose.selfhost.build.yml up -d --build
   # 前者 docker-compose.selfhost.yml 定义 postgres + backend + frontend 三个服务
   # 后者 docker-compose.selfhost.build.yml 覆盖 backend 和 frontend 的 image 字段，改指向本地 multica-backend:dev 和 multica-web:dev，并用本地 Dockerfile / Dockerfile.web build
-make selfhost-build
-
-# make selfhost 
-  # 则会从 GitHub Container Registry 拉取官方预编译的 backend + web 镜像并启动。
 ```
 
 #### 9.3.2. 运行安装脚本
@@ -451,7 +402,30 @@ make selfhost-build
 
 ### 9.4. 问题记录
 
-问题：Alpine Linux 官方软件源在国内访问超时，导致 apk add 安装包失败
+#### 9.4.1. Go版本提示需要>= 1.26.1
+
+`make`提示需要`go >= 1.26.1`，我当前系统是`1.23.1`，可以先升级下系统默认的新版本`1.25.9`，再修改下`server/go.mod`里的go版本要求：`go >= 1.25.1`（若编译时某些库版本要求更高，再考虑下载新版本）
+
+另外，若github的依赖库下载慢，可以配置go代理，`go env -w GOPROXY=https://goproxy.cn,direct`。
+
+```sh
+[root@xdlinux ➜ multica-main ]$ dnf upgrade go
+Last metadata expiration check: 0:08:00 ago on Fri 08 May 2026 09:22:04 PM CST.
+Dependencies resolved.
+==============================================================================================
+ Package                      Architecture            Version                          Repository                  Size
+==============================================================================================
+Upgrading:
+ golang                       x86_64                  1.25.9-1.el9_7                   appstream                  1.2 M
+ golang-bin                   x86_64                  1.25.9-1.el9_7                   appstream                   37 M
+...
+
+# 新版本Go
+[root@xdlinux ➜ multica-main ]$ go version
+go version go1.25.9 (Red Hat 1.25.9-1.el9_7) linux/amd64
+```
+
+#### 9.4.2. 问题：Alpine Linux 官方软件源在国内访问超时，导致 apk add 安装包失败
 
 ```sh
 [root@xdlinux ➜ multica-main ]$ make selfhost-build
@@ -470,3 +444,4 @@ docker compose -f docker-compose.selfhost.yml -f docker-compose.selfhost.build.y
  > [backend stage-1 2/9] RUN apk add --no-cache ca-certificates tzdata:
 0.181 fetch https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/APKINDEX.tar.gz
 ```
+
