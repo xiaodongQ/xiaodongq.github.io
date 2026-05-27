@@ -343,26 +343,27 @@ Receiving objects:  21% (370/1747), 7.04 MiB | 65.00 KiB/s
 
 网络有点慢，直接GitHub上下载zip包，进行本地构建。
 
-参考：[self-host-quickstart](https://multica.ai/docs/zh/self-host-quickstart)
+参考：[self-host-quickstart](https://multica.ai/docs/zh/self-host-quickstart)，官网：[Self-Hosting Guide](https://github.com/multica-ai/multica/blob/main/SELF_HOSTING.md)
 
 #### 9.3.1. 编译本地产物
 
 ```sh
 git clone https://github.com/multica-ai/multica.git
 cd multica
-
-# make selfhost会从 GitHub Container Registry 拉取官方预编译的 backend + web 镜像并启动。
-# 会进行：
-  # 如果没有 .env 文件，从 .env.example 自动生成一份并生成随机 JWT_SECRET
-  # 拉取官方 Docker 镜像（PostgreSQL、Multica backend、Multica frontend）
-  # 用 docker-compose.selfhost.yml 启动全部服务
-  # 等后端 /health 端点准备就绪
 make selfhost
-# 网络原因，拉取镜像可能会比较慢
-#  ✔ Image pgvector/pgvector:pg17                            Pulled                                        1002.6s
-#  ✔ Image ghcr.io/multica-ai/multica-backend:latest         Pulled                                         386.5s
-#  ⠹ Image ghcr.io/multica-ai/multica-web:latest [⣿⣿⣿⣿⣄⣿⣿⣿⣿] 63.96MB / 93.11MB Pulling                    1353.3s
+```
 
+`make selfhost`会从 GitHub Container Registry 拉取官方预编译的 backend + web 镜像并启动。
+
+会进行：
+* 如果没有 .env 文件，从 .env.example 自动生成一份并生成随机 JWT_SECRET
+* 拉取官方 Docker 镜像（PostgreSQL、Multica backend、Multica frontend）
+* 用 `docker-compose.selfhost.yml` 启动全部服务
+* 等后端 `/health` 端点准备就绪
+
+执行编译：
+
+```
 [root@xdlinux ➜ multica-main ]$ make selfhost
 ==> Pulling official Multica images...
 [+] pull 3/11
@@ -395,6 +396,16 @@ Next — install the CLI and connect your machine:
   multica setup self-host
 ```
 
+可能碰到的问题：网络原因，拉取镜像可能会比较慢
+
+```
+#  ✔ Image pgvector/pgvector:pg17                            Pulled          1002.6s
+#  ✔ Image ghcr.io/multica-ai/multica-backend:latest         Pulled           386.5s
+#  ⠹ Image ghcr.io/multica-ai/multica-web:latest [⣿⣿⣿⣿⣄⣿⣿⣿⣿] 63.96MB / 93.11MB Pulling   1353.3s
+```
+
+这里说明下`make selfhost-build`的操作（上面能通则不用考虑此处）
+
 ```sh
 # make selfhost-build 会从当前代码构建（推荐开发/自托管）
   # 这会：
@@ -407,72 +418,145 @@ Next — install the CLI and connect your machine:
   # 后者 docker-compose.selfhost.build.yml 覆盖 backend 和 frontend 的 image 字段，改指向本地 multica-backend:dev 和 multica-web:dev，并用本地 Dockerfile / Dockerfile.web build
 ```
 
-#### 9.3.2. 运行安装脚本
+#### 9.3.2. 编译后服务说明
+
+`make selfhost`编译完成后可看到容器：
 
 ```sh
- install.sh --offline --with-server 的实际行为
-
-  关键：它不会 build，只启动服务。
-
-  流程是：
-  1. setup_server() — 确保源码目录存在，.env 存在
-  2. 直接 docker compose up -d（在离线模式下读 $SOURCE_DIR 的 compose 文件）
-
-  所以 离线模式你需要先 build 好镜像，然后 install.sh 才能启动它们。
-
-
- 设置环境变量后执行：
-  export MULTICA_OFFLINE_MODE=1
-  export MULTICA_SOURCE_DIR=/home/workspace/repo/multica-main    # 源码目录
-  export MULTICA_INSTALL_DIR=$HOME/.multica/server               # 运行时目录
-
-  # 执行离线自托管安装
-  curl -fsSL https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.sh | bash -s -- --offline
-  --with-server
+[root@xdlinux ➜ ~ ]$ docker ps
+CONTAINER ID   IMAGE                                       COMMAND                  CREATED        STATUS                  PORTS                                         NAMES
+dd250592feb2   ghcr.io/multica-ai/multica-web:latest       "docker-entrypoint.s…"   16 hours ago   Up 16 hours             0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp   multica-frontend-1
+cdb3f46c617e   ghcr.io/multica-ai/multica-backend:latest   "./entrypoint.sh"        16 hours ago   Up 16 hours             0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp   multica-backend-1
+4f20bb5cd90c   pgvector/pgvector:pg17                      "docker-entrypoint.s…"   16 hours ago   Up 16 hours (healthy)   0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp   multica-postgres-1
 ```
 
-### 9.4. 问题记录
+从上面`make selfhost`最后的输出也可以看到：
+* 前端：http://localhost:3000
+* 后端：http://localhost:8080
 
-#### 9.4.1. Go版本提示需要>= 1.26.1
+### 9.4. 解决离线验证码获取问题
 
-`make`提示需要`go >= 1.26.1`，我当前系统是`1.23.1`，可以先升级下系统默认的新版本`1.25.9`，再修改下`server/go.mod`里的go版本要求：`go >= 1.25.1`（若编译时某些库版本要求更高，再考虑下载新版本）
+登录`http://192.168.1.150:3000`后（此处改成了我安装server的地址），会提示输入邮箱获取验证码。
 
-另外，若github的依赖库下载慢，可以配置go代理，`go env -w GOPROXY=https://goproxy.cn,direct`。
+![multica-login-image](/images/multica-login-image.png)
+
+若网络不通，有2种方式，可以指定环境变量后，在日志里找到验证码。操作如下：
 
 ```sh
-[root@xdlinux ➜ multica-main ]$ dnf upgrade go
-Last metadata expiration check: 0:08:00 ago on Fri 08 May 2026 09:22:04 PM CST.
-Dependencies resolved.
-==============================================================================================
- Package                      Architecture            Version                          Repository                  Size
-==============================================================================================
-Upgrading:
- golang                       x86_64                  1.25.9-1.el9_7                   appstream                  1.2 M
- golang-bin                   x86_64                  1.25.9-1.el9_7                   appstream                   37 M
-...
+离线自建（make selfhost）不走邮件的话，验证码会打印到后端容器日志里。
 
-# 新版本Go
-[root@xdlinux ➜ multica-main ]$ go version
-go version go1.25.9 (Red Hat 1.25.9-1.el9_7) linux/amd64
+  方式一、获取验证码的步骤 
+
+  1. 启动服务
+   make selfhost     
+  2. 打开登录页 → 输入邮箱后不要去邮箱里找验证码  
+  3. 查后端容器日志
+  docker compose -f docker-compose.selfhost.yml logs backend
+
+  找到这一行：
+  [DEV] Verification code for xxx@example.com: 123456
+  就是这个 6 位数字。
+
+  ---
+
+  方式二、如果你想每次用固定验证码（方便本地反复登录）
+
+  编辑 .env：（代码目录）
+  APP_ENV=development
+  MULTICA_DEV_VERIFICATION_CODE=888888
+                                      
+  然后 docker compose -f docker-compose.selfhost.yml restart backend，之后所有邮箱都用 888888 登录。
+  ▎ ⚠️  这条规则仅对本地/私有实例生效——APP_ENV=production 时这个变量会被忽略。
 ```
 
-#### 9.4.2. 问题：Alpine Linux 官方软件源在国内访问超时，导致 apk add 安装包失败
+实际操作，方式二，固定`888888`：
+
+1、修改`.env`，此处我的目录文件是 `/home/workspace/repo/multica-main/.env`：`APP_ENV`和`MULTICA_DEV_VERIFICATION_CODE`原来都是`=空`：
 
 ```sh
-[root@xdlinux ➜ multica-main ]$ make selfhost-build
-==> Building Multica from the current checkout...
-docker compose -f docker-compose.selfhost.yml -f docker-compose.selfhost.build.yml up -d --build
-[+] up 0/17
- ⠹ Image pgvector/pgvector:pg17 [⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀] Pulling
- ...
-=> [backend internal] load build context              0.1s
- => => transferring context: 3.88MB                   0.1s
- => ERROR [backend stage-1 2/9] RUN apk add --no-cache ca-certificates tzdata                   10.6s
- => CANCELED [backend builder 2/9] RUN apk add --no-cache git   0.0s
- => CANCELED [frontend deps  2/11] RUN corepack enable && corepack prepare pnpm@10.28.2 --activate    0.0s
- => CANCELED [frontend runner 2/6] WORKDIR /app           0.0s
-------
- > [backend stage-1 2/9] RUN apk add --no-cache ca-certificates tzdata:
-0.181 fetch https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/APKINDEX.tar.gz
+# APP_ENV gates production safety checks. Docker self-host pins APP_ENV to
+# "production" by default. Local dev can leave it unset.
+# See SELF_HOSTING.md for the full login setup.
+APP_ENV=development
+# Optional local/testing shortcut. Empty by default, so there is no fixed
+# verification code. Without RESEND_API_KEY, generated codes print to stdout.
+# If you need deterministic local automation, set a 6-digit value such as
+# 888888 and keep APP_ENV non-production. This is ignored when APP_ENV=production.
+MULTICA_DEV_VERIFICATION_CODE=888888
 ```
+
+2、重启server端，`docker compose -f docker-compose.selfhost.yml restart backend`
+
+```sh
+docker compose -f docker-compose.selfhost.yml restart backend
+[+] restart 0/1
+ ⠸ Container multica-backend-1 Restarting                                                                               0.4s
+```
+
+3、这里随便输入邮箱后，查看日志：`docker compose -f docker-compose.selfhost.yml logs backend`
+
+可看到验证码：
+
+```sh
+backend-1  | [DEV] Verification code for test@gmail.com: 579880
+```
+
+### 9.5. 页面初始化
+
+![multica-onboarding-image](/images/multica-onboarding-image.png)
+
+### 9.6. 连接CLI（任务执行机）到服务端，并启动daemon
+
+CLI是指`Claude Code`、`Codex`等AI智能体，负责从multica获取任务并执行。
+
+需要先在执行机器（不一定是上面安装multica的机器，可以是其他服务器）上安装`daemon`，它负责探测该服务器上安装的AI Agent，并将其注册到服务端，agent被分配任务时负责执行任务。
+
+本地实验时，CLI和multica在同一台，此处直接`multica setup self-host`。
+
+`http://localhost:3000/login?cli_callback=http%3A%2F%2Flocalhost%3A43751%2Fcallback&cli_state=07be025316b939f5655863aa6a36d03a`改成`192.168.1.150`，出来的授权url再改成`192.168.1.150`，到远程服务器curl执行即可授权成功。
+
+```sh
+[root@xdlinux ➜ multica-main ]$ multica setup self-host
+Current configuration:
+  server_url: http://localhost:8080
+  app_url:    http://localhost:3000
+
+This will reset your configuration. Continue? [y/N] y
+Configured for self-hosted server.
+  server_url: http://localhost:8080
+  app_url:    http://localhost:3000
+  config:     /root/.multica/config.json
+
+Opening browser to authenticate...
+If the browser didn't open, visit:
+  http://localhost:3000/login?cli_callback=http%3A%2F%2Flocalhost%3A43751%2Fcallback&cli_state=07be025316b939f5655863aa6a36d03a
+
+Waiting for authentication...
+Authenticated as xiaodong0795 (xiaodong0795@gmail.com)
+Token saved to config.
+
+Found 1 workspace(s):
+  • xd的工作区 (c29ac859-3d9f-4113-bafb-c43a9f26b742)
+
+→ Run 'multica daemon start' to start your local agent runtime.
+
+Starting daemon...
+Daemon started (pid 2077248, version 0.2.27)
+Logs: /root/.multica/daemon.log
+
+✓ Setup complete! Your machine is now connected to Multica.
+```
+
+`multica daemon status`查看deamon状态。
+
+```sh
+[root@xdlinux ➜ multica-main ]$ multica daemon status
+Daemon:      running (pid 2.077248e+06, uptime 2m22s)
+Agents:      claude, codex, openclaw
+Workspaces:  1
+```
+
+连接成功，可看到这台执行机了：
+
+![multica-cli-image](/images/multica-cli-image.png)
 
