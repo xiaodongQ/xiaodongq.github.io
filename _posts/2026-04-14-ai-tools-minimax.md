@@ -500,3 +500,42 @@ AI驱动科研!紫东太初AI4S大会落幕,OPC社区引爆AI超级个体浪潮
   2026-04-19 10:53:26
   ...
 ```
+
+## 5. 20260606更新：使用MiniMax-M3模型
+
+MiniMax近期发布了`M3`模型，M3 相比 M2.7 核心新增功能
+* 上下文：200K → 100 万 Token（1M）
+* Agent 智能体迭代：继承 M2.7 自我进化 Harness 框架，新增**Producer+Verifier 自我纠错闭环**、多 Agent 集群协同优化
+
+之前配置的还是`MiniMax-M2.7`，改成`MiniMax-M3`：
+
+Claude Code，`~/.claude/settings.json`：
+
+```sh
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://api.minimaxi.com/anthropic",
+    "ANTHROPIC_AUTH_TOKEN": "sk-cp-KgOfCAZKyPxxxxx",
+    "API_TIMEOUT_MS": "3000000",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "ANTHROPIC_MODEL": "MiniMax-M3",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "MiniMax-M3",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "MiniMax-M3",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "MiniMax-M3"
+  },
+```
+
+另外`npm upgrade -g mmx-cli`更新下`mmx` CLI，其页面也有所更新：
+
+```sh
+[MacOS-xd@qxd ➜ picoclaw git:(main) ]$ mmx
+...
+MINIMAX ~/.mmx/config.json | URL: api.minimaxi.com | Key: sk-c...kIJk (file)
+
+╭────────────────────────────────────────────────────────────────────────╮
+│ MINIMAX  TokenPlan 配额面板              周期: 2026-05-31 — 2026-06-07   │
+├────────────────────────────────────────────────────────────────────────┤
+│ 通用    剩余             99%  周剩余             98%  重置 1h 23m         │
+├────────────────────────────────────────────────────────────────────────┤
+│ 视频    剩余            100%  周剩余            100%  重置 1h 23m         │
+╰────────────────────────────────────────────────────────────────────────╯
+```
