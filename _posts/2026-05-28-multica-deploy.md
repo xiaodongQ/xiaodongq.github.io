@@ -271,9 +271,6 @@ Workspaces:  1
 
 ### 6.1. 非浏览器方式
 
-
-mul_c30fc5eea6d52e88f15ba0a4b917489e7ea6855c
-
 ```sh
 multica config set server_url http://localhost:8080
 multica config set app_url http://localhost:3000
@@ -304,17 +301,70 @@ Daemon started (pid 2352579, version 0.2.27)
 Logs: /home/clauded/.multica/daemon.log
 ```
 
-## 7. 问题
+## 7. 使用
 
-### 7.1. Claude Code无法在root用户下以`--dangerously-skip-permissions`方式启动执行
+
+### 7.1. 配置飞书CLI进行机器人通知
+
+之前的root用户下，OpenClaw已经初始化过飞书cli了，现在切换了新用户clauded（原因见下面问题描述），需要手动初始化一下。
+
+步骤：
+* 1、`lark-cli config init --new` 会自动创建一个机器人和开通消息权限，点击链接或者扫描授权
+* 2、`lark-cli auth login` 机器上进行登录，上一步还不够，这步会将用户写回到本地的配置文件里
+* 3、`lark-cli config show`查看
+
+```sh
+[clauded@xdlinux ~]$ lark-cli config init --new
+
+使用飞书 / Lark 扫码配置应用：
+。。。
+或打开以下链接完成配置：
+  https://open.feishu.cn/page/cli?user_code=HLBZ-KVxx&lpv=1.0.29&ocv=1.0.29&from=cli
+
+正在获取你的应用配置结果...
+
+OK: 应用配置成功! App ID: cli_aaafe65f07f89bd1
+{
+  "appId": "cli_aaafe65f07f89bd1",
+  "appSecret": "****",
+  "brand": "feishu"
+}
+
+[clauded@xdlinux ~]$ lark-cli auth login
+
+摘要:
+  域:       im
+  权限:     常用权限
+  Scopes (14): contact:user.base:readonly, contact:user.basic_profile:readonly, im:chat.members:read, ...
+在浏览器中打开以下链接进行认证:
+...
+
+# users里有用户就可以了
+[clauded@xdlinux ~]$ lark-cli config show
+{
+  "appId": "cli_aaafe65f07f89bd1",
+  "appSecret": "****",
+  "brand": "feishu",
+  "lang": "zh",
+  "profile": "cli_aaafe65f07f89bd1",
+  "users": "飞书用户7170NK (ou_fcf873d86f2fbc3817fabxxxxxxxx)",
+  "workspace": "local"
+}
+```
+
+## 8. 问题
+
+### 8.1. Claude Code无法在root用户下以`--dangerously-skip-permissions`方式启动执行
 
 解决方式：创建一个新用户，并配置root权限，`vim /etc/sudoers`，增加：`clauded ALL=(ALL) NOPASSWD: ALL`
 
 `/tmp`目录权限问题，报错：`EACCES: permission denied, mkdir '/tmp/claude-1000/-home-clauded-multica-workspaces-c29ac859-3d9f-4113-bafb-c43a9f26b742-48e94121-workdir/0a558058-31cb-4502-a433-c859ae8bf4f1/tasks'`
 
+开启其他用户的访问权限后，任务正常：
+
 ![multica-issue-success](/images/multica-issue-success-image.png)
 
-## 8. 参考链接
+## 9. 参考链接
 
 * [multica-ai/multica](https://github.com/multica-ai/multica/blob/main/README.zh-CN.md)
 * [self-host-quickstart](https://multica.ai/docs/zh/self-host-quickstart)
