@@ -46,7 +46,7 @@ Compressing objects:  21% (370/1747), 7.04 MiB | 65.00 KiB/s
 ...
 ```
 
-2、`multica setup self-host`
+2、安装配置CLI，见下面的连接CLI小节
 
 ## 3. 离线安装（手动编译）
 
@@ -268,3 +268,53 @@ Workspaces:  1
 连接成功，可看到这台执行机了：
 
 ![multica-cli-image](/images/multica-cli-image.png)
+
+### 6.1. 非浏览器方式
+
+
+mul_c30fc5eea6d52e88f15ba0a4b917489e7ea6855c
+
+```sh
+multica config set server_url http://localhost:8080
+multica config set app_url http://localhost:3000
+multica login --token mul_c30fc5eea6d52e88f15ba0a4b917489e7ea6855c
+multica daemon start
+```
+
+```sh
+# 设置本地地址
+[clauded@xdlinux ~]$ multica config set server_url http://localhost:8080
+Set server_url = http://localhost:8080
+[clauded@xdlinux ~]$ multica config set app_url http://localhost:3000
+Set app_url = http://localhost:3000
+
+# 用api登录
+[clauded@xdlinux ~]$ multica login --token mul_c30fc5eea6d52e88f15ba0a4b917489e7ea6855c
+Authenticated as xiaodong0795 (xiaodong0795@gmail.com)
+Token saved to config.
+
+Found 1 workspace(s):
+  • xd的工作区 (c29ac859-3d9f-4113-bafb-c43a9f26b742)
+
+→ Run 'multica daemon start' to start your local agent runtime.
+
+# 启动daemon
+[clauded@xdlinux ~]$ multica daemon start
+Daemon started (pid 2352579, version 0.2.27)
+Logs: /home/clauded/.multica/daemon.log
+```
+
+## 7. 问题
+
+### 7.1. Claude Code无法在root用户下以`--dangerously-skip-permissions`方式启动执行
+
+解决方式：创建一个新用户，并配置root权限，`vim /etc/sudoers`，增加：`clauded ALL=(ALL) NOPASSWD: ALL`
+
+`/tmp`目录权限问题，报错：`EACCES: permission denied, mkdir '/tmp/claude-1000/-home-clauded-multica-workspaces-c29ac859-3d9f-4113-bafb-c43a9f26b742-48e94121-workdir/0a558058-31cb-4502-a433-c859ae8bf4f1/tasks'`
+
+![multica-issue-success](/images/multica-issue-success-image.png)
+
+## 8. 参考链接
+
+* [multica-ai/multica](https://github.com/multica-ai/multica/blob/main/README.zh-CN.md)
+* [self-host-quickstart](https://multica.ai/docs/zh/self-host-quickstart)
