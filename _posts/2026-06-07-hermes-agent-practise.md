@@ -11,8 +11,8 @@ OpenClaw用得比较顺手，一直没按照Hermes，此处安装使用下。
 
 相关链接:
 * [NousResearch/hermes-agent 仓库](https://github.com/NousResearch/hermes-agent)
-* [Hermes Agent指导文档](https://hermes-agent.nousresearch.com/docs/zh-Hans/)
-* [配置文档](https://hermes-agent.nousresearch.com/docs/zh-Hans/user-guide/configuration)
+* [Hermes Agent配置文档](https://hermes-agent.nousresearch.com/docs/zh-Hans/user-guide/configuration)
+* 还是这里的指导清晰一些：[安装后的配置教程](https://hermesagent.org.cn/docs/getting-started/setup-wizard)
 
 ---
 
@@ -156,7 +156,7 @@ For more help on a command:
     hermes <command> --help
 ```
 
-### 2.3. 配置模型
+### 2.3. 配置模型（配置后就可以CLI交互了）
 
 `hermes model`：
 
@@ -174,6 +174,105 @@ Base URL [https://api.minimaxi.com/anthropic]:
 
 Default model set to: MiniMax-M3 (via MiniMax (China))
 ```
+
+配置后，这里就可以CLI交互了：
+
+```sh
+[root@xdlinux ➜ ~ ]$ hermes
+
+██╗  ██╗███████╗██████╗ ███╗   ███╗███████╗███████╗       █████╗  ██████╗ ███████╗███╗   ██╗████████╗
+██║  ██║██╔════╝██╔══██╗████╗ ████║██╔════╝██╔════╝      ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝
+███████║█████╗  ██████╔╝██╔████╔██║█████╗  ███████╗█████╗███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║
+██╔══██║██╔══╝  ██╔══██╗██║╚██╔╝██║██╔══╝  ╚════██║╚════╝██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║
+██║  ██║███████╗██║  ██║██║ ╚═╝ ██║███████╗███████║      ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║
+╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝╚══════╝      ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝
+
+╭──────────────────────────────── Hermes Agent v0.16.0 (2026.6.5) · upstream c9863772 ─────────────────────────────────╮
+│                                   Available Tools                                                                    │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⡀⠀⣀⣀⠀⢀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   browser: browser_back, browser_click, ...                                          │
+│  ⠀⠀⠀⠀⠀⠀⢀⣠⣴⣾⣿⣿⣇⠸⣿⣿⠇⣸⣿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀   browser-cdp: browser_cdp, browser_dialog                                           │
+│  ⠀⢀⣠⣴⣶⠿⠋⣩⡿⣿⡿⠻⣿⡇⢠⡄⢸⣿⠟⢿⣿⢿⣍⠙⠿⣶⣦⣄⡀⠀   clarify: clarify                                                                   │
+│  ⠀⠀⠉⠉⠁⠶⠟⠋⠀⠉⠀⢀⣈⣁⡈⢁⣈⣁⡀⠀⠉⠀⠙⠻⠶⠈⠉⠉⠀⠀   code_execution: execute_code                                                       │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣴⣿⡿⠛⢁⡈⠛⢿⣿⣦⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   computer_use: computer_use                                                         │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠿⣿⣦⣤⣈⠁⢠⣴⣿⠿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   cronjob: cronjob                                                                   │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠻⢿⣿⣦⡉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   delegation: delegate_task                                                          │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢷⣦⣈⠛⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   discord: discord                                                                   │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣴⠦⠈⠙⠿⣦⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   (and 21 more toolsets...)                                                          │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⣿⣤⡈⠁⢤⣿⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀                                                                                      │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠛⠷⠄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   Available Skills                                                                   │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⠑⢶⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   autonomous-ai-agents: claude-code, codex, hermes-agent, opencode                   │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⠁⢰⡆⠈⡿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   creative: architecture-diagram, ascii-art, ascii-video, b...                       │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠳⠈⣡⠞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   data-science: jupyter-live-kernel                                                  │
+│  ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀   devops: kanban-orchestrator, kanban-worker                                         │
+│                                   email: himalaya                                                                    │
+│    MiniMax-M3 · Nous Research     general: dogfood, yuanbao                                                          │
+│               /root               github: codebase-inspection, github-auth, github-code-r...                         │
+│  Session: 20260608_225112_98b5c5  media: gif-search, heartmula, songsee, youtube-content                             │
+│                                   mlops: audiocraft-audio-generation, evaluating-llms-ha...                          │
+│                                   note-taking: obsidian                                                              │
+│                                   productivity: airtable, google-workspace, maps, nano-pdf, not...                   │
+│                                   red-teaming: godmode                                                               │
+│                                   research: arxiv, blogwatcher, llm-wiki, polymarket, resea...                       │
+│                                   smart-home: openhue                                                                │
+│                                   social-media: xurl                                                                 │
+│                                   software-development: hermes-agent-skill-authoring, node-inspect-debu...           │
+│                                                                                                                      │
+│                                   28 tools · 69 skills · /help for commands                                          │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+Welcome to Hermes Agent! Type your message or /help for commands.
+A legacy OpenClaw directory was detected at ~/.openclaw/.
+To port your config, memory, and skills over to Hermes, run `hermes claw migrate`.
+If you've already migrated and want to archive the old directory, run `hermes claw cleanup` (renames it to
+~/.openclaw.pre-migration — OpenClaw will stop working after this).
+This tip only shows once.
+✦ Tip: HERMES_EPHEMERAL_SYSTEM_PROMPT injects a system prompt that's never persisted to history.
+
+  ⚠ tirith security scanner enabled but not available — command scanning will use pattern matching only
+
+────────────────────────────────────────
+● 你可以干什么
+─  ⚕ Hermes  ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+     我是 Hermes Agent，一个由 Nous Research 开发的 AI 助手。我能帮你做很多事，下面按类别列一下我能做的事情：
+     编程与开发
+     - 编写、调试、审查代码（Python、JS/TS、Go、Rust、Java 等几乎所有主流语言）
+     - 重构、测试、构建项目
+     ...
+```
+
+### 2.4. 配置消息平台：飞书
+
+`hermes setup`：依次进入到通道的设置，选择飞书，会步骤提示操作，点击URL自动创建飞书机器人即可，操作很友好。
+
+```sh
+Select platforms to configure:
+  ↑↓ navigate  SPACE toggle  ENTER confirm  ESC cancel
+
+   [ ] 📲 WhatsApp  (not configured)
+   [ ] 📡 Signal  (not configured)
+   [ ] 📧 Email  (not configured)
+   [ ] 📱 SMS (Twilio)  (not configured)
+   [ ] 💬 DingTalk  (not configured)
+ → [✓]   Feishu / Lark  (not configured)
+   [ ] 💬 WeCom (Enterprise WeChat)  (not configured)
+   [ ] 💬 WeCom Callback (Self-Built App)  (not configured)
+   [ ] 💬 Weixin / WeChat  (not configured)
+   [ ] 💬 BlueBubbles (iMessage)  (not configured)
+   [ ] 🐧 QQ Bot  (not configured)
+   [ ] 💎 Yuanbao  (not configured)
+   [ ] 🎮 Discord  (not configured)
+   [ ] 💬 Google Chat  (not configured)
+   [ ] 🏠 Home Assistant  (not configured)
+   [ ] 💬 IRC  (not configured)
+   [ ] 💚 LINE  (not configured)
+   [ ] 🔔 ntfy  (not configured)
+   [ ] 🔒 SimpleX Chat  (not configured)
+   [ ] 💼 Microsoft Teams  (not configured)
+```
+
+聊天窗口：
+
+![alt text](/images/1780931425663-hermes-feishu.png)
 
 ---
 
