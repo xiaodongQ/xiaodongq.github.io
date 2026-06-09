@@ -7,7 +7,7 @@ tags: [Hermes, Agent, 自部署]
 
 ## 1. 引言
 
-OpenClaw用得比较顺手，一直没按照Hermes，此处安装使用下。
+OpenClaw用得比较顺手，一直没安装Hermes，此处安装使用下。
 
 相关链接:
 * [NousResearch/hermes-agent 仓库](https://github.com/NousResearch/hermes-agent)
@@ -74,9 +74,9 @@ OpenAI SDK: 2.24.0
 Up to date
 ```
 
-#### 2.1.1. 重建
+#### 2.1.1. venv方式重建
 
-让小龙虾用venv方式重建下：
+前面是系统的python中安装的，没有使用独立环境，让小龙虾用venv方式重建下：
 
 ```sh
 venv 重建完成，doctor 那个 "Not in virtual environment" 警告消失。
@@ -156,7 +156,7 @@ For more help on a command:
     hermes <command> --help
 ```
 
-### 2.3. 配置模型（配置后就可以CLI交互了）
+## 3. 配置模型（配置后就可以CLI交互了）
 
 `hermes model`：
 
@@ -240,7 +240,7 @@ This tip only shows once.
      ...
 ```
 
-### 2.4. 配置消息平台：飞书
+## 4. 配置消息平台：飞书
 
 `hermes setup`：依次进入到通道的设置，选择飞书，会步骤提示操作，点击URL自动创建飞书机器人即可，操作很友好。
 
@@ -274,30 +274,5 @@ Select platforms to configure:
 
 ![alt text](/images/1780931425663-hermes-feishu.png)
 
----
+## 5. 使用体验
 
-## 3. 使用场景
-
-[待补充:实际跑过的业务场景、配置过程、跑出来的结果]
-
----
-
-## 4. 问题记录
-
-[待补充:部署或使用过程中遇到的坑]
-
-### 4.1. 问题1
-
-错误信息:
-```
-[待补充]
-```
-
-解决方式:
-[待补充]
-
----
-
-## 5. 总结
-
-[待补充:核心收获、飞轮、钩子]
