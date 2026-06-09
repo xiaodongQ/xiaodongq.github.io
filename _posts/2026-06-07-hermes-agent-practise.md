@@ -274,5 +274,56 @@ Select platforms to configure:
 
 ![alt text](/images/1780931425663-hermes-feishu.png)
 
-## 5. 使用体验
+## 5. 多agent + 多飞书机器人
 
+可以创建多个agent，每个有各自的飞书交流通道。
+
+`hermes profile list` 查看当前存在的agent。
+
+### 5.1. 创建新agent
+
+1、创建agent，`hermes profile create xxx（agent名）`：
+
+```sh
+[root@xdlinux ➜ .hermes git:(main) ✗ ]$ hermes profile create hermes-dev-agent
+
+Profile 'hermes-dev-agent' created at /root/.hermes/profiles/hermes-dev-agent
+74 bundled skills synced.
+Wrapper created: /root/.local/bin/hermes-dev-agent
+
+⚠ /root/.local/bin is not in your PATH.
+  Add to your shell config (~/.bashrc or ~/.zshrc):
+    export PATH="$HOME/.local/bin:$PATH"
+
+Next steps:
+  hermes-dev-agent setup              Configure API keys and model
+  hermes-dev-agent chat               Start chatting
+  hermes-dev-agent gateway start      Start the messaging gateway
+
+  ⚠ This profile has no API keys yet. Run 'hermes-dev-agent setup' first,
+    or it will inherit keys from your shell environment.
+  Edit ~/.hermes/profiles/hermes-dev-agent/SOUL.md to customize personality
+```
+
+上面会创建一个`hermes-dev-agent`的同名工具，查看内容可看到封装了一层hermes命令。`/root/.local/bin`并不在我的PATH环境变量里，可以`~/.zshrc`里加一下。
+
+```sh
+[root@xdlinux ➜ .hermes git:(main) ✗ ]$ cat /root/.local/bin/hermes-dev-agent
+#!/bin/sh
+exec hermes -p hermes-dev-agent "$@"
+```
+
+2、用agent同名工具进行`setup`配置，类似第一次配置`hermes setup`时的设置
+
+```sh
+hermes-dev-agent setup
+```
+
+配置飞书配对时，也用`hermes-dev-agent`：
+
+```sh
+[root@xdlinux ➜ ~ ]$ hermes-dev-agent pairing approve feishu 7KW26UPR
+
+  Approved! User ou_453885d5c3492c702de2981dad1593a8 on feishu can now use the bot~
+  They'll be recognized automatically on their next message.
+```
