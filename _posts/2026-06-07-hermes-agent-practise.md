@@ -327,3 +327,19 @@ hermes-dev-agent setup
   Approved! User ou_453885d5c3492c702de2981dad1593a8 on feishu can now use the bot~
   They'll be recognized automatically on their next message.
 ```
+
+## 6. 其他配置
+
+### 6.1. 审批模式
+
+模式和行为：
+* `manual（默认）`	对所有危险命令始终提示用户确认
+* `smart`	使用辅助 LLM 评估风险。低风险命令（如 python -c "print('hello')"）自动批准。真正危险的命令自动拒绝。不确定的情况升级为人工提示。
+* `off`	禁用所有审批检查——等同于使用 `--yolo` 运行。所有命令无提示直接执行。
+
+~/.hermes/config.yaml里面，此处我改成`smart`，省得每次要等手动批准。
+
+```sh
+approvals:
+  mode: smart
+```
