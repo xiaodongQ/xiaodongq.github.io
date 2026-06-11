@@ -131,3 +131,166 @@ tags: [Hermes, Agent, 自部署]
 | 进程内服务（Windows） | `github.com/kardianos/service`                                                  | 可选：把二进制注册成 Windows Service；先做"开机启动 + 托盘"再决定                           |
 | 嵌入前端              | stdlib `embed`                                                                  | 沿用                                                                                        |
 | 日志                  | stdlib `log/slog`                                                               | 替代 v2.4 的 RotatingFileHandler，结构化 + 易对接                                           |
+
+## 4. 代码实现
+
+```
+🎉 整体收工
+6 个 Phase 全部完成
+Phase	范围	状态
+Phase 1	9 张表 + models 扩展 + 迁移逻辑	✅
+Phase 2	AI CLI 执行器 + WS + 任务执行 API	✅
+Phase 3	5 新功能后端 + 前端 5 widget + 4 modal	✅
+Phase 4	pty build tag 隔离 + 三平台编译	✅
+Phase 5	5 份文档	✅
+Polish	4 个 form modal 替代 prompt()	✅
+项目最终形态
+
+skill-factory/
+├── cmd/server/        2,881 行 Go + 1,127 行 HTML
+├── internal/          9 个包（backend/executor/hub/scheduler/shortcuts/todo/...）
+├── docs/              4 份文档（CLI/MIGRATION/SCHEDULER + DESIGN）
+├── data/              6 份 db 备份（v1→v2 fresh→phase2/3/3-ui/4-modal）
+├── DESIGN.md          166 行
+├── README.md          122 行
+└── go.mod             Go 1.25 + robfig/cron + gorilla/websocket
+关键数字
+* Go 代码：2,881 行
+* 前端 HTML：1,127 行（增长自 v1 的 707 行）
+* 三平台二进制：macOS 15.0 MB / Linux 15.5 MB / Windows 15.9 MB
+* 测试：6 包全通过
+* API 端点：30+
+* 数据表：9 张
+* WebSocket 频道：6 个
+* AI CLI 类型：claude / cbc / shell
+
+跑起来
+
+cd /Users/xd/Documents/workspace/repo/ai-playground/skill-factory
+go build -o skill-factory ./cmd/server
+DB_PATH=./data/skill-factory.db ADDR=:8080 ./skill-factory
+# 浏览器开 http://localhost:8080
+数据备份齐全（6 份），跨平台编译通过，5 个新功能 + 30+ API + 调度器 + 4 modal UI 全部跑通。可作为 v0.1 收工。
+```
+
+## 5. 编译运行
+
+
+
+## 6. 过程问题
+
+### 6.1. 关于参考Karpathy启发的编码原则
+
+由于之前加过`受 Andrej Karpathy 启发的编码原则`，AI思考时一直在强调 "精准修改"和"不要改进相邻代码"原则，其实这次的任务是可以大范围重构的，我对之前的页面并不满意。
+
+应对操作：从`~/.claude/CLAUDE.md`里去掉这条：`3. 精准修改`，其他几项感觉还是挺有意义的
+
+```
+用户选"现在改前端（5 widget）"。
+
+按 plan § 5：
+
+12 列 grid 布局
+5 个新 widget（链接/目录/todo/定时/AI 任务）
+沿用现有 vanilla JS + 手写 CSS
+WS 客户端
+拆出 app.js 模块
+但 index.html 现在 707 行，要"重写"还是"插入新 section"？按"精准修改"和"不要改进相邻代码"原则，应该在现有结构上追加 5 个 section，不破坏原有 Tab 体系。
+
+实际上，phase 3 widget 是给主页"个人 dashboard"用的，跟原有 5 Tab 不冲突。我可以在 index.html 顶部加一个 dashboard section（默认显示），其他 Tab 保留。
+
+或者更简单：在 index.html 顶部/侧边加一个固定的"快捷面板"，里面嵌入 5 个 widget。
+
+按 plan § 5 设计的 12 列 grid：
+
+左 4 列：链接 / 目录 / todo 三宫格
+中 5 列：AI 任务列表
+右 3 列：定时任务 + 7 天柱图
+这是一个新的 home dashboard 布局。我应该重写 index.html 顶部区域为这个布局，把现有 Tab 移到"More"位置或者下拉里。
+
+但重写 707 行的工作量大，按"精准修改"我应该：
+
+把现有内容保留作为 Tab（"Task Manager" / "Experiences" / "AI Chat" / 等）
+在主页面之前插入一个 "Home" section
+不过 plan § 5 写的是"重写为 12 列 grid"。让我做个折中：在主区上方加 12 列 grid（Home Dashboard），下面留原 Tab 内容（可在 Tab 之间切换）。
+
+实际上，看现状：
+
+index.html 有 5 Tab（Dashboard / Tasks / Experiences / Automation / AI Chat）
+5 Tab 里"Automation"可能就是定时任务的预留位置
+"Dashboard" 已经有 7 天柱图
+最简洁的做法：
+
+在原有 5 Tab 体系上，扩展内容
+把 5 个新 widget 嵌入到合适的 Tab 里
+添加 / 修改 CSS 让布局支持
+不重写，只追加。这符合"精准修改"原则。
+```
+
+可在思考过程中，看到这条规则也是有触发：`2. 简洁优先`
+
+```
+让我重写 DESIGN.md。简洁、聚焦"已实现"而非"方案"，从 v1 演进到 v2。
+
+按"简洁优先"，DESIGN.md 大约 250 行够了。
+```
+
+### 6.2. 主动要求重构
+
+输入：你可以重构这个页面，不需要受限于精准修改原则，进行合理拆分设计
+
+可看到思考过程里，简洁优先原则是挺起作用的：
+
+```
+用户让我重构 index.html 这个页面，不受"精准修改"原则限制，可以做合理拆分设计。这是 Phase 3 时我就提到要做但当时受限于"精准修改"原则没做的——博客文章里也提到了用户决定去除该原则。
+
+现在 index.html 1127 行了，确实需要拆分。让我设计一下：
+
+当前结构：
+
+<head> + <style> (含 widget CSS 等)
+<body>
+Sidebar (5 Tab 导航)
+<main> (5 个 Tab page)
+6 个 modal (task/exp/link/dir/todo-path/scheduled)
+<script> (大量 JS 混在一起)
+重构策略：
+按"简洁优先"和"合理拆分"：
+
+index.html 极简化：只剩骨架 + embed 引用
+拆 CSS 到独立文件：static/css/base.css (设计系统) + static/css/widgets.css (5 widget) + static/css/modals.css (4 modal) — 用 embed 嵌入
+拆 JS 到模块：纯 Go embed 不能 import JS 文件，但可以用 <script> 标签分文件（每个 widget 一个 .js），或用一个 app.js 主入口 + 内嵌 // @ts-check 风格
+
+...
+
+但这样太多文件了，简洁优先。让我精简到 3 层：
+...
+
+让我再做下分类 — 用 1 widget = 1 文件的策略：
+
+static/js/
+  api.js              — 通用：fetchJSON / statusTag / fmt / esc / debounce
+  core.js             — switchTab / reloadCurrentTab / dom helpers
+  widgets/
+    links.js          — loadLinks + showLinkModal + close + submit + delete
+    dirs.js           — loadDirs + showDirModal + close + submit + open + delete
+    todo.js           — loadTodo + toggle + showTodoPathModal + close + submit
+    scheduler.js      — loadScheduler + start/stop/reload + loadScheduledSummary
+    executions.js     — loadRecentExecutions
+  views/
+    dashboard.js      — loadDashboard (调用 widget + render chart + recent tasks) + wrap init
+    tasks.js          — Tasks Tab 全套 + task modal
+    experiences.js    — Experiences Tab + exp modal
+    automation.js     — Automation Tab (loadScheduled + showScheduledModal + runScheduled + deleteScheduled)
+    aichat.js         — AI Chat + xterm
+
+11 个 JS 文件。感觉多了一点。再精简：
+static/js/
+  api.js              — 通用：fetchJSON / statusTag / fmt / esc / debounce / switchTab / reloadCurrentTab
+  views/
+    dashboard.js      — Dashboard Tab + 5 widget + 4 modal（links/dirs/todo/scheduler/executions）
+    tasks.js          — Tasks Tab + task modal
+    experiences.js    — Experiences Tab + exp modal
+    automation.js     — Automation Tab + scheduled modal
+    aichat.js         — AI Chat
+```
