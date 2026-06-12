@@ -367,7 +367,7 @@ ALL OK
 
 ## 7. 仓库地址
 
-仓库在 [xiaodongQ/ai-playground](https://github.com/xiaodongQ/ai-playground)
+仓库在 [xiaodongQ/ai-playground](https://github.com/xiaodongQ/ai-playground/tree/skill-factory-tag) （后续再此基础加功能后重命名了）
 
 关键目录:
 

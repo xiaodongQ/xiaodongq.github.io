@@ -173,9 +173,29 @@ DB_PATH=./data/skill-factory.db ADDR=:8080 ./skill-factory
 数据备份齐全（6 份），跨平台编译通过，5 个新功能 + 30+ API + 调度器 + 4 modal UI 全部跑通。可作为 v0.1 收工。
 ```
 
-## 5. 编译运行
+## 5. 编译和运行
 
+1、总览页，支持：
+* 快捷链接、快捷目录（点击可自动打开）、待办事项
+* 调度器展示 和 操作按钮，针对自动化任务，比如定期检查资源情况
+* 任务统计情况
 
+![总览页](/images/1781277607579-image.png)
+
+2、手动任务
+* 可关联经验库，支持多选，这些信息会一并给AI
+* 创建后需要手动认领，可手动派发给Claude Code执行
+
+![手动创建任务](/images/1781277780759-image.png)
+
+3、定时任务/自动化任务：
+* 执行完支持手动触发AI评分
+
+创建定时任务，支持cron表达式：  
+![定时任务](/images/1781278016145-image.png)
+
+执行完成：  
+![评分](../images/1781278305601-image.png)
 
 ## 6. 过程问题
 
@@ -293,4 +313,68 @@ static/js/
     experiences.js    — Experiences Tab + exp modal
     automation.js     — Automation Tab + scheduled modal
     aichat.js         — AI Chat
+```
+
+### 6.3. AI完成情况评估依据问题
+
+创建的任务，AI Agent（Claude Code等CLI）通过`headless`模式完成后，需要进行评估。这里就需要对任务执行的输出进行解析，作为任务完成情况的评估依据。
+
+`claude -p xxx(比如执行任务后发送通知)` 支持下述几种方式的输出
+* "text" (default)，默认纯文本格式
+* "json"，标准结构化 JSON
+* "stream-json" (realtime streaming)，需要搭配`--verbose`使用，否则会如下报错
+
+```sh
+[MacOS-xd@qxd ➜ skill-factory git:(main) ✗ ]$ claude -p 测试 --output-format stream-json
+Error: When using --print, --output-format=stream-json requires --verbose
+```
+
+**结论**： 自动化任务建议选`--output-format json`。（可了解官方文档：[获取结构化输出](https://code.claude.com/docs/zh-CN/headless#get-structured-output)）
+
+| 输出格式    | 简称     | 输出形态                             | 依赖参数                               | 核心特点                                                                                  | 适用场景                                                                                                     | 不适用场景                                                 | 推荐指数（评估/自动化） |
+| ----------- | -------- | ------------------------------------ | -------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- | ----------------------- |
+| text        | 纯文本   | 人类可读原生对话文本                 | 无（默认）                             | 无结构化字段，仅展示最终回答；无Token、耗时、费用等元数据                                 | 1. 人工终端交互、临时调试<br>2. 简单日志留存、人工翻看                                                       | 程序自动解析、字段提取、量化评估、指标统计                 | ⭐                       |
+| json        | 标准JSON | 单次完整JSON对象，执行结束一次性输出 | 可选 `--verbose`                       | 结构化完整数据，包含回答正文、耗时、Token、费用、会话ID、运行状态等元信息，格式固定易解析 | 1. 程序自动化调用、结果归档<br>2. 离线评测、批量任务评估<br>3. 统计成本、性能指标<br>4. 数据集沉淀、二次分析 | 实时流式展示、边生成边处理内容                             | ⭐⭐⭐⭐⭐                   |
+| stream-json | 流式JSON | 多条分片JSON流，模型生成一段输出一条 | **必须搭配 --verbose**（不加直接报错） | 实时逐块输出，包含系统日志、思考过程、分段回复、运行事件，数据碎片化                      | 1. 前端实现打字机实时效果<br>2. 长文本边生成边转发/处理<br>3. 调试完整运行链路、查看中间日志                 | 离线评估、批量归档、常规自动化脚本（需拼接分片，复杂度高） | ⭐⭐                      |
+
+补充执行实际情况，如下：
+
+1、纯文本
+
+```sh
+[MacOS-xd@qxd ➜ skill-factory git:(main) ✗ ]$ claude -p 测试
+收到，我是 Claude，随时待命。如果有具体任务或问题，直接说就行。
+```
+
+2、标准结构化 JSON，比较能接受
+
+```sh
+[MacOS-xd@qxd ➜ skill-factory git:(main) ✗ ]$ claude -p 测试 --output-format json
+{"type":"result","subtype":"success","is_error":false,"duration_ms":12409,"duration_api_ms":12245,"num_turns":1,"result":"测试消息已收到。我正常工作，可以随时开始处理您的任务。请告诉我需要做什么。","stop_reason":"end_turn","session_id":"f21138f9-1e67-4f53-a120-6aa4bb4b2f3d","total_cost_usd":0.155619,"usage":{"input_tokens":30027,"cache_creation_input_tokens":0,"cache_read_input_tokens":768,"output_tokens":204,"server_tool_use":{"web_search_requests":0,"web_fetch_requests":0},"service_tier":"standard","cache_creation":{"ephemeral_1h_input_tokens":0,"ephemeral_5m_input_tokens":0},"inference_geo":"","iterations":[],"speed":"standard"},"modelUsage":{"MiniMax-M3":{"inputTokens":30027,"outputTokens":204,"cacheReadInputTokens":768,"cacheCreationInputTokens":0,"webSearchRequests":0,"costUSD":0.155619,"contextWindow":200000,"maxOutputTokens":32000}},"permission_denials":[],"terminal_reason":"completed","fast_mode_state":"off","uuid":"e9903078-7b1d-4065-922a-6df0adcefdae"}
+```
+
+3、加上`--verbose`就逐渐离谱了。。（近10000个字节）
+
+```sh
+[MacOS-xd@qxd ➜ skill-factory git:(main) ✗ ]$ claude -p 测试 --output-format json --verbose
+[{"type":"system","subtype":"init","cwd":"/Users/xd/Documents/workspace/repo/ai-playground/skill-factory","session_id":"10a73249-0c42-42c7-909c-108b1843ae62","tools":["Task","AskUserQuestion","Bash","CronCreate","CronDelete","CronList","Edit","EnterPlanMode","EnterWorktree","ExitPlanMode","ExitWorktree","Glob","Grep","ListMcpResourcesTool","LSP","NotebookEdit","Read","ReadMcpResourceTool","ScheduleWakeup","Skill","TaskOutput","TaskStop","TodoWrite","WebFetch","WebSearch","Write","mcp__codegraph__codegraph_callees","mcp__codegraph__codegraph_callers","mcp__codegraph__codegraph_explore","mcp__codegraph__codegraph_files","mcp__codegraph__codegraph_impact","mcp__codegraph__codegraph_node","mcp__codegraph__codegraph_search","mcp__codegraph__codegraph_status","mcp__MiniMax__understand_image","mcp__MiniMax__web_search","mcp__plugin_github_github__authenticate","mcp__plugin_github_github__complete_authentication"],"mcp_servers":[{"name":"plugin:github:github","status":"needs-auth"},{"name":"MiniMax","status":"connected"},{"name":"codegraph","status":"connected"}],"model":"MiniMax-M3","permissionMode":"acceptEdits","slash_commands":["update-config","debug","simplify","batch","loop","claude-api","claude-hud:setup","claude-hud:configure","superpowers:brainstorm","superpowers:execute-plan","superpowers:write-plan","code-review:code-review","ralph-loop:cancel-ralph","ralph-loop:help","ralph-loop:ralph-loop","baoyu-skills:baoyu-cover-image","baoyu-skills:baoyu-compress-image","baoyu-skills:baoyu-article-illustrator","baoyu-skills:baoyu-danger-x-to-markdown","baoyu-skills:baoyu-format-markdown","baoyu-skills:baoyu-danger-gemini-web","baoyu-skills:baoyu-image-gen","baoyu-skills:baoyu-imagine","baoyu-skills:baoyu-markdown-to-html","baoyu-skills:baoyu-infographic","baoyu-skills:baoyu-post-to-wechat","baoyu-skills:baoyu-post-to-weibo","baoyu-skills:baoyu-post-to-x","baoyu-skills:baoyu-slide-deck","baoyu-skills:baoyu-translate","baoyu-skills:baoyu-url-to-markdown","baoyu-skills:baoyu-comic","baoyu-skills:baoyu-youtube-transcript","baoyu-skills:baoyu-xhs-images","minimax-skills:android-native-dev","minimax-skills:flutter-dev","minimax-skills:frontend-dev","minimax-skills:fullstack-dev","minimax-skills:gif-sticker-maker","minimax-skills:ios-application-dev","minimax-skills:buddy-sings","minimax-skills:minimax-multimodal-toolkit","minimax-skills:minimax-docx","minimax-skills:minimax-music-playlist","minimax-skills:minimax-music-gen","minimax-skills:minimax-xlsx","minimax-skills:minimax-pdf","minimax-skills:react-native-dev","minimax-skills:pptx-generator","minimax-skills:vision-analysis","minimax-skills:shader-dev","superpowers:brainstorming","superpowers:executing-plans","superpowers:finishing-a-development-branch","superpowers:receiving-code-review","superpowers:requesting-code-review","superpowers:systematic-debugging","superpowers:subagent-driven-development","superpowers:using-git-worktrees","superpowers:test-driven-development","superpowers:verification-before-completion","superpowers:using-superpowers","superpowers:dispatching-parallel-agents","superpowers:writing-skills","superpowers:writing-plans","frontend-design:frontend-design","skill-creator:skill-creator","xd-git-push:xd-git-push","xd-blog-style:xd-blog-style","prompt-optimizer:prompt-optimizer","compact","context","cost","heapdump","init","review","security-review","insights","team-onboarding"],"apiKeySource":"none","claude_code_version":"2.1.104","output_style":"default","agents":["general-purpose","statusline-setup","Explore","Plan","superpowers:code-reviewer"],"skills":["update-config","debug","simplify","batch","loop","claude-api","baoyu-skills:baoyu-cover-image","baoyu-skills:baoyu-compress-image","baoyu-skills:baoyu-article-illustrator","baoyu-skills:baoyu-danger-x-to-markdown","baoyu-skills:baoyu-format-markdown","baoyu-skills:baoyu-danger-gemini-web","baoyu-skills:baoyu-image-gen","baoyu-skills:baoyu-imagine","baoyu-skills:baoyu-markdown-to-html","baoyu-skills:baoyu-infographic","baoyu-skills:baoyu-post-to-wechat","baoyu-skills:baoyu-post-to-weibo","baoyu-skills:baoyu-post-to-x","baoyu-skills:baoyu-slide-deck","baoyu-skills:baoyu-translate","baoyu-skills:baoyu-url-to-markdown","baoyu-skills:baoyu-comic","baoyu-skills:baoyu-youtube-transcript","baoyu-skills:baoyu-xhs-images","minimax-skills:android-native-dev","minimax-skills:flutter-dev","minimax-skills:frontend-dev","minimax-skills:fullstack-dev","minimax-skills:gif-sticker-maker","minimax-skills:ios-application-dev","minimax-skills:buddy-sings","minimax-skills:minimax-multimodal-toolkit","minimax-skills:minimax-docx","minimax-skills:minimax-music-playlist","minimax-skills:minimax-music-gen","minimax-skills:minimax-xlsx","minimax-skills:minimax-pdf","minimax-skills:react-native-dev","minimax-skills:pptx-generator","minimax-skills:vision-analysis","minimax-skills:shader-dev","superpowers:brainstorming","superpowers:executing-plans","superpowers:finishing-a-development-branch","superpowers:receiving-code-review","superpowers:requesting-code-review","superpowers:systematic-debugging","superpowers:subagent-driven-development","superpowers:using-git-worktrees","superpowers:test-driven-development","superpowers:verification-before-completion","superpowers:using-superpowers","superpowers:dispatching-parallel-agents","superpowers:writing-skills","superpowers:writing-plans","frontend-design:frontend-design","skill-creator:skill-creator","xd-git-push:xd-git-push","xd-blog-style:xd-blog-style","prompt-optimizer:prompt-optimizer"],"plugins":[{"name":"claude-hud","path":"/Users/xd/.claude/plugins/cache/claude-hud/claude-hud/0.0.12","source":"claude-hud@claude-hud"},{"name":"baoyu-skills","path":"/Users/xd/Documents/workspace/repo/baoyu-skills-main/","source":"baoyu-skills@baoyu-skills"},{"name":"minimax-skills","path":"/Users/xd/Documents/workspace/repo/minimax-ai_skills-main/","source":"minimax-skills@minimax-skills"},{"name":"superpowers","path":"/Users/xd/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7","source":"superpowers@claude-plugins-official"},{"name":"frontend-design","path":"/Users/xd/.claude/plugins/cache/claude-plugins-official/frontend-design/7ed523140f50","source":"frontend-design@claude-plugins-official"},{"name":"code-review","path":"/Users/xd/.claude/plugins/cache/claude-plugins-official/code-review/7ed523140f50","source":"code-review@claude-plugins-official"},{"name":"atomic-agents","path":"/Users/xd/.claude/plugins/cache/claude-plugins-official/atomic-agents/734a8101b3a4","source":"atomic-agents@claude-plugins-official"},{"name":"github","path":"/Users/xd/.claude/plugins/cache/claude-plugins-official/github/7ed523140f50","source":"github@claude-plugins-official"},{"name":"ralph-loop","path":"/Users/xd/.claude/plugins/cache/claude-plugins-official/ralph-loop/1.0.0","source":"ralph-loop@claude-plugins-official"},{"name":"skill-creator","path":"/Users/xd/.claude/plugins/cache/claude-plugins-official/skill-creator/7ed523140f50","source":"skill-creator@claude-plugins-official"},{"name":"clangd-lsp","path":"/Users/xd/.claude/plugins/cache/claude-plugins-official/clangd-lsp/1.0.0","source":"clangd-lsp@claude-plugins-official"},{"name":"xd-git-push","path":"/Users/xd/Documents/workspace/repo/xd-self-market/plugins/xd-git-push","source":"xd-git-push@xd-self-market"},{"name":"xd-blog-style","path":"/Users/xd/Documents/workspace/repo/xd-self-market/plugins/xd-blog-style","source":"xd-blog-style@xd-self-market"},{"name":"prompt-optimizer","path":"/Users/xd/Documents/workspace/repo/xd-self-market/plugins/prompt-optimizer","source":"prompt-optimizer@xd-self-market"}],"uuid":"4182b3d1-607a-41ff-b5c9-6f31df99741d","fast_mode_state":"off"},{"type":"assistant","message":{"id":"067b4d20968c3f3d40ea37f22c3e30bf","type":"message","role":"assistant","content":[{"type":"thinking","thinking":"用户发了一条消息\"测试\"，意思是\"test\"。这是一个测试消息。我应该用中文简洁回复，因为CLAUDE.md要求使用中文问答。\n\n按照superpowers规则，对于任何对话我都需要先考虑是否有相关skill。但\"测试\"这种简单消息不涉及任何代码工作或复杂任务，不需要调用任何skill。\n\n我应该简短回复。","signature":"68858856d162c03bf3fecd85d047a2b9803538f1c3a954bd7bb2f3544610b01f"}],"model":"MiniMax-M3","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0,"service_tier":"standard"},"service_tier":"standard","context_management":null},"parent_tool_use_id":null,"session_id":"10a73249-0c42-42c7-909c-108b1843ae62","uuid":"b09b900c-c46a-434c-9886-83d764fddc5f"},{"type":"assistant","message":{"id":"067b4d20968c3f3d40ea37f22c3e30bf","type":"message","role":"assistant","content":[{"type":"text","text":"测试收到。有什么需要我帮忙的吗？"}],"model":"MiniMax-M3","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0,"service_tier":"standard"},"service_tier":"standard","context_management":null},"parent_tool_use_id":null,"session_id":"10a73249-0c42-42c7-909c-108b1843ae62","uuid":"afe8871d-c6c5-4957-8a16-7b708d3e60fa"},{"type":"result","subtype":"success","is_error":false,"duration_ms":6670,"duration_api_ms":6530,"num_turns":1,"result":"测试收到。有什么需要我帮忙的吗？","stop_reason":"end_turn","session_id":"10a73249-0c42-42c7-909c-108b1843ae62","total_cost_usd":0.15251900000000002,"usage":{"input_tokens":30027,"cache_creation_input_tokens":0,"cache_read_input_tokens":768,"output_tokens":80,"server_tool_use":{"web_search_requests":0,"web_fetch_requests":0},"service_tier":"standard","cache_creation":{"ephemeral_1h_input_tokens":0,"ephemeral_5m_input_tokens":0},"inference_geo":"","iterations":[],"speed":"standard"},"modelUsage":{"MiniMax-M3":{"inputTokens":30027,"outputTokens":80,"cacheReadInputTokens":768,"cacheCreationInputTokens":0,"webSearchRequests":0,"costUSD":0.15251900000000002,"contextWindow":200000,"maxOutputTokens":32000}},"permission_denials":[],"terminal_reason":"completed","fast_mode_state":"off","uuid":"427255bd-2fc8-4c89-a0f0-c144cbc1e1a2"}]
+```
+
+`stream-json`方式必须指定`--verbose`，否则会报错：
+
+```sh
+[MacOS-xd@qxd ➜ skill-factory git:(main) ✗ ]$ claude -p 测试 --output-format stream-json
+Error: When using --print, --output-format=stream-json requires --verbose
+```
+
+4、`stream-json --verbose`方式，信息量更大。就下面一个“测试”提示词，输出了**26000字节！**
+
+```sh
+[MacOS-xd@qxd ➜ skill-factory git:(main) ✗ ]$ claude -p 测试 --output-format stream-json --verbose
+{"type":"system","subtype":"hook_started","hook_id":"7bea3d05-e8ad-459d-95c0-070624c798a9","hook_name":"SessionStart:startup","hook_event":"SessionStart","uuid":"bc127330-ffb0-4166-b8bd-73c2e63ec30f","session_id":"6fc36291-ea8b-46f0-ad58-4d620828f27b"}
+{"type":"syst
+
+...
+略略略
+...
 ```
