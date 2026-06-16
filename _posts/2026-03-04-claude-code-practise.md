@@ -50,10 +50,6 @@ pin: true
 
 ![权限模式](/images/2026-03-06-claude-code-permission.png)
 
-**精细控制权限**：我不想每次人工来点击一次接受修改，所以权限进行了下述修改，并安装了开源社区的`cc-safety-net`插件：`npm install -g cc-safety-net`，然后在 `.claude/settings.json` 中启用。
-* 内置数百种危险模式识别
-* 会区分rm -rf /tmp/cache（允许）vs rm -rf /（阻止）
-
 ```sh
 {
   "permissions": {
@@ -65,18 +61,6 @@ pin: true
     ]
   },
   "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "npx -y cc-safety-net",
-            "timeoutSec": 15
-          }
-        ]
-      }
-    ]
   }
 }
 ```
