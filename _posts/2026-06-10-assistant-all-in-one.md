@@ -1,7 +1,7 @@
 ---
-title: AI能力集 -- 构建个人All-In-One助手应用
+title: 个人AI工作台（一） -- 构建个人All-In-One助手应用
 description: 将之前尝试过的自动任务系统和几个日常新需求结合起来，陆续叠加功能进一个服务
-categories: [AI, AI能力集]
+categories: [AI, 个人AI工作台]
 tags: [Agent, 个人助手]
 ---
 
