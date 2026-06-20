@@ -15,15 +15,91 @@ tags: [Agent, 个人助手, xworkbench]
 
 **问题：** `claude -p` 默认每次都是全新会话，无法在同一个上下文中继续追问。
 
-**思路：** `claude -p --output-format json` 执行后会返回一个 `uuid` 字段，后续用 `--resume <uuid>` 可以基于前一个会话继续对话。
+**思路：** `claude -p --output-format json` 执行后会返回一个 `session_id` 字段，后续用 `--resume <session_id>` 可以基于前一个会话继续对话。
 
 **实现：**
 
-1. **解析 uuid**：执行完成时从 JSON 输出中提取 `uuid` 存入 `executions.resume_uuid` 字段
+1. **解析 session_id**：执行完成时从 JSON 输出中提取 `session_id` 存入 `executions.resume_uuid` 字段
 2. **继续对话 API**：`POST /api/executions/{id}/continue`，用 `--resume <uuid>` 构建新命令，创建新 execution 并异步执行
 3. **前端 UI**：执行详情弹窗底部有 resume_uuid 时显示「💬 继续对话」按钮，点击展开输入框
 
 关键代码路径：`cmd/server/main.go` 的 `handleExecutionContinue`，`internal/executor/runner/build.go` 的 `WithResume` 选项。
+
+持续对话的实际测试：
+
+* claude code，`session_id`字段：（**注意不是`uuid`**）
+
+```sh
+[MacOS-xd@qxd ➜ xworkbench git:(main) ✗ ]$ claude -p 测试 --output-format json
+{"type":"result","subtype":"success","is_error":false,"duration_ms":11430,"duration_api_ms":11239,"num_turns":1,"result":"你好！测试收到。我在这里待命，有什么可以帮你的吗？","stop_reason":"end_turn","session_id":"6f71aa4f-fc91-456d-b7d5-2f3b3ff8d64e","total_cost_usd":0.21196874999999998,"usage":{"input_tokens":0,"cache_creation_input_tokens":33007,"cache_read_input_tokens":0,"output_tokens":227,"server_tool_use":{"web_search_requests":0,"web_fetch_requests":0},"service_tier":"standard","cache_creation":{"ephemeral_1h_input_tokens":0,"ephemeral_5m_input_tokens":0},"inference_geo":"","iterations":[],"speed":"standard"},"modelUsage":{"MiniMax-M2.7":{"inputTokens":0,"outputTokens":227,"cacheReadInputTokens":0,"cacheCreationInputTokens":33007,"webSearchRequests":0,"costUSD":0.21196874999999998,"contextWindow":200000,"maxOutputTokens":32000}},"permission_denials":[],"terminal_reason":"completed","fast_mode_state":"off","uuid":"15e3acf3-5ba6-485b-9d14-e390ddce5ee9"}
+
+[MacOS-xd@qxd ➜ xworkbench git:(main) ✗ ]$ claude -p 刚刚发送过什么 -r 6f71aa4f-fc91-456d-b7d5-2f3b3ff8d64e
+
+你刚刚发送的是 **"测试"** 这条消息。
+```
+
+* codebuddy
+
+```sh
+# 分了很多段，`type`的类型作为不同分段的区分，很多段都有sessionId，是同一个。
+# 可以选择一个类型来获取sessionId，比如："type": "ai-title",
+[MacOS-xd@qxd ➜ xworkbench git:(main) ✗ ]$ cbc -p 测试 --output-format json
+[
+  {
+    "type": "message",
+    "role": "user",
+    "content": [
+      {
+        "type": "input_text",
+        "text": "<system-reminder data-role=\"memory\"><memory>\n# auto memory\n\nYou have a persistent, file-based memory system at `/Users/xd/.codebuddy/projects/Users-xd-Documents-workspace-repo-xworkbench/memory`. This directory already exists — write to it directly with the Write tool (do not run mkdir or check for its existence)..........ear here.\n</memory></system-reminder>"
+      },
+      {
+        "type": "input_text",
+        "text": "<system-reminder>\nAs you answer the user's questions, you can use the following context:\n# codebuddyMd\nCod...you should follow if appropriate.\">\n\nContents of /Users/xd/.codebuddy/CODEBUDDY.md (user's private global instructions for all projects):\n\n与用户交流使用中文，生成的文件名等信息还是用英文，合理规划。\n\n现复杂度较高的项目时，需要合理评估优先考虑工业级的方案而不是demo 玩具性质。\n\n## AI 行为准则\n\n> 受 Andrej Karpathy 启发的编码原则\n\n### 1. 编码前思考\n\n- **不要假设........ur task.\n</system-reminder>\n"
+      },
+      ...
+      {
+        "type": "input_text",
+        "text": "<user_query>测试</user_query>"
+      }
+    ],
+    "providerData": {
+      "agent": "cli"
+    },
+    "id": "efdb3bcb-b7a0-41ed-8494-d378038fe4aa",
+    "timestamp": 1781968910641,
+    "sessionId": "a6a12155-bd74-484f-b718-97b53da756fe"
+  },
+  {
+    "type": "file-history-snapshot",
+    "id": "918db229-b821-42bb-9cb1-757051e41174",
+    "timestamp": 1781968910651,
+    "isSnapshotUpdate": false,
+    "snapshot": {
+      "messageId": "efdb3bcb-b7a0-41ed-8494-d378038fe4aa",
+      "trackedFileBackups": {}
+    }
+  },
+  ...
+},
+{
+  "type": "ai-title",
+  "aiTitle": "测试",
+  "sessionId": "a6a12155-bd74-484f-b718-97b53da756fe",
+  "timestamp": 1781968912976
+},
+...
+
+
+# 继续对话
+[MacOS-xd@qxd ➜ xworkbench git:(main) ✗ ]$ cbc -p 刚刚发了什么 -r a6a12155-bd74-484f-b718-97b53da756fe
+上一条我回复的是：
+
+> 你好！我已就绪，可以帮你处理软件工程相关的任务。有什么需要协助的吗？
+
+就是一个简单的欢迎回应，因为你发的"测试"看起来像是在测试连接是否正常。
+```
+
 
 ### 2.2 评估闭环（自动换模型重试）
 
