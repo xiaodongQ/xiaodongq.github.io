@@ -1,4 +1,0 @@
-2026-06-21T23:00:30.096+0800	info	server/main.go:2068	日志写入文件	{"path": "data/logs/xworkbench.log", "build": "unknown"}
-2026-06-21T23:00:30.101+0800	fatal	server/main.go:2116	listen failed	{"addr": ":8902", "err": "listen tcp :8902: bind: address already in use"}
-2026-06-21T23:01:52.300+0800	info	server/main.go:2068	日志写入文件	{"path": "data/logs/xworkbench.log", "build": "unknown"}
-2026-06-21T23:01:52.301+0800	fatal	server/main.go:2116	listen failed	{"addr": ":8902", "err": "listen tcp :8902: bind: address already in use"}
