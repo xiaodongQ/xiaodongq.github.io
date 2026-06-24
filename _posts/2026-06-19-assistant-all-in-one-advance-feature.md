@@ -130,6 +130,14 @@ last_modified_at: 2026-06-24
 
 **实现：** 创建 `task_experiences` 表（task_id, experience_id 联合主键），任务编辑弹窗改为 checkbox 多选experience。
 
+### 2.5 Prompt 精简（移除冗余段）
+
+**问题：** `BuildTaskPrompt` 拼出的 prompt 里同时有 `# 用户指令` 和 `# 任务背景` / `# 任务描述` 几段都引用 `task.Description`，内容重复且增加 token 开销。
+
+**思路：** `# 任务背景` 段已经包含了任务描述全文，`# 用户指令` 段去掉。
+
+**实现：** `internal/task/prompt.go:BuildTaskPrompt` 删除 `# 用户指令` + `t.Description` 两行（commit `7101ee5`，2026-06-24）。
+
 ## 3. 远程 Agent 系统
 
 ### 3.1 Agent 注册与心跳
@@ -291,6 +299,31 @@ ss -tln | grep ":$port "
 
 **实现：** `evaluator.go` 中判断 `len(output) > 100*1024`，超长截断并附加 `[...output truncated...]` 标记。
 
+### 6.4 SQLite PRAGMA 与并发执行修复（SQLITE_BUSY）
+
+**问题：** 两个场景触发 `SQLITE_BUSY`：
+
+1. `OpenDB` 里直接 `db.Exec("PRAGMA ...")` 设置 `busy_timeout` / `journal_mode` / `foreign_keys` —— 这些是 **per-connection** 的，但 `database/sql` 是懒连接池，第一次 `Exec` 只在已有连接上生效，后续 lazy 创建的连接回退默认（busy_timeout=0 / journal_mode=DELETE），实际读写隔离与并发全靠运气。
+2. 调度器 + RunNow 重叠时，同 task 两个 goroutine 同时 `INSERT INTO executions`，写锁争用。
+
+**思路：**
+
+1. PRAGMA 用 `modernc.org/sqlite` 驱动的 DSN 参数 `_pragma=key(value)`，驱动层在**每个新连接打开时**自动执行，确保 per-connection 生效。启动期再 `PRAGMA journal_mode` QueryRow 验证 WAL 真的生效，**fail-fast**。
+2. `Scheduler.doExecute` 用 `singleflight.Group` 包装，同 task ID 的并发触发（cron 与 RunNow 重叠，或 cron 周期 < 子进程时长）合并到一次执行。
+
+**实现：**
+
+- `internal/backend/server.go:OpenDB` 改 DSN：
+  - `_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)&_pragma=synchronous(NORMAL)`
+  - 限连接池：`SetMaxOpenConns(8)` / `SetMaxIdleConns(4)` / `SetConnMaxLifetime(time.Hour)`
+  - 启动期 `QueryRow("PRAGMA journal_mode")` 校验，非 `wal` 直接返回错误并关闭 db（避免带着隐患运行）
+- `internal/scheduler/scheduler.go`：
+  - 新增 `singleflight.Group` 字段
+  - `execute(taskID string, fn func())` 包装 `fn`：同 taskID 合并，后续调用者拿到首次执行结果
+  - 启动日志 `db: opened` 输出 path / journal_mode / busy_timeout_ms / max_open_conns
+- `scripts/e2e.sh` 新增 `case_concurrent_scheduled`：启 2 个 `@every 5s` 任务并发跑，验证不再报 SQLITE_BUSY
+- `go.mod` 加 `golang.org/x/sync v0.21.0`（singleflight 依赖）
+
 ## 7. UI 改进
 
 ### 7.1 区块高度拖拽调整
@@ -409,12 +442,12 @@ ss -tln | grep ":$port "
 
 **问题：** 早期"数据管理"页有 4 个子 tab（导入/导出/备份/快捷），概念模糊、布局拥挤。
 
-**思路：** 改名"系统配置" + 拆为 3+1：配置 / 目录 / 链接 + 导入导出合并到配置子 tab。
+**思路：** 改名"系统配置" + 提升为独立 Tab，与其它业务 Tab 平级；子 tab 简化为 3 个：快捷目录 / 快捷链接 / 默认 CLI。
 
 **实现：**
 
-- 子 tab 拆分：原"快捷"拆为独立的"快捷目录"（`dir_shortcuts`）和"快捷链接"（`web_links`）两个子 tab
-- 4 → 3+1 布局（commit `d6a0048`）
+- 原"数据管理"4 子 tab → 提升为独立 Tab（`config`），由 4 子 tab 简化为 3 个：📁 快捷目录 / 🔗 快捷链接 / 🤖 默认 CLI（commit `d6a0048`）
+- 原"快捷"拆分：原合一个的"快捷" tab 拆为独立的"快捷目录"（`dir_shortcuts`）和"快捷链接"（`web_links`）两个子 tab（commit `4e84262`）
 - 修复 `localStorage` 恢复 + 子 tab active 高亮缺失（`77c37d3`）
 - 空 db 导出时 nullable 字段为 null 修复，避免前端崩（`2ba328a`）
 
@@ -445,6 +478,44 @@ ss -tln | grep ":$port "
 - 时间列加宽到 150 + 操作列缩到 320（`96891e0`）
 - 任务页状态列显示英文（`a877c8f`）
 - 移除全局 `body` zoom，缩放仅作用于 Windows；OS 检测加 fallback（`baa3ff9`）
+
+### 9.10 调度器下次执行时间注入（next_run_at）
+
+**问题：** 定时任务列表只能看"上次执行"，用户反馈"没法预知下次什么时候跑"，反复刷新页面也得不到准确值。
+
+**思路：** 调度器内部有每个任务的 `cron.Entry`，用其 `.Next` 方法直接查下次触发时间。**不要在 handler 里现场 `cron.Parse + Next(time.Now())`**——后者会随 now 漂移，导致 UI 一直跳秒。
+
+**实现链路：**
+
+- `backend.ScheduledTask` 加 `NextRunAt *time.Time` 字段（`cf019d6`，先加字段未注入）
+- `internal/scheduler/scheduler.go` 暴露 `(s *Scheduler) NextRunAt(taskID string) (time.Time, bool)`，走内部 `entry.Next()`，拿不到（未 enabled / 解析失败 / scheduler 未加载）返回 `(zero, false)`
+- `Scheduler` 内部维护两个 map：
+  - `entries map[taskID]cron.EntryID` —— Reload 时构建，供生产 `Start()` 后 cron 引擎自动 `Entry.Next` 更新
+  - `nextRun map[taskID]time.Time` —— Reload 时主动 `Schedule.Next(time.Now())` 算一次，**测试场景不调 Start()**，这个 map 让 `NextRunAt` 在 prod/test 两种场景行为一致
+- `handleScheduledList` 注入：list 循环里 `if nxt, ok := s.sch.NextRunAt(t.ID); ok { t.NextRunAt = &nxt }`（`69dfe7a`）
+- 前端 `views/automation.js` 表格「下次执行时间」列：仅 `enabled` 任务显示；⏰ icon + info 色（`f8c93e3`）区别于「上次」中性色
+- 4 个测试覆盖：
+  - `@every` 描述符解析（`e3e2b03`）
+  - 非法 cron 不阻断整列表（`943e6ce`）
+  - disabled 任务 `next_run_at` 字段不出现（`3310a3c`）
+  - `newTestServer` 启 scheduler 适配（`13034fd`）
+
+**附（同一时期的并发修复）：** SQLite OpenDB 改用 DSN `_pragma=` 参数 + 限连接池（`2da84db`），调度器用 `golang.org/x/sync/singleflight.Group` 合并同 task 的重叠执行（cron 周期 < 子进程时长，或 cron 与 RunNow 重叠）—— 详见 6.4 节。
+
+### 9.11 任务执行链路 bug 修复（6.24 之后）
+
+上一版只写了能力上线，下列 4 个 commit 都是能力落地后才发现的稳定性 / 正确性 bug 修复：
+
+- **`b12fb7e` 远程 agent claim 响应改返预生成 prompt**：原 claim/claim-next 只返 task + experiences 原始数据，agent 端必须自己拼 prompt，容易漏注入；改为接口直接返回拼好的 prompt 字符串
+- **`1d6db92` 手动任务执行注入经验库**：手动点"▶ 运行"时 `BuildTaskPrompt` 没传 experience，导致 prompt 缺经验上下文（与自动任务行为不一致）；同时前端表单从旧单值 `experience_id`（逗号串）切到新 `experience_ids` 数组
+- **`ebd3bc9` 自动化页 5 处 `resume_uuid` 误判**：原 `if (x.resume_uuid)` 判断是否有会话链，5 处遗漏非空字符串边界（如 `"0"` 仍 truthy 但语义无意义）
+- **`6292757` scheduled 频道 chunk 推送改走 exec 频道**：原 `ChannelScheduled` 重复推 stdout/stderr，改为统一走 `ChannelExec` + 前端 `automation.js` 按 `event` 字段过滤（`docs/wsmsg` ChannelScheduled 注释同步更新 `7688f52`）
+
+### 9.12 任务表 td 恢复表格语义（`c922745`）
+
+**问题：** 早前把任务表 td 改成 flex 布局后，td 实际丢掉了 table cell 语义，导致 `text-align: center` 等表格属性失效，部分浏览器（Safari）排序图标换行错乱。
+
+**解决：** td 恢复 `display: table-cell`，flex 行为下沉到内层 div（行/列分离）。这是个不起眼但"修了才发现表格长好看了"的视觉 fix。
 
 ---
 
