@@ -1,8 +1,9 @@
 ---
 title: 个人AI工作台（二） -- All-In-One助手新增高级特性
-description: 续篇，介绍第一篇之后新增的高级特性
+description: 续篇，介绍第一篇之后新增的高级特性；2026-06-24 校对实现状态，新增 9、10 两节
 categories: [AI, 个人AI工作台]
 tags: [Agent, 个人助手, xworkbench]
+last_modified_at: 2026-06-24
 ---
 
 ## 1. 引言
@@ -107,7 +108,9 @@ tags: [Agent, 个人助手, xworkbench]
 
 **思路：** 执行 → AI 评估打分 → 分数低于阈值则换更强模型重试，最多 N 轮。
 
-**实现：** `POST /api/tasks/{id}/run-loop` 接口，实现评估闭环逻辑。评估使用 `--output-format json` 的结构化输出，从 `result` 字段提取评分和评语。
+**实现：** `POST /api/tasks/{id}/run-loop` 接口实现评估闭环逻辑。评估 prompt 要求 LLM 输出 `评分: X` 与 `评语: ...` 格式，由 `internal/evaluator` 解析后写入 `evaluations` 表（`Score=-1` 表示解析失败，`0` 表示真低分，**不互相 fallback**）。
+
+**当前状态：** 截至 2026-06，`run-loop` 与下面的"AI 自治"3 个能力（run-loop / reevaluate / learn）一并接通，并由 `config.json` 的 `ai_loop_enabled` 顶层字段统一开关控制（详见 9.1）。
 
 ### 2.3 Prompt 格式优化
 
@@ -117,7 +120,7 @@ tags: [Agent, 个人助手, xworkbench]
 
 **实现：** `evaluator` 包调用 `claude -p` 时加 `runner.WithStdin()` 选项，prompt 从标准输入流入。
 
-同时任务执行 prompt 简化为 `BuildTaskPromptShort`，只保留任务描述和验收标准两个核心部分。
+**修正：** 任务执行 prompt 早期被简化为 `BuildTaskPromptShort`（只含描述+验收标准），但后续发现手动任务执行与 agent claim 都需要把经验库喂给 AI CLI，**已回退为 `BuildTaskPrompt` 完整版**（`internal/task/prompt.go`，`cmd/server/main.go:618` 注释），`BuildTaskPromptShort` 仍保留以备后续手动模式单独使用。
 
 ### 2.4 经验库多经验关联
 
@@ -157,7 +160,24 @@ tags: [Agent, 个人助手, xworkbench]
 
 **思路：** 关键端点（注册/心跳/认领/上报）统一加速率限制中间件，默认 60 req/min。
 
-**实现：** `internal/ratelimit/ratelimit.go` 提供中间件函数，按 IP 或 token 统计频率。
+**实现：** `internal/ratelimit/ratelimit.go` 提供中间件函数，按 IP 或 token 统计频率。阈值可通过 `RATE_LIMIT_PER_MIN` 环境变量调整（设 `0` 可禁用）。
+
+### 3.4 Agent 管理面板（代理 Tab）
+
+**问题：** 仅有 Agent API（register/heartbeat/claim/report），前端没有可视化查看与管理入口。
+
+**思路：** 在 5 Tab 里的「代理」Tab 加 Agent 管理面板：列出所有 Agent、一键释放/重置 token/切换 auto-claim/删除。
+
+**实现：**
+
+- `GET /api/agents` 列全部 agent（含 status/last_heartbeat/bound_dir_shortcut_id）
+- `POST /api/agents/{id}/release-tasks`：释放该 agent 已认领的任务
+- `POST /api/agents/{id}/reset-token`：重置 token
+- `POST /api/agents/{id}/auto-claim`：切换自动认领
+- `POST /api/agents/{id}/bind-dir-shortcut`：绑定到远程机器的 `dir_shortcut`（type=remote，含 host/user/key_path）
+- `DELETE /api/agents/{id}`：删除 agent
+
+这部分是 5.x Relay 体系与 3.x Agent 系统的连接点，详见 9.2 SSH 远端执行器。
 
 ## 4. 任务治理能力
 
@@ -167,6 +187,8 @@ tags: [Agent, 个人助手, xworkbench]
 
 **实现：** `task_comments` 和 `execution_comments` 两张表（结构一致：id/content/author/mentions/parent_id），支持嵌套评论（parent_id）。API：`GET/POST /api/tasks/{id}/comments`，`GET/POST /api/executions/{id}/comments`。
 
+**当前状态：** 后端 API 仍保留供脚本调用；**前端 UI 区块已精简**（exec-detail-modal 和 task-modal 上的评论区块于 2026-06-21 被 `ae11c06` / `5c91b95` 移除）。详见 10.1。
+
 ### 4.2 任务审计日志
 
 **思路：** 任务状态变更需要记录，便于回溯和调试。
@@ -175,27 +197,35 @@ tags: [Agent, 个人助手, xworkbench]
 
 ### 4.3 任务依赖
 
-**思路：** 某些任务必须等前置任务完成才能开始。
+~~**思路：** 某些任务必须等前置任务完成才能开始。~~
 
-**实现：** `task_dependencies` 表（task_id/depends_on/type），硬依赖阻塞认领，软依赖仅起提示作用。添加时做循环依赖检测（不允许 A→B→A）。
+~~**实现：** `task_dependencies` 表（task_id/depends_on/type），硬依赖阻塞认领，软依赖仅起提示作用。添加时做循环依赖检测（不允许 A→B→A）。~~
+
+> **状态：已移除**（2026-06-20，commit `7450caf`）。后端 `TaskDependencyRepo` + 路由 + handler + `task_dependencies` 表全部删除；`TaskRepo.ClaimTask` / `NextClaimable` 的 `NOT EXISTS task_dependencies` 阻挡 SQL 一并清理。详见 10.2。
 
 ### 4.4 任务模板
 
-**思路：** 常用任务结构可以保存为模板，一键创建。
+~~**思路：** 常用任务结构可以保存为模板，一键创建。~~
 
-**实现：** `task_templates` 表，预设模板体为 JSON（含 title/description/acceptance 等字段），创建时实例化。
+~~**实现：** `task_templates` 表，预设模板体为 JSON（含 title/description/acceptance 等字段），创建时实例化。~~
+
+> **状态：已移除**（2026-06-20，commit `7450caf`）。详见 10.2。
 
 ### 4.5 保存的过滤器
 
-**思路：** 任务列表的筛选条件可以保存，方便快速切换视图。
+~~**思路：** 任务列表的筛选条件可以保存，方便快速切换视图。~~
 
-**实现：** `saved_filters` 表存 filter_json，支持设为默认排序。
+~~**实现：** `saved_filters` 表存 filter_json，支持设为默认排序。~~
+
+> **状态：已移除**（2026-06-23，commit `a87e28b`）。`saved_filters` 表 DROP，路由、handler、前端入口一并删除。详见 10.2。
 
 ### 4.6 Webhook 派发
 
-**思路：** 任务状态变更时自动通知外部系统（如飞书/钉钉/其他服务）。
+~~**思路：** 任务状态变更时自动通知外部系统（如飞书/钉钉/其他服务）。~~
 
-**实现：** `webhooks` 表存 url/secret/events/enabled/fail_count。Dispatcher 监听事件，匹配后发送 HTTP POST，支持失败计数。
+~~**实现：** `webhooks` 表存 url/secret/events/enabled/fail_count。Dispatcher 监听事件，匹配后发送 HTTP POST，支持失败计数。~~
+
+> **状态：已移除**（2026-06-20，commit `7450caf`）。`internal/webhook` 整个包 + `WebhookRepo` + 6 个路由 + 全部 handler 清除；同时 `handleTaskUpdate` 等处的 `whDisp.Dispatch(...)` 调用全部清空。详见 10.2。
 
 ### 4.7 任务优先级
 
@@ -275,17 +305,205 @@ ss -tln | grep ":$port "
 
 **思路：** 将 log_paths/tool_usage/log_samples/code_snippets 合并到 details 一个 JSON 字段。
 
-**实现：** 新字段 `details` TEXT，存量数据通过迁移函数自动合并。API 返回时解析 JSON。
+**实现：** 新字段 `details TEXT`，由 `migrateExperiencesToDetails` 自动合并存量数据。API 返回时无需额外解析（`details` 直接以字符串返回）。最终 `experiences` 表字段：`id/module/keywords/scene/details/version/created_at/updated_at`（7→5）。
 
 ### 7.3 任务表单精简
 
 **移除字段：** module（后端从未使用）、resources（用户认为不必要）。
 
-**实现：** 从 task modal HTML、`submitTask()` JS、`handleTaskCreate/Update` Go 中移除相关字段。
+**实现：** 从 task modal HTML、`submitTask()` JS、`handleTaskCreate/Update` Go 中移除相关字段（commit `c73f73e`，2026-06-19）。
 
-## 8. 后续思路
+> **注：** SQLite `tasks` 表 schema 中 `resources` 列、`task_experiences` 等仍保留以兼容老库，但前端 form 不再暴露。
 
-- 任务执行超时考虑 Graceful Shutdown（给进程发 SIGTERM 等一段时间再 SIGKILL）
-- 经验库和任务模板的智能推荐（根据关键词匹配）
-- Webhook 发送失败后的重试队列
-- 移动端页面适配
+## 8. 后续思路（原 8 节复盘）
+
+上次列的 4 条后续思路，至 2026-06-24 复盘：
+
+- ~~任务执行超时考虑 Graceful Shutdown~~ → **已完成**：`executor.Run` 默认 30 分钟 ctx 超时；`scheduled_tasks.last_status` 增加 `timeout` / `build_error` 两个取值，区分超时与 PATH 缺失。
+- ~~经验库和任务模板的智能推荐~~ → 任务模板**已被移除**（10.2），智能推荐未启动。
+- ~~Webhook 发送失败后的重试队列~~ → **已被移除**（10.2），重试队列不适用。
+- ~~移动端页面适配~~ → 进展较小，仍为 PC 优先。
+
+新增关注点：
+
+- 任务 + Agent 的全链路可观测（executions 采样、Agent 离线告警）
+- SSH 远端 Agent 任务池稳定性（断连恢复、跨平台二进制分发）
+- AI 评估的反幻觉：会话链评估合并多轮输入，避免单次抽样的偏误（详见 9.3）
+
+---
+
+## 9. 后续新增的高级特性（6.19-6.24 之间接入）
+
+> 上一版之后接入的能力。这些在原 6 节"运维能力"中未涵盖，但属于"高级特性"范畴，故另起一节。
+
+### 9.1 AI 自治（总开关 + 3 个能力接通）
+
+**问题：** 之前有 5 个"断头"后端能力（TaskEvent / SavedFilter / TaskTemplate / TaskDependency / Webhook），前 2 个接通了 UI，后 3 个删了；又新增 3 个 AI 自治能力（run-loop / reevaluate / learn），前端没有入口。
+
+**思路：**
+
+- 后端 `ai_loop_enabled` 顶层开关（**不放在 `app_settings` 表**，2026-06-23 重构后与 `scheduler_enabled` 等一同迁入 `config.json` 顶层，详见 9.4）
+- 前端 AI 自治设置搬到"高级设置"区块，与调度器同层
+- 3 个能力接进 UI：`handleTaskReevaluate`（新模型重评最新 execution）、`handleTaskRunLoop`（评估闭环）、`handleTaskLearn`（从执行记录生成经验写入 experiences 表）
+
+**实现：**
+
+- `internal/evaluator/evaluator.go` + `internal/task/prompt.go` 增 `LearnFromExecution`
+- 3 个 handler 共用同一开关检查 `s.aiLoopEnabled()()`，每次请求都查（`Save()` 后下次请求生效，无需 reload）
+- 前端 `views/automation.js` exec-detail-modal 加 "🔁 重评" / "🧠 学习" / "🔁🔁 Run-Loop" 三个按钮（灰显时表示开关未启用）
+
+### 9.2 SSH 远端执行器（Agent 模式）
+
+**问题：** 之前任务执行只能在 xworkbench 所在机器跑，多机器协同场景（Linux 服务 + Windows Agent）需要把任务下发到远端。
+
+**思路：** 借 Agent 体系 + 远程 dir_shortcut，把 SSH 远端执行接进来。
+
+**实现：**
+
+- `internal/executor/ssh_helpers.go` + `ssh_runner.go`：基于 `golang.org/x/crypto/ssh`，支持 password / private key 鉴权（`ssh.ParsePrivateKey` 自动识别 PEM 格式）
+- 远端机器以 `dir_shortcut` 表达：新增 `type=remote` 类型，字段 `remote_host/remote_user/auth_method/remote_password/key_path/port`
+- `Agent.BoundDirShortcutID` 字段把 agent 绑到某台远端机器
+- `handleTaskRun` 根据 `req.AgentID` 判断走本机还是 SSH：agent 非空 → 查 `agentDB.GetByID` → 拿 `BoundDirShortcutID` → `dirDB.GetByID` → 构造 `executor.SSHConfig` → 流式读 stdout/stderr
+- 前端 task 详情面板加"运行位置"下拉（local / 远端 agent）+ "续传 session" 选项（`req.ResumeSessionID`）
+- Agent 报错清晰化：未绑 dir_shortcut / dir_shortcut 非 remote / 缺 host/user 等都返回明确 4xx 错误信息
+
+**测试：**
+
+- 单元测试 `ssh_helpers_test.go` skip（需真 ssh client）
+- 端到端用本地 sshd + socat 验证（详见 `docs/superpowers/plans/`）
+
+### 9.3 会话链评估（evaluate-chain）
+
+**问题：** 一次会话里有多轮 execution（续问、追问），单评一次输出不全面。
+
+**思路：** 把同 `resume_uuid` 的所有 execution 的 input/output 合并后，一次性送评。
+
+**实现：**
+
+- `POST /api/executions/{id}/evaluate-chain`：根据 `exec.ResumeSessionID`（即 `resume_uuid`）查 `ListByResumeUUID`，无则 fallback 到单 execution
+- `evaluator.RunAndSaveChain`：合并 `chain[0..N]` 的 prompt + output，调用同一 `evalPromptTpl` 打分
+- 默认 120s timeout，模型选择跟随 `config.json.preferred_cli` + `models[cli].default`
+- 前端 automation.js exec-detail-modal 在"📊 AI 评估"旁加"📊📊 评估整链" 按钮
+
+**字段修正：** `session_group_id` 已被 `ebca91b` 统一为 `resume_uuid`，文档与代码使用同一字段名。
+
+### 9.4 配置体系重构（config.json 单一来源）
+
+**问题：** 6 个用户偏好（`aichat_default_cli` / `default_terminal` / `preferred_cli` / `todo_md_path` / `ai_loop_enabled` / `scheduler.enabled`）原本散落在 SQLite `app_settings` 表与 `config.json` 嵌套字段，读取时有优先级链歧义。
+
+**思路：** 全部上移到 `config.json` 顶层字段，**不再有 AppSettings 优先级链**。
+
+**实现：**
+
+- `internal/config/config.go` 新增顶层 bool/string 字段，初始化时 `migrateConfig()` 做兜底合并
+- 前端 `aichat.js:loadCliSetting()` 走 `GET /api/config`（不再走已删除的 `/api/settings/*`）
+- 改 CLI 默认值：`PUT /api/config` body `{"aichat_default_cli":"claude"}`
+- `app_settings` SQLite 表整体删除
+
+**配置类型分区（记清）：**
+
+- **顶层偏好字段**：`default_terminal` / `preferred_cli` / `ai_loop_enabled` / `aichat_default_cli` / `todo_md_path` / `scheduler_enabled` —— 改 `config.json` 即可，启动时 `internal/config.Load` 加载
+- **部署级 nested**：`terminal.{detect_paths, types}` / `models.{claude, cbc}.{default, options}` / `relay.api_key`
+
+### 9.5 系统配置页重构（数据管理 → 系统配置）
+
+**问题：** 早期"数据管理"页有 4 个子 tab（导入/导出/备份/快捷），概念模糊、布局拥挤。
+
+**思路：** 改名"系统配置" + 拆为 3+1：配置 / 目录 / 链接 + 导入导出合并到配置子 tab。
+
+**实现：**
+
+- 子 tab 拆分：原"快捷"拆为独立的"快捷目录"（`dir_shortcuts`）和"快捷链接"（`web_links`）两个子 tab
+- 4 → 3+1 布局（commit `d6a0048`）
+- 修复 `localStorage` 恢复 + 子 tab active 高亮缺失（`77c37d3`）
+- 空 db 导出时 nullable 字段为 null 修复，避免前端崩（`2ba328a`）
+
+### 9.6 代理 Tab 强化
+
+- 5.1/5.2 路由加 `relayAuth` 中间件（Bearer Token / X-API-Key），`relay.api_key` 在 `config.json` 顶层
+- 命令执行 / HTTP 转发 两栏分色（`14d6975`）：执行走粉、代理走青
+- 暗色主题对比度优化 + 按钮底部对齐 + form-spacer（`13cc8b2`）
+
+### 9.7 评估 / 日志 / 调度 三个微改进
+
+- 评估行去问号图标，用 title 提示替代（`6360465`）
+- 评估支持整个会话链：见 9.3
+- 调度 sessionId 提取修复 + 启动器支持 resume（`315395d`）
+- 抓 claude `session_id`（不是 `uuid`），避免 `--resume` 报 "No conversation found"（`e014849`，`cmd/server/main.go:extractResumeSessionID` 注释详细记录）
+- 合并评估整链：见 9.3
+- 调度器 status 上一次执行不再用 `last_status="running"` 中间态（主 goroutine 阻塞时写不进去），改用 `last_execution_id` 对应 `exec.completed_at` 是否为空判断
+
+### 9.8 exec-detail 历史展示
+
+- 对话历史区块：展示 `command / output / error / uuid`，按 resume_uuid 分组（`189ff06`）
+- 修复对话历史 API 支持 `resume_uuid` 过滤（`180ac4b`）
+- 优化对话历史展示 UX（`3427515`）
+
+### 9.9 任务页 UI 微调
+
+- 表格列宽调整（防操作列溢出 + 排序图标换行，`9144fe0`）
+- 时间列加宽到 150 + 操作列缩到 320（`96891e0`）
+- 任务页状态列显示英文（`a877c8f`）
+- 移除全局 `body` zoom，缩放仅作用于 Windows；OS 检测加 fallback（`baa3ff9`）
+
+---
+
+## 10. 已精简 / 移除的特性
+
+> 这些是上一版写到、但实际并未落地 / 已被精简 / 已被移除的能力。为保持博客与代码可对照，集中记于此。
+
+### 10.1 仅前端 UI 精简（后端 API 保留）
+
+| 特性 | 原章节 | 状态 |
+|------|--------|------|
+| exec-detail-modal 评论区块 | 4.1 | `ae11c06` 移除 UI；后端 `/api/executions/{id}/comments` 保留 |
+| exec-detail-modal 活动历史区块 | 4.2 | `ae11c06` 移除 UI；后端 `task_events` 表 + `/api/tasks/{id}/events` 保留 |
+| task-modal 评论 / 活动历史 / 对话历史 / AI 自治 区块 | 4.1/4.2/2.x | `5c91b95` 移除（合并到 exec-detail-modal） |
+
+### 10.2 完整移除（前端 + 后端 + 表 + 路由）
+
+| 特性 | 原章节 | commit | 影响范围 |
+|------|--------|--------|----------|
+| 任务依赖 TaskDependency | 4.3 | `7450caf` | -394 行：APIServer 字段 / 6 个路由 / 8 个 repo 方法 / SQL NOT EXISTS 阻挡 |
+| 任务模板 TaskTemplate | 4.4 | `7450caf` | 同上：7 个 repo 方法 / `task_templates` 表 |
+| Webhook 派发 | 4.6 | `7450caf` | 同上：6 个路由 / 8 个 repo 方法 / `webhooks` 表 / `internal/webhook` 包 |
+| 保存的过滤器 SavedFilter | 4.5 | `a87e28b` | `saved_filters` 表 DROP，路由 / handler / UI 一并清除 |
+
+**删除原因（统一）：** 之前是"前端 0 调用 + 后端完整"的 5 个断头能力。"接通 UI"成本 > 实际使用价值（个人项目，自用为主），决定先批量删除 TaskTemplate / TaskDependency / Webhook 3 个；TaskEvent / SavedFilter 保留后端接通 UI（TaskEvent 仍走 audit 日志，SavedFilter 在 6.23 也一并删了）。详见 commit message 与 `docs/superpowers/plans/`。
+
+### 10.3 其它被精简的项
+
+- **任务表单字段**：`module` / `resources` 表单字段移除（`c73f73e`），schema 仍保留以兼容老库
+- **`scripts/build-all.sh`**：`7180062` 删除（产物名仍叫旧名 `skill-factory`，跟 `build.sh -a` 重复）
+- **`--resume <uuid>` 早期误用**：从 `cmd/server/main.go:extractResumeSessionID` 注释看到，老版本用单次 `uuid` 传给 `--resume` 会报 "No conversation found with session ID"，**必须用 `session_id`**（`e014849` 修复）
+
+### 10.4 状态对照表
+
+| 原章节 | 状态 |
+|--------|------|
+| 2.1 AI 继续对话 | ✅ 实际已落地（修正：`--resume` 必须传 `session_id` 而非 `uuid`） |
+| 2.2 评估闭环 | ✅ 已落地，受 `ai_loop_enabled` 控制（见 9.1） |
+| 2.3 Prompt 格式优化 | ✅ 已落地；BuildTaskPromptShort 仍存在但**已回退**为完整版（修复手动任务缺经验的 bug） |
+| 2.4 经验库多经验关联 | ✅ 仍落地，`task_experiences` 中间表 |
+| 3.1 Agent 注册与心跳 | ✅ |
+| 3.2 任务认领与上报 | ✅ |
+| 3.3 速率限制 | ✅（增加 `RATE_LIMIT_PER_MIN` 环境变量） |
+| **3.4 Agent 管理面板** | ✅ 新增（6.22，详 3.4 + 9.2） |
+| 4.1 任务评论 | ⚠️ 后端保留，前端 UI 精简 |
+| 4.2 任务审计日志 | ⚠️ 后端保留（`task_events` 表），前端 UI 精简 |
+| 4.3 任务依赖 | ❌ 已删除 |
+| 4.4 任务模板 | ❌ 已删除 |
+| 4.5 保存的过滤器 | ❌ 已删除 |
+| 4.6 Webhook 派发 | ❌ 已删除 |
+| 4.7 任务优先级 | ✅ 仍落地 |
+| 5.1 HTTP 请求代理 | ✅ |
+| 5.2 服务器端命令执行 | ✅ |
+| 5.3 API Key 认证 | ✅ |
+| 6.1 启停脚本改进 | ✅ |
+| 6.2 统一日志输出 | ✅（`logger.Logger.Infow/Errorw`） |
+| 6.3 评估输出截断 | ✅ |
+| 7.1 区块高度拖拽调整 | ✅ |
+| 7.2 经验库字段精简 | ✅（7→5 字段） |
+| 7.3 任务表单精简 | ✅（`c73f73e`） |
+| **7.4 任务页 UI 微调** | ✅ 新增（见 9.9） |
+| 8 后续思路 | 🔁 复盘见 8 |
