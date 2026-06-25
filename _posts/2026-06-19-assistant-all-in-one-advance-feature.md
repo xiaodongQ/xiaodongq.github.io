@@ -517,6 +517,99 @@ ss -tln | grep ":$port "
 
 **解决：** td 恢复 `display: table-cell`，flex 行为下沉到内层 div（行/列分离）。这是个不起眼但"修了才发现表格长好看了"的视觉 fix。
 
+### 9.13 执行/评估模型独立配置（`55a826c` + `672b891`）
+
+**问题：** 之前执行任务和评估打分共用同一个模型字段（`config.json.models.<cli>.default`），但两者诉求不同：执行要快+便宜（haiku / glm-4.7），评估要稳+准（sonnet）。硬绑一个会双输。
+
+**实现：**
+
+- `internal/config/config.go` 的 `ModelGroup` 加 `EvalDefault string` 字段（`json:"eval_default,omitempty"`），与 `Default` 平级
+- fallback 链：`eval_default` 未设 → `default` → 硬编码 `"sonnet"`
+- config 默认值同步：claude `default=sonnet` / `eval_default=sonnet`；cbc `default=glm-5.1` / `eval_default=glm-5.0`
+- 前端两个下拉独立：创建任务选 default；exec-detail-modal "📊 AI 评估" 弹窗选 eval
+- `cmd/server/main.go` 所有评估入口（`/api/executions/{id}/evaluate` / `evaluate-chain` / `run-loop` / `reevaluate`）改用 `config.AppConfig.EvalModelFor(cliType)` 取模型
+
+**后续调整**（`672b891`）：把 `config.json` 的 `models.claude.eval_default` 从 `haiku` 改回 `sonnet`——haiku 评分不稳定，sonnet 评估更可信。
+
+### 9.14 execution.status 显式状态 + 手动取消（`be08ccf`）
+
+**问题：** 自动化页面执行列表里某条记录"一直显示运行中"，刷新也不消失。3 个根因：
+
+1. ctx 超时后 `execution.error` 字段空白：`executor.Run` 杀子进程时 stderr 是空的，错误信息在 `res.Err`（"signal: killed"），原代码只写 stderr 不写 res.Err
+2. WS 断连后前端永远不刷新："运行中"判定纯靠 `completed_at IS NULL`
+3. 没有手动取消 execution 的接口：`handleTaskCancel` 只针对 task_id；服务器重启后 in-flight goroutine 消失
+
+**实现：**
+
+- `executions` 表加 `status` 列，**6 个取值**：`running` / `success` / `failed` / `timeout` / `cancelled` / `build_error`
+  - `running`：已创建未 Finish
+  - `success`：exit_code=0
+  - `failed`：exit_code≠0 且 ≠-1（子进程报错）
+  - `timeout`：exit_code=-1 且 errOut 含 "context deadline"
+  - `cancelled`：用户手动调 `/api/executions/{id}/cancel` 强制结束
+  - `build_error`：`runner.BuildCommand` 返回 err
+- 错误信息保留：`res.Err.Error()` 兜底写入 errOut
+- 新增 `POST /api/executions/{id}/cancel` 接口
+- 前端自动化页加「⚠ 标记完成」按钮 + 30s 兜底轮询（主刷新还是 3s auto-refresh）
+
+**`status` 字段取代"靠 completed_at+exit_code+error 拼凑"的判定**——更直接，UI 显示也用 status 不用 completed_at。
+
+### 9.15 继续对话延续原 CLI/model（`9ddad16`）
+
+**问题：** `handleExecutionContinue` 以前硬编码 CLI="claude"，原 exec 如果是 cbc 或 shell 会切断运行环境（session 延续了但 CLI 切换了），评估时也会用错模型。
+
+**实现：**
+
+- `executions` 表加 `cli_type TEXT` 列（老库自动 ALTER 迁移）
+- `Execution` struct 加 `CliType string` 字段（`json:"cli_type,omitempty"`）
+- `ExecutionRepo.Create` / `Get` 的 SQL 加 cli_type
+- `handleTaskRun` 写入 `req.CommandType` 到新 exec
+- `handleExecutionContinue` 从原 exec 读 `CliType`，fallback `claude`，构造命令时传入
+- 评估入口用 `execution.cli_type` 判断运行环境，避免 cbc session 误以 claude 评估
+
+### 9.16 任务详情 AI 自治区块加回 + Run Loop 异步化（`2e547ad`）
+
+**问题（4 个独立问题一次性修）：**
+
+1. **AI 自治按钮缺失**（P0 用户感知）：task-modal 里 `#ai-loop-section` / 3 个按钮 / 进度容器 DOM 从来没渲染，后端 handler 全在，前端入口没接。加回 DOM + 3 个 handler。
+2. **Run Loop 同步阻塞**：之前在 HTTP handler 里跑 `for { exec → eval → 换模型重试 }`，单次循环可能 10+ 分钟，超过前端 60s 默认超时断连。改异步（fire-and-forget background goroutine）+ HTTP handler 立即返回 + 前端轮询 status。
+3. **优雅关闭**：scheduler 加 shutdown 钩子，Stop 时等 in-flight goroutine 完成 + 写回 status，不丢中途状态。
+4. **AI 自治开关误判**：`aiLoopEnabled()` 之前从 `AppSettings` 读，重构后从 `config.json` 顶层 `ai_loop_enabled` 读，迁移期间有过期数据。
+
+### 9.17 代理页"生成 Linux 调用脚本"快捷功能（`5345f3f`）
+
+**需求：** 在 Linux 机器上用 shell 调用 xworkbench 代理（命令执行 / HTTP 转发），拷贝后只改 3 处即可用。
+
+**实现：**
+
+- 「代理」Tab 加按钮「📜 生成 Linux 调用脚本」
+- 一键生成可拷贝的 shell 脚本（含 `curl` 调用 `/api/exec` / `/api/proxy/*` 的完整示例）
+- 自动注入 `relay.api_key`（从 config.json 读，用户只需改 URL + HOST + 业务参数）
+- 弹窗带「📋 复制」按钮，复制后可直接 `vim xworkbench-relay.sh && bash ./xworkbench-relay.sh`
+
+### 9.18 调度器 AI 默认超时 1 小时 → 10 分钟（`5b449a6`）
+
+**背景：** `scheduled_tasks.timeout_sec=0` 时调度器按 `command_type` 取默认超时，AI 类型原本是 1 小时、shell 5 分钟。但实际场景下 AI 任务很少跑超过 10 分钟（多数 1-5 分钟完事），1 小时让 "卡住" 的任务占着端口太久。
+
+**改动：** AI 默认 1h → 10min（与 `handleTaskRun` / `handleExecutionContinue` 保持一致），shell 保持 5min 不变。
+
+### 9.19 调度器 next_run_at 实时刷新（`c12db3b`）
+
+**问题：** 上次加的「下次执行时间」字段（9.10）只在 `Reload` 时刷新，但调度器正常运行时 entry.Next() 一直在被 cron 引擎更新——所以 next_run_at 一直停留在"启动时算的"那个值，UI 不实时。
+
+**实现：** `Scheduler.execute` 在每次触发后调用 `s.scheduleNextRun(taskID)`，主动 `entry.Next(time.Now())` 重算 nextRun map。`c12db3b` 之前漏了这一步。
+
+### 9.20 其它 6.25 后微改进
+
+- `f0459a8` 执行列表 UI 精简（删冗余入口 + 标记完成改取消）
+- `76e1ea1` btn-secondary 视觉禁用样式 + 继续对话按钮 loading/error 反馈
+- `403f040` tooltip 自适应视口边界 + jumpToRoot 自动加载更多重试
+- `a722e31` 快捷示例加 `@every m/h` 粒度 + 说明支持单位
+- `ed2067f` cron 表达式说明文案简化
+- `14817dc` 关闭 ai_loop + 换 cbc 默认模型（个人偏好调整，非 bug）
+- `3d5767a` Windows run.sh 兼容（修 netstat `LISTEN`→`LISTENING` + taskkill 走 cmd.exe 避免 Git Bash 路径转换）
+- `582d976` pack 修复（README 6→7 Tab + 修复 bsdtar 警告）
+
 ---
 
 ## 10. 已精简 / 移除的特性
