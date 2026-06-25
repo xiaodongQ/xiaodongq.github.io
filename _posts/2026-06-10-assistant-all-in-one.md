@@ -197,7 +197,7 @@ DB_PATH=./data/skill-factory.db ADDR=:8080 ./skill-factory
 ![定时任务](/images/1781278016145-image.png)
 
 执行完成：  
-![评分](../images/1781278305601-image.png)
+![评分](/images/1781278305601-image.png)
 
 ## 6. 框架优化考虑
 
