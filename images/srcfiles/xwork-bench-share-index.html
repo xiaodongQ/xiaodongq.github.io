@@ -1,0 +1,1270 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>xworkbench v2 - All-in-One 个人工作台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Inter', '-apple-system', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'sans-serif'],
+        display: ['Poppins', 'Inter', '-apple-system', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'sans-serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+      },
+      colors: {
+        bg:           'hsl(222, 20%, 8%)',
+        'bg-alt':     'hsl(222, 20%, 11%)',
+        surface:      'hsl(222, 18%, 14%)',
+        'surface-hover': 'hsl(222, 18%, 18%)',
+        'surface-alt': 'hsl(222, 15%, 17%)',
+        text:         'hsl(220, 15%, 90%)',
+        'text-muted': 'hsl(220, 10%, 55%)',
+        'text-dim':   'hsl(220, 8%, 40%)',
+        primary:      'hsl(210, 90%, 58%)',
+        'primary-dim': 'hsl(210, 70%, 35%)',
+        accent:       'hsl(180, 70%, 48%)',
+        'accent-dim': 'hsl(180, 50%, 30%)',
+        border:       'hsl(222, 15%, 20%)',
+        'border-light': 'hsl(222, 15%, 26%)',
+        success:      'hsl(150, 60%, 50%)',
+        warning:      'hsl(40, 90%, 55%)',
+        danger:       'hsl(0, 75%, 55%)',
+        info:         'hsl(200, 80%, 55%)',
+      },
+    }
+  }
+};
+</script>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+img, video { max-width: 100%; height: auto; display: block; }
+body { overflow-wrap: break-word; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: hsl(222, 20%, 8%);
+  color: hsl(220, 15%, 90%);
+  font-family: 'Inter', -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: hsl(222, 20%, 8%); }
+::-webkit-scrollbar-thumb { background: hsl(222, 15%, 25%); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(222, 15%, 35%); }
+
+/* Hero geometric decorations */
+.hero-geo {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0.06;
+}
+.hero-geo-1 { width: 600px; height: 600px; background: radial-gradient(circle, hsl(210, 90%, 58%), transparent 70%); top: -200px; right: -100px; }
+.hero-geo-2 { width: 400px; height: 400px; background: radial-gradient(circle, hsl(180, 70%, 48%), transparent 70%); bottom: -150px; left: -80px; }
+.hero-geo-3 { width: 200px; height: 200px; border: 2px solid hsl(210, 90%, 58%); opacity: 0.08; top: 50%; left: 10%; transform: rotate(45deg); border-radius: 16px; }
+.hero-geo-4 { width: 150px; height: 150px; border: 2px solid hsl(180, 70%, 48%); opacity: 0.08; top: 30%; right: 15%; transform: rotate(15deg); border-radius: 16px; }
+.hero-geo-5 { width: 80px; height: 80px; background: hsl(210, 90%, 58%); opacity: 0.04; top: 20%; left: 50%; border-radius: 12px; transform: rotate(30deg); }
+
+/* Grid pattern overlay */
+.hero-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(hsl(222, 15%, 20%) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(222, 15%, 20%) 1px, transparent 1px);
+  background-size: 60px 60px;
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+/* Card glow on hover */
+.card-glow {
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.card-glow:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 40px -8px hsla(210, 90%, 58%, 0.12), 0 0 0 1px hsla(210, 90%, 58%, 0.2);
+}
+
+/* Feature card with mockup */
+.feature-card {
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.feature-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 48px -12px hsla(210, 90%, 58%, 0.1), 0 0 0 1px hsla(210, 90%, 58%, 0.15);
+}
+
+/* Staggered fade-in */
+.fade-up {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+.fade-up.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Code syntax highlighting */
+.code-block {
+  background: hsl(222, 20%, 6%);
+  border: 1px solid hsl(222, 15%, 20%);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.code-block .line {
+  display: flex;
+  min-height: 1.75rem;
+  align-items: center;
+}
+.code-block .ln {
+  width: 3rem;
+  text-align: right;
+  padding-right: 1rem;
+  color: hsl(220, 8%, 35%);
+  user-select: none;
+  flex-shrink: 0;
+  font-size: 0.8125rem;
+}
+.code-block .code {
+  font-family: 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', monospace;
+  font-size: 0.8125rem;
+  line-height: 1.75;
+  white-space: pre;
+}
+.code .kw { color: hsl(280, 70%, 65%); }
+.code .fn { color: hsl(210, 90%, 65%); }
+.code .str { color: hsl(150, 60%, 55%); }
+.code .cm { color: hsl(220, 8%, 40%); font-style: italic; }
+.code .pkg { color: hsl(180, 70%, 55%); }
+.code .op { color: hsl(40, 80%, 60%); }
+.code .num { color: hsl(30, 80%, 60%); }
+.code .type { color: hsl(50, 70%, 55%); }
+
+/* Mockup styles */
+.mockup-window {
+  background: hsl(222, 20%, 10%);
+  border: 1px solid hsl(222, 15%, 22%);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.mockup-titlebar {
+  background: hsl(222, 18%, 13%);
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid hsl(222, 15%, 20%);
+}
+.mockup-dot { width: 10px; height: 10px; border-radius: 50%; }
+.mockup-dot-red { background: hsl(0, 65%, 55%); }
+.mockup-dot-yellow { background: hsl(40, 80%, 55%); }
+.mockup-dot-green { background: hsl(150, 55%, 48%); }
+.mockup-body { padding: 14px; }
+
+/* Stat card in mockup */
+.stat-card-mock {
+  background: hsl(222, 18%, 14%);
+  border: 1px solid hsl(222, 15%, 20%);
+  border-radius: 8px;
+  padding: 10px 14px;
+  text-align: center;
+}
+.stat-card-mock .stat-value {
+  font-family: 'Poppins', 'Inter', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.stat-card-mock .stat-label {
+  font-size: 0.65rem;
+  color: hsl(220, 10%, 50%);
+  margin-top: 2px;
+}
+
+/* Table mock */
+.table-mock {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.7rem;
+}
+.table-mock th {
+  text-align: left;
+  padding: 6px 8px;
+  color: hsl(220, 10%, 50%);
+  font-weight: 500;
+  border-bottom: 1px solid hsl(222, 15%, 20%);
+}
+.table-mock td {
+  padding: 6px 8px;
+  border-bottom: 1px solid hsl(222, 15%, 16%);
+  color: hsl(220, 15%, 80%);
+}
+
+/* Badge mock */
+.badge-mock {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.6rem;
+  font-weight: 600;
+}
+.badge-blue { background: hsla(210, 90%, 58%, 0.15); color: hsl(210, 90%, 65%); }
+.badge-green { background: hsla(150, 60%, 50%, 0.15); color: hsl(150, 60%, 55%); }
+.badge-yellow { background: hsla(40, 90%, 55%, 0.15); color: hsl(40, 90%, 60%); }
+.badge-red { background: hsla(0, 75%, 55%, 0.15); color: hsl(0, 75%, 60%); }
+.badge-cyan { background: hsla(180, 70%, 48%, 0.15); color: hsl(180, 70%, 55%); }
+
+/* Terminal mock */
+.terminal-mock {
+  background: hsl(222, 20%, 5%);
+  border-radius: 8px;
+  padding: 14px;
+  font-family: 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', monospace;
+  font-size: 0.7rem;
+  line-height: 1.7;
+}
+.terminal-mock .prompt { color: hsl(150, 60%, 50%); }
+.terminal-mock .cmd { color: hsl(220, 15%, 85%); }
+.terminal-mock .out { color: hsl(220, 10%, 55%); }
+.terminal-mock .cursor {
+  display: inline-block;
+  width: 7px;
+  height: 13px;
+  background: hsl(150, 60%, 50%);
+  vertical-align: middle;
+  animation: blink 1s step-end infinite;
+}
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+/* Architecture diagram */
+.arch-layer {
+  background: hsl(222, 18%, 14%);
+  border: 1px solid hsl(222, 15%, 22%);
+  border-radius: 10px;
+  padding: 14px 20px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+.arch-layer:hover {
+  border-color: hsla(210, 90%, 58%, 0.4);
+  box-shadow: 0 0 20px hsla(210, 90%, 58%, 0.08);
+}
+.arch-arrow {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0;
+  color: hsl(220, 10%, 35%);
+  font-size: 1.2rem;
+}
+
+/* Nav */
+.nav-blur {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  background: hsla(222, 20%, 8%, 0.75);
+  border-bottom: 1px solid hsl(222, 15%, 16%);
+}
+
+/* Button styles */
+.btn-primary {
+  background: linear-gradient(135deg, hsl(210, 90%, 55%), hsl(210, 85%, 48%));
+  color: #fff;
+  font-weight: 600;
+  border-radius: 10px;
+  padding: 12px 28px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 20px hsla(210, 90%, 55%, 0.25);
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px hsla(210, 90%, 55%, 0.35);
+}
+.btn-secondary {
+  background: transparent;
+  color: hsl(220, 15%, 85%);
+  font-weight: 600;
+  border-radius: 10px;
+  padding: 12px 28px;
+  border: 1px solid hsl(222, 15%, 28%);
+  transition: all 0.3s ease;
+}
+.btn-secondary:hover {
+  border-color: hsl(222, 15%, 40%);
+  background: hsla(222, 15%, 20%, 0.5);
+}
+
+/* Section divider */
+.section-divider {
+  width: 60px;
+  height: 3px;
+  background: linear-gradient(90deg, hsl(210, 90%, 55%), hsl(180, 70%, 48%));
+  border-radius: 2px;
+}
+
+/* Tag */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background: hsla(210, 90%, 58%, 0.1);
+  color: hsl(210, 90%, 70%);
+  border: 1px solid hsla(210, 90%, 58%, 0.15);
+}
+
+/* Quick start code */
+.qs-code {
+  background: hsl(222, 20%, 5%);
+  border: 1px solid hsl(222, 15%, 18%);
+  border-radius: 12px;
+  padding: 20px 24px;
+  font-family: 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', monospace;
+  font-size: 0.8125rem;
+  line-height: 1.8;
+  overflow-x: auto;
+}
+.qs-code .cm { color: hsl(220, 8%, 38%); }
+.qs-code .kw { color: hsl(280, 60%, 60%); }
+.qs-code .str { color: hsl(150, 55%, 50%); }
+
+/* Mobile nav */
+.mobile-menu {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease;
+}
+.mobile-menu.open {
+  max-height: 500px;
+}
+</style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="nav-blur sticky top-0 z-50">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between h-16">
+      <a href="#hero" class="flex items-center gap-2.5 no-underline">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: linear-gradient(135deg, hsl(210, 90%, 55%), hsl(180, 70%, 48%));">
+          <span class="text-white font-bold text-sm font-display">X</span>
+        </div>
+        <span class="font-display font-semibold text-text text-base">xworkbench</span>
+      </a>
+      <div class="hidden md:flex items-center gap-8">
+        <a href="#overview" class="text-text-muted hover:text-text text-sm font-medium transition-colors no-underline">概述</a>
+        <a href="#tech" class="text-text-muted hover:text-text text-sm font-medium transition-colors no-underline">技术栈</a>
+        <a href="#features" class="text-text-muted hover:text-text text-sm font-medium transition-colors no-underline">功能</a>
+        <a href="#architecture" class="text-text-muted hover:text-text text-sm font-medium transition-colors no-underline">架构</a>
+        <a href="#quickstart" class="text-text-muted hover:text-text text-sm font-medium transition-colors no-underline">快速开始</a>
+      </div>
+      <button id="mobile-menu-btn" class="md:hidden text-text-muted hover:text-text p-2" aria-label="Toggle menu">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="mobile-menu" class="mobile-menu md:hidden">
+      <div class="flex flex-col gap-3 pb-4">
+        <a href="#overview" class="text-text-muted hover:text-text text-sm font-medium transition-colors no-underline py-1">概述</a>
+        <a href="#tech" class="text-text-muted hover:text-text text-sm font-medium transition-colors no-underline py-1">技术栈</a>
+        <a href="#features" class="text-text-muted hover:text-text text-sm font-medium transition-colors no-underline py-1">功能</a>
+        <a href="#architecture" class="text-text-muted hover:text-text text-sm font-medium transition-colors no-underline py-1">架构</a>
+        <a href="#quickstart" class="text-text-muted hover:text-text text-sm font-medium transition-colors no-underline py-1">快速开始</a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero Section -->
+<section id="hero" class="relative overflow-hidden min-h-[90vh] flex items-center">
+  <div class="hero-grid"></div>
+  <div class="hero-geo hero-geo-1"></div>
+  <div class="hero-geo hero-geo-2"></div>
+  <div class="hero-geo hero-geo-3"></div>
+  <div class="hero-geo hero-geo-4"></div>
+  <div class="hero-geo hero-geo-5"></div>
+
+  <div class="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
+    <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-border bg-surface/50 mb-8">
+      <span class="w-2 h-2 rounded-full bg-success animate-pulse"></span>
+      <span class="text-xs font-medium text-text-muted">v2.0 — 现已发布</span>
+    </div>
+
+    <h1 class="font-display font-extrabold text-5xl sm:text-6xl lg:text-7xl tracking-tight mb-6">
+      <span class="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">xworkbench</span>
+      <span class="text-text"> v2</span>
+    </h1>
+
+    <p class="font-display font-semibold text-xl sm:text-2xl text-text-muted mb-4">
+      All-in-One 个人工作台
+    </p>
+
+    <p class="text-text-muted text-base sm:text-lg max-w-2xl mx-auto mb-10 leading-relaxed">
+      单 Go 二进制 · 14 张表 · 7 Tab · 91 HTTP 路由 · 跨平台
+    </p>
+
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+      <button id="hero-cta" class="btn-primary text-base cursor-pointer">快速开始</button>
+      <button id="hero-source" class="btn-secondary text-base cursor-pointer">
+        <span class="flex items-center gap-2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          查看源码
+        </span>
+      </button>
+    </div>
+
+    <div class="mt-16 flex items-center justify-center gap-8 text-text-dim text-sm">
+      <div class="flex items-center gap-2">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <span>Go 1.22+</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        <span>SQLite</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+        <span>AI 原生</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Overview Section -->
+<section id="overview" class="py-24 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-6xl mx-auto">
+    <div class="text-center mb-16 fade-up">
+      <div class="section-divider mx-auto mb-6"></div>
+      <h2 class="font-display font-bold text-3xl sm:text-4xl text-text mb-4">项目定位</h2>
+      <p class="text-text-muted text-lg max-w-2xl mx-auto">一个面向开发者的全能型个人工作台，融合任务管理、经验沉淀与 AI 自动化</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <!-- Card 1 -->
+      <div class="card-glow bg-surface rounded-2xl p-8 border border-border fade-up">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center mb-5" style="background: hsla(210, 90%, 58%, 0.12);">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="hsl(210, 90%, 58%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <h3 class="font-display font-semibold text-lg text-text mb-3">All-in-One 工作台</h3>
+        <p class="text-text-muted text-sm leading-relaxed">融合任务管理、经验库、AI 执行、调度器、代理五大核心模块，一个界面搞定所有日常工作流。</p>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="card-glow bg-surface rounded-2xl p-8 border border-border fade-up">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center mb-5" style="background: hsla(180, 70%, 48%, 0.12);">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="hsl(180, 70%, 48%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        </div>
+        <h3 class="font-display font-semibold text-lg text-text mb-3">单二进制部署</h3>
+        <p class="text-text-muted text-sm leading-relaxed">Go 语言编译为单一可执行文件，零外部依赖，跨平台运行。下载即用，无需配置数据库或运行时环境。</p>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="card-glow bg-surface rounded-2xl p-8 border border-border fade-up">
+        <div class="w-12 h-12 rounded-xl flex items-center justify-center mb-5" style="background: hsla(280, 60%, 55%, 0.12);">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="hsl(280, 60%, 55%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
+        <h3 class="font-display font-semibold text-lg text-text mb-3">AI 原生</h3>
+        <p class="text-text-muted text-sm leading-relaxed">AI 任务执行 + 自动评估打分 + 经验库自动注入，构建从任务创建到结果评估的完整自治闭环。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Tech Stack Section -->
+<section id="tech" class="py-24 px-4 sm:px-6 lg:px-8 bg-bg-alt">
+  <div class="max-w-6xl mx-auto">
+    <div class="text-center mb-16 fade-up">
+      <div class="section-divider mx-auto mb-6"></div>
+      <h2 class="font-display font-bold text-3xl sm:text-4xl text-text mb-4">技术栈</h2>
+      <p class="text-text-muted text-lg max-w-2xl mx-auto">精选技术组合，兼顾性能与开发体验</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <!-- Backend -->
+      <div class="bg-surface rounded-2xl p-8 border border-border fade-up">
+        <div class="flex items-center gap-3 mb-6">
+          <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: hsla(210, 90%, 58%, 0.12);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(210, 90%, 58%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12h.01"/><path d="M17 12h.01"/><path d="M7 12h.01"/></svg>
+          </div>
+          <h3 class="font-display font-semibold text-xl text-text">后端技术</h3>
+        </div>
+        <div class="flex flex-wrap gap-2.5">
+          <span class="tag">Go 1.22+</span>
+          <span class="tag">SQLite</span>
+          <span class="tag">gorilla/websocket</span>
+          <span class="tag">robfig/cron/v3</span>
+          <span class="tag">creack/pty</span>
+          <span class="tag">modernc.org/sqlite</span>
+          <span class="tag">net/http</span>
+          <span class="tag">encoding/json</span>
+        </div>
+      </div>
+
+      <!-- Frontend -->
+      <div class="bg-surface rounded-2xl p-8 border border-border fade-up">
+        <div class="flex items-center gap-3 mb-6">
+          <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: hsla(180, 70%, 48%, 0.12);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(180, 70%, 48%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          </div>
+          <h3 class="font-display font-semibold text-xl text-text">前端技术</h3>
+        </div>
+        <div class="flex flex-wrap gap-2.5">
+          <span class="tag">Vanilla JS</span>
+          <span class="tag">CSS3</span>
+          <span class="tag">xterm.js</span>
+          <span class="tag">go:embed</span>
+          <span class="tag">零构建</span>
+          <span class="tag">WebSocket</span>
+          <span class="tag">Chart.js</span>
+          <span class="tag">响应式布局</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Core Features Section -->
+<section id="features" class="py-24 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-6xl mx-auto">
+    <div class="text-center mb-16 fade-up">
+      <div class="section-divider mx-auto mb-6"></div>
+      <h2 class="font-display font-bold text-3xl sm:text-4xl text-text mb-4">核心功能</h2>
+      <p class="text-text-muted text-lg max-w-2xl mx-auto">7 大功能模块，覆盖开发工作全流程</p>
+    </div>
+
+    <div class="space-y-10">
+      <!-- Feature 1: Dashboard -->
+      <div class="feature-card bg-surface rounded-2xl border border-border overflow-hidden fade-up">
+        <div class="grid grid-cols-1 lg:grid-cols-5">
+          <div class="lg:col-span-2 p-8 flex flex-col justify-center">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: hsla(210, 90%, 58%, 0.12);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(210, 90%, 58%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+              </div>
+              <h3 class="font-display font-semibold text-xl text-text">总览仪表盘</h3>
+            </div>
+            <ul class="space-y-2.5 text-text-muted text-sm leading-relaxed">
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> 任务状态统计：6 种状态实时汇总</li>
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> 调度器状态监控与启停控制</li>
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> 最近执行记录 + 最新任务列表</li>
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> 任务趋势图（Chart.js 渲染）</li>
+            </ul>
+          </div>
+          <div class="lg:col-span-3 p-6 lg:p-8 flex items-center">
+            <div class="mockup-window w-full">
+              <div class="mockup-titlebar">
+                <div class="mockup-dot mockup-dot-red"></div>
+                <div class="mockup-dot mockup-dot-yellow"></div>
+                <div class="mockup-dot mockup-dot-green"></div>
+                <span class="text-xs text-text-dim ml-2">总览仪表盘</span>
+              </div>
+              <div class="mockup-body">
+                <div class="grid grid-cols-3 gap-2 mb-3">
+                  <div class="stat-card-mock"><div class="stat-value text-warning">12</div><div class="stat-label">待认领</div></div>
+                  <div class="stat-card-mock"><div class="stat-value text-info">5</div><div class="stat-label">待执行</div></div>
+                  <div class="stat-card-mock"><div class="stat-value text-primary">3</div><div class="stat-label">执行中</div></div>
+                  <div class="stat-card-mock"><div class="stat-value text-accent">8</div><div class="stat-label">待交互</div></div>
+                  <div class="stat-card-mock"><div class="stat-value text-success">47</div><div class="stat-label">已完成</div></div>
+                  <div class="stat-card-mock"><div class="stat-value text-danger">2</div><div class="stat-label">异常</div></div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                  <div class="bg-bg rounded-lg p-3 border border-border">
+                    <div class="text-xs text-text-dim mb-2">最近执行</div>
+                    <div class="space-y-1.5">
+                      <div class="flex justify-between text-xs"><span class="text-text-muted">TASK-042 重构API</span><span class="text-success">✓</span></div>
+                      <div class="flex justify-between text-xs"><span class="text-text-muted">TASK-041 修复Bug</span><span class="text-success">✓</span></div>
+                      <div class="flex justify-between text-xs"><span class="text-text-muted">TASK-040 添加测试</span><span class="text-warning">●</span></div>
+                    </div>
+                  </div>
+                  <div class="bg-bg rounded-lg p-3 border border-border">
+                    <div class="text-xs text-text-dim mb-2">最新任务</div>
+                    <div class="space-y-1.5">
+                      <div class="flex justify-between text-xs"><span class="text-text-muted">实现WebSocket</span><span class="badge-mock badge-blue">new</span></div>
+                      <div class="flex justify-between text-xs"><span class="text-text-muted">优化查询性能</span><span class="badge-mock badge-yellow">wip</span></div>
+                      <div class="flex justify-between text-xs"><span class="text-text-muted">编写文档</span><span class="badge-mock badge-green">done</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 2: Task Management -->
+      <div class="feature-card bg-surface rounded-2xl border border-border overflow-hidden fade-up">
+        <div class="grid grid-cols-1 lg:grid-cols-5">
+          <div class="lg:col-span-2 p-8 flex flex-col justify-center">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: hsla(40, 90%, 55%, 0.12);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(40, 90%, 55%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              </div>
+              <h3 class="font-display font-semibold text-xl text-text">任务管理</h3>
+            </div>
+            <ul class="space-y-2.5 text-text-muted text-sm leading-relaxed">
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> AI 驱动执行：支持 claude / cbc / shell 三种 CLI</li>
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> AI 自动评估打分，量化执行质量</li>
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> 经验库自动关联，执行时智能注入</li>
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> 完整状态流转：待认领 → 执行中 → 待交互 → 已完成</li>
+            </ul>
+          </div>
+          <div class="lg:col-span-3 p-6 lg:p-8 flex items-center">
+            <div class="mockup-window w-full">
+              <div class="mockup-titlebar">
+                <div class="mockup-dot mockup-dot-red"></div>
+                <div class="mockup-dot mockup-dot-yellow"></div>
+                <div class="mockup-dot mockup-dot-green"></div>
+                <span class="text-xs text-text-dim ml-2">任务管理</span>
+              </div>
+              <div class="mockup-body p-0">
+                <table class="table-mock">
+                  <thead><tr><th>标题</th><th>状态</th><th>CLI</th><th>操作</th></tr></thead>
+                  <tbody>
+                    <tr><td>重构用户认证模块</td><td><span class="badge-mock badge-blue">执行中</span></td><td>claude</td><td><span class="text-xs text-primary">▶ 查看</span></td></tr>
+                    <tr><td>修复数据库连接泄漏</td><td><span class="badge-mock badge-yellow">待交互</span></td><td>cbc</td><td><span class="text-xs text-primary">▶ 查看</span></td></tr>
+                    <tr><td>添加单元测试覆盖</td><td><span class="badge-mock badge-green">已完成</span></td><td>shell</td><td><span class="text-xs text-primary">▶ 查看</span></td></tr>
+                    <tr><td>优化前端打包流程</td><td><span class="badge-mock badge-red">异常</span></td><td>claude</td><td><span class="text-xs text-primary">▶ 查看</span></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 3: Experience Library -->
+      <div class="feature-card bg-surface rounded-2xl border border-border overflow-hidden fade-up">
+        <div class="grid grid-cols-1 lg:grid-cols-5">
+          <div class="lg:col-span-2 p-8 flex flex-col justify-center">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: hsla(150, 60%, 50%, 0.12);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(150, 60%, 50%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+              </div>
+              <h3 class="font-display font-semibold text-xl text-text">经验库</h3>
+            </div>
+            <ul class="space-y-2.5 text-text-muted text-sm leading-relaxed">
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> 最佳实践沉淀，按模块分类管理</li>
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> 关键词搜索，快速定位相关经验</li>
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> 任务执行时自动注入匹配经验</li>
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> 支持 Markdown 格式编写</li>
+            </ul>
+          </div>
+          <div class="lg:col-span-3 p-6 lg:p-8 flex items-center">
+            <div class="mockup-window w-full">
+              <div class="mockup-titlebar">
+                <div class="mockup-dot mockup-dot-red"></div>
+                <div class="mockup-dot mockup-dot-yellow"></div>
+                <div class="mockup-dot mockup-dot-green"></div>
+                <span class="text-xs text-text-dim ml-2">经验库</span>
+              </div>
+              <div class="mockup-body">
+                <div class="flex gap-2 mb-3">
+                  <span class="badge-mock badge-blue">Go</span>
+                  <span class="badge-mock badge-cyan">SQLite</span>
+                  <span class="badge-mock badge-green">前端</span>
+                  <span class="badge-mock badge-yellow">DevOps</span>
+                </div>
+                <div class="space-y-2">
+                  <div class="bg-bg rounded-lg p-3 border border-border flex justify-between items-center">
+                    <div><div class="text-xs text-text font-medium">Go 错误处理最佳实践</div><div class="text-xs text-text-dim mt-0.5">使用 fmt.Errorf 包装错误上下文</div></div>
+                    <span class="badge-mock badge-blue">Go</span>
+                  </div>
+                  <div class="bg-bg rounded-lg p-3 border border-border flex justify-between items-center">
+                    <div><div class="text-xs text-text font-medium">SQLite WAL 模式配置</div><div class="text-xs text-text-dim mt-0.5">PRAGMA journal_mode=WAL 提升并发</div></div>
+                    <span class="badge-mock badge-cyan">SQLite</span>
+                  </div>
+                  <div class="bg-bg rounded-lg p-3 border border-border flex justify-between items-center">
+                    <div><div class="text-xs text-text font-medium">WebSocket 心跳机制</div><div class="text-xs text-text-dim mt-0.5">30s ping/pong 保持连接</div></div>
+                    <span class="badge-mock badge-green">前端</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 4: Scheduler -->
+      <div class="feature-card bg-surface rounded-2xl border border-border overflow-hidden fade-up">
+        <div class="grid grid-cols-1 lg:grid-cols-5">
+          <div class="lg:col-span-2 p-8 flex flex-col justify-center">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: hsla(280, 60%, 55%, 0.12);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(280, 60%, 55%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <h3 class="font-display font-semibold text-xl text-text">自动化调度</h3>
+            </div>
+            <ul class="space-y-2.5 text-text-muted text-sm leading-relaxed">
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> Cron 表达式定时任务编排</li>
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> 支持 @every 预设快捷配置</li>
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> 实时显示下次执行倒计时</li>
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> 一键启停，执行历史可追溯</li>
+            </ul>
+          </div>
+          <div class="lg:col-span-3 p-6 lg:p-8 flex items-center">
+            <div class="mockup-window w-full">
+              <div class="mockup-titlebar">
+                <div class="mockup-dot mockup-dot-red"></div>
+                <div class="mockup-dot mockup-dot-yellow"></div>
+                <div class="mockup-dot mockup-dot-green"></div>
+                <span class="text-xs text-text-dim ml-2">自动化调度</span>
+              </div>
+              <div class="mockup-body p-0">
+                <table class="table-mock">
+                  <thead><tr><th>名称</th><th>Cron</th><th>类型</th><th>状态</th><th>下次执行</th></tr></thead>
+                  <tbody>
+                    <tr><td>每日数据备份</td><td><code class="text-xs text-accent">0 2 * * *</code></td><td>shell</td><td><span class="badge-mock badge-green">运行中</span></td><td class="text-xs text-text-dim">02:00:00</td></tr>
+                    <tr><td>代码质量检查</td><td><code class="text-xs text-accent">@every 6h</code></td><td>claude</td><td><span class="badge-mock badge-green">运行中</span></td><td class="text-xs text-text-dim">14:30:00</td></tr>
+                    <tr><td>周报生成</td><td><code class="text-xs text-accent">0 9 * * 1</code></td><td>cbc</td><td><span class="badge-mock badge-yellow">暂停</span></td><td class="text-xs text-text-dim">—</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 5: AI Chat / Terminal -->
+      <div class="feature-card bg-surface rounded-2xl border border-border overflow-hidden fade-up">
+        <div class="grid grid-cols-1 lg:grid-cols-5">
+          <div class="lg:col-span-2 p-8 flex flex-col justify-center">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: hsla(180, 70%, 48%, 0.12);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(180, 70%, 48%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+              </div>
+              <h3 class="font-display font-semibold text-xl text-text">AI 对话终端</h3>
+            </div>
+            <ul class="space-y-2.5 text-text-muted text-sm leading-relaxed">
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> 多 Tab PTY 真终端，非模拟</li>
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> claude / cbc / shell 一键切换</li>
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> 确认信号检测，防止误操作</li>
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> xterm.js 渲染，体验接近原生</li>
+            </ul>
+          </div>
+          <div class="lg:col-span-3 p-6 lg:p-8 flex items-center">
+            <div class="mockup-window w-full">
+              <div class="mockup-titlebar">
+                <div class="mockup-dot mockup-dot-red"></div>
+                <div class="mockup-dot mockup-dot-yellow"></div>
+                <div class="mockup-dot mockup-dot-green"></div>
+                <span class="text-xs text-text-dim ml-2">AI 对话 — claude (sonnet)</span>
+              </div>
+              <div class="mockup-body p-0">
+                <div class="terminal-mock">
+                  <div><span class="out">[INFO]</span> <span class="cmd">PTY session established</span></div>
+                  <div><span class="out">[INFO]</span> <span class="cmd">CLI: claude | Model: sonnet</span></div>
+                  <div><span class="out">[INFO]</span> <span class="cmd">WebSocket connected ✓</span></div>
+                  <div style="margin-top:6px;"><span class="prompt">❯</span> <span class="cmd">分析 xworkbench 的架构设计</span></div>
+                  <div class="out" style="margin-top:4px;">xworkbench 采用分层架构，自上而下分为...</div>
+                  <div style="margin-top:6px;"><span class="prompt">❯</span> <span class="cmd">建议如何优化数据库查询性能</span><span class="cursor"></span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 6: Agent -->
+      <div class="feature-card bg-surface rounded-2xl border border-border overflow-hidden fade-up">
+        <div class="grid grid-cols-1 lg:grid-cols-5">
+          <div class="lg:col-span-2 p-8 flex flex-col justify-center">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: hsla(0, 75%, 55%, 0.12);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(0, 75%, 55%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              </div>
+              <h3 class="font-display font-semibold text-xl text-text">代理功能</h3>
+            </div>
+            <ul class="space-y-2.5 text-text-muted text-sm leading-relaxed">
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> 远程命令执行，支持多 Agent 节点</li>
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> HTTP 代理转发，内网穿透</li>
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> Agent 心跳检测与自动重连</li>
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> 执行结果实时回传</li>
+            </ul>
+          </div>
+          <div class="lg:col-span-3 p-6 lg:p-8 flex items-center">
+            <div class="mockup-window w-full">
+              <div class="mockup-titlebar">
+                <div class="mockup-dot mockup-dot-red"></div>
+                <div class="mockup-dot mockup-dot-yellow"></div>
+                <div class="mockup-dot mockup-dot-green"></div>
+                <span class="text-xs text-text-dim ml-2">代理管理</span>
+              </div>
+              <div class="mockup-body">
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="bg-bg rounded-lg p-3 border border-border">
+                    <div class="text-xs text-text-dim mb-2">命令执行</div>
+                    <div class="terminal-mock text-xs" style="padding:8px;">
+                      <div><span class="prompt">$</span> <span class="cmd">uptime</span></div>
+                      <div class="out">14:32  up 7 days</div>
+                      <div><span class="prompt">$</span> <span class="cmd">df -h</span></div>
+                      <div class="out">/dev/sda1  50G  32G</div>
+                    </div>
+                  </div>
+                  <div class="bg-bg rounded-lg p-3 border border-border">
+                    <div class="text-xs text-text-dim mb-2">HTTP 代理</div>
+                    <div class="space-y-2">
+                      <div class="flex justify-between text-xs"><span class="text-text-muted">agent-01</span><span class="text-success">● online</span></div>
+                      <div class="flex justify-between text-xs"><span class="text-text-muted">agent-02</span><span class="text-success">● online</span></div>
+                      <div class="flex justify-between text-xs"><span class="text-text-muted">agent-03</span><span class="text-text-dim">○ offline</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 7: System Config -->
+      <div class="feature-card bg-surface rounded-2xl border border-border overflow-hidden fade-up">
+        <div class="grid grid-cols-1 lg:grid-cols-5">
+          <div class="lg:col-span-2 p-8 flex flex-col justify-center">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: hsla(220, 10%, 55%, 0.12);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(220, 10%, 55%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              </div>
+              <h3 class="font-display font-semibold text-xl text-text">系统配置</h3>
+            </div>
+            <ul class="space-y-2.5 text-text-muted text-sm leading-relaxed">
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> 统一 config.json 管理所有配置</li>
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> 配置导入 / 导出，快速迁移</li>
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> 快捷目录与链接管理</li>
+              <li class="flex items-start gap-2"><span class="text-primary mt-0.5">▸</span> 子 Tab 分组，配置项清晰归类</li>
+            </ul>
+          </div>
+          <div class="lg:col-span-3 p-6 lg:p-8 flex items-center">
+            <div class="mockup-window w-full">
+              <div class="mockup-titlebar">
+                <div class="mockup-dot mockup-dot-red"></div>
+                <div class="mockup-dot mockup-dot-yellow"></div>
+                <div class="mockup-dot mockup-dot-green"></div>
+                <span class="text-xs text-text-dim ml-2">系统配置</span>
+              </div>
+              <div class="mockup-body">
+                <div class="flex gap-2 mb-3">
+                  <span class="badge-mock badge-blue">通用</span>
+                  <span class="badge-mock badge-cyan">AI</span>
+                  <span class="badge-mock badge-green">调度</span>
+                  <span class="badge-mock badge-yellow">代理</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                  <div class="bg-bg rounded-lg p-3 border border-border">
+                    <div class="text-xs text-text-dim mb-2">导出配置</div>
+                    <div class="text-xs text-text-muted">config.json</div>
+                    <div class="w-full bg-border rounded-full h-1 mt-2"><div class="bg-primary h-1 rounded-full" style="width:75%"></div></div>
+                  </div>
+                  <div class="bg-bg rounded-lg p-3 border border-border">
+                    <div class="text-xs text-text-dim mb-2">导入配置</div>
+                    <div class="border border-dashed border-border rounded-lg p-3 text-center text-xs text-text-dim">拖拽文件到此处</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Architecture Section -->
+<section id="architecture" class="py-24 px-4 sm:px-6 lg:px-8 bg-bg-alt">
+  <div class="max-w-4xl mx-auto">
+    <div class="text-center mb-16 fade-up">
+      <div class="section-divider mx-auto mb-6"></div>
+      <h2 class="font-display font-bold text-3xl sm:text-4xl text-text mb-4">架构设计</h2>
+      <p class="text-text-muted text-lg max-w-2xl mx-auto">分层架构，职责清晰，易于扩展</p>
+    </div>
+
+    <div class="space-y-3 fade-up">
+      <!-- Layer 1: Web UI -->
+      <div class="arch-layer" style="border-color: hsla(210, 90%, 58%, 0.3);">
+        <div class="text-sm font-semibold text-primary mb-1">Web UI</div>
+        <div class="text-xs text-text-muted">7 Tab（总览 / 任务 / 经验 / 调度 / 对话 / 代理 / 配置）+ 5 Widget</div>
+      </div>
+      <div class="arch-arrow">↕ WebSocket + HTTP</div>
+
+      <!-- Layer 2: API -->
+      <div class="arch-layer" style="border-color: hsla(180, 70%, 48%, 0.3);">
+        <div class="text-sm font-semibold text-accent mb-1">HTTP API + WebSocket</div>
+        <div class="text-xs text-text-muted">91 路由端点 · RESTful 设计 · 流式推送</div>
+      </div>
+      <div class="arch-arrow">↕</div>
+
+      <!-- Layer 3: Business -->
+      <div class="arch-layer" style="border-color: hsla(280, 60%, 55%, 0.3);">
+        <div class="text-sm font-semibold mb-1" style="color: hsl(280, 60%, 65%);">业务模块</div>
+        <div class="flex flex-wrap justify-center gap-3 text-xs text-text-muted">
+          <span class="bg-surface-alt px-3 py-1 rounded-md border border-border">executor</span>
+          <span class="bg-surface-alt px-3 py-1 rounded-md border border-border">evaluator</span>
+          <span class="bg-surface-alt px-3 py-1 rounded-md border border-border">scheduler</span>
+          <span class="bg-surface-alt px-3 py-1 rounded-md border border-border">relay</span>
+        </div>
+      </div>
+      <div class="arch-arrow">↕</div>
+
+      <!-- Layer 4: Storage -->
+      <div class="arch-layer" style="border-color: hsla(150, 60%, 50%, 0.3);">
+        <div class="text-sm font-semibold text-success mb-1">SQLite</div>
+        <div class="text-xs text-text-muted">14 张表 · WAL 模式 · 零配置</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Data Model Section -->
+<section class="py-24 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-6xl mx-auto">
+    <div class="text-center mb-16 fade-up">
+      <div class="section-divider mx-auto mb-6"></div>
+      <h2 class="font-display font-bold text-3xl sm:text-4xl text-text mb-4">数据模型</h2>
+      <p class="text-text-muted text-lg">14 张 SQLite 表，覆盖业务全流程</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <!-- Business Tables -->
+      <div class="card-glow bg-surface rounded-2xl p-8 border border-border fade-up">
+        <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-5" style="background: hsla(210, 90%, 58%, 0.12);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(210, 90%, 58%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        </div>
+        <h3 class="font-display font-semibold text-lg text-text mb-2">业务表</h3>
+        <p class="text-xs text-text-dim mb-4">8 张核心业务表</p>
+        <div class="flex flex-wrap gap-2">
+          <code class="text-xs bg-surface-alt px-2 py-1 rounded text-primary">tasks</code>
+          <code class="text-xs bg-surface-alt px-2 py-1 rounded text-primary">experiences</code>
+          <code class="text-xs bg-surface-alt px-2 py-1 rounded text-primary">executions</code>
+          <code class="text-xs bg-surface-alt px-2 py-1 rounded text-primary">evaluations</code>
+          <code class="text-xs bg-surface-alt px-2 py-1 rounded text-primary">scheduled_tasks</code>
+          <code class="text-xs bg-surface-alt px-2 py-1 rounded text-primary">web_links</code>
+          <code class="text-xs bg-surface-alt px-2 py-1 rounded text-primary">dir_shortcuts</code>
+          <code class="text-xs bg-surface-alt px-2 py-1 rounded text-primary">agents</code>
+        </div>
+      </div>
+
+      <!-- Relation Tables -->
+      <div class="card-glow bg-surface rounded-2xl p-8 border border-border fade-up">
+        <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-5" style="background: hsla(180, 70%, 48%, 0.12);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(180, 70%, 48%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        </div>
+        <h3 class="font-display font-semibold text-lg text-text mb-2">关联 / 审计表</h3>
+        <p class="text-xs text-text-dim mb-4">4 张关联与审计表</p>
+        <div class="flex flex-wrap gap-2">
+          <code class="text-xs bg-surface-alt px-2 py-1 rounded text-accent">task_experiences</code>
+          <code class="text-xs bg-surface-alt px-2 py-1 rounded text-accent">task_events</code>
+          <code class="text-xs bg-surface-alt px-2 py-1 rounded text-accent">task_comments</code>
+          <code class="text-xs bg-surface-alt px-2 py-1 rounded text-accent">execution_comments</code>
+        </div>
+      </div>
+
+      <!-- Meta Tables -->
+      <div class="card-glow bg-surface rounded-2xl p-8 border border-border fade-up">
+        <div class="w-10 h-10 rounded-lg flex items-center justify-center mb-5" style="background: hsla(280, 60%, 55%, 0.12);">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(280, 60%, 55%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
+        <h3 class="font-display font-semibold text-lg text-text mb-2">元数据表</h3>
+        <p class="text-xs text-text-dim mb-4">2 张元数据表</p>
+        <div class="flex flex-wrap gap-2">
+          <code class="text-xs bg-surface-alt px-2 py-1 rounded" style="color: hsl(280, 60%, 65%);">app_meta</code>
+          <code class="text-xs bg-surface-alt px-2 py-1 rounded" style="color: hsl(280, 60%, 65%);">skill_versions</code>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Code Example Section -->
+<section class="py-24 px-4 sm:px-6 lg:px-8 bg-bg-alt">
+  <div class="max-w-6xl mx-auto">
+    <div class="text-center mb-16 fade-up">
+      <div class="section-divider mx-auto mb-6"></div>
+      <h2 class="font-display font-bold text-3xl sm:text-4xl text-text mb-4">核心代码示例</h2>
+      <p class="text-text-muted text-lg">任务执行引擎的核心逻辑</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start fade-up">
+      <div class="lg:col-span-3">
+        <div class="code-block">
+          <div class="mockup-titlebar">
+            <div class="mockup-dot mockup-dot-red"></div>
+            <div class="mockup-dot mockup-dot-yellow"></div>
+            <div class="mockup-dot mockup-dot-green"></div>
+            <span class="text-xs text-text-dim ml-2">executor.go</span>
+          </div>
+          <div class="p-4 overflow-x-auto">
+            <div class="line"><span class="ln">1</span><span class="code"><span class="cm">// 构造执行命令</span></span></div>
+            <div class="line"><span class="ln">2</span><span class="code"><span class="kw">cmd</span>, <span class="kw">err</span> := <span class="pkg">runner</span>.<span class="fn">BuildCommand</span>(</span></div>
+            <div class="line"><span class="ln">3</span><span class="code">    <span class="str">"claude"</span>,    <span class="cm">// CLI 类型</span></span></div>
+            <div class="line"><span class="ln">4</span><span class="code">    <span class="str">"sonnet"</span>,    <span class="cm">// 模型</span></span></div>
+            <div class="line"><span class="ln">5</span><span class="code">    <span class="str">""</span>,          <span class="cm">// sessionID</span></span></div>
+            <div class="line"><span class="ln">6</span><span class="code">    <span class="kw">prompt</span>,      <span class="cm">// 任务 prompt</span></span></div>
+            <div class="line"><span class="ln">7</span><span class="code">    <span class="pkg">runner</span>.<span class="fn">WithActionReport</span>(),</span></div>
+            <div class="line"><span class="ln">8</span><span class="code">)</span></div>
+            <div class="line"><span class="ln">9</span><span class="code"></span></div>
+            <div class="line"><span class="ln">10</span><span class="code"><span class="cm">// 执行并流式输出</span></span></div>
+            <div class="line"><span class="ln">11</span><span class="code"><span class="kw">result</span>, <span class="kw">err</span> := <span class="pkg">executor</span>.<span class="fn">Run</span>(<span class="kw">ctx</span>, <span class="kw">execDir</span>, <span class="kw">cmd</span>,</span></div>
+            <div class="line"><span class="ln">12</span><span class="code">    <span class="kw">func</span>(<span class="kw">chunk</span> []<span class="type">byte</span>) {</span></div>
+            <div class="line"><span class="ln">13</span><span class="code">        <span class="cm">// 流式回调：WS 推送到前端</span></span></div>
+            <div class="line"><span class="ln">14</span><span class="code">    })</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="lg:col-span-2 space-y-5">
+        <div class="bg-surface rounded-xl p-5 border border-border">
+          <div class="flex items-center gap-2.5 mb-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(210, 90%, 58%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            <span class="text-sm font-semibold text-text">三种 CLI 支持</span>
+          </div>
+          <p class="text-xs text-text-muted leading-relaxed">claude（Anthropic）、cbc（CodeBuddy）、shell（原生命令），统一 BuildCommand 接口，无缝切换。</p>
+        </div>
+
+        <div class="bg-surface rounded-xl p-5 border border-border">
+          <div class="flex items-center gap-2.5 mb-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(180, 70%, 48%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.66 0 3-4.03 3-9s-1.34-9-3-9m0 18c-1.66 0-3-4.03-3-9s1.34-9 3-9m-9 9a9 9 0 0 1 9-9"/></svg>
+            <span class="text-sm font-semibold text-text">流式输出</span>
+          </div>
+          <p class="text-xs text-text-muted leading-relaxed">执行过程实时通过 WebSocket 推送到前端，xterm.js 渲染，用户可实时观察 AI 工作过程。</p>
+        </div>
+
+        <div class="bg-surface rounded-xl p-5 border border-border">
+          <div class="flex items-center gap-2.5 mb-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(280, 60%, 55%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span class="text-sm font-semibold text-text">状态管理 + 错误保留</span>
+          </div>
+          <p class="text-xs text-text-muted leading-relaxed">完整的任务状态机 + 执行事件审计链。异常时保留完整上下文（stdout/stderr/exit code），便于排查。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Quick Start Section -->
+<section id="quickstart" class="py-24 px-4 sm:px-6 lg:px-8">
+  <div class="max-w-6xl mx-auto">
+    <div class="text-center mb-16 fade-up">
+      <div class="section-divider mx-auto mb-6"></div>
+      <h2 class="font-display font-bold text-3xl sm:text-4xl text-text mb-4">30 秒快速上手</h2>
+      <p class="text-text-muted text-lg">三步启动，即刻体验</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start fade-up">
+      <div class="lg:col-span-3">
+        <div class="qs-code">
+          <div><span class="cm"># 1. 克隆项目</span></div>
+          <div><span class="kw">git clone</span> <span class="str">&lt;repo&gt;</span></div>
+          <div><span class="kw">cd</span> xworkbench</div>
+          <div style="margin-top:8px;"><span class="cm"># 2. 编译</span></div>
+          <div>./scripts/build.sh</div>
+          <div style="margin-top:8px;"><span class="cm"># 3. 启动</span></div>
+          <div>./scripts/run.sh</div>
+        </div>
+      </div>
+
+      <div class="lg:col-span-2 space-y-5">
+        <div class="bg-surface rounded-xl p-6 border border-border">
+          <div class="flex items-center gap-2.5 mb-3">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="hsl(150, 60%, 50%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <span class="text-sm font-semibold text-text">启动完成</span>
+          </div>
+          <p class="text-xs text-text-muted leading-relaxed mb-3">默认监听端口 <code class="text-accent bg-surface-alt px-1.5 py-0.5 rounded text-xs">8902</code></p>
+          <div class="bg-bg rounded-lg p-3 border border-border">
+            <div class="text-xs text-text-dim">浏览器打开</div>
+            <div class="text-sm text-primary font-mono mt-1">http://localhost:8902</div>
+          </div>
+        </div>
+
+        <div class="bg-surface rounded-xl p-6 border border-border">
+          <div class="flex items-center gap-2.5 mb-3">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="hsl(210, 90%, 58%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <span class="text-sm font-semibold text-text">系统要求</span>
+          </div>
+          <ul class="space-y-1.5 text-xs text-text-muted">
+            <li class="flex items-center gap-2"><span class="text-primary">▸</span> Go 1.22+</li>
+            <li class="flex items-center gap-2"><span class="text-primary">▸</span> 任意操作系统（Linux / macOS / Windows）</li>
+            <li class="flex items-center gap-2"><span class="text-primary">▸</span> 无需数据库、无需 Docker</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Development Guide Section -->
+<section class="py-24 px-4 sm:px-6 lg:px-8 bg-bg-alt">
+  <div class="max-w-6xl mx-auto">
+    <div class="text-center mb-16 fade-up">
+      <div class="section-divider mx-auto mb-6"></div>
+      <h2 class="font-display font-bold text-3xl sm:text-4xl text-text mb-4">开发指南</h2>
+      <p class="text-text-muted text-lg">快速上手二次开发</p>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 fade-up">
+      <!-- Quad 1 -->
+      <div class="card-glow bg-surface rounded-2xl p-7 border border-border">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: hsla(210, 90%, 58%, 0.12);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(210, 90%, 58%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          </div>
+          <h3 class="font-display font-semibold text-text">加新 API 端点</h3>
+        </div>
+        <ol class="space-y-1.5 text-xs text-text-muted leading-relaxed list-decimal list-inside">
+          <li>在 <code class="text-primary bg-surface-alt px-1 rounded">internal/api/</code> 定义 Handler</li>
+          <li>在 <code class="text-primary bg-surface-alt px-1 rounded">internal/api/router.go</code> 注册路由</li>
+          <li>前端在对应 Tab 页面调用新接口</li>
+        </ol>
+      </div>
+
+      <!-- Quad 2 -->
+      <div class="card-glow bg-surface rounded-2xl p-7 border border-border">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: hsla(180, 70%, 48%, 0.12);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(180, 70%, 48%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+          </div>
+          <h3 class="font-display font-semibold text-text">加新 Tab 页面</h3>
+        </div>
+        <ol class="space-y-1.5 text-xs text-text-muted leading-relaxed list-decimal list-inside">
+          <li>在 <code class="text-accent bg-surface-alt px-1 rounded">web/static/js/pages/</code> 创建页面模块</li>
+          <li>在 <code class="text-accent bg-surface-alt px-1 rounded">web/static/js/app.js</code> 注册 Tab</li>
+          <li>在导航栏添加对应入口</li>
+        </ol>
+      </div>
+
+      <!-- Quad 3 -->
+      <div class="card-glow bg-surface rounded-2xl p-7 border border-border">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: hsla(150, 60%, 50%, 0.12);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(150, 60%, 50%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          </div>
+          <h3 class="font-display font-semibold text-text">改 DB Schema</h3>
+        </div>
+        <ol class="space-y-1.5 text-xs text-text-muted leading-relaxed list-decimal list-inside">
+          <li>修改 <code class="text-success bg-surface-alt px-1 rounded">internal/db/schema.sql</code></li>
+          <li>更新对应的 Go Model 结构体</li>
+          <li>删除旧 DB 文件，重启自动迁移</li>
+        </ol>
+      </div>
+
+      <!-- Quad 4 -->
+      <div class="card-glow bg-surface rounded-2xl p-7 border border-border">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: hsla(40, 90%, 55%, 0.12);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(40, 90%, 55%)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </div>
+          <h3 class="font-display font-semibold text-text">改配置项</h3>
+        </div>
+        <ol class="space-y-1.5 text-xs text-text-muted leading-relaxed list-decimal list-inside">
+          <li>在 <code class="text-warning bg-surface-alt px-1 rounded">config.json</code> 添加新字段</li>
+          <li>更新 <code class="text-warning bg-surface-alt px-1 rounded">internal/config/</code> 结构体</li>
+          <li>前端配置页自动渲染新字段</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="py-16 px-4 sm:px-6 lg:px-8 border-t border-border">
+  <div class="max-w-6xl mx-auto">
+    <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: linear-gradient(135deg, hsl(210, 90%, 55%), hsl(180, 70%, 48%));">
+          <span class="text-white font-bold text-sm font-display">X</span>
+        </div>
+        <div>
+          <div class="font-display font-semibold text-text text-sm">xworkbench v2</div>
+          <div class="text-xs text-text-dim">All-in-One 个人工作台</div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-6 text-sm text-text-muted">
+        <a href="#" class="hover:text-text transition-colors no-underline">文档</a>
+        <a href="#" class="hover:text-text transition-colors no-underline">源码</a>
+        <a href="#" class="hover:text-text transition-colors no-underline">问题反馈</a>
+      </div>
+
+      <div class="text-xs text-text-dim">
+        &copy; 2026 xworkbench. Built with Go &amp; Vanilla JS.
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+// Mobile menu toggle
+(function() {
+  var btn = document.getElementById('mobile-menu-btn');
+  var menu = document.getElementById('mobile-menu');
+  var links = menu.querySelectorAll('a');
+
+  btn.addEventListener('click', function() {
+    menu.classList.toggle('open');
+  });
+
+  links.forEach(function(link) {
+    link.addEventListener('click', function() {
+      menu.classList.remove('open');
+    });
+  });
+})();
+
+// Scroll-triggered fade-up animation
+(function() {
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.fade-up').forEach(function(el) {
+    observer.observe(el);
+  });
+})();
+
+// Hero CTA buttons
+(function() {
+  var cta = document.getElementById('hero-cta');
+  var source = document.getElementById('hero-source');
+
+  cta.addEventListener('click', function() {
+    var target = document.getElementById('quickstart');
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth' });
+    }
+  });
+
+  source.addEventListener('click', function() {
+    window.open('https://github.com', '_blank');
+  });
+})();
+
+// Nav smooth scroll for all anchor links
+(function() {
+  document.querySelectorAll('a[href^="#"]').forEach(function(link) {
+    link.addEventListener('click', function(e) {
+      var targetId = link.getAttribute('href');
+      if (targetId === '#') return;
+      var target = document.querySelector(targetId);
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>
