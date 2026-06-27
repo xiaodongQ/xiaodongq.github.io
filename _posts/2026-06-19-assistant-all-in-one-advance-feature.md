@@ -1,9 +1,9 @@
 ---
 title: 个人AI工作台（二） -- All-In-One助手新增高级特性
-description: 续篇，介绍第一篇之后新增的高级特性；2026-06-24 校对实现状态，新增 9、10 两节
+description: 续篇，介绍第一篇之后新增的高级特性；2026-06-27 重组章节结构，9/10/11/12 四节
 categories: [AI, 个人AI工作台]
 tags: [Agent, 个人助手, xworkbench]
-last_modified_at: 2026-06-24
+last_modified_at: 2026-06-27
 ---
 
 ## 1. 引言
@@ -195,7 +195,7 @@ last_modified_at: 2026-06-24
 
 **实现：** `task_comments` 和 `execution_comments` 两张表（结构一致：id/content/author/mentions/parent_id），支持嵌套评论（parent_id）。API：`GET/POST /api/tasks/{id}/comments`，`GET/POST /api/executions/{id}/comments`。
 
-**当前状态：** 后端 API 仍保留供脚本调用；**前端 UI 区块已精简**（exec-detail-modal 和 task-modal 上的评论区块于 2026-06-21 被 `ae11c06` / `5c91b95` 移除）。详见 10.1。
+**当前状态：** 后端 API 仍保留供脚本调用；**前端 UI 区块已精简**（exec-detail-modal 和 task-modal 上的评论区块于 2026-06-21 被 `ae11c06` / `5c91b95` 移除）。详见 12.1。
 
 ### 4.2 任务审计日志
 
@@ -209,7 +209,7 @@ last_modified_at: 2026-06-24
 
 ~~**实现：** `task_dependencies` 表（task_id/depends_on/type），硬依赖阻塞认领，软依赖仅起提示作用。添加时做循环依赖检测（不允许 A→B→A）。~~
 
-> **状态：已移除**（2026-06-20，commit `7450caf`）。后端 `TaskDependencyRepo` + 路由 + handler + `task_dependencies` 表全部删除；`TaskRepo.ClaimTask` / `NextClaimable` 的 `NOT EXISTS task_dependencies` 阻挡 SQL 一并清理。详见 10.2。
+> **状态：已移除**（2026-06-20，commit `7450caf`）。后端 `TaskDependencyRepo` + 路由 + handler + `task_dependencies` 表全部删除；`TaskRepo.ClaimTask` / `NextClaimable` 的 `NOT EXISTS task_dependencies` 阻挡 SQL 一并清理。详见 12.2。
 
 ### 4.4 任务模板
 
@@ -217,7 +217,7 @@ last_modified_at: 2026-06-24
 
 ~~**实现：** `task_templates` 表，预设模板体为 JSON（含 title/description/acceptance 等字段），创建时实例化。~~
 
-> **状态：已移除**（2026-06-20，commit `7450caf`）。详见 10.2。
+> **状态：已移除**（2026-06-20，commit `7450caf`）。详见 12.2。
 
 ### 4.5 保存的过滤器
 
@@ -225,7 +225,7 @@ last_modified_at: 2026-06-24
 
 ~~**实现：** `saved_filters` 表存 filter_json，支持设为默认排序。~~
 
-> **状态：已移除**（2026-06-23，commit `a87e28b`）。`saved_filters` 表 DROP，路由、handler、前端入口一并删除。详见 10.2。
+> **状态：已移除**（2026-06-23，commit `a87e28b`）。`saved_filters` 表 DROP，路由、handler、前端入口一并删除。详见 12.2。
 
 ### 4.6 Webhook 派发
 
@@ -233,7 +233,7 @@ last_modified_at: 2026-06-24
 
 ~~**实现：** `webhooks` 表存 url/secret/events/enabled/fail_count。Dispatcher 监听事件，匹配后发送 HTTP POST，支持失败计数。~~
 
-> **状态：已移除**（2026-06-20，commit `7450caf`）。`internal/webhook` 整个包 + `WebhookRepo` + 6 个路由 + 全部 handler 清除；同时 `handleTaskUpdate` 等处的 `whDisp.Dispatch(...)` 调用全部清空。详见 10.2。
+> **状态：已移除**（2026-06-20，commit `7450caf`）。`internal/webhook` 整个包 + `WebhookRepo` + 6 个路由 + 全部 handler 清除；同时 `handleTaskUpdate` 等处的 `whDisp.Dispatch(...)` 调用全部清空。详见 12.2。
 
 ### 4.7 任务优先级
 
@@ -284,6 +284,10 @@ ss -tln | grep ":$port "
 ```
 
 重启脚本输出前后 PID 对比：`pid=12345 (前: 12344)`。
+
+**后续改进（6.26）：**
+- `73f0b06` run.sh 启动检测改用**端口监听**（替代原来的进程检测），避免 stale PID 问题；兼容 Git Bash on Windows（`netstat LISTENING` → `LISTEN`）
+- `0e44b75` 打包产物目录改为 `dist/xworkbench_YYYYMMDD/`（按日期分目录，不互相覆盖），内含 `data/` / `scripts/` 子目录；`run.sh` 移入 `scripts/`
 
 ### 6.2 统一日志输出
 
@@ -353,8 +357,8 @@ ss -tln | grep ":$port "
 上次列的 4 条后续思路，至 2026-06-24 复盘：
 
 - ~~任务执行超时考虑 Graceful Shutdown~~ → **已完成**：`executor.Run` 默认 30 分钟 ctx 超时；`scheduled_tasks.last_status` 增加 `timeout` / `build_error` 两个取值，区分超时与 PATH 缺失。
-- ~~经验库和任务模板的智能推荐~~ → 任务模板**已被移除**（10.2），智能推荐未启动。
-- ~~Webhook 发送失败后的重试队列~~ → **已被移除**（10.2），重试队列不适用。
+- ~~经验库和任务模板的智能推荐~~ → 任务模板**已被移除**（12.2），智能推荐未启动。
+- ~~Webhook 发送失败后的重试队列~~ → **已被移除**（12.2），重试队列不适用。
 - ~~移动端页面适配~~ → 进展较小，仍为 PC 优先。
 
 新增关注点：
@@ -502,7 +506,7 @@ ss -tln | grep ":$port "
 
 **附（同一时期的并发修复）：** SQLite OpenDB 改用 DSN `_pragma=` 参数 + 限连接池（`2da84db`），调度器用 `golang.org/x/sync/singleflight.Group` 合并同 task 的重叠执行（cron 周期 < 子进程时长，或 cron 与 RunNow 重叠）—— 详见 6.4 节。
 
-### 9.11 任务执行链路 bug 修复（6.24 之后）
+### 10.1 任务执行链路 bug 修复（6.24 之后）
 
 上一版只写了能力上线，下列 4 个 commit 都是能力落地后才发现的稳定性 / 正确性 bug 修复：
 
@@ -511,13 +515,13 @@ ss -tln | grep ":$port "
 - **`ebd3bc9` 自动化页 5 处 `resume_uuid` 误判**：原 `if (x.resume_uuid)` 判断是否有会话链，5 处遗漏非空字符串边界（如 `"0"` 仍 truthy 但语义无意义）
 - **`6292757` scheduled 频道 chunk 推送改走 exec 频道**：原 `ChannelScheduled` 重复推 stdout/stderr，改为统一走 `ChannelExec` + 前端 `automation.js` 按 `event` 字段过滤（`docs/wsmsg` ChannelScheduled 注释同步更新 `7688f52`）
 
-### 9.12 任务表 td 恢复表格语义（`c922745`）
+### 10.2 任务表 td 恢复表格语义（`c922745`）
 
 **问题：** 早前把任务表 td 改成 flex 布局后，td 实际丢掉了 table cell 语义，导致 `text-align: center` 等表格属性失效，部分浏览器（Safari）排序图标换行错乱。
 
 **解决：** td 恢复 `display: table-cell`，flex 行为下沉到内层 div（行/列分离）。这是个不起眼但"修了才发现表格长好看了"的视觉 fix。
 
-### 9.13 执行/评估模型独立配置（`55a826c` + `672b891`）
+### 10.3 执行/评估模型独立配置（`55a826c` + `672b891`）
 
 **问题：** 之前执行任务和评估打分共用同一个模型字段（`config.json.models.<cli>.default`），但两者诉求不同：执行要快+便宜（haiku / glm-4.7），评估要稳+准（sonnet）。硬绑一个会双输。
 
@@ -531,7 +535,7 @@ ss -tln | grep ":$port "
 
 **后续调整**（`672b891`）：把 `config.json` 的 `models.claude.eval_default` 从 `haiku` 改回 `sonnet`——haiku 评分不稳定，sonnet 评估更可信。
 
-### 9.14 execution.status 显式状态 + 手动取消（`be08ccf`）
+### 10.4 execution.status 显式状态 + 手动取消（`be08ccf`）
 
 **问题：** 自动化页面执行列表里某条记录"一直显示运行中"，刷新也不消失。3 个根因：
 
@@ -554,7 +558,7 @@ ss -tln | grep ":$port "
 
 **`status` 字段取代"靠 completed_at+exit_code+error 拼凑"的判定**——更直接，UI 显示也用 status 不用 completed_at。
 
-### 9.15 继续对话延续原 CLI/model（`9ddad16`）
+### 10.5 继续对话延续原 CLI/model（`9ddad16`）
 
 **问题：** `handleExecutionContinue` 以前硬编码 CLI="claude"，原 exec 如果是 cbc 或 shell 会切断运行环境（session 延续了但 CLI 切换了），评估时也会用错模型。
 
@@ -567,7 +571,7 @@ ss -tln | grep ":$port "
 - `handleExecutionContinue` 从原 exec 读 `CliType`，fallback `claude`，构造命令时传入
 - 评估入口用 `execution.cli_type` 判断运行环境，避免 cbc session 误以 claude 评估
 
-### 9.16 任务详情 AI 自治区块加回 + Run Loop 异步化（`2e547ad`）
+### 10.6 任务详情 AI 自治区块加回 + Run Loop 异步化（`2e547ad`）
 
 **问题（4 个独立问题一次性修）：**
 
@@ -576,7 +580,7 @@ ss -tln | grep ":$port "
 3. **优雅关闭**：scheduler 加 shutdown 钩子，Stop 时等 in-flight goroutine 完成 + 写回 status，不丢中途状态。
 4. **AI 自治开关误判**：`aiLoopEnabled()` 之前从 `AppSettings` 读，重构后从 `config.json` 顶层 `ai_loop_enabled` 读，迁移期间有过期数据。
 
-### 9.17 代理页"生成 Linux 调用脚本"快捷功能（`5345f3f`）
+### 10.7 代理页"生成 Linux 调用脚本"快捷功能（`5345f3f`）
 
 **需求：** 在 Linux 机器上用 shell 调用 xworkbench 代理（命令执行 / HTTP 转发），拷贝后只改 3 处即可用。
 
@@ -587,19 +591,19 @@ ss -tln | grep ":$port "
 - 自动注入 `relay.api_key`（从 config.json 读，用户只需改 URL + HOST + 业务参数）
 - 弹窗带「📋 复制」按钮，复制后可直接 `vim xworkbench-relay.sh && bash ./xworkbench-relay.sh`
 
-### 9.18 调度器 AI 默认超时 1 小时 → 10 分钟（`5b449a6`）
+### 10.8 调度器 AI 默认超时 1 小时 → 10 分钟（`5b449a6`）
 
 **背景：** `scheduled_tasks.timeout_sec=0` 时调度器按 `command_type` 取默认超时，AI 类型原本是 1 小时、shell 5 分钟。但实际场景下 AI 任务很少跑超过 10 分钟（多数 1-5 分钟完事），1 小时让 "卡住" 的任务占着端口太久。
 
 **改动：** AI 默认 1h → 10min（与 `handleTaskRun` / `handleExecutionContinue` 保持一致），shell 保持 5min 不变。
 
-### 9.19 调度器 next_run_at 实时刷新（`c12db3b`）
+### 10.9 调度器 next_run_at 实时刷新（`c12db3b`）
 
 **问题：** 上次加的「下次执行时间」字段（9.10）只在 `Reload` 时刷新，但调度器正常运行时 entry.Next() 一直在被 cron 引擎更新——所以 next_run_at 一直停留在"启动时算的"那个值，UI 不实时。
 
 **实现：** `Scheduler.execute` 在每次触发后调用 `s.scheduleNextRun(taskID)`，主动 `entry.Next(time.Now())` 重算 nextRun map。`c12db3b` 之前漏了这一步。
 
-### 9.20 其它 6.25 后微改进
+### 10.10 其它 6.25 后微改进
 
 - `f0459a8` 执行列表 UI 精简（删冗余入口 + 标记完成改取消）
 - `76e1ea1` btn-secondary 视觉禁用样式 + 继续对话按钮 loading/error 反馈
@@ -609,14 +613,80 @@ ss -tln | grep ":$port "
 - `14817dc` 关闭 ai_loop + 换 cbc 默认模型（个人偏好调整，非 bug）
 - `3d5767a` Windows run.sh 兼容（修 netstat `LISTEN`→`LISTENING` + taskkill 走 cmd.exe 避免 Git Bash 路径转换）
 - `582d976` pack 修复（README 6→7 Tab + 修复 bsdtar 警告）
+- `fd9ad17` fix(ui): 默认终端字段从 `terminal.default_type` 改为顶层 `default_terminal`
+- `73f0b06` fix(scripts): run.sh 启动检测改用端口监听（兼容 Git Bash on Windows）
+- `2619ed4` fix(ui): 终端设置弹窗 detect race 防护，避免 stale 结果污染
+
+## 11. 新增高级特性（6.26）
+
+### 11.1 AI 沙盒（data/ai-sandbox/）
+
+**背景：** 之前 AI 任务（claude/cbc）的 CWD 是 xworkbench 二进制所在目录，AI 用 Write 工具写代码时就会污染源码树（如之前 `internal/twosum/twosum.go` 就是 AI 试写留下的烟雾测试产物）。
+
+**实现：** `internal/paths` 加 `AISandboxDir()` 返回 `data/ai-sandbox/` 绝对路径，`internal/executor` 新增 `RunInSandbox()` wrapper，5 个 AI 调用点（手动跑/继续对话/run-loop/learn/评估）统一从 `executor.Run` 切换为 `RunInSandbox`。
+
+**防御两层：**
+- Layer 1：CWD 沙盒（`RunInSandbox` 强制 `data/ai-sandbox/`）
+- Layer 2：`.gitignore`（`data/` + `internal/sum/` 等不入仓，即使写进去也不污染 build）
+
+**环境变量：** `AI_SANDBOX_DIR` 可覆盖默认路径。
+
+**未沙盒：** scheduler 任务（用用户配置的 `WorkingDir`）/ PTY（用户主动交互）/ handleSetConfig（写 config.json，不算 AI 任务）。
+
+**后续尝试又回退（`6f9d9ae` → `ce9aef6`）：** 曾加 Layer 3 的 post-write validation，用 `git status` 检查并自动 revert AI 写出的源码文件，但发现会误伤 AI 修 bug 的合法工作流（如 AI 改 `internal/foo.go` 修 bug 会被 checkout 掉），且与其它开发者工作流冲突（用户正在 internal/ 改东西，AI 一跑用户修改也被清掉）。最终回退到此两层防御。未来如需更硬隔离，方向是 OS 级沙箱（`sandbox-exec` / `bwrap`），不是 git hook。
+
+### 11.2 危险权限放开（--dangerously-skip-permissions）
+
+**需求：** 某些场景下 AI CLI 需要完全放开权限（如需要写系统目录、访问敏感路径），但默认应该关闭防止误操作。
+
+**实现：**
+
+- `internal/config/config.go` 加顶层 `DangerouslySkipPermissions bool`（默认 false）
+- `internal/executor/runner/build.go` 加 `WithSkipPermissions()` 选项：开启时 claude/cbc 不传 `--allowedTools`，改传 `--dangerously-skip-permissions`；shell/evaluator 不受影响
+- 调度任务根据配置决定是否 skip；evaluator（评估员）保持原样不受影响
+- 前端系统配置 → 默认 CLI 子 tab 加"完全放开 CLI 权限"独立卡片：**红色边框警示**，关闭状态只有"启用"按钮可触发，点击需 confirm 列出风险；开启状态 checkbox 可直接关闭
+
+**注意：** 此选项与 AI 沙盒是正交机制——前者是 AI 能写什么文件，后者是 AI 的工作目录在哪里。两者可独立开关。
+
+### 11.3 AI 自治全链路修复（`dcf3ebf`）
+
+6.26 的一次集中重构，修复 AI 自治能力（`ai_loop_enabled`）的全链路问题：
+
+**配置层（internal/config）**
+- 加 `AppConfigMu` RWMutex + `Get/Snapshot/Update/SetAndSave/TestSnapshotAndRestore` helpers，copy-on-write 语义；所有生产代码 read 改走 `Get()`，消除 HTTP handler 与后台 goroutine 的 data race
+- `SetAndSave` 自动处理 Save 失败回滚
+- `Save()` / `LoadFromPath()` 加 `configFilePathMu` 锁
+
+**后端（cmd/server/main.go）**
+- 3 处过期 403 错误信息修正：从原指向 `AI_LOOP_ENABLED=1` / `ai_loop.enabled` 改为指向顶层 `ai_loop_enabled`
+- `handleSetConfig` 重写为 3 阶段：校验 → 决策 → `SetAndSave`。校验失败不污染内存；Save 失败自动回滚
+- `handleSetPreferredCLI` / `handleSetTodoPath` / `Scheduler.Start|Stop` 一律改用 `SetAndSave`
+- run-loop 加**任务级去重**（`s.runLoops` map + 互斥锁），并发触发返 409，防止 WS 重复 iteration 事件和 DB 重复 execution
+- `handleTaskLearn` 改走 `preferred_cli` + `EvalDefault`，不再硬编码 claude/haiku
+- `handleSetConfig` 落盘后 `hub.Broadcast(ChannelConfig, ...)` 广播配置变更
+
+**前端（automation.js / ws-client.js / index.html）**
+- `toggleAILoop` 加 `_ailoopInflight` 防抖 + 期间 disable checkbox
+- `ws-client.js` 监听 config 频道，调 `loadAILoopStatus()` 即时同步**跨 Tab** UI 状态
+- 元素 ID 重命名避免歧义：`ai-loop-section` → `task-ailoop-block`；`ailoop-section-content/arrow` → `advanced-ailoop-content/arrow`
+- UI hint 文案与新路径对齐
+
+**测试（5 个测试文件）**
+- 改用 `t.Cleanup(config.TestSnapshotAndRestore())` 取代只恢复指针的旧模式，避免 helper 中途修改字段后 restore 翻车
+- `TestRunLoop_ReturnsImmediatelyWithStatusStarted` 配套初始化 `s.runLoops`
+
+**WebSocket 协议**
+- `internal/wsmsg` 加 `ChannelConfig` 频道
+
+**验证：** `go test -race -count=10` 压力测试全过。
 
 ---
 
-## 10. 已精简 / 移除的特性
+## 12. 已精简 / 移除的特性
 
 > 这些是上一版写到、但实际并未落地 / 已被精简 / 已被移除的能力。为保持博客与代码可对照，集中记于此。
 
-### 10.1 仅前端 UI 精简（后端 API 保留）
+### 12.1 仅前端 UI 精简（后端 API 保留）
 
 | 特性 | 原章节 | 状态 |
 |------|--------|------|
@@ -624,7 +694,7 @@ ss -tln | grep ":$port "
 | exec-detail-modal 活动历史区块 | 4.2 | `ae11c06` 移除 UI；后端 `task_events` 表 + `/api/tasks/{id}/events` 保留 |
 | task-modal 评论 / 活动历史 / 对话历史 / AI 自治 区块 | 4.1/4.2/2.x | `5c91b95` 移除（合并到 exec-detail-modal） |
 
-### 10.2 完整移除（前端 + 后端 + 表 + 路由）
+### 12.2 完整移除（前端 + 后端 + 表 + 路由）
 
 | 特性 | 原章节 | commit | 影响范围 |
 |------|--------|--------|----------|
@@ -635,13 +705,13 @@ ss -tln | grep ":$port "
 
 **删除原因（统一）：** 之前是"前端 0 调用 + 后端完整"的 5 个断头能力。"接通 UI"成本 > 实际使用价值（个人项目，自用为主），决定先批量删除 TaskTemplate / TaskDependency / Webhook 3 个；TaskEvent / SavedFilter 保留后端接通 UI（TaskEvent 仍走 audit 日志，SavedFilter 在 6.23 也一并删了）。详见 commit message 与 `docs/superpowers/plans/`。
 
-### 10.3 其它被精简的项
+### 12.3 其它被精简的项
 
 - **任务表单字段**：`module` / `resources` 表单字段移除（`c73f73e`），schema 仍保留以兼容老库
 - **`scripts/build-all.sh`**：`7180062` 删除（产物名仍叫旧名 `skill-factory`，跟 `build.sh -a` 重复）
 - **`--resume <uuid>` 早期误用**：从 `cmd/server/main.go:extractResumeSessionID` 注释看到，老版本用单次 `uuid` 传给 `--resume` 会报 "No conversation found with session ID"，**必须用 `session_id`**（`e014849` 修复）
 
-### 10.4 状态对照表
+### 12.4 状态对照表
 
 | 原章节 | 状态 |
 |--------|------|
@@ -671,3 +741,6 @@ ss -tln | grep ":$port "
 | 7.3 任务表单精简 | ✅（`c73f73e`） |
 | **7.4 任务页 UI 微调** | ✅ 新增（见 9.9） |
 | 8 后续思路 | 🔁 复盘见 8 |
+| 11.1 AI 沙盒 | ✅ 新增（data/ai-sandbox/ + .gitignore 两层防御） |
+| 11.2 危险权限放开 | ✅ 新增（--dangerously-skip-permissions，默认关闭） |
+| 11.3 AI 自治全链路修复 | ✅ 新增（配置并发安全 + run-loop 去重 + 跨 Tab 同步） |
