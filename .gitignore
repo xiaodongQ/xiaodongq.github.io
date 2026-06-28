@@ -28,4 +28,4 @@ assets/js/dist
 
 .sass-cache
 .DS_Store
-.swp
+.swp.playwright-cli
