@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>xworkbench 工作台 · 功能介绍</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --text: #1e293b;
+    --text-secondary: #64748b;
+    --border: #e2e8f0;
+    --primary: #3b82f6;
+    --primary-light: #eff6ff;
+    --accent: #f59e0b;
+    --success: #10b981;
+    --hover: #f1f5f9;
+    --sidebar-w: 240px;
+  }
+
+  [data-theme="dark"] {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --text: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --border: #334155;
+    --primary: #60a5fa;
+    --primary-light: #1e3a5f;
+    --accent: #fbbf24;
+    --success: #34d399;
+    --hover: #334155;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  /* 左侧固定导航 */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: var(--sidebar-w);
+    height: 100vh;
+    background: var(--card);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(135deg, var(--primary-light) 0%, #dbeafe 100%);
+  }
+
+  [data-theme="dark"] .sidebar-header {
+    background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+  }
+
+  .sidebar-logo {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  .sidebar-logo span { font-size: 20px; }
+
+  .sidebar-subtitle {
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  .theme-toggle {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--card);
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+  }
+
+  .theme-toggle:hover {
+    border-color: var(--primary);
+    background: var(--hover);
+  }
+
+  .sidebar-nav {
+    flex: 1;
+    padding: 16px 12px;
+  }
+
+  .nav-group { margin-bottom: 8px; }
+
+  .nav-group-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.2s;
+    user-select: none;
+  }
+
+  .nav-group-title:hover {
+    background: var(--hover);
+  }
+
+  .nav-group-title .arrow {
+    font-size: 10px;
+    transition: transform 0.2s;
+    color: var(--text-secondary);
+  }
+
+  .nav-group.collapsed .nav-group-title .arrow { transform: rotate(-90deg); }
+
+  .nav-group-items {
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+  }
+
+  .nav-group.collapsed .nav-group-items { max-height: 0 !important; }
+
+  .nav-item {
+    display: block;
+    padding: 8px 12px 8px 36px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s;
+    text-decoration: none;
+  }
+
+  .nav-item:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+
+  .nav-item.active {
+    background: var(--primary-light);
+    color: var(--primary);
+    font-weight: 500;
+  }
+
+  /* 主内容区 */
+  .main {
+    margin-left: var(--sidebar-w);
+    padding: 24px 40px 60px;
+    max-width: 900px;
+  }
+
+  .main-header {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0;
+  }
+
+  /* 1级导航区块 */
+  .section {
+    margin-bottom: 32px;
+    scroll-margin-top: 40px;
+  }
+
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .section-title .arrow {
+    font-size: 14px;
+    transition: transform 0.2s;
+    color: var(--text-secondary);
+  }
+
+  .section-title.collapsed .arrow { transform: rotate(-90deg); }
+
+  .section-title .badge {
+    font-size: 12px;
+    font-weight: normal;
+    color: var(--text-secondary);
+    background: var(--hover);
+    padding: 4px 10px;
+    border-radius: 12px;
+  }
+
+  .section-title:hover { color: var(--primary); }
+
+  .section-content {
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+  }
+
+  .section-content.collapsed { max-height: 0 !important; }
+
+  /* 功能卡片网格 */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .feature-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    transition: all 0.2s;
+  }
+
+  .feature-card:hover {
+    border-color: var(--primary);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+  }
+
+  .feature-card .icon { font-size: 22px; margin-bottom: 8px; }
+  .feature-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .feature-card p { font-size: 12px; color: var(--text-secondary); line-height: 1.4; }
+
+  /* 信息说明 */
+  .info-block {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+
+  .info-block h4 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .info-block ul {
+    list-style: none;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .info-block li {
+    padding: 3px 0;
+    padding-left: 16px;
+    position: relative;
+    line-height: 1.4;
+  }
+
+  .info-block li::before {
+    content: "•";
+    position: absolute;
+    left: 4px;
+    color: var(--primary);
+    font-weight: bold;
+  }
+
+  /* 场景卡片 */
+  .scenario-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin: 12px 0;
+  }
+
+  .scenario-card {
+    background: var(--primary-light);
+    border: 1px solid var(--primary);
+    border-radius: 8px;
+    padding: 12px;
+  }
+
+  [data-theme="dark"] .scenario-card {
+    background: rgba(96, 165, 250, 0.1);
+  }
+
+  .scenario-card h5 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 6px;
+  }
+
+  .scenario-card p {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+  }
+
+  /* 截图展示 */
+  .screenshot-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 16px 0;
+  }
+
+  .screenshot-wrap img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .screenshot-caption {
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    border-top: 1px solid var(--border);
+    background: var(--hover);
+  }
+
+  /* 快捷工具 - 3列小部件 */
+  .widget-preview {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin: 12px 0;
+  }
+
+  .widget-mini {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+    transition: all 0.2s;
+  }
+
+  .widget-mini:hover {
+    border-color: var(--primary);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+  }
+
+  .widget-mini .icon { font-size: 28px; margin-bottom: 8px; }
+  .widget-mini h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .widget-mini p { font-size: 12px; color: var(--text-secondary); }
+
+  /* 状态流程 */
+  .status-flow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 10px 0;
+  }
+
+  .status-chip {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .status-chip.pending { background: #fef3c7; color: #92400e; }
+  .status-chip.in_progress { background: #dbeafe; color: #1e40af; }
+  .status-chip.running { background: #d1fae5; color: #065f46; }
+  .status-chip.waiting { background: #ede9fe; color: #5b21b6; }
+  .status-chip.done { background: #f3f4f6; color: #374151; }
+  .status-chip.error { background: #fee2e2; color: #991b1b; }
+
+  [data-theme="dark"] .status-chip.pending { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+  [data-theme="dark"] .status-chip.in_progress { background: rgba(96, 165, 250, 0.2); color: #60a5fa; }
+  [data-theme="dark"] .status-chip.running { background: rgba(52, 211, 153, 0.2); color: #34d399; }
+  [data-theme="dark"] .status-chip.waiting { background: rgba(167, 139, 250, 0.2); color: #a78bfa; }
+  [data-theme="dark"] .status-chip.done { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
+  [data-theme="dark"] .status-chip.error { background: rgba(248, 113, 113, 0.2); color: #f87171; }
+
+  .flow-arrow {
+    color: var(--text-secondary);
+    font-size: 14px;
+  }
+
+  /* 技术架构 */
+  .arch-diagram {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 16px 0;
+    text-align: center;
+  }
+
+  .arch-box {
+    display: inline-block;
+    padding: 8px 16px;
+    border-radius: 8px;
+    margin: 6px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .arch-box.main { background: var(--primary-light); border: 2px solid var(--primary); color: var(--primary); }
+  .arch-box.sub { background: var(--hover); border: 1px solid var(--border); color: var(--text); }
+  .arch-box.ext { background: var(--accent); border: 1px solid var(--accent); color: #92400e; }
+  [data-theme="dark"] .arch-box.ext { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+
+  /* 快速上手 */
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin: 16px 0;
+  }
+
+  .step {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+  }
+
+  .step-num {
+    width: 36px;
+    height: 36px;
+    background: var(--primary);
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 14px;
+    font-weight: 700;
+    font-size: 16px;
+  }
+
+  .step h4 { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+  .step p { font-size: 13px; color: var(--text-secondary); }
+
+  /* 代码块 */
+  .code-block {
+    background: #1e293b;
+    color: #e2e8f0;
+    border-radius: 10px;
+    padding: 20px 24px;
+    font-family: "SF Mono", Monaco, Consolas, monospace;
+    font-size: 13px;
+    overflow-x: auto;
+    margin: 20px 0;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  [data-theme="dark"] .code-block {
+    background: #0d1117;
+    border: 1px solid #30363d;
+  }
+
+  .code-block .comment { color: #64748b; }
+  [data-theme="dark"] .code-block .comment { color: #8b949e; }
+  .code-block .cmd { color: #38bdf8; }
+  [data-theme="dark"] .code-block .cmd { color: #79c0ff; }
+  .code-block .str { color: #a3e635; }
+  [data-theme="dark"] .code-block .str { color: #7ee787; }
+
+  /* 项目简介 */
+  .intro-hero {
+    background: linear-gradient(135deg, var(--primary-light) 0%, #dbeafe 100%);
+    border: 2px solid var(--primary);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 16px;
+  }
+
+  [data-theme="dark"] .intro-hero {
+    background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+  }
+
+  .intro-hero h2 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+
+  .intro-hero .sub {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 14px;
+  }
+
+  .intro-hero .tags {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .intro-hero .tag {
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .intro-hero .tag.primary {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+  }
+
+
+  /* 2级内容区 */
+  .sub-section {
+    margin-bottom: 24px;
+    scroll-margin-top: 40px;
+  }
+
+  .sub-section-title {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+
+  .sub-section-intro {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    line-height: 1.5;
+  }
+
+  /* 特性列表 */
+  .feature-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin: 10px 0;
+  }
+
+  .feature-list-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+  }
+
+  .feature-list-item .icon { font-size: 16px; }
+  .feature-list-item .text { color: var(--text-secondary); line-height: 1.4; }
+
+  /* 响应式 */
+  @media (max-width: 1024px) {
+    :root { --sidebar-w: 240px; }
+    .main { padding: 32px 32px 60px; }
+  }
+
+  @media (max-width: 768px) {
+    .sidebar { transform: translateX(-100%); transition: transform 0.3s; }
+    .sidebar.open { transform: translateX(0); }
+    .main { margin-left: 0; padding: 24px 16px 60px; }
+    .widget-preview { grid-template-columns: 1fr; }
+    .scenario-grid { grid-template-columns: 1fr; }
+    .feature-list { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 左侧导航 -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo"><span>⚡</span> xworkbench</div>
+    <div class="sidebar-subtitle">All-in-One 个人工作台 v2</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-group" id="nav-intro">
+      <div class="nav-group-title" onclick="toggleNavGroup(this)">
+        <span class="arrow">▼</span>
+        📖 项目简介
+      </div>
+      <div class="nav-group-items">
+        <a class="nav-item active" href="#intro">简介</a>
+      </div>
+    </div>
+
+    <div class="nav-group" id="nav-features">
+      <div class="nav-group-title" onclick="toggleNavGroup(this)">
+        <span class="arrow">▼</span>
+        ⚡ 核心功能
+      </div>
+      <div class="nav-group-items">
+        <a class="nav-item" href="#feat-dashboard">总览仪表盘</a>
+        <a class="nav-item" href="#feat-tools">快捷工具</a>
+        <a class="nav-item" href="#feat-tasks">任务管理</a>
+        <a class="nav-item" href="#feat-experiences">经验库</a>
+        <a class="nav-item" href="#feat-automation">自动化调度</a>
+        <a class="nav-item" href="#feat-aichat">AI 对话</a>
+        <a class="nav-item" href="#feat-relay">代理</a>
+        <a class="nav-item" href="#feat-config">系统配置</a>
+      </div>
+    </div>
+
+    <div class="nav-group" id="nav-arch">
+      <div class="nav-group-title" onclick="toggleNavGroup(this)">
+        <span class="arrow">▼</span>
+        🏗 技术架构
+      </div>
+      <div class="nav-group-items">
+        <a class="nav-item" href="#arch">架构概览</a>
+        <a class="nav-item" href="#arch-detail">技术选型</a>
+      </div>
+    </div>
+
+    <div class="nav-group" id="nav-start">
+      <div class="nav-group-title" onclick="toggleNavGroup(this)">
+        <span class="arrow">▼</span>
+        🚀 快速上手
+      </div>
+      <div class="nav-group-items">
+        <a class="nav-item" href="#start">启动步骤</a>
+        <a class="nav-item" href="#start-config">配置说明</a>
+      </div>
+    </div>
+  </nav>
+</aside>
+
+<!-- 主内容 -->
+<main class="main">
+  <div class="main-header">
+    <button class="theme-toggle" id="theme-icon" onclick="toggleTheme()">🌙</button>
+  </div>
+
+  <!-- ========== 项目简介 ========== -->
+  <section class="section" id="intro">
+    <div class="section-title">
+      📖 项目简介
+      <span class="badge">Project Introduction</span>
+    </div>
+    <div class="section-content">
+      <div class="intro-hero">
+        <h2>xworkbench — All-in-One 个人工作台</h2>
+        <p class="sub">统一入口：快捷工具 · 任务管理 · 自动化 · AI 对话</p>
+        <div class="tags">
+          <span class="tag primary">多平台</span>
+          <span class="tag primary">定时调度</span>
+          <span class="tag primary">AI 自治</span>
+          <span class="tag primary">远程 Agent</span>
+          <span class="tag primary">经验沉淀</span>
+        </div>
+      </div>
+
+      <div class="info-block" id="intro-features">
+        <h4>🎯 能做什么</h4>
+        <ul>
+          <li>统一入口：作为日常 <strong>homepage / launcher</strong>，常用网址、目录、待办事项一键直达</li>
+          <li>任务管理：手动任务、远程 Agent 任务、AI 自治任务，统一追踪</li>
+          <li>自动化调度：Cron 定时任务，支持 shell / claude / cbc 多类型</li>
+          <li>AI 对话：浏览器内终端体验，多 CLI（claude/cbc/codex/shell）切换</li>
+          <li>经验库：可复用上下文积累，关联任务自动注入，AI 学习自动写入</li>
+          <li>代理：跨平台命令执行、HTTP 转发、远程 Agent 管理</li>
+        </ul>
+      </div>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="icon">📊</div>
+          <h3>总览仪表盘</h3>
+          <p>任务统计、趋势图、调度器状态、最近执行，一目了然</p>
+        </div>
+        <div class="feature-card">
+          <div class="icon">🔗</div>
+          <h3>快捷工具</h3>
+          <p>快捷链接、目录、待办事项，集中管理</p>
+        </div>
+        <div class="feature-card">
+          <div class="icon">📋</div>
+          <h3>任务管理</h3>
+          <p>手动+远程双模式，状态流转，AI 辅助评估</p>
+        </div>
+        <div class="feature-card">
+          <div class="icon">📚</div>
+          <h3>经验库</h3>
+          <p>可复用上下文积累，关键词匹配，与任务关联</p>
+        </div>
+        <div class="feature-card">
+          <div class="icon">⚡</div>
+          <h3>自动化调度</h3>
+          <p>Cron 定时任务，支持 shell/claude/cbc 多类型</p>
+        </div>
+        <div class="feature-card">
+          <div class="icon">🤖</div>
+          <h3>AI 对话</h3>
+          <p>终端式交互体验，多 CLI 支持，持续会话</p>
+        </div>
+        <div class="feature-card">
+          <div class="icon">🔀</div>
+          <h3>代理</h3>
+          <p>命令执行、HTTP 转发、远程 Agent 管理</p>
+        </div>
+        <div class="feature-card">
+          <div class="icon">⚙️</div>
+          <h3>系统配置</h3>
+          <p>快捷目录/链接管理、AI 默认设置、配置文件</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 核心功能 ========== -->
+  <section class="section" id="features">
+    <div class="section-title">
+      ⚡ 核心功能
+      <span class="badge">8 个子模块</span>
+    </div>
+    <div class="section-content">
+
+      <!-- 总览仪表盘 -->
+      <div class="sub-section" id="sub-dashboard">
+        <h3 class="sub-section-title" id="feat-dashboard">📊 总览仪表盘</h3>
+        <p class="sub-section-intro">一屏看清全局：有多少任务、谁在跑、下次何时执行、最近执行了什么。</p>
+        <div class="scenario-grid">
+          <div class="scenario-card">
+            <h5>📈 任务统计</h5>
+            <p>6 种状态计数（待认领/待执行/执行中/待交互/已完成/异常），颜色区分，点击快速筛选</p>
+          </div>
+          <div class="scenario-card">
+            <h5>📉 趋势图</h5>
+            <p>近 7 日任务数量柱状图，区分手动和调度任务，分析工作负载分布</p>
+          </div>
+          <div class="scenario-card">
+            <h5>⏰ 调度器状态</h5>
+            <p>实时显示运行状态，展示下次执行时间，可快速启停</p>
+          </div>
+          <div class="scenario-card">
+            <h5>⚡ 最近执行</h5>
+            <p>实时展示最新记录，自动刷新（默认 3s），支持手动触发</p>
+          </div>
+        </div>
+        <div class="screenshot-wrap">
+          <img src="/assets/xworkbench/screenshots/01-dashboard.png" alt="总览仪表盘" loading="lazy">
+          <div class="screenshot-caption">总览页面：任务统计、趋势图、调度器状态、最近执行</div>
+        </div>
+      </div>
+
+      <!-- 快捷工具 -->
+      <div class="sub-section" id="sub-tools">
+        <h3 class="sub-section-title" id="feat-tools">🔧 快捷工具</h3>
+        <p class="sub-section-intro">常驻首页的快捷入口：链接、目录、待办，一点就开，无需再翻文件夹或备忘录。</p>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:12px 0">
+          <div class="scenario-card">
+            <h5>🔗 快捷链接</h5>
+            <p>图标卡片展示，点击新窗口打开。悬停显示删除，支持自定义图标</p>
+          </div>
+          <div class="scenario-card">
+            <h5>📂 快捷目录</h5>
+            <p>支持本地路径（Finder/xdg-open/explorer）和远程 <code>user@host:/path</code></p>
+          </div>
+          <div class="scenario-card">
+            <h5>☑️ 待办事项</h5>
+            <p>绑定 todo.md，解析 <code>- [ ]</code>/<code>- [x]</code>，点击自动写回</p>
+          </div>
+        </div>
+        <div class="screenshot-wrap">
+          <img src="/assets/xworkbench/screenshots/01-dashboard.png" alt="快捷工具" loading="lazy">
+          <div class="screenshot-caption">总览页面左侧：快捷链接、待办事项 widget</div>
+        </div>
+        <div style="display:flex;gap:12px;margin:16px 0;flex-wrap:wrap">
+          <div style="flex:1;min-width:260px;background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+            <img src="/assets/xworkbench/screenshots/08-shortcuts-dir.png" alt="快捷目录" style="width:100%;height:220px;object-fit:cover;display:block" loading="lazy">
+            <div style="padding:8px 12px;font-size:12px;color:var(--text-secondary);border-top:1px solid var(--border);background:var(--hover)">📂 快捷目录：Finder/xdg-open/explorer 打开本地或远程目录</div>
+          </div>
+          <div style="flex:1;min-width:260px;background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+            <img src="/assets/xworkbench/screenshots/09-shortcuts-term.png" alt="终端快捷" style="width:100%;height:220px;object-fit:cover;display:block" loading="lazy">
+            <div style="padding:8px 12px;font-size:12px;color:var(--text-secondary);border-top:1px solid var(--border);background:var(--hover)">🖥 终端快捷：WezTerm/Terminal.app 等直接打开目录</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 任务管理 -->
+      <div class="sub-section" id="sub-tasks">
+        <h3 class="sub-section-title" id="feat-tasks">📋 任务管理</h3>
+        <p class="sub-section-intro">把要做的事记下来，AI 帮你跑，跑完还能评估。手动和远程 Agent 都能管。</p>
+        <div class="scenario-grid">
+          <div class="scenario-card">
+            <h5>手动任务</h5>
+            <p>本地创建，认领后执行。适合个人工作项沉淀和追踪。</p>
+          </div>
+          <div class="scenario-card">
+            <h5>远程 Agent 任务</h5>
+            <p>远程机器领取执行，支持分布式协作，适合多机器场景。</p>
+          </div>
+        </div>
+        <div class="info-block">
+          <h4>🔄 状态流转</h4>
+          <div class="status-flow">
+            <span class="status-chip pending">pending</span>→<span class="status-chip in_progress">in_progress</span>→<span class="status-chip running">running</span>→<span class="status-chip waiting">waiting_input</span>→<span class="status-chip done">archived</span>
+          </div>
+        </div>
+        <div class="scenario-grid">
+          <div class="scenario-card">
+            <h5>🤖 AI 自治</h5>
+            <p>Run Loop / Reevaluate / Learn 三个按钮，<code>--resume</code> 继续对话</p>
+          </div>
+          <div class="scenario-card">
+            <h5>📚 经验关联</h5>
+            <p>创建任务时关联多条经验，AI 决策时自动参考</p>
+          </div>
+        </div>
+        <div class="screenshot-wrap">
+          <img src="/assets/xworkbench/screenshots/02-tasks.png" alt="任务管理" loading="lazy">
+          <div class="screenshot-caption">任务列表页：状态筛选、类型筛选、关键词搜索</div>
+        </div>
+      </div>
+
+      <!-- 经验库 -->
+      <div class="sub-section" id="sub-experiences">
+        <h3 class="sub-section-title" id="feat-experiences">📚 经验库</h3>
+        <p class="sub-section-intro">把可复用的上下文（如配置、命令、踩坑记录）存起来，创建任务时关联进去，AI 决策更准。</p>
+        <div class="scenario-grid">
+          <div class="scenario-card">
+            <h5>🔍 快速检索</h5>
+            <p>搜索"mysql 连接池"，找到相关配置经验和排查步骤</p>
+          </div>
+          <div class="scenario-card">
+            <h5>🔗 任务辅助</h5>
+            <p>创建"排查慢查询"任务时，关联"mysql 慢日志分析"经验</p>
+          </div>
+          <div class="scenario-card">
+            <h5>✨ 自动学习</h5>
+            <p>AI 执行成功后，点击 Learn 自动沉淀为新经验</p>
+          </div>
+          <div class="scenario-card">
+            <h5>📤 团队共享</h5>
+            <p>导出经验库为 JSON，与团队共享上下文片段</p>
+          </div>
+        </div>
+        <div class="screenshot-wrap">
+          <img src="/assets/xworkbench/screenshots/03-experiences.png" alt="经验库" loading="lazy">
+          <div class="screenshot-caption">经验库页面：分类导航、搜索、详情查看</div>
+        </div>
+      </div>
+
+      <!-- 自动化调度 -->
+      <div class="sub-section" id="sub-automation">
+        <h3 class="sub-section-title" id="feat-automation">⚡ 自动化调度</h3>
+        <p class="sub-section-intro">写好 Cron 表达式，交给调度器定时跑。shell、Claude、Codebuddy 都支持，睡觉时也在跑。</p>
+        <div class="scenario-grid">
+          <div class="scenario-card">
+            <h5>定时巡检</h5>
+            <p><code>0 */6 * * *</code> 每6小时检查服务器状态</p>
+          </div>
+          <div class="scenario-card">
+            <h5>每日报告</h5>
+            <p><code>0 9 * * *</code> 每天9点生成业务报告</p>
+          </div>
+          <div class="scenario-card">
+            <h5>持续监控</h5>
+            <p><code>@every 30s</code> 每30秒检查指定条件</p>
+          </div>
+          <div class="scenario-card">
+            <h5>周度复盘</h5>
+            <p><code>0 10 * * 1</code> 每周一10点执行复盘流程</p>
+          </div>
+        </div>
+        <div class="info-block">
+          <h4>⚙️ 调度器控制</h4>
+          <ul>
+            <li>启动/停止/重载调度器，优雅关闭（等待 in-flight goroutine）</li>
+            <li>启动时自动恢复上次状态，支持手动触发立即执行</li>
+          </ul>
+        </div>
+        <div class="info-block">
+          <h4>⏰ 定时任务配置</h4>
+          <ul>
+            <li>Cron 表达式（分 时 日 月 周）或快捷预设 <code>@every 30s</code> / <code>@hourly</code></li>
+            <li>命令类型：shell / claude / cbc，模型：haiku(快) / sonnet(准) / opus(强)</li>
+            <li>超时：AI 任务默认 10min，shell 任务 5min</li>
+          </ul>
+        </div>
+        <div class="screenshot-wrap">
+          <img src="/assets/xworkbench/screenshots/04-automation.png" alt="自动化调度" loading="lazy">
+          <div class="screenshot-caption">自动化页面：定时任务列表、调度器控制、执行记录</div>
+        </div>
+      </div>
+
+      <!-- AI 对话 -->
+      <div class="sub-section" id="sub-aichat">
+        <h3 class="sub-section-title" id="feat-aichat">🤖 AI 对话</h3>
+        <p class="sub-section-intro">在浏览器里开一个真实终端，随时问 AI 问题，多 CLI 切换。</p>
+        <div class="info-block">
+          <h4>🖥️ 终端体验</h4>
+          <ul>
+            <li>基于 xterm.js 真实终端模拟，支持全屏、复制粘贴、滚动回溯</li>
+            <li>多会话管理，会话历史持久化，重启不丢失</li>
+          </ul>
+        </div>
+        <div class="feature-list">
+          <div class="feature-list-item"><span class="icon">🦙</span><span class="text"><strong>claude</strong> — Anthropic Claude CLI</span></div>
+          <div class="feature-list-item"><span class="icon">🦙</span><span class="text"><strong>cbc</strong> — Codebuddy CLI</span></div>
+          <div class="feature-list-item"><span class="icon">🔷</span><span class="text"><strong>codex</strong> — OpenAI Codex CLI</span></div>
+          <div class="feature-list-item"><span class="icon">💻</span><span class="text"><strong>shell</strong> — 本地 shell</span></div>
+        </div>
+        <div class="scenario-grid">
+          <div class="scenario-card">
+            <h5>日常对话</h5>
+            <p>"帮我添加一条 redis-cluster 经验"</p>
+          </div>
+          <div class="scenario-card">
+            <h5>即时问答</h5>
+            <p>遇到问题直接询问 AI，获取解决方案</p>
+          </div>
+        </div>
+        <div class="screenshot-wrap">
+          <img src="/assets/xworkbench/screenshots/07-aichat.png" alt="AI 对话" loading="lazy">
+          <div class="screenshot-caption">AI 对话页面：终端式交互，支持多 CLI</div>
+        </div>
+      </div>
+
+      <!-- 代理 -->
+      <div class="sub-section" id="sub-relay">
+        <h3 class="sub-section-title" id="feat-relay">🔀 代理</h3>
+        <p class="sub-section-intro">Linux 服务器受限网络下，通过代理调用 Windows 工作电脑上的 xworkbench，让它代为执行命令或转发请求。</p>
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;margin:12px 0;text-align:center">
+          <div style="display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap">
+            <div style="background:var(--hover);border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-size:13px">
+              🌐 Linux 服务器<br><span style="font-size:12px;color:var(--text-secondary)">受限网络，主动调用代理</span>
+            </div>
+            <div style="color:var(--text-secondary);font-size:20px">→</div>
+            <div style="background:var(--primary-light);border:2px solid var(--primary);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--primary)">
+              ⚡ xworkbench 工作台<br><span style="font-size:12px;opacity:0.8">Windows 工作电脑</span>
+            </div>
+            <div style="color:var(--text-secondary);font-size:20px">→</div>
+            <div style="background:var(--hover);border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-size:13px">
+              🌐 目标服务<br><span style="font-size:12px;color:var(--text-secondary)">内网 API / 数据库 / 任意端口</span>
+            </div>
+          </div>
+          <div style="margin-top:12px;font-size:12px;color:var(--text-secondary)">典型：Linux 服务器访问受限网络 → 调用 Windows 工作台上的 xworkbench 代理 → 代理代为访问目标服务</div>
+        </div>
+        <div class="scenario-grid">
+          <div class="scenario-card">
+            <h5>⚡ 命令执行</h5>
+            <p>在 xworkbench 机器执行 shell/powershell，返回 stdout/stderr/exit_code</p>
+          </div>
+          <div class="scenario-card">
+            <h5>🌐 HTTP 转发</h5>
+            <p>透传请求到目标 URL，自动携带认证头（authorization/x-api-key/cookie）</p>
+          </div>
+          <div class="scenario-card">
+            <h5>📡 远程 Agent</h5>
+            <p>查看在线状态，心跳超时30s/任务超时10min自动释放</p>
+          </div>
+          <div class="scenario-card">
+            <h5>🖥️ Linux 调用</h5>
+            <p>生成调用脚本，远程机器无需安装 xworkbench，通过 api_key 鉴权</p>
+          </div>
+        </div>
+        <div class="screenshot-wrap">
+          <img src="/assets/xworkbench/screenshots/05-relay.png" alt="代理" loading="lazy">
+          <div class="screenshot-caption">代理页面：命令执行、HTTP 转发、远程 Agent 管理</div>
+        </div>
+      </div>
+
+      <!-- 系统配置 -->
+      <div class="sub-section" id="sub-config">
+        <h3 class="sub-section-title" id="feat-config">⚙️ 系统配置</h3>
+        <p class="sub-section-intro">管理快捷目录/链接、切换默认 AI CLI、调整模型配置，所有偏好通过 UI 修改并持久化。</p>
+        <div class="scenario-grid">
+          <div class="scenario-card">
+            <h5>📂 快捷目录</h5>
+            <p>导入/导出配置，支持去重策略（skip/overwrite/append）</p>
+          </div>
+          <div class="scenario-card">
+            <h5>🔗 快捷链接</h5>
+            <p>导入/导出，自定义图标 URL，批量管理</p>
+          </div>
+          <div class="scenario-card">
+            <h5>🤖 AI 默认</h5>
+            <p>全局默认 CLI（claude/cbc），执行/评估模型独立配置</p>
+          </div>
+          <div class="scenario-card">
+            <h5>📄 配置文件</h5>
+            <p><code>./config.json</code>（不入库），或通过 UI 修改自动保存</p>
+          </div>
+        </div>
+        <div class="screenshot-wrap">
+          <img src="/assets/xworkbench/screenshots/06-config.png" alt="系统配置" loading="lazy">
+          <div class="screenshot-caption">系统配置页面</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ========== 技术架构 ========== -->
+  <section class="section" id="arch">
+    <div class="section-title">
+      🏗 技术架构
+      <span class="badge">Technical Architecture</span>
+    </div>
+    <div class="section-content">
+      <div class="arch-diagram" id="arch-detail">
+        <div class="arch-box main">xworkbench 单二进制</div>
+        <div style="margin: 12px 0; color: var(--text-secondary);">↓</div>
+        <div class="arch-box sub">Go 1.22+ · SQLite (modernc.org/sqlite, 无 CGO)</div>
+        <div class="arch-box sub">Web UI (HTML/CSS/JS) · WebSocket</div>
+        <div class="arch-box sub">调度器 (cron) · AI CLI 桥接</div>
+        <div style="margin: 12px 0; color: var(--text-secondary);">↓</div>
+        <div class="arch-box ext">PTY (macOS/Linux) · ConPTY (Windows)</div>
+        <div class="arch-box ext">AI CLI (claude / cbc / codex)</div>
+        <div class="arch-box ext">远程 Agent 协议</div>
+      </div>
+
+      <div class="info-block">
+        <h4>🛠 技术选型</h4>
+        <ul>
+          <li><strong>Go 单二进制</strong>：部署简单，无需运行时环境，跨平台编译一条命令</li>
+          <li><strong>SQLite (无 CGO)</strong>：零依赖数据库，<code>modernc.org/sqlite</code> 纯 Go 实现</li>
+          <li><strong>Web UI</strong>：浏览器即客户端，随时随地访问，响应式设计</li>
+          <li><strong>PTY / ConPTY</strong>：真终端体验，支持交互式命令执行</li>
+          <li><strong>WebSocket</strong>：实时双向通信，执行输出实时推送</li>
+        </ul>
+      </div>
+
+      <div class="info-block">
+        <h4>🏛 系统架构</h4>
+        <ul>
+          <li><strong>前端</strong>：纯静态 HTML/CSS/JS，单文件入口，多 view 模块化</li>
+          <li><strong>后端</strong>：Go HTTP 服务，RESTful API + WebSocket</li>
+          <li><strong>数据层</strong>：SQLite 数据库，14 张表，迁移自动化</li>
+          <li><strong>调度层</strong>：内置 cron 调度器，支持高并发任务</li>
+          <li><strong>AI 层</strong>：抽象 CLI 接口，支持 claude / cbc / shell 多类型</li>
+        </ul>
+      </div>
+
+      <div class="info-block">
+        <h4>📊 关键指标</h4>
+        <ul>
+          <li>HTTP 路由：<strong>91 个</strong></li>
+          <li>Go 代码量：<strong>~14600 行</strong></li>
+          <li>数据库表：<strong>14 张</strong></li>
+          <li>功能 Tab：<strong>7 个</strong>（总览 / 任务 / 经验库 / 自动化 / 系统配置 / AI 对话 / 代理）</li>
+          <li>Widget：<strong>5 个</strong>（快捷链接 / 待办 / 目录 / 调度器摘要 / 最近执行）</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 快速上手 ========== -->
+  <section class="section" id="start">
+    <div class="section-title">
+      🚀 快速上手
+      <span class="badge">Quick Start</span>
+    </div>
+    <div class="section-content">
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <h4>克隆项目</h4>
+          <p>git clone 仓库代码</p>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <h4>编译运行</h4>
+          <p>./scripts/build.sh && ./scripts/run.sh</p>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <h4>打开浏览器</h4>
+          <p>访问 http://localhost:8902</p>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <h4>开始使用</h4>
+          <p>体验 7 大功能模块</p>
+        </div>
+      </div>
+
+      <div class="code-block">
+<span class="comment"># 克隆并进入项目</span>
+git clone &lt;repo&gt;
+cd xworkbench
+
+<span class="comment"># 编译（macOS 默认）</span>
+<span class="cmd">./scripts/build.sh</span>  <span class="comment"># → ./bin/xworkbench</span>
+
+<span class="comment"># 三平台编译</span>
+<span class="cmd">./scripts/build.sh -a</span>  <span class="comment"># → xworkbench-darwin/linux/windows</span>
+
+<span class="comment"># 清理编译产物</span>
+<span class="cmd">./scripts/build.sh -c</span>
+
+<span class="comment"># 启动服务（默认端口 8902）</span>
+<span class="cmd">./scripts/run.sh</span>
+
+<span class="comment"># 其他命令</span>
+<span class="cmd">./scripts/run.sh --stop</span>  <span class="comment"># 停止</span>
+<span class="cmd">./scripts/run.sh --restart</span>  <span class="comment"># 重启</span>
+<span class="cmd">./scripts/run.sh --log</span>  <span class="comment"># 查看日志</span>
+<span class="cmd">./scripts/run.sh --status</span>  <span class="comment"># 运行状态</span>
+      </div>
+
+      <div class="info-block" id="start-config">
+        <h4>📄 配置（可选）</h4>
+        <ul>
+          <li>复制模板：<code>cp config.json.template config.json</code></li>
+          <li>按需修改配置项（终端类型、模型列表等）</li>
+          <li>也可通过 UI：系统配置 Tab → 修改 → 保存</li>
+          <li>配置文件 <code>./config.json</code> 不入库，适合个人偏好</li>
+        </ul>
+      </div>
+
+      <div class="info-block">
+        <h4>🖥 平台支持</h4>
+        <ul>
+          <li><strong>macOS</strong>：真 PTY / AI 对话 / 调度器 / Finder 打开目录 ✅</li>
+          <li><strong>Linux</strong>：真 PTY / AI 对话 / 调度器 / xdg-open 打开目录 ✅</li>
+          <li><strong>Windows</strong>：ConPTY / 调度器 / Explorer 打开目录 ✅，AI 对话 ✅</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  // 主题切换
+  function toggleTheme() {
+    const html = document.documentElement;
+    const icon = document.getElementById('theme-icon');
+    if (html.getAttribute('data-theme') === 'dark') {
+      html.removeAttribute('data-theme');
+      icon.textContent = '🌙';
+      localStorage.setItem('theme', 'light');
+    } else {
+      html.setAttribute('data-theme', 'dark');
+      icon.textContent = '☀️';
+      localStorage.setItem('theme', 'dark');
+    }
+  }
+
+  // 初始化主题
+  (function() {
+    const saved = localStorage.getItem('theme');
+    if (saved === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      document.getElementById('theme-icon').textContent = '☀️';
+    }
+  })();
+
+  // 左侧导航分组展开/收起
+  function toggleNavGroup(title) {
+    const group = title.parentElement;
+    group.classList.toggle('collapsed');
+  }
+
+  // 1级展开/收起
+  function toggleSection(title) {
+    title.classList.toggle('collapsed');
+    const content = title.nextElementSibling;
+    content.classList.toggle('collapsed');
+  }
+
+  // 导航滚动高亮
+  const sections = document.querySelectorAll('.section[id], .sub-section[id], [id^="feat-"], [id^="intro-"], [id^="arch-"], [id^="start-"]');
+  const navItems = document.querySelectorAll('.nav-item');
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        navItems.forEach(item => {
+          const href = item.getAttribute('href');
+          item.classList.toggle('active', href === '#' + id);
+        });
+      }
+    });
+  }, { threshold: 0.3 });
+
+  sections.forEach(section => observer.observe(section));
+
+  // 平滑滚动
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      const targetId = item.getAttribute('href').slice(1);
+      const target = document.getElementById(targetId);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  });
+</script>
+
+</body>
+</html>
