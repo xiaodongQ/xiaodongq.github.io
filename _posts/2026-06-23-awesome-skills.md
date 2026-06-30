@@ -278,6 +278,16 @@ pip install -e 'packages/markitdown[all]'
 2、生成的ppt：  
 [xworkbench-v2-share-ppt.pdf](/images/srcfiles/xworkbench-v2-share-ppt.pdf)
 
+### 5.2. OpenHuman
+
+> [OpenHuman中文文档](https://openhuman.org.cn/docs/overview/what-is-openhuman)
+
+OpenHuman 是面向个人工作流的桌面 AI Agent：它试图把你的本地知识库、日历、邮件、浏览器、协作工具和模型能力连成一个长期运行的个人上下文系统。
+* OpenHuman 的思路是把上下文沉淀为可追踪的记忆结构，并让这些记忆可以被用户看见、编辑和迁移。
+* 基于 Obsidian / Markdown，OpenHuman 同时包含桌面 GUI、Rust Core、Memory Tree、Obsidian Wiki、模型路由和集成层。
+* OpenHuman 的核心不是单个聊天窗口，而是一套围绕个人上下文长期运行的桌面系统。它把桌面端、Rust Core、本地工作区、Obsidian 可读记忆、模型路由、OAuth 集成和原生工具连接成一个闭环：先收集上下文，再整理记忆，最后让 Agent 在用户授权范围内执行任务。
+
+
 ## 6. 多媒体类
 
 > 待补充
