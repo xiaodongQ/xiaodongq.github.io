@@ -16,7 +16,7 @@ last_modified_at: 2026-06-28
 
 ## 2. 功能介绍
 
-> 📥 单文件版本下载：[xworkbench-intro-standalone.html](/assets/xworkbench/xworkbench-intro-standalone.html)（所有样式和图片内嵌，可离线使用）
+> 📥 单文件版本下载：[点击此处查看](/assets/xworkbench/xworkbench-intro-standalone.html)，[点击此处下载](/assets/xworkbench/xworkbench-intro-standalone.html){: download=""}（所有样式和图片内嵌，可离线使用）
 
 <iframe src="/assets/xworkbench/xworkbench-intro.html" width="100%" height="900" style="border:none;" loading="lazy"></iframe>
 
