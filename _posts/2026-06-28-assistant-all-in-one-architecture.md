@@ -3,7 +3,6 @@ title: 个人AI工作台（三） -- xworkbench 功能介绍页
 description: 完整的 xworkbench 功能介绍页面，交互式文档，包含全部 8 个核心模块的详细说明
 categories: [AI, 个人AI工作台]
 tags: [Agent, 个人助手, xworkbench]
-last_modified_at: 2026-06-28
 ---
 
 ## 1. 引言
