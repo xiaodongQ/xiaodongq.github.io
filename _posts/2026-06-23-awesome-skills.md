@@ -93,136 +93,94 @@ claude-code-setup 是 Anthropic 官方认证 Claude Code 插件，全称 Claude 
 /claude-code-setup:claude-automation-recommender
 
 ⏺ 我将分析 xworkbench 代码库,推荐适合的 Claude Code 自动化配置。先做代码库分析。
-
   Read 2 files, listed 6 directories (ctrl+o to expand)
-
 ⏺ 基于 xworkbench 代码库的分析,以下是推荐的 Claude Code 自动化配置(每类 1-2 项最相关的):
-
-  Claude Code Automation Recommendations
-
-  Codebase Profile
-
-  - 类型: Go 1.25 后端单二进制 + 嵌入前端 (vanilla JS)
-  - 关键依赖: gorilla/websocket、modernc.org/sqlite(纯 Go)、creack/pty、robfig/cron/v3、zap
-  - 规模: 65 个 .go 文件 / 14 张 SQLite 表 / 91 个 HTTP 路由
-  - 已配置: .claude/CLAUDE.md、6 个 openspec-* 技能、playwright-cli 技能、opsx commands、settings.local.json 已放行
-  WebFetch+Edit
-
-  ---
-  🔌 MCP Servers
-
-  GitHub MCP
-
-  Why: 项目用 git 管理,已有 .github/workflows/,Claude Code 平时改完代码需要走 gh pr create / gh issue view 时,装上
-  GitHub MCP 后能直接 mcp__plugin_github_github__* 操作 PR/Issue/Actions,比手动切 gh 流畅很多;也避免每次都让 Claude 拼
-  URL。
-  前置: gh auth login 已完成(本机已有)
-  安装: claude mcp add --transport http github https://api.githubcopilot.com/mcp/(走 OAuth,首次会触发授权)
-
-  context7
-
-  Why: 大量用了 gorilla/websocket、robfig/cron/v3、modernc.org/sqlite 这类库,API 表面经常会跨小版本变(典型:gorilla
-  websocket 的 CloseMessage code 常量、cron 的 WithSeconds 选项)。需要查库的最新签名/行为时,context7 实时拉官方文档,比
-  WebFetch 抓 GitHub README 准。
-  安装: claude mcp add context7
-
-  ---
-  🎯 Skills
-
-  xworkbench-add-endpoint
-
-  Why: CLAUDE.md §12 已经把"加新端点"流程写得很死板(5 步:加路由→添 repo→写 handler→前端 fetchJSON→写
-  httptest)。这就是教科书级 skill 用例 —— 把文档里那段直接转成 /xworkbench-add-endpoint 技能,Claude 接到"加个
-  /api/foo"指令时按 5 步执行,不会漏写测试。
-  创建: .claude/skills/xworkbench-add-endpoint/SKILL.md
-  调用: Both(用户 /xworkbench-add-endpoint,Claude 也会自动用)
-  模板:
-  ---
-  name: xworkbench-add-endpoint
-  description: Use when adding a new HTTP endpoint to xworkbench. Follows the 5-step pattern (route → repo → handler →
-  frontend → test) defined in CLAUDE.md §12.
-  ---
-  # Add xworkbench HTTP endpoint
-  按 CLAUDE.md §12 的 5 步走...
-
-  xworkbench-e2e
-
-  Why: ./scripts/e2e.sh 支持 basic / fast / 全量 / 远端 URL 多种模式,默认跑全量比较重。包成 skill 后 Claude 在改动 API
-  后能自动跑 fast 模式(复用运行中的 server)验证,不打扰用户。
-  创建: .claude/skills/xworkbench-e2e/SKILL.md
-  调用: Both
-  模板:
-  ---
-  name: xworkbench-e2e
-  description: Use when verifying API changes work end-to-end. Wraps ./scripts/e2e.sh with smart mode selection (fast vs
-   basic vs full).
-  ---
-  # Run e2e tests
-  判断改动范围 → 选模式...
-
-  ---
-  ⚡ Hooks
-
-  PostToolUse: 改 .go 后自动 gofmt + go vet
-
-  Why: CLAUDE.md §13.9 明确写"gofmt 一定要跑,Go 1.25 工具链强约束,CI 会卡" —— 这就是自动化的标准场景。每次 Edit/Write 完
-   .go 文件,跑 gofmt -w + go vet 当场发现问题,不用等 CI 撞墙。
-  位置: .claude/settings.json
-  配置:
-  {
-    "hooks": {
-      "PostToolUse": [{
-        "matcher": "Edit|Write",
-        "hooks": [{
-          "type": "command",
-          "command": "if [[ \"$CLAUDE_FILE\" == *.go ]]; then gofmt -w \"$CLAUDE_FILE\" && go vet ./...; fi"
-        }]
-      }]
-    }
-  }
-  注意: CLAUDE_FILE 是 Claude Code 暴露给 hook 的环境变量,需根据实际 schema 调整(若不支持,可改成在 hook 脚本里 ls *.go
-  扫最近改动)。
-
-  ---
-  🤖 Subagents
-
-  go-handler-reviewer(针对 main.go handleXxx)
-
-  Why: cmd/server/main.go 91 个路由,大量 handleXxx 函数,Claude 写新 handler 时容易抄老 handler 的反模式(漏 writeErr、忘
-  writeJSON、错误吞掉 context、用 log.Println 而非 zap)。一个专门审 Go HTTP handler 的 subagent,按项目约定(看
-  terminal_api_test.go 风格 + CLAUDE.md §12)对照检查,比通用 code-reviewer 更贴这个项目。
-  位置: .claude/agents/go-handler-reviewer.md
-  模板:
-  ---
-  name: go-handler-reviewer
-  description: Reviews xworkbench HTTP handlers against project conventions. Use after editing cmd/server/main.go or
-  adding a new handleXxx function.
-  tools: Read, Grep, Glob, Bash
-  ---
-  你专审 xworkbench 的 Go HTTP handler...
-  检查清单:
-  - 错误用 writeErr(w, code, msg) 而非 http.Error
-  - 成功用 writeJSON(w, data) 而非手动 marshal
-  - 路由在 routes() 注册了吗
-  - 测试文件 *_api_test.go 写了吗
-  - context 透传了吗(尤其 DB/Cache 操作)
-
-  ---
-  已有的(无需再加)
-
-  - ✅ openspec-*/opsx commands —— spec 驱动工作流已配置
-  - ✅ playwright-cli skill —— 浏览器自动化已配置
-  - ✅ settings.local.json 放行 Edit —— 写权限已开
-  - ✅ CLAUDE.md(项目 + 用户)—— 上下文已加载
-
-  ---
-  想看更多吗? 告诉我聚焦哪类:
-  - "再来 3 个 MCP server 方案"(比如 Linear / Slack / Sentry)
-  - "再给几个 hook"(比如 PreToolUse 拦 config.json 编辑,PostToolUse 跑 go test 相关包)
-  - "再给几个 subagent"(比如 security-reviewer 看 scheduler、performance-analyzer 看 DB query)
-
-  想直接落地? 我可以挑其中任意 1-2 项直接帮你写好文件。
 ```
+
+### 3.3. herdr：比tmux更好用的AI终端复用器
+
+**越用越感觉好用**
+
+![herdr使用示例](/images/1783848026295-image.png)
+
+个人使用经验：
+* 主题建议：`dracula`或者`nord`，对当前选择的session区分得更清楚
+* **不同目录**创建不同的`workspace`工作区：这样左上侧展示更清晰。`tab标签页`不会体现在左侧，建议仅在同一个workspace里用。
+
+#### 3.3.1. 基本介绍和安装
+
+> [herdr](https://github.com/ogulcancelik/herdr)
+>
+> [文档](https://herdr.dev/zh-cn/docs/concepts/)
+
+很实用的特性：
+* tmux特性：本次打开的终端，下次输入`herdr`进入还是保持的
+* 各菜单支持vim基本操作，上下控制`j/k`
+* 支持鼠标点击操作、右键操作
+* AI Agent展示，并且点击某个agent时，会自动跳转到对应窗口
+
+**使用**：直接从仓库地址下载单二进制即可，添加到`PATH`路径。
+
+**配置文件**在：`~/.config/herdr`下面
+
+几个概念：
+
+1、工作区（workspace）
+* 工作区是最顶层的项目容器。为每个仓库、任务或调查使用一个工作区。
+* 工作区拥有标签页和窗格。它在侧边栏中的状态由内部的智能体汇总而来,让你一眼看出哪个项目需要关注。
+
+2、标签（tab）
+* 标签页是工作区内的一种布局。用标签页来分隔不同视图,比如 agents、logs、server 或 review。
+* 标签页可以通过 CLI 和 socket API 寻址。
+
+3、窗格
+* 窗格是一个真实的终端。Herdr 渲染终端输出,把输入传回进程,并在客户端分离后保留窗格。
+* 窗格可以向右或向下分割。它们可以手动重命名、通过 CLI 读取、接收输入,以及被关闭。
+
+4、会话（session）
+* 会话是一个持久的 Herdr 服务器命名空间。默认的 herdr 命令连接到默认会话。
+* 命名会话是彼此独立的运行时命名空间，`herdr session list`可查看
+
+#### 3.3.2. 快捷键
+
+> 基本所有操作都可以在页面上鼠标操作。
+
+**前缀键（prefix）**是 `ctrl+b`，输入后即可用快捷键进行快速控制。
+
+下面记录一些实操比较实用的快捷键，示例说明：`ctrl+b` + `q`这种表示先输入`prefix`前缀键后 -> **松开** -> 再输入`q`。
+
+1、全局操作类
+* 查看各快捷键：`ctrl+b`然后`?`，随时查看快捷键
+* 退出herdr：`ctrl+b` + `q`。后续要进入的话输入`herdr`即可，原来的会话还是在的。在页面点击`menu`->`detach`效果一样。
+* 重新加载配置文件：`ctrl+b` + `shift` + `r`
+* 设置：`ctrl+b` + `s`
+
+2、导航类操作
+* 工作区(workspace)导航：`ctrl+b` + `w`，进入后可以**快速裂屏(split)**，`prefix+j/k/l/h`切换位置。支持**右键**后鼠标操作。
+* 新建工作区：`ctrl+b` + `shift` + `n`
+
+* 会话(session)导航：`ctrl+b` + `g`，进入后可以选择不同会话（可跨工作区），还支持过滤名称、过滤状态（鼠标按键即可）
+* 新建会话：`ctrl+b` + `shift` + `g`，会创建新的worktree（会让你先确认worktree名称）
+
+#### 3.3.3. windows下使用（手动编译）
+
+手动编译下，`rust-toolchain.toml`里限定了编译工具链为`1.96.1"`，自己本地更新了`cargo 1.97.0`
+* 可用`rustup override set stable`来解除自己本地的版本强要求（不修改项目里的限制）
+* 恢复则用`rustup override unset`
+
+### hookify
+
+用于创建自定义钩子的插件，从Claude Code官方插件市场安装即可。
+
+工作原理：
+- Hookify 在这些事件上触发：PreToolUse、PostToolUse、Stop、UserPromptSubmit
+- 读取 .claude/hookify.*.local.md 配置文件中的规则
+- 规则匹配时显示警告或阻止操作
+
+可用命令：
+- /hookify - 从对话分析创建钩子
+- /hookify:list - 列出所有配置的钩子
+- /hookify:configure - 交互式启用/禁用钩子
 
 ## 4. 文档处理类
 
@@ -255,6 +213,25 @@ git clone git@github.com:microsoft/markitdown.git
 cd markitdown
 pip install -e 'packages/markitdown[all]'
 ```
+
+### OfficeCLI (20260712更新)
+
+> [OfficeCLI](https://github.com/iOfficeAI/OfficeCLI)
+
+说明见：[README_zh](https://github.com/iOfficeAI/OfficeCLI/blob/main/README_zh.md)
+* 开源免费。**单一可执行文件**。无需安装 Office。零依赖。全平台运行。（单一自包含可执行文件，`.NET`运行时已内嵌 -- 无需安装任何依赖，无需管理运行时）
+* OfficeCLI 的内置 HTML 渲染引擎，高度还原文档原貌 —— 这正是让 AI 拥有"眼睛"的关键。 它把 `.docx` / `.xlsx` / `.pptx` 渲染为 `HTML` 或 `PNG`，闭合 **"渲染 → 看 → 改"** 的循环。
+
+安装：
+* 包管理器安装：`npm install -g @officecli/officecli`
+* 或者到GitHub下载：[GitHub Releases](https://github.com/iOfficeAI/OfficeCLI/releases)
+
+**添加Skill**：
+* 有上述CLI后，下载`https://officecli.ai/SKILL.md`作为skill即可，创建一个`officecli`的目录
+
+关闭自动更新：
+* OfficeCLI 会在后台自动检查更新。通过 `officecli config autoUpdate false` 关闭，或通过 OFFICECLI_SKIP_UPDATE=1 跳过单次检查。配置文件位于 `~/.officecli/config.json`。
+
 
 ## 5. 综合办公类
 
