@@ -164,9 +164,42 @@ claude-code-setup 是 Anthropic 官方认证 Claude Code 插件，全称 Claude 
 
 #### 3.3.3. windows下使用（手动编译）
 
-手动编译下，`rust-toolchain.toml`里限定了编译工具链为`1.96.1"`，自己本地更新了`cargo 1.97.0`
-* 可用`rustup override set stable`来解除自己本地的版本强要求（不修改项目里的限制）
-* 恢复则用`rustup override unset`
+> 预发布版本里有windows的产物，比如：[release-preview-2026-07-07](https://github.com/ogulcancelik/herdr/releases#release-preview-2026-07-07-f5354780e4ef)
+
+由于windows下我使用Claude Code时Agent里没显示，以及我需要支持codebuddy，修改代码后手动编译下。
+
+~~手动编译，`rust-toolchain.toml`里限定了编译工具链为`1.96.1"`，自己本地更新了`cargo 1.97.0`~~
+~~* 可用`rustup override set stable`来解除自己本地的版本强要求（不修改项目里的限制）~~
+~~* 恢复则用`rustup override unset`~~
+
+编译报错，提示需要zig：
+
+```sh
+...
+    cargo:rerun-if-env-changed=ZIG
+
+       --- stderr
+
+       thread 'main' (2101680) panicked at build.rs:77:10:
+       failed to execute zig build for vendored libghostty-vt: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+       note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+     warning: build failed, waiting for other jobs to finish...
+```
+
+Zig 是一门编译型、静态强类型、系统级编程语言，由 Andrew Kelley 开发，主打替代 C 语言，兼顾高性能、内存安全、极简语法、无 GC、无隐藏控制流。核心特点：
+* **对标 C，可无缝互操作**。可以直接调用 C 库、编译 C 代码、导出 C ABI，不用绑定层；能逐步替换现有 C 项目。
+* **手动内存管理，但大幅降低内存 bug**。没有 GC、没有 RAII；靠显式分配器、可选错误处理、编译期空指针检查杜绝野指针、内存泄漏。
+* **零运行时隐藏开销**。没有隐式拷贝、没有异常栈展开、无隐形构造析构，性能贴近裸 C。
+* 强大编译期计算（Comptime）
+* 一体化工具链。比如：`zig build`：读取项目 build.zig 构建工程（替代 Make/CMake）；`zig fetch`：包管理器，拉取第三方依赖到全局缓存
+* **跨平台、交叉编译原生支持**。一条命令就能编译 Windows/macOS/Linux/ 嵌入式固件，不用装对应平台 SDK。
+
+下载一份zig，放到本地，添加到PATH环境变量。重新编译即可，建议编译release版本（`16MB release` vs `160MB debug`的大小区别）：
+
+```sh
+[root@xdlinux ➜ herdr git:(master) ✗ ]$ cargo build --release
+    Finished `release` profile [optimized] target(s) in 0.10s
+```
 
 ### hookify
 
