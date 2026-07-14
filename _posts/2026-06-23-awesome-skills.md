@@ -201,7 +201,7 @@ Zig 是一门编译型、静态强类型、系统级编程语言，由 Andrew Ke
     Finished `release` profile [optimized] target(s) in 0.10s
 ```
 
-### hookify
+### 3.4. hookify
 
 用于创建自定义钩子的插件，从Claude Code官方插件市场安装即可。
 
@@ -214,6 +214,16 @@ Zig 是一门编译型、静态强类型、系统级编程语言，由 Andrew Ke
 - /hookify - 从对话分析创建钩子
 - /hookify:list - 列出所有配置的钩子
 - /hookify:configure - 交互式启用/禁用钩子
+
+### 3.5. loop-me
+
+> 在这个集合里，里面还有一些其他的skill推荐：[mattpocock/skills](https://github.com/mattpocock/skills)
+
+安装：`npx skills@latest add mattpocock/skills`
+
+通过交互式“拷问”会话，深入挖掘用户需求，以生成高度详细且无歧义的自动化工作流规范。它专注于识别用户生活中的重复模式（“循环”），并将其转化为可由 AI 智能体直接执行的明确指令，从而实现任务的有效委托和自动化，确保规范清晰到无需额外提问即可被实现。
+* 使用前：用户手动定义工作流时，常常因描述模糊或遗漏细节，导致在实际开发或自动化过程中需要频繁沟通和返工，耗费大量时间和精力。
+* 使用后：此技能通过交互式提问，帮助用户产出高度清晰、无歧义的工作流规范，确保 AI 智能体可以直接实现，无需额外澄清，显著提升效率。
 
 ## 4. 文档处理类
 
@@ -247,7 +257,7 @@ cd markitdown
 pip install -e 'packages/markitdown[all]'
 ```
 
-### OfficeCLI (20260712更新)
+### 4.2. OfficeCLI (20260712更新)
 
 > [OfficeCLI](https://github.com/iOfficeAI/OfficeCLI)
 
