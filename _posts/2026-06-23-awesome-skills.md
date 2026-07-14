@@ -215,6 +215,182 @@ Zig 是一门编译型、静态强类型、系统级编程语言，由 Andrew Ke
 - /hookify:list - 列出所有配置的钩子
 - /hookify:configure - 交互式启用/禁用钩子
 
+```sh
+Hookify 识别机制 — 全链路拆解
+
+  不是 Claude "识别" .local.md 文件,而是 Hookify 插件通过 Claude
+  Code 原生 Hook 系统埋点 → 启动 Python 脚本 → 脚本用 glob 扫描文件
+  → 正则匹配 → 把结果回注给 Claude。下面是完整 5 层链路。
+
+  1. 插件注册层 — hooks.json
+
+  Hookify 插件根目录的 hooks.json 把 Python 脚本注册到 Claude Code
+  的 4 个原生 Hook 点上:
+
+  /Users/xd/.claude/plugins/cache/claude-plugins-official/hookify/7e
+  d523140f50/hooks/hooks.json
+
+  {
+    "hooks": {
+      "PreToolUse":    [{ "type": "command", "command": "python3
+  .../pretooluse.py" }],
+      "PostToolUse":   [{ "type": "command", "command": "python3
+  .../posttooluse.py" }],
+      "Stop":          [{ "type": "command", "command": "python3
+  .../stop.py" }],
+      "UserPromptSubmit": [{ "type": "command", "command": "python3
+  .../userpromptsubmit.py" }]
+    }
+  }
+
+  type: "command" 是 Claude Code 原生支持的 Hook 类型 —
+  触发时它派生一个 Python 子进程,通过 stdin/stdout 与之通信。
+
+  2. 事件触发层 — Claude Code 派生子进程
+
+  每次你(或我)触发工具调用时:
+
+  Claude 决定跑 Bash("git push -f")
+    ↓
+  Claude Code 拦截,派 python3 pretooluse.py
+    ↓
+  通过 stdin 喂入 JSON:
+  {
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_input": { "command": "git push -f origin main" },
+    ...
+  }
+    ↓
+  等子进程 stdout 写出 JSON 决定结果
+
+  3. 文件扫描层 — glob('hookify.*.local.md')
+
+  Python 脚本启动后,关键就一行(config_loader.py:210):
+
+  pattern = os.path.join('.claude', 'hookify.*.local.md')
+  files = glob.glob(pattern)
+
+  *.local.md 就是文件命名约定,Hookify 约定的"规则文件"长这样:
+
+  .claude/hookify.warn-force-push.local.md
+         │       │               │
+         │       │               └─ .local.md(约定后缀)
+         │       └─ 规则名(任意,描述性)
+         └─ hookify 前缀(约定前缀)
+
+  没有任何索引文件、没有注册表,就是简单的 glob
+  匹配,符合这个模式的文件就当成规则读。
+
+  4. 解析层 — 自写 YAML frontmatter 解析
+
+  每个文件按 --- 切三段(config_loader.py:97-103):
+
+  parts = content.split('---', 2)
+  frontmatter_text = parts[1]   # --- 之间的 YAML
+  message = parts[2].strip()     # --- 之后就是告警文本
+
+  注意:没用 PyYAML 库,而是一个自写的简化 YAML 解析器(~100 行),支持:
+  - key: value 简单键值对
+  - key: 下面跟 list / nested dict
+  - value 自动识别 true / false 字符串转 bool
+  - 单引号/双引号包裹
+
+  5. 匹配层 — 编译正则 + 字段匹配
+
+  解析后构造 Rule 对象(config_loader.py:33-84):
+
+  @dataclass
+  class Rule:
+      name: str          # "warn-git-force-push"
+      enabled: bool      # True
+      event: str         # "bash"
+      pattern: str       # "git\\s+push[^\n]*?(-f\\b|...)"
+      action: str        # "warn"
+      message: str       # 整段告警正文
+      conditions: List[Condition]  # pattern 自动转 condition
+
+  pattern 字段在 from_dict 里被自动包成 Condition(field="command",
+  operator="regex_match", ...)(config_loader.py:60-73):
+  - event: bash → 匹配 tool_input.command
+  - event: file → 匹配 tool_input.new_text
+  - 其他 → 匹配 content
+
+  正则编译用了 lru_cache(maxsize=128)
+  缓存(rule_engine.py:14-24),重复匹配同一 pattern 不重编译。
+
+  6. 决策层 — 输出 JSON 给 Claude Code
+
+  匹配命中后,Python 把 JSON 写到 stdout(rule_engine.py:62-79):
+
+  {
+    "hookSpecificOutput": {
+      "hookEventName": "PreToolUse",
+      "permissionDecision": "deny"   // block 时
+    },
+    "systemMessage": "⚠️ 检测到 git force push ..."
+  }
+
+  action: warn 不设 permissionDecision,只塞 systemMessage;action:
+  block 设 deny 让 Claude Code 拒绝执行。
+
+  全链路流程图
+
+  ~/.claude/plugins/cache/.../hookify/hooks/hooks.json
+     ↓ Claude Code 启动时加载
+  [Claude Code 主进程] 注册 4 个 Hook 监听点
+     ↓ 用户触发工具调用
+  [Claude Code] fork → python3 pretooluse.py
+     ↓ stdin
+  [Python] json.load 拿到 tool_name + tool_input
+     ↓
+  [Python] glob('.claude/hookify.*.local.md')
+     ↓
+  [Python] 逐文件:  split('---') → 自写 YAML 解析 → 构 Rule 对象
+     ↓
+  [Python] re.compile(pattern) (lru_cache)
+     ↓
+  [Python] 拿 pattern 在 tool_input.command / new_text 上 re.search
+     ↓
+  [Python] 命中 → 收集 message,按 action 构造 JSON
+     ↓ stdout
+  [Claude Code] 解析返回值:
+     - permissionDecision=deny → 阻断工具执行
+     - systemMessage → 注入 Claude 上下文作为"系统提醒"
+
+  几个关键事实
+
+  1. 没有"识别"过程,只有"匹配"过程 — glob
+  扫文件,文件内容当字符串读,不建索引。
+  2. 匹配发生在 Python 子进程,不在 Claude 自己里 — Claude
+  模型本身不"看" .local.md,它只看到 Python 回传的 systemMessage。
+  3. 每次事件都重新 glob + 解析 — 但有
+  lru_cache,纯函数式。改文件立即生效,无状态。
+  4. .local.md 命名是约定不是强制 — 改前缀 hookify. 就不会被扫到。
+  5. err 兜底很激进 — pretooluse.py:62 永远 sys.exit(0),Hook
+  报错绝不阻断工具(避免规则写崩导致 Claude 完全瘫痪)。
+
+  关键源文件路径
+
+  ┌───────────────────────┬──────────────────────────┐
+  │         文件          │           作用           │
+  ├───────────────────────┼──────────────────────────┤
+  │ hooks/hooks.json      │ 注册 4 个 Hook 命令      │
+  ├───────────────────────┼──────────────────────────┤
+  │ hooks/pretooluse.py   │ 工具执行前入口           │
+  ├───────────────────────┼──────────────────────────┤
+  │ core/config_loader.py │ 扫描 + 解析 + 构 Rule    │
+  ├───────────────────────┼──────────────────────────┤
+  │ core/rule_engine.py   │ 正则匹配 + 决策构造 JSON │
+  └───────────────────────┴──────────────────────────┘
+
+  一句话总结:Hookify 没有任何"识别"魔法 — 它就是用 glob
+  扫固定命名模式的 markdown 文件,按 --- 切出 YAML+正文,YAML
+  喂给自写解析器,正文当告警内容,pattern
+  字段编译成正则,匹配时执行,命中就回注 systemMessage。 Claude
+  自己从头到尾不知道这些文件存在,它只看到 Python 进程吐回来的 JSON。
+```
+
 ### 3.5. loop-me
 
 > 在这个集合里，里面还有一些其他的skill推荐：[mattpocock/skills](https://github.com/mattpocock/skills)
@@ -224,6 +400,12 @@ Zig 是一门编译型、静态强类型、系统级编程语言，由 Andrew Ke
 通过交互式“拷问”会话，深入挖掘用户需求，以生成高度详细且无歧义的自动化工作流规范。它专注于识别用户生活中的重复模式（“循环”），并将其转化为可由 AI 智能体直接执行的明确指令，从而实现任务的有效委托和自动化，确保规范清晰到无需额外提问即可被实现。
 * 使用前：用户手动定义工作流时，常常因描述模糊或遗漏细节，导致在实际开发或自动化过程中需要频繁沟通和返工，耗费大量时间和精力。
 * 使用后：此技能通过交互式提问，帮助用户产出高度清晰、无歧义的工作流规范，确保 AI 智能体可以直接实现，无需额外澄清，显著提升效率。
+
+### 3.6. codebuddy/claude 自动化工作
+
+[让 CodeBuddy 写 Workflow](https://www.codebuddy.cn/docs/cli/workflows#%E8%AE%A9-codebuddy-%E5%86%99-workflow)
+
+可以自己写工作流，其内置了一个工作流：`/deep-research`
 
 ## 4. 文档处理类
 
