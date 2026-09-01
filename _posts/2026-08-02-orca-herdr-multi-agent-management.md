@@ -51,6 +51,34 @@ Herdr 由 [@ogulcancelik](https://github.com/ogulcancelik) 开发，纯 Rust 实
 * AI Agent 自身可以调用 Herdr 接口：自动新建窗格、读取其他窗格日志、等待其他 Agent 任务完成，实现Agent 互相调度、多智能体流水线，适合自动化编码工作流。
 * 会话持久化落地：重启电脑依然复原全部 AI 会话、历史对话上下文、分屏布局
 
+#### herdr插件
+
+[herdr插件市场](https://herdr.dev/plugins/)
+
+几个实用：
+
+1、herdr-auto-title 自动给tab命名，而不是默认的简单展示1、2
+
+项目地址：https://github.com/kryptamine/herdr-auto-title
+
+安装方式：`herdr plugin install kryptamine/herdr-auto-title`
+
+需要`herdr server stop`再herdr重启生效。
+
+2、文件导航栏：herdr-file-viewer
+
+https://github.com/smarzban/herdr-file-viewer
+
+`herdr plugin install smarzban/herdr-file-viewer`
+
+3、代码git修改对比
+
+https://github.com/persiyanov/herdr-reviewr
+
+4、类VSCode的侧边栏（可以替换2、3）
+
+herdr plugin install alexarthurs/herdr-sidebar/plugins/herdr-sidebar
+
 ### 2.2. Orca介绍：图形 IDE 向，多 Agent 集成开发环境
 
 StablyAI Orca 是硅谷创业公司Stably（YC 孵化）在 2026 年推出的开源多 AI 编程智能体编排 IDE（Agentic IDE / ADE 智能体开发环境），核心作用是统一调度多款 AI 编程 Agent（Claude Code、OpenAI Codex、Cursor、Gemini、GitHub Copilot 等）并行开发，依靠Git Worktree 隔离机制解决多 AI 同时写代码互相覆盖、Git 冲突、上下文污染的行业痛点。
