@@ -260,7 +260,83 @@ function continuationPrompt(goal: GoalState): string {
 **优点**：无需修改 LLM 行为，通过 prompt engineering 实现  
 **缺点**：依赖 prompt 模板质量，消耗 token
 
-## 5. 结论
+## 5. PI 与 Prime Agent 的架构关系
+
+### 5.1 架构分层
+
+Prime Agent 基于 [pi (earendil-works/pi)](https://github.com/earendil-works/pi) monorepo 构建，架构分层清晰：
+
+```
+@earendil-works/pi (pi monorepo)
+├── @earendil-works/pi-ai           # 统一 LLM API 层
+├── @earendil-works/pi-agent-core   # 通用 Agent 核心（agent loop）
+├── @earendil-works/pi-coding-agent # Coding Agent CLI
+└── @earendil-works/pi-tui         # 终端 UI 库
+
+Prime Agent (fork + 扩展)
+└── 基于 pi packages 构建，添加：
+    - Prime Agent 特有配置
+    - Goal/RLM 功能
+    - 特定集成
+```
+
+### 5.2 Prime Agent Packages 对应关系
+
+| Prime Agent Package | 对应 pi package | 用途 |
+|-------------------|-----------------|------|
+| `packages/agent` | `@earendil-works/pi-agent-core` | Agent 循环、状态管理 |
+| `packages/ai` | `@earendil-works/pi-ai` | 多 provider LLM API |
+| `packages/coding-agent` | `@earendil-works/pi-coding-agent` | Python REPL、session 管理 |
+| `packages/tui` | `@earendil-works/pi-tui` | 终端界面组件 |
+
+### 5.3 调用栈
+
+```
+用户输入
+    ↓
+coding-agent (业务逻辑, goal/RLM)
+    ↓
+agent (agent loop, tool execution)
+    ↓
+pi-ai (LLM API 调用)
+    ↓
+各 Provider (Anthropic/OpenAI/MiniMax/Google...)
+```
+
+### 5.4 分工设计的好处
+
+1. **模块化** - 各层职责清晰，可独立替换
+2. **可复用** - pi packages 可被其他项目使用
+3. **可定制** - Prime Agent 通过 fork 方式保留定制能力
+4. **可测试** - 各层可单独测试
+
+### 5.5 pi-ai 统一 LLM API
+
+`@earendil-works/pi-ai` 封装了多种 LLM provider：
+
+```typescript
+// packages/ai/package.json
+{
+  "exports": {
+    ".": "./dist/index.js",              // 统一入口
+    "./anthropic": "./dist/providers/anthropic.js",
+    "./openai-responses": "./dist/providers/openai-responses.js",
+    "./google": "./dist/providers/google.js",
+    // ...更多 provider
+  }
+}
+```
+
+支持 providers：
+- Anthropic (Claude)
+- OpenAI (GPT-4/Codex)
+- Google (Gemini)
+- AWS Bedrock
+- Mistral
+- MiniMax
+- OpenRouter
+
+## 6. 结论
 
 Prime Agent 的长程任务设计采用了**混合策略**：
 
@@ -273,9 +349,10 @@ Prime Agent 的长程任务设计采用了**混合策略**：
 
 对于需要精细控制长程任务的场景，Prime Agent 的设计值得参考；对于简单场景，直接使用 LangGraph 的 checkpoint 机制可能更合适。
 
-## 6. 参考
+## 7. 参考
 
 - [Prime Agent GitHub](https://github.com/PrimeIntellect-ai/prime-agent)
+- [pi monorepo](https://github.com/earendil-works/pi)
 - [LangGraph Persistence](https://docs.langchain.com/oss/python/langgraph/persistence)
 - [SWE-agent](https://github.com/CodeByteMe/SWE-agent)
 - [AI长程任务方案分析设计](https://xiaodongq.github.io/2026/09/09/long-term-ai-task/)
