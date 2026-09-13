@@ -427,6 +427,8 @@ Hookify 识别机制 — 全链路拆解
 
 ### 3.7. openviking
 
+模型配置：
+
 ```sh
 # /root/.openviking/ov.conf
 {
@@ -434,13 +436,13 @@ Hookify 识别机制 — 全链路拆解
     "workspace": "/root/.openviking/data"
   },
   "embedding": {
-    "dense": {
-      "provider": "openai",
-      "model": "MiniMax-M3",
-      "api_key": "sk-cp-KgOfCAZKyPH_o4GV_tWl_UEk_NqdvcKpUtMNbRQxxx",
-      "api_base": "https://api.minimaxi.com/v1",
-      "dimension": 1024
-    }
+      "dense": {
+          "provider": "minimax",
+          "model": "embo-01",
+          "api_key": "sk-cp-KgOfCAZKyPH_o4GV_tWl_UEk_NqdvcKpUtMNbRQ0I9QKE7R_TEaRJvm2xxx",
+          "dimension": 1536
+      }
+  }
   },
   "vlm": {
     "provider": "openai",
@@ -455,6 +457,25 @@ Hookify 识别机制 — 全链路拆解
     "port": 1933,
     "root_api_key": "123456"
   }
+}
+```
+
+cli配置，可以让AI创建用户：
+
+```
+ plugin:openviking-memory:openviking 现在连接正常 ✔
+  根本原因：ovcli.conf 里配的是 root API key（123456），但 MCP 数据 API 需要
+  user API key 才能访问租户级数据。
+  解决方法：创建了一个 user 账号 (testuser)，用它的 user key 替换了 root key。
+```
+
+```sh
+# /root/.openviking/ovcli.conf
+{
+  "url": "http://127.0.0.1:1933",
+  "api_key": "ZGVmYXVsdA.dGVzdHVzZXI.YmU4MTM4ZDM4ZGQzOTBlNjI4NDU1ZWU2ZmYyMzEzOTgwMGM3MGI2xxx",
+  "account": "default",
+  "user": "testuser"
 }
 ```
 
