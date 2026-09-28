@@ -240,3 +240,29 @@ Pairing URL: orca://pair?code=eyJ2IjoyLCJlbmRwb2ludCI6IndzOi8vMTAwLjc4LjE3OC4xMD
 ![Orca 手机端终端视图](/images/2026-08-02-orca-mobile-terminal.webp)
 
 上图是手机切换到 `XWORKBENCH 1` 里的 `main` 会话，直接在手机上操作远程 Linux 主机，运行着 Claude Code。
+
+### 3.7. 笔记本通过Tailscale控制家里Linux主机
+
+场景：笔记本拿到外面时，想连接家里的Linux主机
+
+上面实践了怎么用手动控制Linux主机，此处类似，也是用Tailscale进行控制。
+* 笔记本上安装Tailscale，用同一账号登录后，该账号下的设备就在同一个局域网了，直接使用IP进行SSH即可
+* Orca连接方式：Orca的设置里 -> 选择远程主机：远程Orca服务器 -> 连接到主机：添加服务器。里面设置配对URL即可（局域网IP）
+
+人在外面没办法看到之前终端打印的配对URL，下面贴一下让AI获取配对URL的记录：（在orca源码下问答，自己根据代码逻辑生成了URL）
+
+```sh
+通过以下步骤获取的：
+
+  1. 查看进程启动参数 — 从 ps aux 看到 Orca 服务端以 --mobile-pairing 模式运行，配对地址是 100.78.1xx.xxx:6768
+  2. 读取设备注册表 — 文件 /root/.config/orca/orca-devices.json 包含了所有配对过的设备信息，其中有一个 scope: "runtime"
+  的待配对设备（lastSeenAt: 0 表示从未连接过）
+  3. 读取 E2EE 公钥 — /root/.config/orca/orca-e2ee-keypair.json 包含服务端的 Curve25519 公钥
+  4. 手动重建配对码 — 按照 src/shared/pairing.ts 中的 encodePairingOffer 函数逻辑，把这些数据组装成 JSON，然后用 base64url 编码生成
+  orca://pair?code=... URL
+
+  实际上如果你想让 Orca 服务端直接输出配对 URL，最简单的方法是看它启动时的输出 —— 服务端在启动时会通过 ServeReadinessPublisher
+  打印配对信息（见 src/main/server/serve-readiness.ts）。
+
+  当前服务端已经在运行但没有打印 URL，是因为它是作为后台进程启动的，没有捕获 stdout。
+```
