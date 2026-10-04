@@ -41,17 +41,17 @@ playwright-cli install --skills
 核心维度横向对比表：
 
 
-| 对比维度        | Playwright MCP                     | Playwright-CLI                           |
-| ----------- | ---------------------------------- | ---------------------------------------- |
-| **Token消耗** | 极高，4–10倍CLI                        | 极低，节省80%–95%                             |
-| 文件系统依赖      | 不需要，纯内存                            | 必须读写本地磁盘                                 |
-| 兼容客户端       | 所有MCP标准客户端（Claude Desktop、通用Agent） | 带Shell权限编码助手（Cursor、Claude Code、Copilot） |
-| 功能完整性       | 默认阉割大量高级API                        | 完整开放全部Playwright能力                       |
-| 会话持久        | 服务常驻，原生长会话                         | 需手动管理会话ID，配置复杂                           |
-| 扩展能力        | 仅原生工具，无Skill包                      | 支持自定义Skill技能模板                           |
-| 页面数据传递      | 完整无障碍树直传上下文                        | 仅返回元素ID，快照存磁盘                            |
-| 最佳场景        | 探索式自主Agent、无Shell沙箱、长期自主探索测试       | 开发代码生成、批量E2E测试、前端调试、爬虫                   |
-| 部署环境        | 云端隔离、容器、无本地权限                      | 本地开发环境、拥有完整终端权限                          |
+| 对比维度      | Playwright MCP                                 | Playwright-CLI                                      |
+| ------------- | ---------------------------------------------- | --------------------------------------------------- |
+| **Token消耗** | 极高，4–10倍CLI                                | 极低，节省80%–95%                                   |
+| 文件系统依赖  | 不需要，纯内存                                 | 必须读写本地磁盘                                    |
+| 兼容客户端    | 所有MCP标准客户端（Claude Desktop、通用Agent） | 带Shell权限编码助手（Cursor、Claude Code、Copilot） |
+| 功能完整性    | 默认阉割大量高级API                            | 完整开放全部Playwright能力                          |
+| 会话持久      | 服务常驻，原生长会话                           | 需手动管理会话ID，配置复杂                          |
+| 扩展能力      | 仅原生工具，无Skill包                          | 支持自定义Skill技能模板                             |
+| 页面数据传递  | 完整无障碍树直传上下文                         | 仅返回元素ID，快照存磁盘                            |
+| 最佳场景      | 探索式自主Agent、无Shell沙箱、长期自主探索测试 | 开发代码生成、批量E2E测试、前端调试、爬虫           |
+| 部署环境      | 云端隔离、容器、无本地权限                     | 本地开发环境、拥有完整终端权限                      |
 
 
 选型建议（直接照场景选）
@@ -427,7 +427,21 @@ Hookify 识别机制 — 全链路拆解
 
 ### 3.7. openviking
 
-模型配置：
+[OpenViking文档](https://docs.openviking.ai/zh/getting-started/01-introduction)
+
+1、安装：
+`npm i -g @openviking/cli`
+
+2、服务端
+```sh
+openviking-server init
+openviking-server doctor
+openviking-server
+```
+
+可以让AI创建自启动服务。
+
+3、模型配置：
 
 ```sh
 # /root/.openviking/ov.conf
@@ -477,6 +491,25 @@ cli配置，可以让AI创建用户：
   "account": "default",
   "user": "testuser"
 }
+```
+
+基本命令：
+
+```sh
+ov config show
+ov config list -o json
+ov config validate
+ov health
+ov status
+```
+
+4、安装agent插件
+
+[为Claude Code添加长期记忆功能](https://docs.openviking.ai/zh/agent-integrations/02-claude-code)
+
+```sh
+claude plugin marketplace add https://raw.githubusercontent.com/volcengine/OpenViking/main/.claude-plugin/marketplace.json
+claude plugin install openviking-memory@openviking
 ```
 
 ## 4. 文档处理类
